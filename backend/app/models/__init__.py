@@ -10,6 +10,12 @@ from app.models.blueprint import (
     SecurityRequirementEvidence,
     SecurityRequirementDependency,
 )
+from app.models.scan import (
+    SecurityScan,
+    ScannerExecution,
+    SecurityFinding,
+    RequirementVerificationResult,
+)
 
 __all__ = [
     "Base",
@@ -23,4 +29,8 @@ __all__ = [
     "SecurityRequirement",
     "SecurityRequirementEvidence",
     "SecurityRequirementDependency",
+    "SecurityScan",
+    "ScannerExecution",
+    "SecurityFinding",
+    "RequirementVerificationResult",
 ]

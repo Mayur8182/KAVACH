@@ -5,6 +5,8 @@ import type {
   ApiErrorDetail,
   SecurityBlueprint,
   SecurityRequirement,
+  SecurityScan,
+  ScannerHealthResponse,
 } from './types/api';
 import { HealthStatusBanner } from './components/HealthStatusBanner';
 import { Navigation } from './components/Navigation';
@@ -35,6 +37,12 @@ export function App() {
   const [activeBlueprint, setActiveBlueprint] = useState<SecurityBlueprint | null>(null);
   const [blueprintLoading, setBlueprintLoading] = useState<boolean>(false);
   const [blueprintError, setBlueprintError] = useState<string | null>(null);
+
+  // Scanner state
+  const [scannerHealth, setScannerHealth] = useState<ScannerHealthResponse[]>([]);
+  const [activeScan, setActiveScan] = useState<SecurityScan | null>(null);
+  const [scanLoading, setScanLoading] = useState<boolean>(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const fetchHealth = useCallback(async () => {
     setLoading(true);
@@ -353,6 +361,42 @@ export function App() {
       setBlueprintError(err?.message || 'Blueprint generation failed');
     } finally {
       setBlueprintLoading(false);
+    }
+  };
+
+  const fetchScannersHealth = useCallback(async () => {
+    const res = await apiClient.getScannersHealth();
+    if (res.data) {
+      setScannerHealth(res.data);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchScannersHealth();
+  }, [fetchScannersHealth]);
+
+  const handleTriggerScan = async () => {
+    if (!activeBlueprint) {
+      setScanError('Please select or generate a Security Blueprint first before triggering verification.');
+      return;
+    }
+    setScanLoading(true);
+    setScanError(null);
+    try {
+      const res = await apiClient.triggerScan(activeBlueprint.project_id, {
+        blueprint_id: activeBlueprint.id,
+        target_type: 'LOCAL_DIRECTORY',
+        target_path: '.',
+      });
+      if (res.error) {
+        setScanError(res.error.message || 'Scan execution failed');
+      } else if (res.data) {
+        setActiveScan(res.data);
+      }
+    } catch (err: any) {
+      setScanError(err?.message || 'Scan execution failed');
+    } finally {
+      setScanLoading(false);
     }
   };
 
@@ -1118,82 +1162,387 @@ export function App() {
 
           {/* TAB: SCANNERS */}
           {currentTab === 'scanners' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div className="glass-panel" style={{ padding: '20px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '8px' }}>
-                  Security Scanners Orchestration Layer
-                </h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  Per production rules, scanner results are never simulated. Each scanner will execute its
-                  actual CLI/container process in future scanner steps.
-                </p>
-              </div>
-
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Header Panel */}
               <div
+                className="glass-panel"
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  padding: '24px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
                   gap: '16px',
                 }}
               >
-                {[
-                  {
-                    name: 'Semgrep',
-                    type: 'Static Application Security Testing (SAST)',
-                    ext: 'scanners/semgrep',
-                  },
-                  {
-                    name: 'Gitleaks',
-                    type: 'Secret & Credential Detection',
-                    ext: 'scanners/gitleaks',
-                  },
-                  {
-                    name: 'OSV-Scanner',
-                    type: 'Open Source Vulnerability Dependency Audit',
-                    ext: 'scanners/osv',
-                  },
-                  {
-                    name: 'Trivy',
-                    type: 'Container Image & OS Vulnerability Scanning',
-                    ext: 'scanners/trivy',
-                  },
-                  {
-                    name: 'Checkov',
-                    type: 'Infrastructure as Code (IaC) Policy Enforcement',
-                    ext: 'scanners/checkov',
-                  },
-                ].map((s) => (
-                  <div key={s.name} className="glass-panel" style={{ padding: '20px' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '8px',
-                      }}
-                    >
-                      <span style={{ fontSize: '15px', fontWeight: 600 }}>{s.name}</span>
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          color: 'var(--text-muted)',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          background: 'rgba(255,255,255,0.05)',
-                        }}
-                      >
-                        ARCHITECTURE READY
-                      </span>
+                <div>
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: 'var(--accent-primary)',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Production Verification Engine &bull; Step 6
+                  </div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Automated Security Scanner Orchestration
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    Runs real CLI binaries, collects raw machine output, normalizes findings, and deterministically verifies Step 5 Blueprint requirements.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleTriggerScan}
+                  disabled={scanLoading}
+                  style={{
+                    backgroundColor: 'var(--accent-primary)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: scanLoading ? 'not-allowed' : 'pointer',
+                    boxShadow: 'var(--shadow-glow)',
+                  }}
+                >
+                  {scanLoading ? 'Executing Scanners...' : 'Run Real Security Verification Scan'}
+                </button>
+              </div>
+
+              {scanError && (
+                <div style={{ color: 'var(--status-danger)', fontSize: '13px' }}>
+                  Scan execution error: {scanError}
+                </div>
+              )}
+
+              {/* Registered CLI Tools Operational Status */}
+              <div>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    marginBottom: '12px',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  CLI Scanners Environment Status
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: '12px',
+                  }}
+                >
+                  {[
+                    { name: 'semgrep', label: 'Semgrep', type: 'SAST' },
+                    { name: 'gitleaks', label: 'Gitleaks', type: 'SECRETS' },
+                    { name: 'osv-scanner', label: 'OSV-Scanner', type: 'SCA' },
+                    { name: 'trivy', label: 'Trivy', type: 'CONTAINER' },
+                    { name: 'checkov', label: 'Checkov', type: 'IAC' },
+                  ].map((tool) => {
+                    const health = scannerHealth.find((h) => h.scanner_name === tool.name);
+                    const isHealthy = health?.status === 'healthy';
+                    return (
+                      <div key={tool.name} className="glass-panel" style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {tool.label}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: isHealthy ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)',
+                              color: isHealthy ? 'var(--status-success)' : '#facc15',
+                              border: isHealthy ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(234, 179, 8, 0.3)',
+                            }}
+                          >
+                            {isHealthy ? 'OPERATIONAL' : 'NOT CONFIGURED'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          Domain: {tool.type}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                          {isHealthy ? `Version: ${health?.version || 'detected'}` : 'Binary not found in PATH'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Scan Results */}
+              {activeScan && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* Scan Summary Banner */}
+                  <div
+                    className="glass-panel"
+                    style={{
+                      padding: '20px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Scan Reference</div>
+                      <code style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {activeScan.id}
+                      </code>
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                      {s.type}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      {s.ext}
+
+                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Status: </span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--status-success)' }}>
+                          {activeScan.status}
+                        </span>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Target: </span>
+                        <code style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          {activeScan.target_path}
+                        </code>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total Findings: </span>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#f87171' }}>
+                          {activeScan.finding_count}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  {/* Requirement Verification States */}
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: 'var(--accent-primary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '12px',
+                        paddingBottom: '4px',
+                        borderBottom: '1px solid var(--border-subtle)',
+                      }}
+                    >
+                      Step 5 Blueprint Requirements Verification Outcomes
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {activeScan.verifications?.map((v) => (
+                        <div
+                          key={v.id}
+                          className="glass-panel"
+                          style={{
+                            padding: '16px 20px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '12px',
+                            borderLeft:
+                              v.status === 'VIOLATED'
+                                ? '4px solid #ef4444'
+                                : v.status === 'SATISFIED'
+                                ? '4px solid #22c55e'
+                                : '4px solid #94a3b8',
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  backgroundColor:
+                                    v.status === 'VIOLATED'
+                                      ? 'rgba(239, 68, 68, 0.15)'
+                                      : v.status === 'SATISFIED'
+                                      ? 'rgba(34, 197, 94, 0.15)'
+                                      : 'rgba(148, 163, 184, 0.15)',
+                                  color:
+                                    v.status === 'VIOLATED'
+                                      ? '#f87171'
+                                      : v.status === 'SATISFIED'
+                                      ? '#22c55e'
+                                      : '#94a3b8',
+                                  border: '1px solid currentColor',
+                                }}
+                              >
+                                {v.status}
+                              </span>
+                              <code style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {v.requirement_key}
+                              </code>
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                              {v.rationale}
+                            </div>
+                          </div>
+
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'right' }}>
+                            <div>{v.evidence_summary}</div>
+                            {v.contributing_findings_count > 0 && (
+                              <div style={{ color: '#f87171', fontWeight: 600, marginTop: '2px' }}>
+                                {v.contributing_findings_count} violating finding(s)
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Individual Scanner Executions */}
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: 'var(--accent-primary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '12px',
+                        paddingBottom: '4px',
+                        borderBottom: '1px solid var(--border-subtle)',
+                      }}
+                    >
+                      Scanner Process Execution Audit
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+                      {activeScan.executions?.map((e) => (
+                        <div key={e.id} className="glass-panel" style={{ padding: '16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {e.scanner_name.toUpperCase()} ({e.scanner_type})
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                backgroundColor:
+                                  e.status === 'COMPLETED'
+                                    ? 'rgba(34, 197, 94, 0.15)'
+                                    : 'rgba(234, 179, 8, 0.15)',
+                                color: e.status === 'COMPLETED' ? '#22c55e' : '#facc15',
+                              }}
+                            >
+                              {e.status}
+                            </span>
+                          </div>
+
+                          {e.command && (
+                            <code style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                              $ {e.command}
+                            </code>
+                          )}
+
+                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            Duration: {e.duration_ms !== null ? `${e.duration_ms}ms` : 'N/A'} &bull; Findings: {e.finding_count}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Security Findings List */}
+                  {activeScan.findings && activeScan.findings.length > 0 && (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          color: '#f87171',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          marginBottom: '12px',
+                          paddingBottom: '4px',
+                          borderBottom: '1px solid var(--border-subtle)',
+                        }}
+                      >
+                        Normalized Security Findings ({activeScan.findings.length})
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {activeScan.findings.map((f) => (
+                          <div key={f.id} className="glass-panel" style={{ padding: '16px 20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                              <div>
+                                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                  {f.title}
+                                </div>
+                                <code style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                  Rule: {f.rule_id} &bull; Engine: {f.scanner_name}
+                                </code>
+                              </div>
+
+                              <span
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  backgroundColor: f.severity === 'CRITICAL' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(249, 115, 22, 0.15)',
+                                  color: f.severity === 'CRITICAL' ? '#f87171' : '#fb923c',
+                                  border: '1px solid currentColor',
+                                }}
+                              >
+                                {f.severity}
+                              </span>
+                            </div>
+
+                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                              {f.description}
+                            </p>
+
+                            {f.snippet && (
+                              <div
+                                style={{
+                                  backgroundColor: 'rgba(0,0,0,0.3)',
+                                  padding: '8px 12px',
+                                  borderRadius: 'var(--radius-sm)',
+                                  marginTop: '8px',
+                                  fontSize: '12px',
+                                  fontFamily: 'var(--font-mono)',
+                                  color: '#cbd5e1',
+                                }}
+                              >
+                                {f.snippet}
+                              </div>
+                            )}
+
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                              Location: <code>{f.file_path}{f.line_number ? `:${f.line_number}` : ''}</code> &bull; Fingerprint: <code>{f.fingerprint.substring(0, 16)}...</code>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

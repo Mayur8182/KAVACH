@@ -9,6 +9,12 @@ import type {
   SecurityRequirement,
   BlueprintCreateRequest,
   BlueprintComparisonResponse,
+  SecurityScan,
+  SecurityFinding,
+  ScannerExecution,
+  RequirementVerification,
+  ScanTriggerRequest,
+  ScannerHealthResponse,
 } from '../types/api';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000/api/v1';
@@ -190,6 +196,61 @@ class ApiClient {
       {},
       token,
     );
+  }
+
+  /** Security Scanner & Verification APIs */
+  public async getScannersHealth(): Promise<ApiResponse<ScannerHealthResponse[]>> {
+    return this.request<ScannerHealthResponse[]>('/scans/tools/health');
+  }
+
+  public async triggerScan(
+    projectId: string,
+    payload?: ScanTriggerRequest,
+    token?: string,
+  ): Promise<ApiResponse<SecurityScan>> {
+    return this.request<SecurityScan>(
+      `/projects/${projectId}/scans`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+      },
+      token,
+    );
+  }
+
+  public async getScan(
+    scanId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityScan>> {
+    return this.request<SecurityScan>(`/scans/${scanId}`, {}, token);
+  }
+
+  public async listProjectScans(
+    projectId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityScan[]>> {
+    return this.request<SecurityScan[]>(`/projects/${projectId}/scans`, {}, token);
+  }
+
+  public async getScanFindings(
+    scanId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityFinding[]>> {
+    return this.request<SecurityFinding[]>(`/scans/${scanId}/findings`, {}, token);
+  }
+
+  public async getScanExecutions(
+    scanId: string,
+    token?: string,
+  ): Promise<ApiResponse<ScannerExecution[]>> {
+    return this.request<ScannerExecution[]>(`/scans/${scanId}/executions`, {}, token);
+  }
+
+  public async getScanVerifications(
+    scanId: string,
+    token?: string,
+  ): Promise<ApiResponse<RequirementVerification[]>> {
+    return this.request<RequirementVerification[]>(`/scans/${scanId}/verifications`, {}, token);
   }
 }
 

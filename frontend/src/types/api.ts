@@ -229,3 +229,89 @@ export interface BlueprintComparisonResponse {
   modified_requirements: RequirementDiff[];
   unchanged_count: number;
 }
+
+// Security Verification & Scanner Engine Types
+export interface ScannerExecution {
+  id: string;
+  scan_id: string;
+  scanner_name: string;
+  scanner_type: string;
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'NOT_CONFIGURED' | 'NOT_AVAILABLE';
+  scanner_version?: string | null;
+  command?: string | null;
+  exit_code?: number | null;
+  stdout_summary?: string | null;
+  stderr_output?: string | null;
+  finding_count: number;
+  duration_ms?: number | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface SecurityFinding {
+  id: string;
+  scan_id: string;
+  scanner_execution_id: string;
+  scanner_name: string;
+  rule_id: string;
+  title: string;
+  description: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFORMATIONAL';
+  file_path?: string | null;
+  line_number?: number | null;
+  column_number?: number | null;
+  snippet?: string | null;
+  fingerprint: string;
+  raw_metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface RequirementVerification {
+  id: string;
+  scan_id: string;
+  requirement_id: string;
+  requirement_key: string;
+  status: 'SATISFIED' | 'VIOLATED' | 'UNKNOWN' | 'NOT_EVALUATED';
+  rationale: string;
+  evidence_summary: string;
+  contributing_findings_count: number;
+  created_at: string;
+}
+
+export interface SecurityScan {
+  id: string;
+  project_id: string;
+  blueprint_id?: string | null;
+  intent_id?: string | null;
+  target_type: string;
+  target_path: string;
+  target_reference?: string | null;
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'PARTIAL' | 'CANCELLED';
+  requested_by: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  scanner_count: number;
+  finding_count: number;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+  executions?: ScannerExecution[];
+  findings?: SecurityFinding[];
+  verifications?: RequirementVerification[];
+}
+
+export interface ScanTriggerRequest {
+  target_type?: string;
+  target_path?: string;
+  blueprint_id?: string;
+  selected_scanners?: string[];
+}
+
+export interface ScannerHealthResponse {
+  scanner_name: string;
+  scanner_type: string;
+  tool_name: string;
+  status: 'healthy' | 'not_configured';
+  version?: string | null;
+  message: string;
+}
