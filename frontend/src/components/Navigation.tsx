@@ -8,7 +8,7 @@ import {
   CpuIcon,
 } from './Icons';
 
-export type NavTab = 'overview' | 'projects' | 'blueprints' | 'scanners' | 'policies' | 'diagnostics';
+export type NavTab = 'overview' | 'intents' | 'projects' | 'blueprints' | 'scanners' | 'policies' | 'diagnostics';
 
 interface NavigationProps {
   currentTab: NavTab;
@@ -23,9 +23,10 @@ export const Navigation: React.FC<NavigationProps> = ({
 }) => {
   const navItems: { id: NavTab; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Platform Overview', icon: <ShieldIcon size={16} /> },
+    { id: 'intents', label: 'Intent Engine', icon: <TerminalIcon size={16} /> },
     { id: 'projects', label: 'Projects & Repositories', icon: <LayersIcon size={16} /> },
     { id: 'blueprints', label: 'Security Blueprints', icon: <CpuIcon size={16} /> },
-    { id: 'scanners', label: 'Security Scanners', icon: <TerminalIcon size={16} /> },
+    { id: 'scanners', label: 'Security Scanners', icon: <ActivityIcon size={16} /> },
     { id: 'policies', label: 'Policy Engine (OPA)', icon: <DatabaseIcon size={16} /> },
     { id: 'diagnostics', label: 'Infrastructure Diagnostics', icon: <ActivityIcon size={16} /> },
   ];

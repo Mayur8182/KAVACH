@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.agent import Agent
     from app.models.audit_event import AuditEvent
+    from app.models.intent import Intent
 
 
 class Project(Base, TimestampMixin):
@@ -85,4 +86,9 @@ class Project(Base, TimestampMixin):
     audit_events: Mapped[List["AuditEvent"]] = relationship(
         "AuditEvent",
         back_populates="project",
+    )
+    intents: Mapped[List["Intent"]] = relationship(
+        "Intent",
+        back_populates="project",
+        cascade="all, delete-orphan",
     )

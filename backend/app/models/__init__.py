@@ -3,6 +3,7 @@ from app.models.user import User
 from app.models.project import Project
 from app.models.agent import Agent
 from app.models.audit_event import AuditEvent
+from app.models.intent import Intent
 
 __all__ = [
     "Base",
@@ -11,4 +12,5 @@ __all__ = [
     "Project",
     "Agent",
     "AuditEvent",
+    "Intent",
 ]

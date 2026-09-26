@@ -1,4 +1,11 @@
-import type { ApiResponse, HealthResponse, LivenessResponse, ReadinessResponse } from '../types/api';
+import type {
+  ApiResponse,
+  HealthResponse,
+  LivenessResponse,
+  ReadinessResponse,
+  IntentResponse,
+  IntentSubmitRequest,
+} from '../types/api';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000/api/v1';
 
@@ -13,12 +20,17 @@ class ApiClient {
     return this.baseUrl;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    token?: string,
+  ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...((options.headers as Record<string, string>) || {}),
     };
 
     try {
@@ -37,7 +49,6 @@ class ApiClient {
       }
 
       if (!response.ok) {
-        // Backend returned structured error or HTTP error
         const errorDetail = responseBody?.error || {
           code: `HTTP_${status}`,
           message: responseBody?.message || response.statusText || 'Request failed',
@@ -58,7 +69,6 @@ class ApiClient {
         data: responseBody as T,
       };
     } catch (networkError: any) {
-      // Catch real connection refused / network failures without faking data
       return {
         isError: true,
         status: 0,
@@ -72,19 +82,46 @@ class ApiClient {
     }
   }
 
-  /** Checks process liveness (/health/live) */
+  /** Health & Readiness Probes */
   public async getLiveness(): Promise<ApiResponse<LivenessResponse>> {
     return this.request<LivenessResponse>('/health/live');
   }
 
-  /** Checks infrastructure readiness (/health/ready) */
   public async getReadiness(): Promise<ApiResponse<ReadinessResponse>> {
     return this.request<ReadinessResponse>('/health/ready');
   }
 
-  /** Retrieves aggregated platform operational metadata (/health) */
   public async getHealth(): Promise<ApiResponse<HealthResponse>> {
     return this.request<HealthResponse>('/health');
+  }
+
+  /** Intent Understanding Engine APIs */
+  public async submitIntent(
+    payload: IntentSubmitRequest,
+    token?: string,
+  ): Promise<ApiResponse<IntentResponse>> {
+    return this.request<IntentResponse>(
+      '/intents',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      token,
+    );
+  }
+
+  public async getIntent(
+    intentId: string,
+    token?: string,
+  ): Promise<ApiResponse<IntentResponse>> {
+    return this.request<IntentResponse>(`/intents/${intentId}`, {}, token);
+  }
+
+  public async listIntentsForProject(
+    projectId: string,
+    token?: string,
+  ): Promise<ApiResponse<IntentResponse[]>> {
+    return this.request<IntentResponse[]>(`/intents/project/${projectId}`, {}, token);
   }
 }
 
