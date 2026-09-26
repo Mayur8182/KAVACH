@@ -5,6 +5,10 @@ import type {
   ReadinessResponse,
   IntentResponse,
   IntentSubmitRequest,
+  SecurityBlueprint,
+  SecurityRequirement,
+  BlueprintCreateRequest,
+  BlueprintComparisonResponse,
 } from '../types/api';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000/api/v1';
@@ -122,6 +126,70 @@ class ApiClient {
     token?: string,
   ): Promise<ApiResponse<IntentResponse[]>> {
     return this.request<IntentResponse[]>(`/intents/project/${projectId}`, {}, token);
+  }
+
+  /** Security Blueprint Engine APIs */
+  public async generateBlueprint(
+    projectId: string,
+    payload?: BlueprintCreateRequest,
+    token?: string,
+  ): Promise<ApiResponse<SecurityBlueprint>> {
+    return this.request<SecurityBlueprint>(
+      `/projects/${projectId}/blueprints`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+      },
+      token,
+    );
+  }
+
+  public async getBlueprint(
+    blueprintId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityBlueprint>> {
+    return this.request<SecurityBlueprint>(`/blueprints/${blueprintId}`, {}, token);
+  }
+
+  public async listBlueprintsForProject(
+    projectId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityBlueprint[]>> {
+    return this.request<SecurityBlueprint[]>(`/projects/${projectId}/blueprints`, {}, token);
+  }
+
+  public async getBlueprintRequirements(
+    blueprintId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityRequirement[]>> {
+    return this.request<SecurityRequirement[]>(`/blueprints/${blueprintId}/requirements`, {}, token);
+  }
+
+  public async regenerateBlueprint(
+    blueprintId: string,
+    payload?: BlueprintCreateRequest,
+    token?: string,
+  ): Promise<ApiResponse<SecurityBlueprint>> {
+    return this.request<SecurityBlueprint>(
+      `/blueprints/${blueprintId}/regenerate`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+      },
+      token,
+    );
+  }
+
+  public async compareBlueprints(
+    v1: string,
+    v2: string,
+    token?: string,
+  ): Promise<ApiResponse<BlueprintComparisonResponse>> {
+    return this.request<BlueprintComparisonResponse>(
+      `/blueprints/compare?v1=${encodeURIComponent(v1)}&v2=${encodeURIComponent(v2)}`,
+      {},
+      token,
+    );
   }
 }
 

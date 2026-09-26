@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.agent import Agent
     from app.models.audit_event import AuditEvent
     from app.models.intent import Intent
+    from app.models.blueprint import SecurityBlueprint
 
 
 class Project(Base, TimestampMixin):
@@ -89,6 +90,11 @@ class Project(Base, TimestampMixin):
     )
     intents: Mapped[List["Intent"]] = relationship(
         "Intent",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    blueprints: Mapped[List["SecurityBlueprint"]] = relationship(
+        "SecurityBlueprint",
         back_populates="project",
         cascade="all, delete-orphan",
     )

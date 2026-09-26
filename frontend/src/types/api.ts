@@ -158,3 +158,74 @@ export interface IntentResponse {
   created_at: string;
   updated_at: string;
 }
+
+// Security Blueprint Engine Types
+export interface RequirementEvidenceItem {
+  id: string;
+  source_type: string;
+  source_field: string;
+  evidence_text: string;
+  created_at: string;
+}
+
+export interface RequirementDependencyItem {
+  id: string;
+  depends_on_key: string;
+  dependency_type: string;
+  description?: string | null;
+}
+
+export interface SecurityRequirement {
+  id: string;
+  blueprint_id: string;
+  requirement_key: string;
+  title: string;
+  description: string;
+  category: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFORMATIONAL';
+  priority: 'REQUIRED' | 'RECOMMENDED' | 'OPTIONAL';
+  mandatory: boolean;
+  rationale: string;
+  verification_strategy: string[];
+  status: 'ACTIVE' | 'WAIVED' | 'SATISFIED' | 'VIOLATED' | 'UNKNOWN';
+  security_invariant?: string | null;
+  created_at: string;
+  evidence_items: RequirementEvidenceItem[];
+  dependencies: RequirementDependencyItem[];
+}
+
+export interface SecurityBlueprint {
+  id: string;
+  project_id: string;
+  intent_id: string;
+  version: number;
+  status: 'DRAFT' | 'GENERATING' | 'GENERATED' | 'FAILED' | 'SUPERSEDED';
+  methodology_version: string;
+  generated_by: string;
+  risk_factors: string[];
+  created_at: string;
+  updated_at: string;
+  requirement_count: number;
+  requirements?: SecurityRequirement[];
+}
+
+export interface BlueprintCreateRequest {
+  intent_id?: string;
+}
+
+export interface RequirementDiff {
+  requirement_key: string;
+  title: string;
+  changes: Record<string, { old: unknown; new: unknown }>;
+}
+
+export interface BlueprintComparisonResponse {
+  blueprint_v1_id: string;
+  blueprint_v1_version: number;
+  blueprint_v2_id: string;
+  blueprint_v2_version: number;
+  added_requirements: SecurityRequirement[];
+  removed_requirements: SecurityRequirement[];
+  modified_requirements: RequirementDiff[];
+  unchanged_count: number;
+}
