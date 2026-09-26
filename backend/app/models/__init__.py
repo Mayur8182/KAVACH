@@ -1,9 +1,14 @@
-from sqlalchemy.orm import DeclarativeBase
+from app.models.base import Base, TimestampMixin
+from app.models.user import User
+from app.models.project import Project
+from app.models.agent import Agent
+from app.models.audit_event import AuditEvent
 
-
-class Base(DeclarativeBase):
-    """Base declarative class for all PostgreSQL application models (to be created in Step 3)."""
-    pass
-
-
-__all__ = ["Base"]
+__all__ = [
+    "Base",
+    "TimestampMixin",
+    "User",
+    "Project",
+    "Agent",
+    "AuditEvent",
+]
