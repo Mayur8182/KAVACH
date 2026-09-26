@@ -1,0 +1,3 @@
+# Architecture Extension Point: MCP Client
+# Connects to external MCP servers (GitHub, AWS, K8s, Docker) using official MCP SDK.
+# Real implementation to be introduced in subsequent phase.

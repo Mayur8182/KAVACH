@@ -1,0 +1,2 @@
+# Architecture Extension Point: MCP Security Gateway
+# Proxies and enforces identity, authorization, risk, and policy checks before delegating to MCP tools.
