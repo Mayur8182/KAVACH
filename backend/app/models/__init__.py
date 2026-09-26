@@ -16,6 +16,13 @@ from app.models.scan import (
     SecurityFinding,
     RequirementVerificationResult,
 )
+from app.models.policy import (
+    SecurityPolicy,
+    SecurityPolicyVersion,
+    SecurityDecision,
+    DecisionEvidence,
+    SecurityApproval,
+)
 
 __all__ = [
     "Base",
@@ -33,4 +40,9 @@ __all__ = [
     "ScannerExecution",
     "SecurityFinding",
     "RequirementVerificationResult",
+    "SecurityPolicy",
+    "SecurityPolicyVersion",
+    "SecurityDecision",
+    "DecisionEvidence",
+    "SecurityApproval",
 ]

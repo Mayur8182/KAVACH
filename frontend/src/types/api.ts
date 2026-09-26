@@ -315,3 +315,137 @@ export interface ScannerHealthResponse {
   version?: string | null;
   message: string;
 }
+
+/** Step 7 — Policy & Decision Engine Types */
+export interface SecurityPolicyVersion {
+  id: string;
+  policy_id: string;
+  version: number;
+  definition: Record<string, any>;
+  created_by: string;
+  created_at: string;
+  change_reason?: string | null;
+  active: boolean;
+}
+
+export interface SecurityPolicy {
+  id: string;
+  project_id?: string | null;
+  name: string;
+  description: string;
+  scope: string;
+  status: 'ACTIVE' | 'DISABLED' | 'DRAFT';
+  priority: number;
+  policy_type: string;
+  current_version: number;
+  created_by: string;
+  effective_from: string;
+  effective_until?: string | null;
+  created_at: string;
+  updated_at: string;
+  latest_version?: SecurityPolicyVersion | null;
+  versions_count?: number;
+}
+
+export interface PolicyCreateRequest {
+  name: string;
+  description: string;
+  scope?: string;
+  priority?: number;
+  policy_type?: string;
+  definition: Record<string, any>;
+}
+
+export interface DecisionEvidence {
+  id: string;
+  decision_id: string;
+  evidence_type: string;
+  source_type: string;
+  source_id?: string | null;
+  attribute: string;
+  observed_value: any;
+  expected_condition: string;
+  effect: string;
+  rule_name?: string | null;
+  policy_version_id?: string | null;
+  created_at: string;
+}
+
+export interface SecurityApproval {
+  id: string;
+  decision_id: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
+  requested_by: string;
+  approved_by?: string | null;
+  reason?: string | null;
+  approval_notes?: string | null;
+  requested_at: string;
+  approved_at?: string | null;
+  expires_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SecurityDecision {
+  id: string;
+  project_id: string;
+  actor_type: string;
+  actor_id: string;
+  operation_type: string;
+  operation_id?: string | null;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  environment: string;
+  decision: 'ALLOW' | 'WARN' | 'BLOCK' | 'REQUIRE_APPROVAL' | 'NOT_EVALUATED';
+  reason: string;
+  policy_version_ids: string[];
+  blueprint_id?: string | null;
+  scan_id?: string | null;
+  created_at: string;
+  evidence?: DecisionEvidence[];
+  approvals?: SecurityApproval[];
+}
+
+export interface EvaluateDecisionRequest {
+  operation: {
+    type: string;
+    environment: string;
+    resource_type?: string;
+    resource_id?: string;
+    metadata?: Record<string, any>;
+  };
+  actor?: {
+    type: string;
+    id: string;
+    name?: string;
+    roles?: string[];
+  };
+  scan_id?: string;
+  blueprint_id?: string;
+}
+
+export interface SimulateDecisionResponse {
+  decision: string;
+  reason: string;
+  policy_version_ids: string[];
+  matched_rules: Array<{
+    rule_name: string;
+    policy_name: string;
+    decision: string;
+    rationale: string;
+  }>;
+  evidence: Array<{
+    evidence_type: string;
+    attribute: string;
+    observed_value: any;
+    expected_condition: string;
+    effect: string;
+    rule_name?: string;
+  }>;
+  simulated_at: string;
+  would_block: boolean;
+  would_require_approval: boolean;
+  would_warn: boolean;
+  would_allow: boolean;
+}
+

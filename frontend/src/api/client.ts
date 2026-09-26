@@ -15,6 +15,13 @@ import type {
   RequirementVerification,
   ScanTriggerRequest,
   ScannerHealthResponse,
+  SecurityPolicy,
+  SecurityPolicyVersion,
+  PolicyCreateRequest,
+  SecurityDecision,
+  EvaluateDecisionRequest,
+  SimulateDecisionResponse,
+  SecurityApproval,
 } from '../types/api';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000/api/v1';
@@ -251,6 +258,156 @@ class ApiClient {
     token?: string,
   ): Promise<ApiResponse<RequirementVerification[]>> {
     return this.request<RequirementVerification[]>(`/scans/${scanId}/verifications`, {}, token);
+  }
+
+  /** Step 7 — Policy, Decision & Approval APIs */
+  public async getPolicies(
+    projectId: string,
+    activeOnly: boolean = false,
+    token?: string,
+  ): Promise<ApiResponse<SecurityPolicy[]>> {
+    return this.request<SecurityPolicy[]>(`/projects/${projectId}/policies?active_only=${activeOnly}`, {}, token);
+  }
+
+  public async getPolicy(
+    policyId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityPolicy>> {
+    return this.request<SecurityPolicy>(`/policies/${policyId}`, {}, token);
+  }
+
+  public async createPolicy(
+    projectId: string,
+    payload: PolicyCreateRequest,
+    token?: string,
+  ): Promise<ApiResponse<SecurityPolicy>> {
+    return this.request<SecurityPolicy>(
+      `/projects/${projectId}/policies`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      token,
+    );
+  }
+
+  public async createPolicyVersion(
+    policyId: string,
+    payload: { definition: Record<string, any>; change_reason?: string },
+    token?: string,
+  ): Promise<ApiResponse<SecurityPolicyVersion>> {
+    return this.request<SecurityPolicyVersion>(
+      `/policies/${policyId}/versions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      token,
+    );
+  }
+
+  public async activatePolicy(
+    policyId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityPolicy>> {
+    return this.request<SecurityPolicy>(
+      `/policies/${policyId}/activate`,
+      { method: 'POST' },
+      token,
+    );
+  }
+
+  public async disablePolicy(
+    policyId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityPolicy>> {
+    return this.request<SecurityPolicy>(
+      `/policies/${policyId}/disable`,
+      { method: 'POST' },
+      token,
+    );
+  }
+
+  public async evaluateDecision(
+    projectId: string,
+    payload: EvaluateDecisionRequest,
+    token?: string,
+  ): Promise<ApiResponse<SecurityDecision>> {
+    return this.request<SecurityDecision>(
+      `/projects/${projectId}/decisions/evaluate`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      token,
+    );
+  }
+
+  public async simulateDecision(
+    projectId: string,
+    payload: EvaluateDecisionRequest,
+    token?: string,
+  ): Promise<ApiResponse<SimulateDecisionResponse>> {
+    return this.request<SimulateDecisionResponse>(
+      `/projects/${projectId}/policies/simulate`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      token,
+    );
+  }
+
+  public async listDecisions(
+    projectId: string,
+    limit: number = 50,
+    token?: string,
+  ): Promise<ApiResponse<SecurityDecision[]>> {
+    return this.request<SecurityDecision[]>(`/projects/${projectId}/decisions?limit=${limit}`, {}, token);
+  }
+
+  public async getDecision(
+    decisionId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityDecision>> {
+    return this.request<SecurityDecision>(`/decisions/${decisionId}`, {}, token);
+  }
+
+  public async approveDecision(
+    approvalId: string,
+    payload: { approval_notes?: string },
+    token?: string,
+  ): Promise<ApiResponse<SecurityApproval>> {
+    return this.request<SecurityApproval>(
+      `/approvals/${approvalId}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      token,
+    );
+  }
+
+  public async rejectDecision(
+    approvalId: string,
+    payload: { reason?: string; approval_notes?: string },
+    token?: string,
+  ): Promise<ApiResponse<SecurityApproval>> {
+    return this.request<SecurityApproval>(
+      `/approvals/${approvalId}/reject`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      token,
+    );
+  }
+
+  public async listPendingApprovals(
+    projectId: string,
+    token?: string,
+  ): Promise<ApiResponse<SecurityApproval[]>> {
+    return this.request<SecurityApproval[]>(`/projects/${projectId}/approvals/pending`, {}, token);
   }
 }
 

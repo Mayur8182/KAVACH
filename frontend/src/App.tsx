@@ -7,6 +7,10 @@ import type {
   SecurityRequirement,
   SecurityScan,
   ScannerHealthResponse,
+  SecurityPolicy,
+  SecurityDecision,
+  SecurityApproval,
+  SimulateDecisionResponse,
 } from './types/api';
 import { HealthStatusBanner } from './components/HealthStatusBanner';
 import { Navigation } from './components/Navigation';
@@ -15,7 +19,6 @@ import { EmptyState } from './components/EmptyState';
 import {
   LayersIcon,
   CpuIcon,
-  DatabaseIcon,
   RefreshIcon,
   CheckCircleIcon,
   AlertCircleIcon,
@@ -43,6 +46,19 @@ export function App() {
   const [activeScan, setActiveScan] = useState<SecurityScan | null>(null);
   const [scanLoading, setScanLoading] = useState<boolean>(false);
   const [scanError, setScanError] = useState<string | null>(null);
+
+  // Policy & Decision state (Step 7)
+  const [policies, setPolicies] = useState<SecurityPolicy[]>([]);
+  const [selectedPolicy, setSelectedPolicy] = useState<SecurityPolicy | null>(null);
+  const [decisions, setDecisions] = useState<SecurityDecision[]>([]);
+  const [selectedDecision, setSelectedDecision] = useState<SecurityDecision | null>(null);
+  const [pendingApprovals, setPendingApprovals] = useState<SecurityApproval[]>([]);
+  const [simulationResult, setSimulationResult] = useState<SimulateDecisionResponse | null>(null);
+  const [policyLoading, setPolicyLoading] = useState<boolean>(false);
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [operationType, setOperationType] = useState<string>('DEPLOY');
+  const [operationEnv, setOperationEnv] = useState<string>('production');
+  const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
 
   const fetchHealth = useCallback(async () => {
     setLoading(true);
@@ -397,6 +413,206 @@ export function App() {
       setScanError(err?.message || 'Scan execution failed');
     } finally {
       setScanLoading(false);
+    }
+  };
+
+  const fetchPoliciesAndDecisions = useCallback(async () => {
+    if (!activeBlueprint?.project_id) return;
+    setPolicyLoading(true);
+    try {
+      const [pRes, dRes, aRes] = await Promise.all([
+        apiClient.getPolicies(activeBlueprint.project_id),
+        apiClient.listDecisions(activeBlueprint.project_id),
+        apiClient.listPendingApprovals(activeBlueprint.project_id),
+      ]);
+      if (pRes.data) {
+        setPolicies(pRes.data);
+        if (pRes.data.length > 0 && !selectedPolicy) {
+          setSelectedPolicy(pRes.data[0]);
+        }
+      }
+      if (dRes.data) {
+        setDecisions(dRes.data);
+        if (dRes.data.length > 0 && !selectedDecision) {
+          setSelectedDecision(dRes.data[0]);
+        }
+      }
+      if (aRes.data) setPendingApprovals(aRes.data);
+    } catch (err: any) {
+      setPolicyError(err?.message || 'Failed loading policies');
+    } finally {
+      setPolicyLoading(false);
+    }
+  }, [activeBlueprint?.project_id, selectedDecision, selectedPolicy]);
+
+  useEffect(() => {
+    if (currentTab === 'policies') {
+      fetchPoliciesAndDecisions();
+    }
+  }, [currentTab, fetchPoliciesAndDecisions]);
+
+  const handleEvaluateDecision = async () => {
+    if (!activeBlueprint?.project_id) {
+      setPolicyError('Active project blueprint required.');
+      return;
+    }
+    setPolicyLoading(true);
+    setPolicyError(null);
+    setActionSuccessMessage(null);
+    try {
+      const res = await apiClient.evaluateDecision(activeBlueprint.project_id, {
+        operation: {
+          type: operationType,
+          environment: operationEnv,
+        },
+        scan_id: activeScan?.id,
+        blueprint_id: activeBlueprint.id,
+      });
+      if (res.error) {
+        setPolicyError(res.error.message || 'Evaluation failed');
+      } else if (res.data) {
+        const newDec = res.data;
+        setSelectedDecision(newDec);
+        setDecisions(prev => [newDec, ...prev]);
+        setActionSuccessMessage(`Decision evaluated: ${newDec.decision}`);
+        fetchPoliciesAndDecisions();
+      }
+    } catch (err: any) {
+      setPolicyError(err?.message || 'Evaluation failed');
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
+  const handleSimulateDecision = async () => {
+    if (!activeBlueprint?.project_id) {
+      setPolicyError('Active project blueprint required.');
+      return;
+    }
+    setPolicyLoading(true);
+    setPolicyError(null);
+    setActionSuccessMessage(null);
+    try {
+      const res = await apiClient.simulateDecision(activeBlueprint.project_id, {
+        operation: {
+          type: operationType,
+          environment: operationEnv,
+        },
+        scan_id: activeScan?.id,
+        blueprint_id: activeBlueprint.id,
+      });
+      if (res.error) {
+        setPolicyError(res.error.message || 'Simulation failed');
+      } else if (res.data) {
+        setSimulationResult(res.data);
+        setActionSuccessMessage(`Simulation complete: would result in ${res.data.decision}`);
+      }
+    } catch (err: any) {
+      setPolicyError(err?.message || 'Simulation failed');
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
+  const handleCreateDefaultPolicy = async () => {
+    if (!activeBlueprint?.project_id) {
+      setPolicyError('Active project blueprint required.');
+      return;
+    }
+    setPolicyLoading(true);
+    setPolicyError(null);
+    try {
+      const defaultPolicyPayload = {
+        name: 'Production Gate & Risk Policy',
+        description: 'Blocks critical findings and requires independent approval for high-risk operations.',
+        scope: 'PROJECT',
+        priority: 100,
+        policy_type: 'DEPLOYMENT',
+        definition: {
+          name: 'Production Gate & Risk Policy',
+          description: 'Production deployment governance',
+          scope: { environment: 'production', operation: 'DEPLOY' },
+          fail_closed: 'BLOCK',
+          priority: 100,
+          rules: [
+            {
+              name: 'block-critical-findings',
+              when: { finding: { severity: { operator: 'IN', value: ['CRITICAL'] }, status: 'OPEN' } },
+              decision: 'BLOCK',
+              priority: 100,
+              message: 'Production deployment blocked: open CRITICAL security finding detected.',
+            },
+            {
+              name: 'require-approval-on-high',
+              when: { finding: { severity: { operator: 'EQUALS', value: 'HIGH' }, status: 'OPEN' } },
+              decision: 'REQUIRE_APPROVAL',
+              priority: 90,
+              message: 'Production deployment requires security lead approval: HIGH severity finding identified.',
+            },
+            {
+              name: 'block-violated-requirements',
+              when: { requirement: { status: 'VIOLATED' } },
+              decision: 'BLOCK',
+              priority: 80,
+              message: 'Production deployment blocked: required security blueprint requirement is violated.',
+            },
+            {
+              name: 'warn-medium-findings',
+              when: { finding: { severity: { operator: 'EQUALS', value: 'MEDIUM' }, status: 'OPEN' } },
+              decision: 'WARN',
+              priority: 50,
+              message: 'Medium risk finding recorded with warning.',
+            },
+          ],
+        },
+      };
+      const res = await apiClient.createPolicy(activeBlueprint.project_id, defaultPolicyPayload);
+      if (res.error) {
+        setPolicyError(res.error.message || 'Policy creation failed');
+      } else if (res.data) {
+        setActionSuccessMessage(`Policy '${res.data.name}' created successfully.`);
+        fetchPoliciesAndDecisions();
+      }
+    } catch (err: any) {
+      setPolicyError(err?.message || 'Policy creation failed');
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
+  const handleApprove = async (approvalId: string) => {
+    setPolicyLoading(true);
+    setPolicyError(null);
+    try {
+      const res = await apiClient.approveDecision(approvalId, { approval_notes: 'Approved via control plane console.' });
+      if (res.error) {
+        setPolicyError(res.error.message || 'Approval failed');
+      } else {
+        setActionSuccessMessage('Approval granted successfully.');
+        fetchPoliciesAndDecisions();
+      }
+    } catch (err: any) {
+      setPolicyError(err?.message || 'Approval failed');
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
+  const handleReject = async (approvalId: string) => {
+    setPolicyLoading(true);
+    setPolicyError(null);
+    try {
+      const res = await apiClient.rejectDecision(approvalId, { reason: 'Rejected from control plane UI.' });
+      if (res.error) {
+        setPolicyError(res.error.message || 'Rejection failed');
+      } else {
+        setActionSuccessMessage('Approval rejected.');
+        fetchPoliciesAndDecisions();
+      }
+    } catch (err: any) {
+      setPolicyError(err?.message || 'Rejection failed');
+    } finally {
+      setPolicyLoading(false);
     }
   };
 
@@ -1548,12 +1764,526 @@ export function App() {
 
           {/* TAB: POLICIES */}
           {currentTab === 'policies' && (
-            <EmptyState
-              icon={<DatabaseIcon size={28} />}
-              title="Open Policy Agent (OPA) Integration"
-              description="Rego policy suites will be evaluated by the Policy Engine to make authoritative ALLOW or BLOCK decisions on developer actions and AI tool invocations."
-              statusBadge="FUTURE STEP"
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Header & Evaluation Bar */}
+              <div className="glass-panel" style={{ padding: '24px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                    marginBottom: '20px',
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        textTransform: 'uppercase',
+                        fontWeight: 700,
+                        color: 'var(--accent-primary)',
+                        letterSpacing: '0.05em',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      Policy &bull; Risk &bull; Allow-Warn-Block Engine &bull; Step 7
+                    </div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Deterministic Policy Evaluation & Governance
+                    </h3>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                      Consumes Step 5 Blueprint requirements and Step 6 verification findings to make authoritative ALLOW, WARN, BLOCK, or REQUIRE_APPROVAL decisions.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {policies.length === 0 && (
+                      <button
+                        onClick={handleCreateDefaultPolicy}
+                        disabled={policyLoading}
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.06)',
+                          color: '#fff',
+                          border: '1px solid var(--border-subtle)',
+                          padding: '10px 16px',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          cursor: policyLoading ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        + Create Default Production Policy
+                      </button>
+                    )}
+                    <button
+                      onClick={fetchPoliciesAndDecisions}
+                      disabled={policyLoading}
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.06)',
+                        color: 'var(--text-secondary)',
+                        border: '1px solid var(--border-subtle)',
+                        padding: '10px 16px',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <RefreshIcon size={14} /> Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {/* Operation Context Selector & Evaluation Trigger */}
+                <div
+                  style={{
+                    backgroundColor: 'rgba(0,0,0,0.2)',
+                    padding: '16px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Target Operation
+                    </label>
+                    <select
+                      value={operationType}
+                      onChange={(e) => setOperationType(e.target.value)}
+                      style={{
+                        backgroundColor: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '8px 12px',
+                        fontSize: '13px',
+                      }}
+                    >
+                      <option value="DEPLOY">DEPLOY (Deployment to environment)</option>
+                      <option value="MERGE">MERGE (Pull request merge)</option>
+                      <option value="PUSH">PUSH (Code push)</option>
+                      <option value="EXECUTE_TOOL">EXECUTE_TOOL (Agent tool invocation)</option>
+                      <option value="ACCESS_SECRET">ACCESS_SECRET (Access credentials)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Target Environment
+                    </label>
+                    <select
+                      value={operationEnv}
+                      onChange={(e) => setOperationEnv(e.target.value)}
+                      style={{
+                        backgroundColor: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '8px 12px',
+                        fontSize: '13px',
+                      }}
+                    >
+                      <option value="production">production (Strict fail-closed)</option>
+                      <option value="staging">staging (Pre-production)</option>
+                      <option value="development">development (Sandbox)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={handleSimulateDecision}
+                      disabled={policyLoading}
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        color: '#fff',
+                        border: '1px solid var(--border-subtle)',
+                        padding: '10px 18px',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: policyLoading ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Simulate (Dry-Run)
+                    </button>
+
+                    <button
+                      onClick={handleEvaluateDecision}
+                      disabled={policyLoading}
+                      style={{
+                        backgroundColor: 'var(--accent-primary)',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '10px 20px',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: policyLoading ? 'not-allowed' : 'pointer',
+                        boxShadow: 'var(--shadow-glow)',
+                      }}
+                    >
+                      {policyLoading ? 'Evaluating...' : 'Evaluate Policy Decision'}
+                    </button>
+                  </div>
+                </div>
+
+                {policyError && (
+                  <div
+                    style={{
+                      marginTop: '16px',
+                      padding: '12px 16px',
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid var(--accent-danger)',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--accent-danger)',
+                      fontSize: '13px',
+                    }}
+                  >
+                    {policyError}
+                  </div>
+                )}
+
+                {actionSuccessMessage && (
+                  <div
+                    style={{
+                      marginTop: '16px',
+                      padding: '12px 16px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                      border: '1px solid var(--accent-success)',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--accent-success)',
+                      fontSize: '13px',
+                    }}
+                  >
+                    {actionSuccessMessage}
+                  </div>
+                )}
+              </div>
+
+              {/* Simulation Result Preview (Dry Run) */}
+              {simulationResult && (
+                <div
+                  className="glass-panel"
+                  style={{
+                    padding: '20px',
+                    border: '1px solid var(--accent-warning)',
+                    backgroundColor: 'rgba(245, 158, 11, 0.05)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span
+                        style={{
+                          backgroundColor:
+                            simulationResult.decision === 'BLOCK'
+                              ? 'var(--accent-danger)'
+                              : simulationResult.decision === 'REQUIRE_APPROVAL'
+                              ? 'var(--accent-warning)'
+                              : simulationResult.decision === 'WARN'
+                              ? '#eab308'
+                              : 'var(--accent-success)',
+                          color: '#fff',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          padding: '4px 10px',
+                          borderRadius: '4px',
+                        }}
+                      >
+                        SIMULATED DECISION: {simulationResult.decision}
+                      </span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Dry-Run Simulation at {new Date(simulationResult.simulated_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setSimulationResult(null)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                    >
+                      &times; Close
+                    </button>
+                  </div>
+
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                    <strong>Reason:</strong> {simulationResult.reason}
+                  </p>
+
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    Note: Simulation does not authorize execution, mutate system state, or create immutable audit decision records.
+                  </div>
+                </div>
+              )}
+
+              {/* Pending Approvals & Separation of Duties */}
+              {pendingApprovals.length > 0 && (
+                <div className="glass-panel" style={{ padding: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <AlertCircleIcon size={18} color="var(--accent-warning)" />
+                      Pending Security Approvals ({pendingApprovals.length})
+                    </h4>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      Separation of duties enforced: Requester cannot self-approve.
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {pendingApprovals.map((ap) => (
+                      <div
+                        key={ap.id}
+                        style={{
+                          backgroundColor: 'rgba(0,0,0,0.2)',
+                          padding: '16px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border-subtle)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '12px',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {ap.reason || 'Operation requires approval'}
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            Requested by: <code>{ap.requested_by}</code> &bull; Requested at:{' '}
+                            {new Date(ap.requested_at).toLocaleTimeString()}{' '}
+                            {ap.expires_at && `(Expires ${new Date(ap.expires_at).toLocaleTimeString()})`}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => handleReject(ap.id)}
+                            disabled={policyLoading}
+                            style={{
+                              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                              color: 'var(--accent-danger)',
+                              border: '1px solid var(--accent-danger)',
+                              padding: '8px 14px',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => handleApprove(ap.id)}
+                            disabled={policyLoading}
+                            style={{
+                              backgroundColor: 'var(--accent-success)',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '8px 16px',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Approve
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Two Column Layout: Policies List & Decision Records */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+                {/* Active Policies Column */}
+                <div className="glass-panel" style={{ padding: '24px' }}>
+                  <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px' }}>
+                    Configured Security Policies ({policies.length})
+                  </h4>
+
+                  {policies.length === 0 ? (
+                    <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                      No active policies configured for this project.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {policies.map((p) => (
+                        <div
+                          key={p.id}
+                          style={{
+                            backgroundColor: 'rgba(0,0,0,0.2)',
+                            padding: '16px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border-subtle)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {p.name}
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                backgroundColor: p.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.2)',
+                                color: p.status === 'ACTIVE' ? 'var(--accent-success)' : 'var(--text-muted)',
+                              }}
+                            >
+                              v{p.current_version} &bull; {p.status}
+                            </span>
+                          </div>
+
+                          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                            {p.description}
+                          </p>
+
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '10px' }}>
+                            Scope: <code>{p.scope}</code> &bull; Priority: <code>{p.priority}</code> &bull; Type: <code>{p.policy_type}</code>
+                          </div>
+
+                          {p.latest_version?.definition?.rules && (
+                            <div style={{ marginTop: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                                Policy Rules ({p.latest_version.definition.rules.length}):
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {p.latest_version.definition.rules.map((r: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      fontSize: '11px',
+                                      color: 'var(--text-secondary)',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      backgroundColor: 'rgba(0,0,0,0.15)',
+                                      padding: '4px 8px',
+                                      borderRadius: '3px',
+                                    }}
+                                  >
+                                    <span>{r.name}</span>
+                                    <span
+                                      style={{
+                                        fontWeight: 700,
+                                        color:
+                                          r.decision === 'BLOCK'
+                                            ? 'var(--accent-danger)'
+                                            : r.decision === 'REQUIRE_APPROVAL'
+                                            ? 'var(--accent-warning)'
+                                            : r.decision === 'WARN'
+                                            ? '#eab308'
+                                            : 'var(--accent-success)',
+                                      }}
+                                    >
+                                      {r.decision}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Evaluated Decisions & Evidence Column */}
+                <div className="glass-panel" style={{ padding: '24px' }}>
+                  <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px' }}>
+                    Immutable Security Decisions ({decisions.length})
+                  </h4>
+
+                  {decisions.length === 0 ? (
+                    <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                      No security decisions recorded yet. Click "Evaluate Policy Decision" to evaluate against active policies.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {decisions.map((dec) => (
+                        <div
+                          key={dec.id}
+                          style={{
+                            backgroundColor: 'rgba(0,0,0,0.2)',
+                            padding: '16px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border-subtle)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span
+                              style={{
+                                fontWeight: 800,
+                                fontSize: '12px',
+                                padding: '4px 10px',
+                                borderRadius: '4px',
+                                backgroundColor:
+                                  dec.decision === 'BLOCK'
+                                    ? 'var(--accent-danger)'
+                                    : dec.decision === 'REQUIRE_APPROVAL'
+                                    ? 'var(--accent-warning)'
+                                    : dec.decision === 'WARN'
+                                    ? '#eab308'
+                                    : 'var(--accent-success)',
+                                color: '#fff',
+                              }}
+                            >
+                              {dec.decision}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              {new Date(dec.created_at).toLocaleTimeString()}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '8px' }}>
+                            {dec.operation_type} &bull; Environment: <code>{dec.environment}</code>
+                          </div>
+
+                          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            <strong>Reason:</strong> {dec.reason}
+                          </p>
+
+                          {dec.evidence && dec.evidence.length > 0 && (
+                            <div style={{ marginTop: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                Deterministic Evidence ({dec.evidence.length} items):
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {dec.evidence.map((ev, evIdx) => (
+                                  <div
+                                    key={evIdx}
+                                    style={{
+                                      fontSize: '11px',
+                                      backgroundColor: 'rgba(0,0,0,0.25)',
+                                      padding: '6px 8px',
+                                      borderRadius: '3px',
+                                      color: '#cbd5e1',
+                                    }}
+                                  >
+                                    <div>
+                                      <code>{ev.evidence_type}</code> &bull; Attribute: <code>{ev.attribute}</code> &rarr; Observed: <strong style={{ color: '#fff' }}>{String(ev.observed_value)}</strong>
+                                    </div>
+                                    <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>
+                                      Expected: {ev.expected_condition} &bull; Effect: <span style={{ color: ev.effect === 'BLOCK' ? 'var(--accent-danger)' : 'var(--accent-warning)' }}>{ev.effect}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* TAB: DIAGNOSTICS */}
