@@ -9,10 +9,6 @@ const nextConfig = {
   reactStrictMode: false,
   devIndicators: false,
   outputFileTracingRoot: path.resolve(__dirname),
-  // Keep HTTP connections alive so the proxy doesn't close prematurely
-  httpAgentOptions: {
-    keepAlive: true,
-  },
   productionBrowserSourceMaps: false,
   typescript: {
     ignoreBuildErrors: true,
@@ -26,9 +22,6 @@ const nextConfig = {
     optimizePackageImports: [
       'lucide-react',
     ],
-    // Allow 180s for long-running backend operations like remediation pipelines
-    // (git clone + patch + rescan + PR creation can take 30-90s)
-    proxyTimeout: 180000,
   },
   async redirects() {
     return [

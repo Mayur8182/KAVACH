@@ -11,7 +11,7 @@ fi
 export PYTHONPATH="$ROOT_DIR/backend"
 export BACKEND_PORT=8000
 export BACKEND_URL="http://127.0.0.1:8000"
-export FRONTEND_PORT=3000
+export HOSTNAME="0.0.0.0"
 export PORT="${PORT:-10000}"
 
 echo "=================================================="
@@ -26,14 +26,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 echo "--> FastAPI Backend launched (PID: $BACKEND_PID)."
 
-# 2. Start Next.js Frontend in background on internal localhost:3000
-echo "--> Starting Next.js Frontend on 127.0.0.1:3000..."
+# 2. Start Next.js Frontend directly on public 0.0.0.0:$PORT
+echo "--> Starting Next.js Frontend on 0.0.0.0:$PORT..."
 cd "$ROOT_DIR/frontend"
-npx next start -H 127.0.0.1 -p 3000 &
-FRONTEND_PID=$!
-echo "--> Next.js Frontend launched (PID: $FRONTEND_PID)."
-
-# 3. Start Unified Gateway in foreground on public 0.0.0.0:$PORT (binds in <20ms)
-echo "--> Starting Kavach Unified Gateway on 0.0.0.0:$PORT..."
-cd "$ROOT_DIR"
-exec node gateway.js
+exec ./node_modules/.bin/next start -H 0.0.0.0 -p "$PORT"
