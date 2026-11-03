@@ -11,6 +11,7 @@ fi
 export PYTHONPATH="$ROOT_DIR/backend"
 export BACKEND_PORT=8000
 export BACKEND_URL="http://127.0.0.1:8000"
+export HOSTNAME="0.0.0.0"
 PORT="${PORT:-10000}"
 
 echo "=================================================="
@@ -41,4 +42,4 @@ done
 # 3. Start Next.js Frontend in foreground on Render's assigned $PORT
 echo "--> Starting Next.js Frontend on 0.0.0.0:$PORT..."
 cd "$ROOT_DIR/frontend"
-exec npm start -- -p "$PORT"
+exec npm start -- -p "$PORT" -H 0.0.0.0
