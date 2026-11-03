@@ -77,11 +77,13 @@ const server = http.createServer((req, res) => {
     req.url === '/openapi.json';
   const targetPort = isApi ? BACKEND_PORT : FRONTEND_PORT;
 
+  const originalHost = req.headers.host || 'kavachsecurity.me';
   const headers = { ...req.headers };
-  // Preserve original host and client info
+
   headers['x-forwarded-for'] = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   headers['x-forwarded-proto'] = req.headers['x-forwarded-proto'] || 'https';
-  headers['x-forwarded-host'] = req.headers['x-forwarded-host'] || req.headers.host;
+  headers['x-forwarded-host'] = originalHost;
+  headers['host'] = `127.0.0.1:${targetPort}`;
 
   const proxyReq = http.request(
     {
@@ -97,20 +99,32 @@ const server = http.createServer((req, res) => {
     }
   );
 
-  proxyReq.on('error', (err) => {
-    // If frontend is still warming up during first few seconds of boot
-    if (!isApi) {
-      res.writeHead(200, {
-        'Content-Type': 'text/html',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      });
-      return res.end(WARMUP_HTML);
-    }
-    res.writeHead(503, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Backend service warming up', code: err.code }));
+  // Set timeout to prevent indefinitely hanging connections
+  proxyReq.setTimeout(45000, () => {
+    proxyReq.destroy(new Error('Gateway Target Timeout'));
   });
 
-  req.pipe(proxyReq, { end: true });
+  proxyReq.on('error', (err) => {
+    console.error(`[Gateway] Error forwarding ${req.method} ${req.url} -> :${targetPort}:`, err.message);
+    if (!res.headersSent) {
+      if (!isApi) {
+        res.writeHead(200, {
+          'Content-Type': 'text/html',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        });
+        return res.end(WARMUP_HTML);
+      }
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Backend service warming up', code: err.code || 'UNAVAILABLE' }));
+    }
+  });
+
+  // CRITICAL: In Node.js, GET/HEAD requests have no body. We MUST call proxyReq.end()!
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    proxyReq.end();
+  } else {
+    req.pipe(proxyReq, { end: true });
+  }
 });
 
 // Support WebSocket proxying (e.g. live telemetry streams, terminal sessions)
@@ -131,7 +145,8 @@ server.on('upgrade', (req, socket, head) => {
     socket.pipe(proxySocket);
   });
 
-  proxySocket.on('error', () => {
+  proxySocket.on('error', (err) => {
+    console.error(`[Gateway WebSocket Error] -> :${targetPort}:`, err.message);
     socket.destroy();
   });
   socket.on('error', () => {
