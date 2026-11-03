@@ -49,8 +49,9 @@ COPY backend /app/backend
 # Copy Built Next.js Frontend from builder stage
 COPY --from=frontend-builder /app/frontend /app/frontend
 
-# Copy and configure startup script
+# Copy startup script and gateway
 COPY start.sh /app/start.sh
+COPY gateway.js /app/gateway.js
 RUN chmod +x /app/start.sh
 
 # Render dynamically assigns PORT (defaults to 10000)
