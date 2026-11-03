@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: 'Cookie Policy | Kavach',
     description:
       'Zero advertising trackers. Strictly essential tokens for cryptographic session integrity.',
-    url: 'https://kavach.security/cookies',
+    url: 'https://kavachsecurity.me/cookies',
   },
 };
 
@@ -125,8 +125,8 @@ export default function CookiePolicyPage() {
             </h2>
             <p>
               For privacy and cookie inquiries, reach our Security & Privacy Operations team at{' '}
-              <a href="mailto:privacy@kavach.security" style={{ color: '#09090B', fontWeight: 600, textDecoration: 'underline' }}>
-                privacy@kavach.security
+              <a href="mailto:privacy@kavachsecurity.me" style={{ color: '#09090B', fontWeight: 600, textDecoration: 'underline' }}>
+                privacy@kavachsecurity.me
               </a>.
             </p>
           </section>

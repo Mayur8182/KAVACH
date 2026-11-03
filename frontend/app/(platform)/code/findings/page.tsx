@@ -392,7 +392,7 @@ export default function SASTFindingsPage() {
   // Quick action: assign finding
   const handleAssignFinding = async (findingId: string) => {
     setActiveActionRowId(null);
-    const assignee = window.prompt('Enter assignee email or name:', 'security-team@seculayer.io');
+    const assignee = window.prompt('Enter assignee email or name:', 'security@kavachsecurity.me');
     if (!assignee) return;
     try {
       await api.findings.assign(findingId, assignee);

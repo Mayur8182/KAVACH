@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: 'SecuLayer Interactive Security Demo',
     description:
       'Experience live finding triage, automated remediation diffs, and eBPF guardrails in our sandbox.',
-    url: 'https://seculayer.io/demo',
+    url: 'https://kavachsecurity.me/demo',
   },
 };
 

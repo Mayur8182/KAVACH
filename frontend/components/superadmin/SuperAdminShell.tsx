@@ -308,7 +308,7 @@ export function SuperAdminShell({ children }: SuperAdminShellProps) {
                       {currentUser?.name || 'Superadmin User'}
                     </p>
                     <p className="text-[11px] text-slate-500 truncate">
-                      {currentUser?.email || 'admin@seculayer.io'}
+                      {currentUser?.email || 'admin@kavachsecurity.me'}
                     </p>
                   </div>
                   <Link

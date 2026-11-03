@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: 'SecuLayer Security Engineering Resources',
     description:
       'Research papers, compliance checklists, and technical blueprints for modern security engineering teams.',
-    url: 'https://seculayer.io/resources',
+    url: 'https://kavachsecurity.me/resources',
   },
 };
 

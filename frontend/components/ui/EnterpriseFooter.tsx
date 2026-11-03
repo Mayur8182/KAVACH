@@ -112,12 +112,12 @@ export const EnterpriseFooter: React.FC = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', marginTop: '2px' }}>
               <a
-                href="mailto:security@kavach.security"
+                href="mailto:security@kavachsecurity.me"
                 style={{ color: '#71717A', textDecoration: 'none', transition: 'color 150ms' }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = '#09090B')}
                 onMouseLeave={(e) => (e.currentTarget.style.color = '#71717A')}
               >
-                security@kavach.security
+                security@kavachsecurity.me
               </a>
               <a
                 href="tel:+18887328529"
@@ -222,7 +222,7 @@ export const EnterpriseFooter: React.FC = () => {
                 { label: 'Acceptable Use & Disclosure', href: '/legal' },
                 { label: 'International Compliance (GDPR/CCPA)', href: '/legal' },
                 { label: 'Data Subject Privacy Request (DSAR)', href: '/legal' },
-                { label: 'Security Team (security@kavach.security)', href: 'mailto:security@kavach.security' },
+                { label: 'Security Team (security@kavachsecurity.me)', href: 'mailto:security@kavachsecurity.me' },
               ].map((item) => (
                 <li key={item.label}>
                   <Link

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: 'SecuLayer Security Solutions',
     description:
       'Security architectures for high-growth startups, regulated finance, and multi-cloud enterprises.',
-    url: 'https://seculayer.io/solutions',
+    url: 'https://kavachsecurity.me/solutions',
   },
 };
 

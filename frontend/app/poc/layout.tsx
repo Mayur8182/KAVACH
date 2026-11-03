@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: 'SecuLayer Proof-of-Concept Deployment',
     description:
       'Evaluate SecuLayer inside your VPC or cloud account with measurable security benchmarks.',
-    url: 'https://seculayer.io/poc',
+    url: 'https://kavachsecurity.me/poc',
   },
 };
 

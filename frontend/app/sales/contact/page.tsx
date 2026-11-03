@@ -98,8 +98,8 @@ export default function ContactSalesPage() {
               <Mail size={20} />
             </div>
             <div style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>Email Us</div>
-            <a href="mailto:sales@kavach.security" style={{ fontSize: '14px', fontWeight: 600, color: '#2563EB', textDecoration: 'none' }}>
-              sales@kavach.security
+            <a href="mailto:sales@kavachsecurity.me" style={{ fontSize: '14px', fontWeight: 600, color: '#2563EB', textDecoration: 'none' }}>
+              sales@kavachsecurity.me
             </a>
             <div style={{ fontSize: '12px', color: '#64748B', marginTop: 'auto' }}>We typically reply within 1 business day.</div>
           </div>

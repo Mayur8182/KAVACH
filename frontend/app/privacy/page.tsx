@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: 'Privacy Policy | Kavach',
     description:
       'Zero model training on customer code, TLS 1.3 encryption, GDPR/CCPA data deletion rights, and deterministic governance.',
-    url: 'https://kavach.security/privacy',
+    url: 'https://kavachsecurity.me/privacy',
   },
 };
 
@@ -104,8 +104,8 @@ export default function PrivacyPage() {
               <div style={{ fontWeight: 700, color: '#09090B', marginBottom: '6px' }}>How to Request Data Deletion or Account Erasure:</div>
               <p style={{ margin: '0 0 10px', fontSize: '13px', color: '#52525B' }}>
                 1. Submit a formal request via email to{' '}
-                <a href="mailto:privacy@kavach.security" style={{ color: '#09090B', fontWeight: 600, textDecoration: 'underline' }}>
-                  privacy@kavach.security
+                <a href="mailto:privacy@kavachsecurity.me" style={{ color: '#09090B', fontWeight: 600, textDecoration: 'underline' }}>
+                  privacy@kavachsecurity.me
                 </a>{' '}
                 with the subject line <code>[DATA ERASURE REQUEST] - Organization Name</code>.
                 <br />
@@ -116,8 +116,8 @@ export default function PrivacyPage() {
               <div style={{ fontWeight: 700, color: '#09090B', marginBottom: '6px' }}>How to Correct Inaccurate Data:</div>
               <p style={{ margin: 0, fontSize: '13px', color: '#52525B' }}>
                 Email{' '}
-                <a href="mailto:privacy@kavach.security" style={{ color: '#09090B', fontWeight: 600, textDecoration: 'underline' }}>
-                  privacy@kavach.security
+                <a href="mailto:privacy@kavachsecurity.me" style={{ color: '#09090B', fontWeight: 600, textDecoration: 'underline' }}>
+                  privacy@kavachsecurity.me
                 </a>{' '}
                 with <code>[DATA RECTIFICATION REQUEST]</code> and details of the erroneous information.
               </p>
@@ -202,7 +202,7 @@ export default function PrivacyPage() {
               <br /><br />
               <strong>Kavach Security &amp; Privacy Office</strong><br />
               Attn: Data Protection Officer<br />
-              Email: <a href="mailto:privacy@kavach.security" style={{ color: '#09090B', fontWeight: 600 }}>privacy@kavach.security</a><br />
+              Email: <a href="mailto:privacy@kavachsecurity.me" style={{ color: '#09090B', fontWeight: 600 }}>privacy@kavachsecurity.me</a><br />
               Legal Address: 100 Montgomery St, Suite 2400, San Francisco, CA 94104
             </p>
           </section>

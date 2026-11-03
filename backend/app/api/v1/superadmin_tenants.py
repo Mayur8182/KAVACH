@@ -31,6 +31,7 @@ router = APIRouter(prefix="/superadmin/tenants", tags=["SuperAdmin — Tenant Ma
 # Founder SuperAdmin Authorization Dependency
 # ─────────────────────────────────────────────────────────────────────────────
 FOUNDER_SUPERADMIN_EMAILS = {
+    "admin@kavachsecurity.me",
     "mkbharvad7174@gmail.com",
     "mkbharvad534@gmail.com",
     "mkbharvad8080@gmail.com",

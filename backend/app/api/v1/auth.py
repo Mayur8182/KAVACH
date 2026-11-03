@@ -421,18 +421,32 @@ async def github_oauth_callback(
                 )
             gh_user = user_resp.json()
 
-            # 3. Fetch verified email if profile email is hidden
-            email = gh_user.get("email")
-            if not email:
-                emails_resp = await client.get("https://api.github.com/user/emails", headers=gh_headers)
-                if emails_resp.status_code == 200:
-                    emails = emails_resp.json()
+            # 3. Fetch verified email from identity provider (enforce verified email claim)
+            email = None
+            email_is_verified = False
+
+            emails_resp = await client.get("https://api.github.com/user/emails", headers=gh_headers)
+            if emails_resp.status_code == 200:
+                emails = emails_resp.json()
+                for em in emails:
+                    if em.get("primary") and em.get("verified"):
+                        email = em.get("email")
+                        email_is_verified = True
+                        break
+                if not email:
                     for em in emails:
-                        if em.get("primary") and em.get("verified"):
+                        if em.get("verified"):
                             email = em.get("email")
+                            email_is_verified = True
                             break
-                    if not email and emails:
-                        email = emails[0].get("email")
+                if not email and emails:
+                    email = emails[0].get("email")
+                    email_is_verified = bool(emails[0].get("verified", False))
+
+            if not email:
+                email = gh_user.get("email")
+                # Profile email from GitHub is verified if provided directly
+                email_is_verified = bool(email)
     except HTTPException:
         raise
     except httpx.TimeoutException:
@@ -448,9 +462,10 @@ async def github_oauth_callback(
 
     if not email:
         email = f"{gh_user.get('login')}@users.noreply.github.com"
-
+        email_is_verified = False
 
     FOUNDER_SUPERADMIN_EMAILS = {
+        "admin@kavachsecurity.me",
         "mkbharvad7174@gmail.com",
         "mkbharvad534@gmail.com",
         "mkbharvad8080@gmail.com",
@@ -459,7 +474,8 @@ async def github_oauth_callback(
         "mayur.k.bharvad@gmail.com",
         "dev@antigravity.security",
     }
-    is_founder_email = email.lower().strip() in FOUNDER_SUPERADMIN_EMAILS
+    # Enforce authoritative verified identity claim for SuperAdmin privilege grant
+    is_founder_email = (email.lower().strip() in FOUNDER_SUPERADMIN_EMAILS) and email_is_verified
 
     # 4. Find or create user in database
     user_service = UserService(db)

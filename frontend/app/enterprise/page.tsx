@@ -56,7 +56,7 @@ export default function EnterprisePage() {
       setMessage('');
     } catch (err: any) {
       console.error('Enterprise inquiry failed:', err);
-      setError(err?.message || 'Failed to submit inquiry. Please try again or email enterprise@seculayer.io.');
+      setError(err?.message || 'Failed to submit inquiry. Please try again or email sales@kavachsecurity.me.');
     } finally {
       setLoading(false);
     }

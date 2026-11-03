@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: 'SecuLayer Technical Documentation',
     description:
       'Architecture, API references, CLI integration, and deterministic security guides.',
-    url: 'https://seculayer.io/docs',
+    url: 'https://kavachsecurity.me/docs',
   },
 };
 

@@ -107,7 +107,7 @@ export default function LoginPage() {
 
   // Explicit demo credentials button for developer/evaluator convenience
   const handleUseDemoAccount = () => {
-    setEmail('admin@kavach.corp');
+    setEmail('admin@kavachsecurity.me');
     setPassword('KavachSecure2026!');
     setEmailTouched(true);
     setPasswordTouched(true);

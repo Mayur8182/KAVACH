@@ -1791,7 +1791,7 @@ Customer agrees to pay the Annual Contract Value of **${arr:,.2f} USD** payable 
         action="CONTRACT_GENERATED",
         resource_type="sales_agreement",
         actor_type="legal_counsel",
-        actor_id="legal@seculayer.io",
+        actor_id="legal@kavachsecurity.me",
         resource_id=contract_id,
         status="SUCCESS",
         metadata={

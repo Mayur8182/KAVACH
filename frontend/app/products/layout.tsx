@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: 'SecuLayer Security Products Suite',
     description:
       'Unified security control plane across code, cloud infrastructure, runtime containers, and autonomous AI tools.',
-    url: 'https://seculayer.io/products',
+    url: 'https://kavachsecurity.me/products',
   },
 };
 

@@ -471,7 +471,7 @@ export default function GlobalUIStateShowcasePage() {
       {/* Interactive Modals */}
       <SessionExpiredDialog
         isOpen={showSessionModal}
-        userEmail="security-lead@kavach.corp"
+        userEmail="security@kavachsecurity.me"
         onReauthenticate={async () => {
           await new Promise((r) => setTimeout(r, 600));
           setShowSessionModal(false);

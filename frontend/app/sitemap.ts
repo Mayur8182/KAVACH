@@ -7,7 +7,7 @@ import { MetadataRoute } from 'next';
  * - Zero private platform routes exposed in sitemap.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seculayer.io';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kavachsecurity.me';
   const currentDate = new Date().toISOString();
 
   const publicRoutes = [

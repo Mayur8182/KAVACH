@@ -58,7 +58,7 @@ export default function LegalCenterPage() {
     setTimeout(() => {
       setDsarSubmitting(false);
       toast.success('Privacy Request Received', {
-        description: 'Our Data Protection Officer (dpo@kavach.security) will verify and fulfill your request within 30 days.',
+        description: 'Our Data Protection Officer (privacy@kavachsecurity.me) will verify and fulfill your request within 30 days.',
       });
       setDsarName('');
       setDsarEmail('');
@@ -114,8 +114,8 @@ export default function LegalCenterPage() {
             </div>
             <div>
               <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>Legal & Commercial Requests</div>
-              <a href="mailto:legal@kavach.security" style={{ fontSize: '12px', color: '#2563EB', textDecoration: 'none', fontFamily: 'monospace' }}>
-                legal@kavach.security
+              <a href="mailto:legal@kavachsecurity.me" style={{ fontSize: '12px', color: '#2563EB', textDecoration: 'none', fontFamily: 'monospace' }}>
+                legal@kavachsecurity.me
               </a>
             </div>
           </div>
@@ -126,8 +126,8 @@ export default function LegalCenterPage() {
             </div>
             <div>
               <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>Security Vulnerability Reporting</div>
-              <a href="mailto:security@kavach.security" style={{ fontSize: '12px', color: '#059669', textDecoration: 'none', fontFamily: 'monospace' }}>
-                security@kavach.security
+              <a href="mailto:security@kavachsecurity.me" style={{ fontSize: '12px', color: '#059669', textDecoration: 'none', fontFamily: 'monospace' }}>
+                security@kavachsecurity.me
               </a>
             </div>
           </div>
@@ -138,8 +138,8 @@ export default function LegalCenterPage() {
             </div>
             <div>
               <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>Data Protection Officer (DPO)</div>
-              <a href="mailto:dpo@kavach.security" style={{ fontSize: '12px', color: '#DB2777', textDecoration: 'none', fontFamily: 'monospace' }}>
-                dpo@kavach.security
+              <a href="mailto:privacy@kavachsecurity.me" style={{ fontSize: '12px', color: '#DB2777', textDecoration: 'none', fontFamily: 'monospace' }}>
+                privacy@kavachsecurity.me
               </a>
             </div>
           </div>
@@ -396,7 +396,7 @@ export default function LegalCenterPage() {
                 3. Data Processing Agreement (DPA) & Standard Contractual Clauses (SCCs)
               </h3>
               <p>
-                Kavach offers a standardized Data Processing Addendum conforming to GDPR Article 28 and the European Commission Standard Contractual Clauses (Decision 2021/914/EU). To execute a countersigned DPA with custom data residency schedules, please contact <a href="mailto:dpo@kavach.security" style={{ color: '#2563EB' }}>dpo@kavach.security</a>.
+                Kavach offers a standardized Data Processing Addendum conforming to GDPR Article 28 and the European Commission Standard Contractual Clauses (Decision 2021/914/EU). To execute a countersigned DPA with custom data residency schedules, please contact <a href="mailto:privacy@kavachsecurity.me" style={{ color: '#2563EB' }}>privacy@kavachsecurity.me</a>.
               </p>
             </section>
           </div>
@@ -442,7 +442,7 @@ export default function LegalCenterPage() {
                 </div>
               </div>
               <p>
-                Send vulnerability reports with reproduction steps and proof-of-concept diffs to <a href="mailto:security@kavach.security" style={{ color: '#2563EB', fontWeight: 600 }}>security@kavach.security</a>. Our team acknowledges receipt within 24 hours.
+                Send vulnerability reports with reproduction steps and proof-of-concept diffs to <a href="mailto:security@kavachsecurity.me" style={{ color: '#2563EB', fontWeight: 600 }}>security@kavachsecurity.me</a>. Our team acknowledges receipt within 24 hours.
               </p>
             </section>
           </div>
@@ -493,7 +493,7 @@ export default function LegalCenterPage() {
                 3. 30-Day Money-Back Refund Policy
               </h3>
               <p>
-                If you are dissatisfied with Kavach for any reason within the first 30 days of purchasing a paid plan, contact <a href="mailto:billing@kavach.security" style={{ color: '#2563EB' }}>billing@kavach.security</a> for a full 100% refund without dispute or hassle.
+                If you are dissatisfied with Kavach for any reason within the first 30 days of purchasing a paid plan, contact <a href="mailto:billing@kavachsecurity.me" style={{ color: '#2563EB' }}>billing@kavachsecurity.me</a> for a full 100% refund without dispute or hassle.
               </p>
             </section>
 

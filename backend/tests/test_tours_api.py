@@ -11,7 +11,7 @@ async def test_tours_status_and_lifecycle():
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # Create a test token for an admin user
         token = create_access_token(
-            data={"sub": "admin@seculayer.io", "role": "admin"}
+            data={"sub": "admin@kavachsecurity.me", "role": "admin"}
         )
         headers = {"Authorization": f"Bearer {token}"}
 

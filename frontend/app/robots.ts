@@ -7,7 +7,7 @@ import { MetadataRoute } from 'next';
  * - SEO Rule 6: Private authenticated platform consoles strictly disallowed (noindex/nofollow).
  */
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seculayer.io';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kavachsecurity.me';
 
   return {
     rules: [

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: 'Contact SecuLayer Security Engineering',
     description:
       'Contact our team for enterprise inquiries, live architectural walkthroughs, and responsible disclosure.',
-    url: 'https://seculayer.io/contact',
+    url: 'https://kavachsecurity.me/contact',
   },
 };
 

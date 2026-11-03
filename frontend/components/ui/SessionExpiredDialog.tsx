@@ -12,7 +12,7 @@ export interface SessionExpiredDialogProps {
 
 export function SessionExpiredDialog({
   isOpen,
-  userEmail = 'security-engineer@kavach.corp',
+  userEmail = 'security@kavachsecurity.me',
   onReauthenticate,
   onClose,
 }: SessionExpiredDialogProps) {

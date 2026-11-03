@@ -30,6 +30,7 @@ router = APIRouter(prefix="/superadmin/entitlements", tags=["SuperAdmin - Featur
 # Founder SuperAdmin RBAC Guard
 # ─────────────────────────────────────────────────────────────────────────────
 FOUNDER_SUPERADMIN_EMAILS = {
+    "admin@kavachsecurity.me",
     "mkbharvad7174@gmail.com",
     "mkbharvad534@gmail.com",
     "mkbharvad8080@gmail.com",

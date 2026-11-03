@@ -55,7 +55,8 @@ class Settings(BaseSettings):
     # Mail / Invitation SMTP Configuration (Loaded from environment)
     mail_username: Optional[str] = Field(default=None, description="SMTP username / email from environment")
     mail_password: Optional[str] = Field(default=None, description="SMTP password / app password from environment")
-    mail_default_sender: Optional[str] = Field(default="security@seculayer.internal", description="Default sender address")
+    mail_default_sender: Optional[str] = Field(default="noreply@kavachsecurity.me", description="Default sender address")
+    mail_alerts_sender: str = Field(default="alerts@kavachsecurity.me", description="Security alerts sender address")
     mail_server: str = Field(default="smtp.gmail.com", description="SMTP server host")
     mail_port: int = Field(default=587, description="SMTP server port")
     mail_starttls: bool = Field(default=True, description="Enable STARTTLS for SMTP")
@@ -72,6 +73,9 @@ class Settings(BaseSettings):
             "http://127.0.0.1:3002",
             "http://localhost:5173",
             "http://127.0.0.1:5173",
+            "https://kavachsecurity.me",
+            "https://app.kavachsecurity.me",
+            "https://api.kavachsecurity.me",
         ],
         description="Allowed CORS origin domains",
     )

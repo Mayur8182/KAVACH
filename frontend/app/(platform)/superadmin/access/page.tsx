@@ -170,7 +170,7 @@ export default function AccessControlPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {currentUser?.email || 'admin@seculayer.io'}
+                  {currentUser?.email || 'admin@kavachsecurity.me'}
                 </p>
                 <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
                   <span>User ID: <span className="font-mono text-slate-600">{currentUser?.id || 'Normalized UUID'}</span></span>

@@ -1567,11 +1567,11 @@ export default function KavachHomePage() {
               </p>
               <div style={{ fontSize: '13px', color: '#64748B', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                 <a
-                  href="mailto:security@kavach.security"
+                  href="mailto:security@kavachsecurity.me"
                   style={{ color: '#64748B', textDecoration: 'none' }}
                   className="hover:text-slate-900"
                 >
-                  security@kavach.security
+                  security@kavachsecurity.me
                 </a>
                 <span>+1 (888) 732-8529</span>
               </div>

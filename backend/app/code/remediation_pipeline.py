@@ -582,8 +582,8 @@ class RemediationPipeline:
                 await _safe_run_subprocess(["git", "-C", target_ws, "checkout", "-B", branch])
                 if patch_diff:
                     self._apply_diff_manually(target_ws, patch_diff)
-                await _safe_run_subprocess(["git", "-C", target_ws, "config", "user.name", "Kavach AI Remediation"])
-                await _safe_run_subprocess(["git", "-C", target_ws, "config", "user.email", "remediation@kavach.security"])
+                await _safe_run_subprocess(["git", "-C", target_ws, "config", "user.name", "Kavach Bot"])
+                await _safe_run_subprocess(["git", "-C", target_ws, "config", "user.email", "bot@kavachsecurity.me"])
                 await _safe_run_subprocess(["git", "-C", target_ws, "add", "-A"])
                 
                 # Verify staged changes exist; if working tree was already clean, add automated audit record

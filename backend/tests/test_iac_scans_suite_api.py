@@ -9,7 +9,7 @@ app = create_application()
 
 test_user = User(
     id=uuid.uuid4(),
-    email="admin@seculayer.io",
+    email="admin@kavachsecurity.me",
     password_hash="testhash",
     name="Dev Security",
     is_active=True,

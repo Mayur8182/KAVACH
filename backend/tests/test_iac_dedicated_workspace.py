@@ -25,7 +25,7 @@ app = create_application()
 
 test_user = User(
     id=uuid.uuid4(),
-    email="iac-engineer@kavach.security",
+    email="iac-engineer@kavachsecurity.me",
     password_hash="testhash123",
     name="DevSecOps Lead",
     is_active=True,

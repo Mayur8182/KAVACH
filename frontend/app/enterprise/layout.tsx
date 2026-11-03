@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: 'SecuLayer Enterprise Security Blueprint',
     description:
       'SOC 2 Type II, SLSA Level 3 provenance, and dedicated multi-cloud security architecture for high-compliance engineering orgs.',
-    url: 'https://seculayer.io/enterprise',
+    url: 'https://kavachsecurity.me/enterprise',
   },
 };
 

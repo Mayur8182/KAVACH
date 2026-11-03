@@ -6,7 +6,7 @@ import { CookieConsentBanner } from '@/components/common/CookieConsentBanner';
 import { AgentationDevTool } from '@/components/dev/AgentationDevTool';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seculayer.io';
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kavachsecurity.me';
 
 export const viewport: Viewport = {
   themeColor: '#0F172A',

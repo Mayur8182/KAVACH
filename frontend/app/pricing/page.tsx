@@ -531,8 +531,8 @@ export default function PricingPage() {
               Data Processing Agreement (DPA) &rarr;
             </Link>
             <span style={{ color: '#CBD5E1' }}>•</span>
-            <a href="mailto:billing@kavach.security" style={{ color: '#64748B', textDecoration: 'none' }}>
-              billing@kavach.security
+            <a href="mailto:billing@kavachsecurity.me" style={{ color: '#64748B', textDecoration: 'none' }}>
+              billing@kavachsecurity.me
             </a>
           </div>
         </div>

@@ -31,6 +31,7 @@ from app.models.user import User
 router = APIRouter(prefix="/superadmin", tags=["SuperAdmin — Platform Governance & Reality APIs"])
 
 FOUNDER_SUPERADMIN_EMAILS = {
+    "admin@kavachsecurity.me",
     "mkbharvad7174@gmail.com",
     "mkbharvad534@gmail.com",
     "mkbharvad8080@gmail.com",

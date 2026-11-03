@@ -24,7 +24,8 @@ class EmailService:
     def __init__(self):
         self.username = settings.mail_username
         self.password = settings.mail_password
-        self.default_sender = settings.mail_default_sender or self.username
+        self.default_sender = settings.mail_default_sender or "noreply@kavachsecurity.me"
+        self.alerts_sender = getattr(settings, "mail_alerts_sender", "alerts@kavachsecurity.me")
         self.smtp_server = settings.mail_server
         self.smtp_port = settings.mail_port
         self.starttls = settings.mail_starttls
@@ -57,17 +58,17 @@ class EmailService:
         invite_url: str,
         inviter_name: Optional[str] = None,
         inviter_email: Optional[str] = None,
-        organization_name: str = "SecuLayer Control Plane",
+        organization_name: str = "Kavach Control Plane",
         message: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Sends a real team invitation email with a secure acceptance token.
         """
-        sender_display = f"SecuLayer Team <{self.default_sender}>"
+        sender_display = f"Kavach Security <{self.default_sender}>"
         inviter_display = inviter_name or inviter_email or "An Administrator"
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"Invitation to join {organization_name} on SecuLayer"
+        msg["Subject"] = f"Invitation to join {organization_name} on Kavach"
         msg["From"] = sender_display
         msg["To"] = recipient_email
 
@@ -85,7 +86,7 @@ To accept your invitation and access your security workspace, click the link bel
 This invitation link is valid for 7 days.
 If you were not expecting this invitation, you can safely ignore this email.
 
-SecuLayer Security Team
+Kavach Security Team
 """
 
         # HTML body with modern design system styling
@@ -205,7 +206,7 @@ SecuLayer Security Team
         This link is cryptographically signed and expires in 7 days.<br>
         If you did not request this invitation, no action is required.
       </p>
-      <p>&copy; 2026 SecuLayer Inc. All rights reserved.</p>
+      <p>&copy; 2026 Kavach Security Inc. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -242,25 +243,25 @@ SecuLayer Security Team
         Sends account email verification link with real SMTP delivery.
         """
         display_name = user_name or recipient_email.split('@')[0]
-        sender_display = f"SecuLayer Security <{self.default_sender}>"
+        sender_display = f"Kavach Security <{self.default_sender}>"
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Verify your SecuLayer Security Account"
+        msg["Subject"] = "Verify your Kavach Security Account"
         msg["From"] = sender_display
         msg["To"] = recipient_email
 
         text_body = f"""
 Hello {display_name},
 
-Thank you for registering with SecuLayer Security Control Plane.
+Thank you for registering with Kavach Security Control Plane.
 Please verify your email address by opening the following link in your browser:
 
 {verification_url}
 
 This verification link is valid for 15 minutes.
-If you did not create an account on SecuLayer, please disregard this email.
+If you did not create an account on Kavach, please disregard this email.
 
-SecuLayer Security Operations
+Kavach Security Operations
 """
 
         html_body = f"""
@@ -336,7 +337,7 @@ SecuLayer Security Operations
     <h1>Verify Your Email Address</h1>
     <p>Hello <strong>{display_name}</strong>,</p>
     <p>
-      Thank you for creating your account on <strong>SecuLayer</strong>.
+      Thank you for creating your account on <strong>Kavach</strong>.
       Please verify your email address to activate your security workspace and enable MFA protection.
     </p>
 
@@ -354,9 +355,9 @@ SecuLayer Security Operations
     <div class="footer">
       <p>
         This link is cryptographically signed and expires in 15 minutes.<br>
-        If you did not register for SecuLayer, no further action is required.
+        If you did not register for Kavach, no further action is required.
       </p>
-      <p>&copy; 2026 SecuLayer Inc. All rights reserved.</p>
+      <p>&copy; 2026 Kavach Security Inc. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -383,17 +384,17 @@ SecuLayer Security Operations
         Sends password reset link with real SMTP delivery.
         """
         display_name = user_name or recipient_email.split('@')[0]
-        sender_display = f"SecuLayer Security <{self.default_sender}>"
+        sender_display = f"Kavach Security <{self.default_sender}>"
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Password Reset Request — SecuLayer"
+        msg["Subject"] = "Password Reset Request — Kavach"
         msg["From"] = sender_display
         msg["To"] = recipient_email
 
         text_body = f"""
 Hello {display_name},
 
-A password reset was requested for your SecuLayer account.
+A password reset was requested for your Kavach account.
 To reset your password, visit the following URL:
 
 {reset_url}
@@ -401,7 +402,7 @@ To reset your password, visit the following URL:
 This link is valid for 30 minutes.
 If you did not request a password reset, please secure your account immediately or contact your administrator.
 
-SecuLayer Security Team
+Kavach Security Team
 """
 
         html_body = f"""
@@ -496,7 +497,7 @@ SecuLayer Security Team
       <p>
         This link expires in 30 minutes. If you did not request a password reset, you can safely ignore this email.
       </p>
-      <p>&copy; 2026 SecuLayer Inc. All rights reserved.</p>
+      <p>&copy; 2026 Kavach Security Inc. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -523,24 +524,24 @@ SecuLayer Security Team
         Sends emergency MFA recovery code to user via real SMTP.
         """
         display_name = user_name or recipient_email.split('@')[0]
-        sender_display = f"SecuLayer Security <{self.default_sender}>"
+        sender_display = f"Kavach Security <{self.default_sender}>"
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Emergency MFA Recovery Code — SecuLayer"
+        msg["Subject"] = "Emergency MFA Recovery Code — Kavach"
         msg["From"] = sender_display
         msg["To"] = recipient_email
 
         text_body = f"""
 Hello {display_name},
 
-Here is your emergency MFA recovery code for SecuLayer:
+Here is your emergency MFA recovery code for Kavach:
 
 {recovery_code}
 
 Use this one-time code on the MFA Recovery page to bypass 2FA and access your account.
 This code is valid for 15 minutes.
 
-SecuLayer Security Team
+Kavach Security Team
 """
 
         html_body = f"""
@@ -779,6 +780,107 @@ Kavach Security Team
             return {"success": True, "recipient": recipient_email, "details": res}
         except Exception as exc:
             logger.error(f"Failed to deliver unlock OTP to {recipient_email}: {exc}", exc_info=True)
+            return {"success": False, "recipient": recipient_email, "error": str(exc)}
+
+    async def send_security_alert_email(
+        self,
+        recipient_email: str,
+        alert_title: str,
+        alert_details: str,
+        severity: str = "HIGH",
+    ) -> Dict[str, Any]:
+        """
+        Dispatches real-time security alerts via alerts@kavachsecurity.me.
+        """
+        sender_display = f"Kavach Security Alerts <{self.alerts_sender}>"
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"[{severity.upper()}] Kavach Security Alert: {alert_title}"
+        msg["From"] = sender_display
+        msg["To"] = recipient_email
+
+        text_body = f"""Kavach Security Alert Notification
+Severity: {severity.upper()}
+Title: {alert_title}
+
+Details:
+{alert_details}
+
+Review and triage this security event immediately in your Kavach Control Plane dashboard.
+Kavach Automated Security Engine
+alerts@kavachsecurity.me
+"""
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0F172A;
+      margin: 0;
+      padding: 40px 20px;
+      color: #F8FAFC;
+    }}
+    .container {{
+      max-width: 560px;
+      margin: 0 auto;
+      background-color: #1E293B;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      padding: 32px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }}
+    .badge {{
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background-color: #EF4444;
+      color: #FFFFFF;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }}
+    h1 {{
+      font-size: 18px;
+      font-weight: 700;
+      color: #F8FAFC;
+      margin: 14px 0 8px 0;
+    }}
+    .alert-box {{
+      background-color: #0F172A;
+      border-left: 4px solid #EF4444;
+      padding: 16px;
+      margin: 16px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 13px;
+      color: #E2E8F0;
+      line-height: 1.6;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="badge">Security Alert &bull; {severity.upper()}</div>
+    <h1>{alert_title}</h1>
+    <div class="alert-box">{alert_details}</div>
+    <p style="font-size: 13px; color: #94A3B8; margin-top: 24px;">
+      Dispatched by Kavach Security Automation Engine. For inquiries: alerts@kavachsecurity.me.
+    </p>
+  </div>
+</body>
+</html>
+"""
+        msg.attach(MIMEText(text_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        try:
+            res = await asyncio.to_thread(self._send_sync, msg, recipient_email)
+            return {"success": True, "recipient": recipient_email, "details": res}
+        except Exception as exc:
+            logger.error(f"Failed to deliver security alert to {recipient_email}: {exc}", exc_info=True)
             return {"success": False, "recipient": recipient_email, "error": str(exc)}
 
 

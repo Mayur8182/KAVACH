@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: 'Terms of Service | Kavach',
     description:
       'Customer code ownership guarantees, deterministic governance, cancellation terms, and enterprise SLA.',
-    url: 'https://kavach.security/terms',
+    url: 'https://kavachsecurity.me/terms',
   },
 };
 
@@ -86,7 +86,7 @@ export default function TermsPage() {
               </div>
               <ul style={{ paddingLeft: '20px', margin: 0, color: '#52525B', fontSize: '13px' }}>
                 <li><strong>Self-Serve Subscriptions (Pro / Team):</strong> You may cancel your subscription at any time via Account Settings → Billing. Cancellation takes effect at the conclusion of the current monthly or annual billing cycle, with no subsequent charges.</li>
-                <li><strong>14-Day Evaluation Refund Guarantee:</strong> If you are dissatisfied with Kavach within the first 14 calendar days of your initial paid subscription, contact <code>billing@kavach.security</code> for a full, no-questions-asked refund.</li>
+                <li><strong>14-Day Evaluation Refund Guarantee:</strong> If you are dissatisfied with Kavach within the first 14 calendar days of your initial paid subscription, contact <code>billing@kavachsecurity.me</code> for a full, no-questions-asked refund.</li>
                 <li><strong>Enterprise Contracts:</strong> Enterprise agreements are governed by the specific terms detailed in the executed Master Services Agreement (MSA) and Statement of Work (SOW).</li>
               </ul>
             </div>

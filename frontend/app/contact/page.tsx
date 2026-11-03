@@ -211,7 +211,7 @@ export default function ContactPage() {
 
       setMsgSuccess(res);
     } catch (err: any) {
-      setMsgError(err?.message || 'Failed to transmit message. Please email hello@kavach.security.');
+      setMsgError(err?.message || 'Failed to transmit message. Please email support@kavachsecurity.me.');
     } finally {
       setMsgLoading(false);
     }
@@ -377,7 +377,7 @@ export default function ContactPage() {
           {/* Card 3: Email us */}
           <div
             onClick={() => {
-              window.location.href = 'mailto:hello@kavach.security';
+              window.location.href = 'mailto:support@kavachsecurity.me';
             }}
             style={{
               backgroundColor: '#FFFFFF',
@@ -409,7 +409,7 @@ export default function ContactPage() {
               Email us
             </h3>
             <p style={{ fontSize: '14px', color: '#71717A', margin: '0 0 20px 0', lineHeight: 1.4 }}>
-              hello@kavach.security, for anything at all.
+              support@kavachsecurity.me, for anything at all.
             </p>
             <div
               style={{
@@ -421,7 +421,7 @@ export default function ContactPage() {
                 gap: '4px',
               }}
             >
-              <span>hello@kavach.security</span>
+              <span>support@kavachsecurity.me</span>
               <span style={{ fontSize: '16px' }}>&gt;</span>
             </div>
           </div>
@@ -592,8 +592,8 @@ export default function ContactPage() {
 
               <div style={{ marginTop: '48px', fontSize: '13px', color: '#A1A1AA' }}>
                 The calendar didn&apos;t load? Email{' '}
-                <a href="mailto:hello@kavach.security" style={{ color: '#2563EB', textDecoration: 'none' }}>
-                  hello@kavach.security
+                <a href="mailto:support@kavachsecurity.me" style={{ color: '#2563EB', textDecoration: 'none' }}>
+                  support@kavachsecurity.me
                 </a>{' '}
                 and we&apos;ll send you times.
               </div>
