@@ -1,0 +1,21 @@
+id: unsafe-file-upload
+title: Unsafe File Upload Handling
+severity: high
+risk_level: High
+category: Input Validation
+cwe: CWE-434
+owasp: A04:2021-Insecure Design
+cvss_score: "8.1 (High)"
+patterns:
+  - "multer("
+  - "file.save("
+  - "upload.single("
+  - "upload.array("
+  - "fs.writeFileSync("
+description: "Handling file uploads without validating file extensions, content-type headers, and byte magic numbers."
+remediation: "Verify file extension against an allowlist, validate MIME types from actual file headers, generate random stored file names, and store uploads on an isolated object store."
+references:
+  - title: "OWASP File Upload Cheat Sheet"
+    url: "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html"
+  - title: "CWE-434: Unrestricted Upload of File with Dangerous Type"
+    url: "https://cwe.mitre.org/data/definitions/434.html"

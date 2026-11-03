@@ -15,14 +15,67 @@ logger = logging.getLogger("secure-control-plane")
 
 settings = get_settings()
 
-# Create Async Engine with connection pooling and health pre-ping
+import os
+
+# Resolve database URL robustly (especially for SQLite file paths and MongoDB URLs)
+raw_db_url = settings.database_url
+if raw_db_url.startswith(("mongodb://", "mongodb+srv://")):
+    # SQLAlchemy requires an async SQL dialect, whereas MongoDB is managed by app.core.mongo
+    if not getattr(settings, "mongodb_url", None):
+        settings.mongodb_url = raw_db_url
+    raw_db_url = getattr(settings, "sql_database_url", "sqlite+aiosqlite:///backend/dev.db")
+
+if raw_db_url.startswith("sqlite+aiosqlite:///"):
+    sqlite_path = raw_db_url.replace("sqlite+aiosqlite:///", "")
+    # If not absolute, search in expected locations
+    if not os.path.isabs(sqlite_path) and not os.path.exists(sqlite_path):
+        candidates = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dev.db")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend", "dev.db")),
+            os.path.abspath("dev.db"),
+            os.path.abspath("backend/dev.db"),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                clean_path = c.replace("\\", "/")
+                raw_db_url = f"sqlite+aiosqlite:///{clean_path}"
+                break
+
+engine_kwargs: Dict[str, Any] = {
+    "echo": False,
+    "pool_pre_ping": True,
+}
+if "sqlite" not in raw_db_url:
+    engine_kwargs["pool_size"] = 20
+    engine_kwargs["max_overflow"] = 40
+    engine_kwargs["pool_recycle"] = 1800  # Recycle connections after 30 minutes to prevent stale dropped connections
+    engine_kwargs["pool_timeout"] = 30.0  # Timeout for acquiring a connection from pool
+else:
+    engine_kwargs["connect_args"] = {"timeout": 60.0, "check_same_thread": False}
+
+from sqlalchemy import event
+
+# Create Async Engine with health pre-ping
 engine: AsyncEngine = create_async_engine(
-    settings.database_url,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    raw_db_url,
+    **engine_kwargs,
 )
+
+if "sqlite" in raw_db_url:
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=60000")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA cache_size=-64000")  # 64MB in-memory page cache (ultra fast)
+            cursor.execute("PRAGMA temp_store=MEMORY")   # In-memory temporary tables & indices
+            cursor.execute("PRAGMA mmap_size=268435456") # 256MB zero-copy memory-mapped I/O
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+        except Exception:
+            pass
 
 # Async Session Factory
 AsyncSessionLocal = async_sessionmaker(
@@ -31,6 +84,22 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
     autoflush=False,
 )
+
+_session_factory = None
+
+
+def get_session_factory():
+    """Returns the active async session factory (defaults to AsyncSessionLocal, overridable in tests)."""
+    global _session_factory
+    if _session_factory is not None:
+        return _session_factory
+    return AsyncSessionLocal
+
+
+def set_session_factory(factory):
+    """Sets a custom session factory (e.g. TestingSessionLocal for tests)."""
+    global _session_factory
+    _session_factory = factory
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

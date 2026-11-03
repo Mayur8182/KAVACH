@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, List, Optional, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 from app.engines.scanner.models import (
     FullScanVerificationResult,
     NormalizedFindingCandidate,
@@ -76,14 +76,65 @@ class SecurityVerificationEngine:
     def __init__(self, registry: ScannerRegistry = default_scanner_registry) -> None:
         self.registry = registry
 
+    async def verify_target(
+        self,
+        target: ScanTarget,
+        selected_scanners: Optional[List[str]] = None,
+        blueprint_requirements: Optional[List[Dict]] = None,
+        on_event: Optional[Callable[[str, str, Dict[str, Any]], Awaitable[None]]] = None,
+    ) -> FullScanVerificationResult:
+        """Executes full scan and evaluates target against requirements."""
+        return await self.execute_scan(target, selected_scanners, blueprint_requirements, on_event=on_event)
+
     async def execute_scan(
         self,
         target: ScanTarget,
         selected_scanners: Optional[List[str]] = None,
         blueprint_requirements: Optional[List[Dict]] = None,
+        on_event: Optional[Callable[[str, str, Dict[str, Any]], Awaitable[None]]] = None,
     ) -> FullScanVerificationResult:
         scanners = self.registry.get_scanners_by_names(selected_scanners)
-        execution_tasks = [s.scan(target) for s in scanners]
+
+        async def _run_monitored(s):
+            if on_event:
+                try:
+                    await on_event(s.scanner_name, "STARTING", {"engine": s.scanner_name, "type": s.scanner_type})
+                except Exception:
+                    pass
+            try:
+                res: ScannerExecutionResult = await s.scan(target)
+                if on_event:
+                    try:
+                        await on_event(s.scanner_name, "COMPLETED" if res.status == "COMPLETED" else "FAILED", {
+                            "engine": s.scanner_name,
+                            "type": s.scanner_type,
+                            "status": res.status,
+                            "finding_count": len(res.findings),
+                            "duration_ms": res.duration_ms,
+                            "error_message": res.error_message,
+                            "stdout_summary": res.stdout_summary,
+                            "stderr_output": res.stderr_output,
+                            "exit_code": res.exit_code,
+                            "scanner_version": res.scanner_version,
+                            "command": res.command,
+                        })
+                    except Exception:
+                        pass
+                return res
+            except Exception as exc:
+                if on_event:
+                    try:
+                        await on_event(s.scanner_name, "FAILED", {
+                            "engine": s.scanner_name,
+                            "type": s.scanner_type,
+                            "status": "FAILED",
+                            "error_message": str(exc),
+                        })
+                    except Exception:
+                        pass
+                raise
+
+        execution_tasks = [_run_monitored(s) for s in scanners]
 
         # Execute all selected scanners concurrently
         execution_results: List[ScannerExecutionResult] = await asyncio.gather(
@@ -91,15 +142,14 @@ class SecurityVerificationEngine:
             return_exceptions=False,
         )
 
-        # Aggregate and deduplicate findings by fingerprint
-        seen_fingerprints: Set[str] = set()
-        all_findings: List[NormalizedFindingCandidate] = []
+        # Perform cross-scanner correlation, deduplication, and evidence preservation
+        from app.engines.orchestrator.deduplication import CrossScannerDeduplicator
 
-        for exec_res in execution_results:
-            for f in exec_res.findings:
-                if f.fingerprint not in seen_fingerprints:
-                    seen_fingerprints.add(f.fingerprint)
-                    all_findings.append(f)
+        deduplicator = CrossScannerDeduplicator()
+        correlated_findings, dedup_summary = deduplicator.process_scanner_executions(execution_results)
+
+        # Convert to NormalizedFindingCandidates with rich provenance metadata for DB persistence
+        all_findings = [deduplicator.to_normalized_candidate(cf) for cf in correlated_findings]
 
         # Evaluate Step 5 Blueprint Requirements based on real scanner evidence
         verifications = self.evaluate_requirements(
@@ -121,6 +171,8 @@ class SecurityVerificationEngine:
             verifications=verifications,
             scanner_count=len(execution_results),
             finding_count=len(all_findings),
+            correlated_findings=correlated_findings,
+            deduplication_summary=dedup_summary.model_dump(),
         )
 
     def evaluate_requirements(

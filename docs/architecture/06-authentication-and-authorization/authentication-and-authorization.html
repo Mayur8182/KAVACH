@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer Control Plane — Authentication &amp; Authorization</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --soft: #94a3b8;
+      --line: #e2e8f0;
+      --line-strong: #cbd5e1;
+      --accent: #ea580c;
+      --accent-tint: rgba(234, 88, 12, 0.08);
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+      --font-mono: "Geist Mono", monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--ink);
+      padding: 40px 24px;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+    header.header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    p.lead {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+      max-width: 860px;
+    }
+    .diagram-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .diagram-scroll {
+      width: 100%;
+      overflow-x: auto;
+      padding: 32px 24px;
+      background: var(--paper);
+    }
+    svg.canvas {
+      display: block;
+      margin: 0 auto;
+      min-width: 1100px;
+    }
+    .diagram-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: #f1f5f9;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .source-panel {
+      margin-top: 24px;
+      background: #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .source-header {
+      padding: 10px 16px;
+      background: #1e293b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cbd5e1;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    pre.code-block {
+      padding: 16px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="eyebrow">Fig. 06 · Zero-Trust Identity Pipeline</div>
+      <h1>Authentication, MFA &amp; Multi-Tenant Scoping Flow</h1>
+      <p class="lead">From ingress credential validation through JWT token extraction, TOTP verification, organization boundary gating, and RBAC policy enforcement.</p>
+    </header>
+
+    <div class="diagram-card">
+      <div class="diagram-scroll">
+        <svg class="canvas" viewBox="0 0 1100 680" width="1100" height="680" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569" />
+            </marker>
+            <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ea580c" />
+            </marker>
+            <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.04" />
+            </filter>
+          </defs>
+
+          <!-- Zones -->
+          <rect x="40" y="40" width="250" height="600" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="52" y="32" width="180" height="18" fill="#ffffff" />
+          <text x="56" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b">ACTORS &amp; CREDENTIALS</text>
+
+          <rect x="330" y="40" width="380" height="600" rx="8" fill="#fafafa" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="342" y="32" width="220" height="18" fill="#ffffff" />
+          <text x="346" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#ea580c">VERIFICATION &amp; RBAC GATES</text>
+
+          <rect x="750" y="40" width="310" height="600" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,4" />
+          <rect x="762" y="32" width="200" height="18" fill="#ffffff" />
+          <text x="766" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b">ISOLATED TENANT STORAGE</text>
+
+          <!-- Connectors -->
+          <!-- Human Login -> Auth Gateway -->
+          <path d="M 270 115 H 360" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="315" y="108" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">Credentials</text>
+
+          <!-- OAuth -> Callback -->
+          <path d="M 270 235 H 360" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <text x="315" y="228" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">OAuth Code</text>
+
+          <!-- API Key / Agent -> Gateway -->
+          <path d="M 270 355 H 360" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <text x="315" y="348" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">X-API-Key</text>
+
+          <!-- JWT Validation -> MFA Check -->
+          <path d="M 520 160 V 195" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- MFA Check -> Tenant Scoping -->
+          <path d="M 520 270 V 305" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Tenant Scoping -> RBAC Matrix -->
+          <path d="M 520 380 V 415" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+
+          <!-- RBAC -> Tenant-isolated DB Query -->
+          <path d="M 680 460 H 770" fill="none" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="725" y="452" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a" text-anchor="middle">Scoped Query</text>
+
+          <!-- Failed Auth -> Lockout Counter -->
+          <path d="M 360 140 H 310 Q 300 140 300 160 V 500 Q 300 520 340 520 H 360" fill="none" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arrow)" />
+          <text x="290" y="330" font-family="'Geist Mono', monospace" font-size="8" fill="#dc2626" transform="rotate(-90, 290, 330)" text-anchor="middle">5x Fail -> Lock Account</text>
+
+          <!-- Nodes: Actors & Credentials -->
+          <g transform="translate(60, 75)" filter="url(#shadow)">
+            <rect width="210" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">HUMAN DEVELOPER</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Email &amp; Password</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Salted bcrypt Hash</text>
+          </g>
+
+          <g transform="translate(60, 195)" filter="url(#shadow)">
+            <rect width="210" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">FEDERATED SSO</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">GitHub / Google OAuth</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Enterprise SAML / OIDC</text>
+          </g>
+
+          <g transform="translate(60, 315)" filter="url(#shadow)">
+            <rect width="210" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">MACHINE / AGENT</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">PAT &amp; Agent Tokens</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">SHA-256 Hashed API Keys</text>
+          </g>
+
+          <!-- Nodes: Verification & Gates -->
+          <g transform="translate(360, 75)" filter="url(#shadow)">
+            <rect width="320" height="85" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">TOKEN EXTRACTION &amp; EXPIRY</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">1. JWT Bearer Verification</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Signature, Expiration &amp; Revocation Check</text>
+            <text x="14" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[VERIFIED ZERO-TRUST DECODER]</text>
+          </g>
+
+          <g transform="translate(360, 195)" filter="url(#shadow)">
+            <rect width="320" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">RFC 6238 TOTP</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">2. Two-Factor Authentication</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">TOTP Code / Trusted Device Fingerprint</text>
+          </g>
+
+          <g transform="translate(360, 305)" filter="url(#shadow)">
+            <rect width="320" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">HEADER: X-ORGANIZATION-ID</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">3. Tenant Isolation Boundary</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Asserts caller belongs to requested organization</text>
+          </g>
+
+          <g transform="translate(360, 415)" filter="url(#shadow)">
+            <rect width="320" height="90" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+            <rect x="0" y="0" width="5" height="90" rx="2" fill="#ea580c" />
+            <text x="16" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">AUTHORIZATION MATRIX</text>
+            <text x="16" y="40" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">4. RBAC Policy Enforcement</text>
+            <text x="16" y="58" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Roles: OWNER · ADMIN · MEMBER · VIEWER</text>
+            <text x="16" y="72" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[STRICT ACCESS CONTROL]</text>
+          </g>
+
+          <g transform="translate(360, 530)" filter="url(#shadow)">
+            <rect width="320" height="75" rx="6" fill="#ffffff" stroke="#fca5a5" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#dc2626">BRUTE FORCE PREVENTION</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#991b1b">Account Lockout Tracker</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">5 Failed Logins -> Locked for 30m</text>
+          </g>
+
+          <!-- Nodes: Isolated Tenant Storage -->
+          <g transform="translate(770, 415)" filter="url(#shadow)">
+            <rect width="270" height="110" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">STRICT ORG ROW-LEVEL FILTER</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">PostgreSQL Scoped Queries</text>
+            <text x="14" y="56" font-family="'Geist Mono', monospace" font-size="8" fill="#0f172a">WHERE organization_id = :org_id</text>
+            <text x="14" y="72" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Projects, Repos, Scans, Findings</text>
+            <text x="14" y="88" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[PROVEN TENANT ISOLATION]</text>
+          </g>
+
+          <!-- Legend -->
+          <g transform="translate(60, 620)">
+            <circle cx="6" cy="6" r="4" fill="#ea580c" />
+            <text x="16" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Focal RBAC Gate</text>
+            <circle cx="160" cy="6" r="4" fill="#16a34a" />
+            <text x="170" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Scoped DB Access</text>
+            <circle cx="330" cy="6" r="4" fill="#dc2626" />
+            <text x="340" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Account Lockout Path</text>
+          </g>
+        </svg>
+      </div>
+      <div class="diagram-footer">
+        <span>FIG. 06 · AUTHENTICATION &amp; AUTHORIZATION</span>
+        <span>STANDALONE SVG · NO EXTERNAL ASSETS</span>
+        <span>GROUND TRUTH: BACKEND/APP/API/V1/AUTH.PY</span>
+      </div>
+    </div>
+
+    <!-- Editable Source Panel -->
+    <div class="source-panel">
+      <div class="source-header">
+        <span>EDITABLE MERMAID SOURCE (FOR MAINTENANCE &amp; GITHUB PREVIEWS)</span>
+        <span>COPY / PASTE READY</span>
+      </div>
+      <pre class="code-block"><code>graph LR
+    subgraph Ingress["1. ACTORS &amp; CREDENTIALS"]
+        USER["Developer<br/><small>Password + bcrypt</small>"]
+        OAUTH["OAuth SSO<br/><small>GitHub / Google</small>"]
+        AGENT["AI Agent / PAT<br/><small>SHA-256 API Key</small>"]
+    end
+
+    subgraph Gates["2. VERIFICATION &amp; RBAC GATES"]
+        JWT["1. JWT Token Verification<br/><small>Signature &amp; Expiry</small>"]
+        MFA["2. TOTP 2FA Verification<br/><small>RFC 6238</small>"]
+        TENANT["3. Tenant Isolation Boundary<br/><small>X-Organization-Id</small>"]
+        RBAC{"4. RBAC Policy Enforcement<br/><small>OWNER / ADMIN / MEMBER</small>"}
+        LOCKOUT["Brute Force Tracker<br/><small>5x Fail Lockout</small>"]
+    end
+
+    subgraph Storage["3. ISOLATED STORAGE"]
+        DB[("PostgreSQL Scoped Queries<br/><small>WHERE organization_id = :org_id</small>")]
+    end
+
+    USER --> JWT
+    OAUTH --> JWT
+    AGENT --> JWT
+    JWT --> MFA
+    MFA --> TENANT
+    TENANT --> RBAC
+    RBAC -->|Authorized| DB
+    USER -.->|Failure Loop| LOCKOUT
+
+    classDef focal stroke:#ea580c,stroke-width:2px;
+    class RBAC,JWT focal;</code></pre>
+    </div>
+  </div>
+</body>
+</html>

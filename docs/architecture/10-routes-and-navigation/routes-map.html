@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer — Routes & Navigation Hierarchy Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --subtle: #94a3b8;
+      --border: #e2e8f0;
+      --accent: #ea580c;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      padding: 48px;
+      line-height: 1.5;
+    }
+    header {
+      max-width: 1400px;
+      margin: 0 auto 36px auto;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+      display: inline-block;
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 2px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 38px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .description {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 880px;
+    }
+    .canvas-card {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      padding: 32px;
+      overflow-x: auto;
+    }
+    svg {
+      display: block;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+    .mermaid-source {
+      max-width: 1400px;
+      margin: 36px auto 0 auto;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 24px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    .mermaid-source pre {
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="eyebrow">Next.js 15 App Router · Route Taxonomy & Page Mapping</div>
+    <h1>Product Navigation & Route Tree Map</h1>
+    <p class="description">
+      Full structural decomposition of Next.js 15 App Router routes across Public Auth, Dashboard Core, Product Modules
+      (Code, Cloud, Attack, Protect, Compliance), and Organization Settings. Links each frontend route to its corresponding FastAPI backend handler.
+    </p>
+  </header>
+
+  <div class="canvas-card">
+    <svg width="1280" height="740" viewBox="0 0 1280 740" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#0f172a" />
+        </marker>
+        <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#ea580c" />
+        </marker>
+      </defs>
+
+      <!-- App Root -->
+      <rect x="40" y="320" width="180" height="80" rx="8" fill="#0f172a" stroke="#0f172a" stroke-width="1.5" />
+      <text x="60" y="355" font-family="'Geist', sans-serif" font-size="16" font-weight="600" fill="#ffffff">Root Router</text>
+      <text x="60" y="375" font-family="'Geist Mono', monospace" font-size="12" fill="#94a3b8">frontend/app/</text>
+
+      <!-- Branch 1: Auth & Onboarding -->
+      <rect x="280" y="60" width="220" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="300" y="88" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">(auth) Group</text>
+      <text x="300" y="110" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/login &middot; /register</text>
+      <text x="300" y="130" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/mfa &middot; /forgot-password</text>
+      <text x="300" y="150" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; [VERIFIED] JWT / TOTP</text>
+
+      <!-- Branch 2: Dashboard Overview -->
+      <rect x="280" y="200" width="220" height="90" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="300" y="228" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Dashboard Home</text>
+      <text x="300" y="250" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/dashboard</text>
+      <text x="300" y="270" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; [VERIFIED] /metrics API</text>
+
+      <!-- Branch 3: Product Modules Trunk -->
+      <rect x="280" y="320" width="220" height="150" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+      <text x="300" y="348" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Product Modules</text>
+      <text x="300" y="370" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">&bull; Thing Code</text>
+      <text x="300" y="390" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">&bull; Thing Cloud</text>
+      <text x="300" y="410" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">&bull; Thing Attack</text>
+      <text x="300" y="430" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">&bull; Thing Protect</text>
+      <text x="300" y="450" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">&bull; Thing Compliance</text>
+
+      <!-- Branch 4: Settings & Org -->
+      <rect x="280" y="500" width="220" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="300" y="528" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Settings & Control</text>
+      <text x="300" y="550" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/settings/organization</text>
+      <text x="300" y="570" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/settings/members &middot; /billing</text>
+      <text x="300" y="590" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; [VERIFIED] RBAC & Quotas</text>
+
+      <!-- Root to Branches Connectors -->
+      <path d="M 220 360 L 250 360 Q 260 360 260 115 L 280 115" stroke="#0f172a" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+      <path d="M 220 360 L 250 360 Q 260 360 260 245 L 280 245" stroke="#0f172a" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+      <path d="M 220 360 L 280 360" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+      <path d="M 220 360 L 250 360 Q 260 360 260 555 L 280 555" stroke="#0f172a" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+
+      <!-- Module Leaf 1: Thing Code -->
+      <rect x="560" y="60" width="320" height="100" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="580" y="88" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">/code &middot; Thing Code</text>
+      <text x="580" y="110" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/repositories &middot; /scans &middot; /findings</text>
+      <text x="580" y="130" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/hotspots &middot; /dependencies &middot; /sbom</text>
+      <text x="580" y="150" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; [VERIFIED] Full SAST & Hotspots</text>
+
+      <!-- Module Leaf 2: Thing Cloud -->
+      <rect x="560" y="180" width="320" height="100" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="580" y="208" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">/cloud &middot; Thing Cloud</text>
+      <text x="580" y="230" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/connections &middot; /inventory &middot; /posture</text>
+      <text x="580" y="250" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/iam &middot; /drift</text>
+      <text x="580" y="270" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; [VERIFIED] Checkov & CSPM</text>
+
+      <!-- Module Leaf 3: Thing Attack -->
+      <rect x="560" y="300" width="320" height="100" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="580" y="328" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">/attack &middot; Thing Attack</text>
+      <text x="580" y="350" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/targets &middot; /campaigns</text>
+      <text x="580" y="370" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/tests &middot; /paths</text>
+      <text x="580" y="390" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; [VERIFIED] DAST & Evidence</text>
+
+      <!-- Module Leaf 4: Thing Protect -->
+      <rect x="560" y="420" width="320" height="100" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="580" y="448" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">/protect &middot; Thing Protect</text>
+      <text x="580" y="470" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/runtime-alerts &middot; /container-scan</text>
+      <text x="580" y="490" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/mcp-sessions &middot; /mcp-tools</text>
+      <text x="580" y="510" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; [VERIFIED] eBPF & MCP Gateway</text>
+
+      <!-- Module Leaf 5: Thing Compliance -->
+      <rect x="560" y="540" width="320" height="100" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="580" y="568" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">/compliance &middot; Thing Compliance</text>
+      <text x="580" y="590" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/frameworks &middot; /controls</text>
+      <text x="580" y="610" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">/blueprint &middot; /agent-governance</text>
+      <text x="580" y="630" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; [VERIFIED] OPA Policy Engine</text>
+
+      <!-- Connectors Module Trunk -> Leaves -->
+      <path d="M 500 395 L 530 395 Q 540 395 540 110 L 560 110" stroke="#0f172a" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+      <path d="M 500 395 L 530 395 Q 540 395 540 230 L 560 230" stroke="#0f172a" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+      <path d="M 500 395 L 530 395 Q 540 395 540 350 L 560 350" stroke="#0f172a" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+      <path d="M 500 395 L 530 395 Q 540 395 540 470 L 560 470" stroke="#0f172a" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+      <path d="M 500 395 L 530 395 Q 540 395 540 590 L 560 590" stroke="#0f172a" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+
+      <!-- Right Column: Backend API Mapping Targets -->
+      <rect x="940" y="60" width="300" height="580" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="960" y="90" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">MAPPED FASTAPI ENDPOINTS</text>
+
+      <text x="960" y="130" font-family="'Geist Mono', monospace" font-size="11" fill="#0f172a">&bull; /api/v1/auth/*</text>
+      <text x="960" y="150" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">  Token, MFA, Accounts</text>
+
+      <text x="960" y="190" font-family="'Geist Mono', monospace" font-size="11" fill="#0f172a">&bull; /api/v1/scans/* & findings/*</text>
+      <text x="960" y="210" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">  SAST, Secrets, Hotspots</text>
+
+      <text x="960" y="250" font-family="'Geist Mono', monospace" font-size="11" fill="#0f172a">&bull; /api/v1/cloud/*</text>
+      <text x="960" y="270" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">  Discovery, IAM, Drift</text>
+
+      <text x="960" y="310" font-family="'Geist Mono', monospace" font-size="11" fill="#0f172a">&bull; /api/v1/attack/*</text>
+      <text x="960" y="330" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">  Campaigns, Tests, Oracles</text>
+
+      <text x="960" y="370" font-family="'Geist Mono', monospace" font-size="11" fill="#0f172a">&bull; /api/v1/mcp/* & protect/*</text>
+      <text x="960" y="390" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">  Tools, Sessions, eBPF</text>
+
+      <text x="960" y="430" font-family="'Geist Mono', monospace" font-size="11" fill="#0f172a">&bull; /api/v1/compliance/*</text>
+      <text x="960" y="450" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">  Controls, OPA, Evidence</text>
+
+      <text x="960" y="490" font-family="'Geist Mono', monospace" font-size="11" fill="#0f172a">&bull; /api/v1/organizations/*</text>
+      <text x="960" y="510" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">  Workspaces, Seats, Billing</text>
+
+      <!-- Connectors Leaves to Endpoints -->
+      <path d="M 880 110 L 940 190" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 880 230 L 940 250" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 880 350 L 940 310" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 880 470 L 940 370" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 880 590 L 940 430" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+    </svg>
+  </div>
+
+  <div class="mermaid-source">
+    <div style="color: #94a3b8; margin-bottom: 8px;">// Editable Mermaid Source Definition</div>
+    <pre>
+graph LR
+    ROOT["Root Router (frontend/app)"]
+
+    AUTH["(auth) Group (Login, Register, MFA)"]
+    DASH["/dashboard (Executive Overview)"]
+    MODS["Product Modules (/code, /cloud, /attack, /protect, /compliance)"]
+    SETT["/settings (Org, Members, Billing)"]
+
+    ROOT --> AUTH
+    ROOT --> DASH
+    ROOT --> MODS
+    ROOT --> SETT
+
+    API["FastAPI Backend (app/api/v1/endpoints)"]
+    AUTH --> API
+    DASH --> API
+    MODS --> API
+    SETT --> API
+
+    classDef accent fill:#ffffff,stroke:#ea580c,stroke-width:2px;
+    class MODS,API accent;
+    </pre>
+  </div>
+
+</body>
+</html>

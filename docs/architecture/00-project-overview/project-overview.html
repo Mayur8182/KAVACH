@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer Control Plane — Project Overview & Core Philosophy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --soft: #94a3b8;
+      --line: #e2e8f0;
+      --line-strong: #cbd5e1;
+      --accent: #ea580c;
+      --accent-tint: rgba(234, 88, 12, 0.08);
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+      --font-mono: "Geist Mono", monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--ink);
+      padding: 40px 24px;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+    header.header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    p.lead {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+      max-width: 860px;
+    }
+    .diagram-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .diagram-scroll {
+      width: 100%;
+      overflow-x: auto;
+      padding: 32px 24px;
+      background: var(--paper);
+    }
+    svg.canvas {
+      display: block;
+      margin: 0 auto;
+      min-width: 1080px;
+    }
+    .diagram-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: #f1f5f9;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .source-panel {
+      margin-top: 24px;
+      background: #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .source-header {
+      padding: 10px 16px;
+      background: #1e293b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cbd5e1;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    pre.code-block {
+      padding: 16px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="eyebrow">Fig. 00 · Architectural Golden Rule</div>
+      <h1>SecuLayer Control Plane: The Closed-Loop Security Guard</h1>
+      <p class="lead">“LLM proposes. Deterministic security systems decide. Runtime evidence proves.” Autonomous AI agents and developers propose modifications through an identity-aware gateway, validated by deterministic policy engines and security scanners before execution.</p>
+    </header>
+
+    <div class="diagram-card">
+      <div class="diagram-scroll">
+        <svg class="canvas" viewBox="0 0 1100 660" width="1100" height="660" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569" />
+            </marker>
+            <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ea580c" />
+            </marker>
+            <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.04" />
+            </filter>
+          </defs>
+
+          <!-- ================= BACKGROUND REGIONS / ZONES ================= -->
+          <!-- Zone 1: Untrusted Ingress -->
+          <rect x="30" y="40" width="220" height="580" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4" />
+          <rect x="42" y="32" width="140" height="18" fill="#ffffff" />
+          <text x="46" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b" letter-spacing="0.1em">UNTRUSTED ACTORS</text>
+
+          <!-- Zone 2: Control Plane Trust Boundary (The Core Guard) -->
+          <rect x="290" y="40" width="480" height="580" rx="8" fill="#fafafa" stroke="#cbd5e1" stroke-width="1.5" />
+          <rect x="306" y="30" width="250" height="20" fill="#ffffff" />
+          <text x="312" y="44" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#ea580c" letter-spacing="0.1em">DETERMINISTIC CONTROL PLANE</text>
+
+          <!-- Zone 3: Execution Targets & Sensors -->
+          <rect x="810" y="40" width="260" height="580" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4" />
+          <rect x="822" y="32" width="180" height="18" fill="#ffffff" />
+          <text x="826" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b" letter-spacing="0.1em">EXECUTION &amp; SENSORS</text>
+
+          <!-- ================= CONNECTORS (Z-ORDER: DRAWN BEHIND NODES) ================= -->
+          <!-- Developer -> Guard Gateway -->
+          <path d="M 210 110 H 320" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="260" y="102" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b" text-anchor="middle">Intent Proposal</text>
+
+          <!-- Agent -> Guard Gateway -->
+          <path d="M 210 210 H 260 Q 270 210 270 190 V 130 Q 270 120 280 120 H 320" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="265" y="224" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b" text-anchor="middle">Tool Call</text>
+
+          <!-- Gateway -> Intent Engine -->
+          <path d="M 450 145 V 180" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Intent Engine -> Security Blueprint -->
+          <path d="M 450 240 V 275" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Blueprint -> Security Engine -->
+          <path d="M 450 335 V 370" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Security Engine -> Policy Engine -->
+          <path d="M 450 430 V 465" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+
+          <!-- Policy Decision: ALLOWED (To Execution Targets) -->
+          <path d="M 580 495 H 840" fill="none" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="700" y="488" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#16a34a" text-anchor="middle">[ DECISION: ALLOW ]</text>
+
+          <!-- Policy Decision: BLOCKED (To AI Remediation Engine) -->
+          <path d="M 450 525 V 560" fill="none" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="490" y="546" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#dc2626">[ BLOCK ]</text>
+
+          <!-- Execution Targets -> Runtime Sensors -->
+          <path d="M 940 370 V 415" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Sensors -> Evidence Collector Loopback to Policy -->
+          <path d="M 840 450 H 730 Q 710 450 710 420 V 220 Q 710 200 600 200 H 570" fill="none" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-accent)" />
+          <text x="716" y="310" font-family="'Geist Mono', monospace" font-size="9" fill="#ea580c" transform="rotate(-90, 716, 310)" text-anchor="middle">Runtime Evidence Proof</text>
+
+          <!-- AI Remediation -> Verification Rescan Loopback -->
+          <path d="M 320 590 H 280 Q 260 590 260 560 V 400 Q 260 380 300 380 H 320" fill="none" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-accent)" />
+          <text x="250" y="480" font-family="'Geist Mono', monospace" font-size="9" fill="#ea580c" transform="rotate(-90, 250, 480)" text-anchor="middle">Unified Patch Rescan</text>
+
+          <!-- ================= NODES ================= -->
+
+          <!-- Node: Developer -->
+          <g transform="translate(50, 75)" filter="url(#shadow)">
+            <rect width="160" height="65" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="12" y="22" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b" letter-spacing="0.1em">HUMAN INGRESS</text>
+            <text x="12" y="42" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Developer / Admin</text>
+            <text x="12" y="56" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b">PR / CLI / Commit</text>
+          </g>
+
+          <!-- Node: AI Agent -->
+          <g transform="translate(50, 175)" filter="url(#shadow)">
+            <rect width="160" height="65" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="12" y="22" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b" letter-spacing="0.1em">AUTONOMOUS AGENT</text>
+            <text x="12" y="42" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">AI Coding Agent</text>
+            <text x="12" y="56" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b">Claude / Codex / MCP</text>
+          </g>
+
+          <!-- Node: Agent Security Guard Gateway (Focal Header) -->
+          <g transform="translate(320, 80)" filter="url(#shadow)">
+            <rect width="260" height="65" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" />
+            <rect x="0" y="0" width="6" height="65" rx="2" fill="#ea580c" />
+            <text x="18" y="22" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c" letter-spacing="0.1em">GATEWAY INTERCEPTOR</text>
+            <text x="18" y="42" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">Security Guard Gateway</text>
+            <text x="18" y="56" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b">Identity Scoping &amp; Risk Check</text>
+          </g>
+
+          <!-- Node: Intent Engine -->
+          <g transform="translate(330, 180)" filter="url(#shadow)">
+            <rect width="240" height="60" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">ENGINE 01</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">Intent Engine</text>
+            <text x="14" y="51" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b">Parses Goal &amp; Resource Scope</text>
+          </g>
+
+          <!-- Node: Security Blueprint Engine -->
+          <g transform="translate(330, 275)" filter="url(#shadow)">
+            <rect width="240" height="60" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">ENGINE 02</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">Security Blueprint Engine</text>
+            <text x="14" y="51" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b">Dynamic Control Synthesis</text>
+          </g>
+
+          <!-- Node: Security Scanner Engine -->
+          <g transform="translate(330, 370)" filter="url(#shadow)">
+            <rect width="240" height="60" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">ENGINE 03</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">Deterministic Security Scanners</text>
+            <text x="14" y="51" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b">Semgrep · Gitleaks · OSV · Checkov</text>
+          </g>
+
+          <!-- Node: Policy Engine (OPA) (Focal Decision Core) -->
+          <g transform="translate(320, 465)" filter="url(#shadow)">
+            <rect width="260" height="60" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+            <rect x="0" y="0" width="6" height="60" rx="2" fill="#ea580c" />
+            <text x="18" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">ENGINE 04 · AUTHORITATIVE DECISION</text>
+            <text x="18" y="38" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">Policy Engine (OPA / Rego)</text>
+            <text x="18" y="51" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b">Deterministic Zero-Trust Evaluation</text>
+          </g>
+
+          <!-- Node: AI Remediation Engine -->
+          <g transform="translate(320, 560)" filter="url(#shadow)">
+            <rect width="260" height="52" rx="6" fill="#ffffff" stroke="#fca5a5" stroke-width="1" />
+            <text x="14" y="18" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#dc2626">ENGINE 05 · REPAIR LOOP</text>
+            <text x="14" y="34" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#991b1b">AI Remediation &amp; Patch Synthesis</text>
+            <text x="14" y="46" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Must pass deterministic re-scanning</text>
+          </g>
+
+          <!-- Node: Execution Targets (Cloud, Git, K8s, Docker) -->
+          <g transform="translate(840, 310)" filter="url(#shadow)">
+            <rect width="200" height="60" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">ENFORCED ACTIONS</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">Infrastructure &amp; CI/CD</text>
+            <text x="14" y="51" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b">GitHub · Kubernetes · AWS · Docker</text>
+          </g>
+
+          <!-- Node: Runtime Sensors & Evidence -->
+          <g transform="translate(840, 415)" filter="url(#shadow)">
+            <rect width="200" height="65" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.2" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">ENGINE 09 · PROOF VERIFICATION</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Runtime Sensors</text>
+            <text x="14" y="52" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b">OpenTelemetry Traces &amp; Audit Logs</text>
+          </g>
+
+          <!-- Legend Strip -->
+          <g transform="translate(50, 600)">
+            <circle cx="6" cy="6" r="4" fill="#ea580c" />
+            <text x="16" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Focal Control / Authority</text>
+            <circle cx="180" cy="6" r="4" fill="#16a34a" />
+            <text x="190" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Allowed Execution Path</text>
+            <circle cx="340" cy="6" r="4" fill="#dc2626" />
+            <text x="350" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Blocked / Remediation Loop</text>
+            <line x1="510" y1="6" x2="530" y2="6" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="3,3" />
+            <text x="536" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Closed-Loop Verification Trace</text>
+          </g>
+        </svg>
+      </div>
+      <div class="diagram-footer">
+        <span>FIG. 00 · CLOSED-LOOP CONTROL PLANE</span>
+        <span>STANDALONE SVG · NO EXTERNAL ASSETS</span>
+        <span>GROUND TRUTH: ARCHITECTURE.MD</span>
+      </div>
+    </div>
+
+    <!-- Editable Source Panel -->
+    <div class="source-panel">
+      <div class="source-header">
+        <span>EDITABLE MERMAID SOURCE (FOR MAINTENANCE &amp; GITHUB PREVIEWS)</span>
+        <span>COPY / PASTE READY</span>
+      </div>
+      <pre class="code-block"><code>graph LR
+    subgraph Untrusted["UNTRUSTED INGRESS"]
+        DEV["Developer / Admin<br/><small>PR / CLI / Commit</small>"]
+        AGENT["AI Coding Agent<br/><small>Claude / Codex / MCP</small>"]
+    end
+
+    subgraph ControlPlane["DETERMINISTIC CONTROL PLANE"]
+        GW["Agent Security Guard Gateway<br/><small>Identity Scoping &amp; Risk Check</small>"]
+        INTENT["Engine 01: Intent Engine<br/><small>Goal &amp; Resource Scope</small>"]
+        BLUEPRINT["Engine 02: Blueprint Engine<br/><small>Dynamic Control Synthesis</small>"]
+        SCANNERS["Engine 03: Deterministic Scanners<br/><small>Semgrep / Gitleaks / OSV / Checkov</small>"]
+        OPA{"Engine 04: Policy Engine (OPA)<br/><small>Authoritative Decision</small>"}
+        REMED["Engine 05: AI Remediation Engine<br/><small>Patch Synthesis &amp; Re-scan</small>"]
+    end
+
+    subgraph Execution["EXECUTION &amp; SENSORS"]
+        TARGETS["Infrastructure &amp; CI/CD<br/><small>GitHub / K8s / AWS / Docker</small>"]
+        SENSORS["Engine 09: Runtime Sensors<br/><small>OpenTelemetry Traces &amp; Audit Logs</small>"]
+    end
+
+    DEV -->|Intent Proposal| GW
+    AGENT -->|Tool Call| GW
+    GW --> INTENT
+    INTENT --> BLUEPRINT
+    BLUEPRINT --> SCANNERS
+    SCANNERS --> OPA
+    OPA -->|ALLOW| TARGETS
+    OPA -->|BLOCK| REMED
+    REMED -.->|Rescan Request| SCANNERS
+    TARGETS --> SENSORS
+    SENSORS -.->|Evidence Loopback| OPA
+
+    classDef focal stroke:#ea580c,stroke-width:2px;
+    class OPA,GW,SENSORS focal;</code></pre>
+    </div>
+  </div>
+</body>
+</html>

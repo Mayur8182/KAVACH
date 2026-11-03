@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shared Control Plane — Multi-Tenancy, Entitlements & Platform Core</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --subtle: #94a3b8;
+      --border: #e2e8f0;
+      --accent: #ea580c;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      padding: 48px;
+      line-height: 1.5;
+    }
+    header {
+      max-width: 1400px;
+      margin: 0 auto 36px auto;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+      display: inline-block;
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 2px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 38px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .description {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 880px;
+    }
+    .canvas-card {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      padding: 32px;
+      overflow-x: auto;
+    }
+    svg {
+      display: block;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+    .mermaid-source {
+      max-width: 1400px;
+      margin: 36px auto 0 auto;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 24px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    .mermaid-source pre {
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="eyebrow">Shared Control Plane Architecture · Tenancy, Entitlements & Core Services</div>
+    <h1>Platform Multi-Tenancy & Shared Control Plane</h1>
+    <p class="description">
+      Underlying backbone managing organizational hierarchy (Organizations &rarr; Workspaces &rarr; Projects &rarr; Repositories),
+      fine-grained RBAC membership, subscription tier and seat quota gating, invitation workflows, third-party integrations, and unified audit logs.
+    </p>
+  </header>
+
+  <div class="canvas-card">
+    <svg width="1280" height="740" viewBox="0 0 1280 740" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#0f172a" />
+        </marker>
+        <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#ea580c" />
+        </marker>
+      </defs>
+
+      <!-- Region Zone: Organization & Tenancy Hierarchy -->
+      <rect x="40" y="40" width="360" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="60" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 1: TENANCY & ISOLATION HIERARCHY</text>
+
+      <!-- Region Zone: Entitlements, Plans & Quotas -->
+      <rect x="430" y="40" width="420" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="450" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 2: SUBSCRIPTION GATING & SEATS</text>
+
+      <!-- Region Zone: Integrations & Audit Services -->
+      <rect x="880" y="40" width="360" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="900" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 3: INTEGRATIONS & PLATFORM AUDIT</text>
+
+      <!-- Node: Organization Entity -->
+      <rect x="70" y="100" width="300" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Organization [VERIFIED]</text>
+      <text x="90" y="148" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">organizations table (slug, billing_tier)</text>
+      <text x="90" y="168" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Root tenant boundary</text>
+      <text x="90" y="186" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Zero cross-tenant data bleed (Rule 6)</text>
+
+      <!-- Node: Workspace Entity -->
+      <rect x="70" y="240" width="300" height="100" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="268" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Workspace [VERIFIED]</text>
+      <text x="90" y="288" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">workspaces table</text>
+      <text x="90" y="308" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Department or environment division</text>
+      <text x="90" y="326" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Scoped members & security policies</text>
+
+      <!-- Node: Project Entity -->
+      <rect x="70" y="370" width="300" height="100" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="398" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Project [VERIFIED]</text>
+      <text x="90" y="418" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">projects table</text>
+      <text x="90" y="438" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Target of security scans & blueprints</text>
+      <text x="90" y="456" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Enforces default_branch & scanners</text>
+
+      <!-- Node: User & RBAC Membership -->
+      <rect x="70" y="500" width="300" height="120" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="528" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">User & RBAC Membership [VERIFIED]</text>
+      <text x="90" y="548" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">users & accounts tables</text>
+      <text x="90" y="568" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Roles: OWNER, ADMIN, MEMBER, AUDITOR</text>
+      <text x="90" y="586" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Explicit tenant membership mapping</text>
+      <text x="90" y="604" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">MFA enforcement flags</text>
+
+      <!-- Connectors Zone 1 -->
+      <path d="M 220 210 L 220 240" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 220 340 L 220 370" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 220 470 L 220 500" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+      <!-- Node: Tenant Plan & Subscriptions -->
+      <rect x="460" y="100" width="360" height="120" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="480" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Tenant Plan & Tiers [VERIFIED]</text>
+      <text x="480" y="148" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">tenant_plan.py models</text>
+      <text x="480" y="168" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">COMMUNITY, TEAM, ENTERPRISE tiers</text>
+      <text x="480" y="186" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Feature flags & capability gating</text>
+      <text x="480" y="204" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Trial state & subscription validity</text>
+
+      <!-- Node: Quota & Seat Allocator -->
+      <rect x="460" y="250" width="360" height="120" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+      <text x="480" y="278" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Quota & Seat Management [VERIFIED]</text>
+      <text x="480" y="298" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">quota_seat_trial.py models</text>
+      <text x="480" y="318" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Max seats, scan concurrency limits</text>
+      <text x="480" y="336" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Monthly AI token budget & burst throttling</text>
+      <text x="480" y="354" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Storage size limit enforcement</text>
+
+      <!-- Node: Invitations & Onboarding Flow -->
+      <rect x="460" y="400" width="360" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="480" y="428" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Invitation Service [VERIFIED]</text>
+      <text x="480" y="448" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">invitation.py & frontend invitation client</text>
+      <text x="480" y="468" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Cryptographic invite tokens, expiry</text>
+      <text x="480" y="486" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Role pre-allocation & seat check</text>
+
+      <!-- Connectors Zone 1 -> Zone 2 -->
+      <path d="M 370 155 L 460 155" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 640 220 L 640 250" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 640 370 L 640 400" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+      <!-- Node: Integration Hub -->
+      <rect x="910" y="100" width="300" height="130" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="930" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Integration Hub [VERIFIED]</text>
+      <text x="930" y="148" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">integration_models.py</text>
+      <text x="930" y="168" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">GitHub App / Personal Access Token</text>
+      <text x="930" y="186" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Jenkins CI/CD webhook triggers</text>
+      <text x="930" y="204" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Slack, Teams & Webhook alerts</text>
+
+      <!-- Node: Central Audit Event Pipeline -->
+      <rect x="910" y="260" width="300" height="130" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="930" y="288" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Unified Audit Pipeline [VERIFIED]</text>
+      <text x="930" y="308" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">audit_event.py table</text>
+      <text x="930" y="328" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">who, what, when, where, why</text>
+      <text x="930" y="348" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">policy_evaluation & execution_result</text>
+      <text x="930" y="366" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Append-only audit trail (Rule 20)</text>
+
+      <!-- Node: Incident & Alert Routing -->
+      <rect x="910" y="420" width="300" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="930" y="448" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Incident & Alert Routing</text>
+      <text x="930" y="468" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">incident_models.py & soc_models.py</text>
+      <text x="930" y="488" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Severity thresholds & pager notifications</text>
+      <text x="930" y="506" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Correlation ID cross-referencing</text>
+
+      <!-- Connectors Zone 2 -> Zone 3 -->
+      <path d="M 820 160 L 910 160" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 820 310 L 910 310" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 1060 230 L 1060 260" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 1060 390 L 1060 420" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+    </svg>
+  </div>
+
+  <div class="mermaid-source">
+    <div style="color: #94a3b8; margin-bottom: 8px;">// Editable Mermaid Source Definition</div>
+    <pre>
+graph LR
+    subgraph Zone1["Tenancy & Isolation Hierarchy"]
+        ORG["Organization (Tenant Root)"]
+        WS["Workspace (Department Boundary)"]
+        PROJ["Project (Repository / App Scope)"]
+        USR["User & RBAC Membership (Owner/Admin/Member)"]
+        ORG --> WS --> PROJ --> USR
+    end
+
+    subgraph Zone2["Subscription Gating & Seats"]
+        TP["Tenant Plan & Tiers (Community/Team/Enterprise)"]
+        QS["Quota & Seat Management (Max Seats/Scans)"]
+        INV["Invitation Service (Token & Pre-assigned Role)"]
+        TP --> QS --> INV
+    end
+
+    subgraph Zone3["Integrations & Platform Audit"]
+        IH["Integration Hub (GitHub, Jenkins, Slack)"]
+        AUD["Unified Audit Pipeline (Append-Only Log)"]
+        INC["Incident & Alert Routing (Severity Escalation)"]
+        IH --> AUD --> INC
+    end
+
+    ORG --> TP
+    PROJ --> IH
+    QS --> AUD
+
+    classDef accent fill:#ffffff,stroke:#ea580c,stroke-width:2px;
+    class QS,AUD accent;
+    </pre>
+  </div>
+
+</body>
+</html>

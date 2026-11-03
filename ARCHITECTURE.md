@@ -186,3 +186,99 @@ secure-control-plane/
 ├── docker-compose.yml
 └── README.md
 ```
+
+---
+
+## 6. AI Provider Layer & Autonomous Security Control Plane Architecture
+
+### Core Design Principle
+> **"LLM proposes. Deterministic security systems decide. Runtime evidence proves."**
+- **Antigravity is NOT the product's "AI brain" or security authority.** It is integrated as an **AI Execution & Remediation Provider**.
+- The core THING security control plane (detect, policy decision, agent authorization, tool sandboxing, verification re-scans, and cryptographic audit logging) is completely independent of any external LLM model.
+- If Antigravity is unavailable, expensive, or upgraded, the THING architecture does not change; other execution providers (Gemini, local Ollama, Claude, GPT) plug in seamlessly through the unified `AIExecutionProvider` interface.
+
+### Architectural Hierarchy
+
+```text
+                    THING
+          Autonomous Security Control Plane
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+     Detect           Decide           Verify
+        │                │                │
+     SAST/DAST       Policy Engine     Re-scan
+     Secrets         Risk Engine       Tests
+     SCA             Security Rules    Validation
+     Cloud           AI Orchestrator   Evidence
+        │                │                │
+        └────────────────┼────────────────┘
+                         │
+                 AI Provider Layer
+                         │
+                ┌────────┴────────┐
+                │                 │
+           Antigravity        Other Models
+           API/Core           (Gemini, Ollama)
+                │
+                ↓
+        Remediation Agent
+                │
+       ┌────────┼─────────┐
+       ↓        ↓         ↓
+     Patch    PR       Explanation
+       │        │         │
+       └────────┼─────────┘
+                ↓
+          Security Tests
+                ↓
+             Re-scan
+                ↓
+       ┌────────┴────────┐
+       │                 │
+     PASS              FAIL
+       │                 │
+   Accept PR        Retry / Escalate
+```
+
+### AutoFix Closed-Loop Remediation Flow
+
+```text
+THING Scanner (Semgrep, Gitleaks, Trivy, ZAP)
+      ↓
+Finding Engine (Indexes in PostgreSQL `security_findings`)
+      ↓
+Risk + Policy Engine (Determines allowable remediation constraints)
+      ↓
+AI Remediation Orchestrator (`AIRemediationOrchestrator`)
+      ↓
+AI Provider (Antigravity Primary / Gemini / Local Fallback)
+      ↓
+Generate unified diff patch & PR metadata
+      ↓
+Apply patch in isolated workspace sandbox
+      ↓
+Run unit tests & AST semantic parsing
+      ↓
+Run security scanner again (re-scan)
+      ↓
+Vulnerability eradicated with 0 regressions?
+      │
+   YES ─────→ Gateway creates GitHub/GitLab PR (`POST /api/v1/pull-requests/fix`)
+      │        Persist SLSA attestation evidence & mark finding resolved
+   NO
+      ↓
+Escalate to human security engineer with diagnostic audit log
+```
+
+### Security Boundary Directives
+1. **Zero Frontend Credentials:** API keys (`ANTIGRAVITY_API_KEY`, `GEMINI_API_KEY`) reside strictly in server-side configuration. The browser interacts only with authenticated THING backend endpoints.
+2. **Restricted Tool Authorization:** External AI agents never receive direct access to production, databases, cloud accounts, or Git main branches. Every tool invocation passes through the THING Agent Security Gateway:
+   ```text
+   AI Agent -> THING Agent Gateway -> Permission Check -> Tool Authorization -> Sandbox -> Execute -> Audit Log
+   ```
+   * Allowed for remediation: `file.read`, `workspace.patch`, `test.run`, `scanner.rescan`, `vcs.branch.create`, `vcs.pull_request.open`
+   * Blocked / Denied: `kubectl.delete_deployment`, `cloud.destroy_resource`, `db.drop_table`, `vcs.main.direct_push`, `secrets.read_raw`
+
+### Core Product Differentiation
+> *"THING doesn't just ask AI to fix vulnerabilities. It controls what an AI agent is allowed to do, gives it only the required authority, executes remediation in an isolated environment, verifies the security properties after the change, and produces evidence that the fix actually worked."*

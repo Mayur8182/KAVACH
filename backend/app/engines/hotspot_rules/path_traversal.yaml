@@ -1,0 +1,22 @@
+id: path-traversal-risk
+title: Path Traversal Risk
+severity: high
+risk_level: High
+category: Input Validation
+cwe: CWE-22
+owasp: A01:2021-Broken Access Control
+cvss_score: "7.8 (High)"
+patterns:
+  - "res.sendFile("
+  - "fs.readFile("
+  - "fs.readFileSync("
+  - "fs.createReadStream("
+  - "open("
+  - "path.resolve("
+description: "Direct filesystem access using user-influenced parameters without directory sandboxing, potentially allowing reading arbitrary server files."
+remediation: "Normalize file paths with path.normalize() and ensure the resolved canonical path starts with the designated safe base directory."
+references:
+  - title: "OWASP Path Traversal"
+    url: "https://owasp.org/www-community/attacks/Path_Traversal"
+  - title: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+    url: "https://cwe.mitre.org/data/definitions/22.html"

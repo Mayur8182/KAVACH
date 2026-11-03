@@ -5,6 +5,7 @@ from app.engines.scanner.gitleaks import GitleaksScanner
 from app.engines.scanner.osv import OsvScanner
 from app.engines.scanner.trivy import TrivyScanner
 from app.engines.scanner.checkov import CheckovScanner
+from app.engines.scanner.builtin import BuiltinSecurityScanner
 
 
 class ScannerRegistry:
@@ -12,6 +13,7 @@ class ScannerRegistry:
 
     def __init__(self) -> None:
         self._scanners: Dict[str, SecurityScanner] = {
+            "seculayer-builtin": BuiltinSecurityScanner(),
             "semgrep": SemgrepScanner(),
             "gitleaks": GitleaksScanner(),
             "osv-scanner": OsvScanner(),
@@ -20,7 +22,10 @@ class ScannerRegistry:
         }
 
     def get_scanner(self, name: str) -> Optional[SecurityScanner]:
-        return self._scanners.get(name.lower())
+        norm = name.lower().replace("_", "-")
+        if norm == "osv":
+            norm = "osv-scanner"
+        return self._scanners.get(norm)
 
     def get_all_scanners(self) -> List[SecurityScanner]:
         return list(self._scanners.values())
@@ -36,9 +41,26 @@ class ScannerRegistry:
         return selected
 
     async def get_all_health(self) -> List[Dict]:
+        import asyncio
+        from datetime import datetime, timezone
+        coros = [scanner.health() for scanner in self._scanners.values()]
+        raw_results = await asyncio.gather(*coros, return_exceptions=True)
         results = []
-        for scanner in self._scanners.values():
-            results.append(await scanner.health())
+        for i, scanner in enumerate(self._scanners.values()):
+            res = raw_results[i]
+            if isinstance(res, Exception):
+                results.append({
+                    "scanner_name": scanner.scanner_name,
+                    "scanner_type": scanner.scanner_type,
+                    "tool_name": scanner.tool_name,
+                    "status": "not_configured",
+                    "is_available": False,
+                    "version": None,
+                    "message": f"Health check failed: {str(res)}",
+                    "last_health_check": datetime.now(timezone.utc).isoformat(),
+                })
+            else:
+                results.append(res)
         return results
 
 

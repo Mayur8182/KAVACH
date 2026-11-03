@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thing Cloud — Architecture & CSPM Lifecycle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --subtle: #94a3b8;
+      --border: #e2e8f0;
+      --accent: #ea580c; /* SecuLayer Burnt Orange */
+      --accent-soft: rgba(234, 88, 12, 0.08);
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      padding: 48px;
+      line-height: 1.5;
+    }
+    header {
+      max-width: 1400px;
+      margin: 0 auto 36px auto;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+      display: inline-block;
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 2px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 38px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .description {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 880px;
+    }
+    .canvas-card {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      padding: 32px;
+      overflow-x: auto;
+    }
+    svg {
+      display: block;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+    .mermaid-source {
+      max-width: 1400px;
+      margin: 36px auto 0 auto;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 24px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    .mermaid-source pre {
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="eyebrow">Thing Cloud Architecture · CSPM, IaC, IAM & Drift Verification</div>
+    <h1>Cloud Security & Posture Management Engine</h1>
+    <p class="description">
+      Deterministic discovery of multi-cloud assets across AWS, Azure, GCP, and Kubernetes. Integrates Checkov IaC scanning,
+      IAM entitlement graphs, firewall rule inspection, resource drift detection against Terraform blueprints, and audited remediation actions.
+    </p>
+  </header>
+
+  <div class="canvas-card">
+    <svg width="1280" height="740" viewBox="0 0 1280 740" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#0f172a" />
+        </marker>
+        <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#ea580c" />
+        </marker>
+      </defs>
+
+      <!-- Region Zone: Ingestion & Auth -->
+      <rect x="40" y="40" width="340" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="60" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 1: PROVIDER INGESTION & AUTH</text>
+
+      <!-- Region Zone: Discovery & Analysis Engine -->
+      <rect x="420" y="40" width="460" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="440" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 2: DISCOVERY, GRAPH & IAC VERIFICATION</text>
+
+      <!-- Region Zone: Findings, Drift & Remediation -->
+      <rect x="920" y="40" width="320" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="940" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 3: OBSERVATIONS & REMEDIATION</text>
+
+      <!-- Node: Cloud Providers -->
+      <rect x="70" y="100" width="280" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Cloud Providers & Clusters</text>
+      <text x="90" y="148" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">AWS (STS / IAM Role Assume)</text>
+      <text x="90" y="166" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Azure (Service Principal / MS Graph)</text>
+      <text x="90" y="184" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">GCP (Workload Identity / Service Account)</text>
+
+      <!-- Node: CloudConnection DB -->
+      <rect x="70" y="250" width="280" height="90" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="278" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">CloudConnection [VERIFIED]</text>
+      <text x="90" y="298" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_connections table</text>
+      <text x="90" y="316" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">READ_ONLY | CONTROLLED_WRITE</text>
+
+      <!-- Node: CloudDiscoveryJob -->
+      <rect x="70" y="380" width="280" height="90" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="408" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">CloudDiscoveryJob</text>
+      <text x="90" y="428" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_discovery_jobs table</text>
+      <text x="90" y="446" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">QUEUED &rarr; RUNNING &rarr; COMPLETED</text>
+
+      <!-- Node: CloudAuditEvent -->
+      <rect x="70" y="510" width="280" height="90" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="538" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">CloudAuditEvent Ingest</text>
+      <text x="90" y="558" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_audit_events table</text>
+      <text x="90" y="576" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">CloudTrail | ActivityLog | SCC Audit</text>
+
+      <!-- Connectors Zone 1 -->
+      <path d="M 210 210 L 210 250" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 210 340 L 210 380" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+      <!-- Node: CloudResource Inventory & Relationships -->
+      <rect x="450" y="100" width="400" height="120" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="470" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Asset Inventory & Graph [VERIFIED]</text>
+      <text x="470" y="148" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_resources (provider_resource_id, ARN, URI)</text>
+      <text x="470" y="168" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_resource_relationships (CAN_ACCESS, ASSUMES,</text>
+      <text x="470" y="186" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">TRUSTS, CONTAINS, ROUTES_TO, EXPOSES)</text>
+
+      <!-- Node: IAM & Network Posture -->
+      <rect x="450" y="260" width="400" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="470" y="288" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">IAM & Network Policy Evaluation</text>
+      <text x="470" y="308" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_iam_principals, roles, assignments</text>
+      <text x="470" y="326" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_networks, subnets, firewall_rules</text>
+      <text x="470" y="344" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">is_public_ingress & wildcard check</text>
+
+      <!-- Node: Checkov & IaC Compliance -->
+      <rect x="450" y="410" width="400" height="100" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="470" y="438" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Checkov Scanner & IaC Engine [VERIFIED]</text>
+      <text x="470" y="458" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">backend/app/engines/scanner/checkov.py</text>
+      <text x="470" y="476" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Terraform / CloudFormation / ARM / K8s manifests</text>
+
+      <!-- Node: CloudResourceDrift -->
+      <rect x="450" y="550" width="400" height="90" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="470" y="578" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">CloudResourceDrift [VERIFIED]</text>
+      <text x="470" y="598" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_resource_drift table</text>
+      <text x="470" y="616" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Terraform blueprint vs Live state diff</text>
+
+      <!-- Cross Zone Connectors (Zone 1 -> Zone 2) -->
+      <path d="M 350 425 L 400 425 Q 410 425 410 200 L 410 160 L 450 160" stroke="#0f172a" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+      <path d="M 650 220 L 650 260" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 650 370 L 650 410" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 650 510 L 650 550" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+      <!-- Node: CloudSecurityObservation -->
+      <rect x="940" y="100" width="280" height="110" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+      <text x="960" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">CloudSecurityObservation</text>
+      <text x="960" y="148" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_security_observations</text>
+      <text x="960" y="168" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">rule_id, observed_value</text>
+      <text x="960" y="186" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">severity: CRITICAL | HIGH | MED</text>
+
+      <!-- Node: CloudProviderFinding -->
+      <rect x="940" y="250" width="280" height="90" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="960" y="278" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">CloudProviderFinding</text>
+      <text x="960" y="298" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Security Hub / Defender / SCC</text>
+      <text x="960" y="316" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Ingested native provider findings</text>
+
+      <!-- Node: CloudAction & Evidence -->
+      <rect x="940" y="380" width="280" height="130" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="960" y="408" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">CloudAction & Evidence [VERIFIED]</text>
+      <text x="960" y="428" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_actions & action_evidence</text>
+      <text x="960" y="448" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">RESTRICT_PUBLIC_ACCESS</text>
+      <text x="960" y="466" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">REMOVE_SECURITY_GROUP_RULE</text>
+      <text x="960" y="484" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Idempotent with Before/After Diff</text>
+
+      <!-- Node: CloudDeployment -->
+      <rect x="940" y="550" width="280" height="90" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="960" y="578" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">CloudDeployment Gating</text>
+      <text x="960" y="598" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_deployments table</text>
+      <text x="960" y="616" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Policy check before container push</text>
+
+      <!-- Connectors Zone 2 -> Zone 3 -->
+      <path d="M 850 150 L 940 150" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+      <path d="M 850 315 L 890 315 Q 900 315 900 295 L 900 295 L 940 295" stroke="#0f172a" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+      <path d="M 1080 210 L 1080 250" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 1080 340 L 1080 380" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 850 595 L 940 595" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+    </svg>
+  </div>
+
+  <div class="mermaid-source">
+    <div style="color: #94a3b8; margin-bottom: 8px;">// Editable Mermaid Source Definition</div>
+    <pre>
+graph LR
+    subgraph Zone1["Zone 1: Ingestion & Auth"]
+        CP["Cloud Providers (AWS / Azure / GCP)"]
+        CC["CloudConnection (cloud_connections)"]
+        CDJ["CloudDiscoveryJob"]
+        CAE["CloudAuditEvent Ingest"]
+        CP --> CC --> CDJ
+    end
+
+    subgraph Zone2["Zone 2: Discovery, Graph & IaC"]
+        CR["Asset Inventory & Graph (cloud_resources)"]
+        IAM["IAM & Network Posture (iam_roles, firewalls)"]
+        CK["Checkov IaC Scanner (checkov.py)"]
+        CRD["CloudResourceDrift (Terraform vs Live)"]
+        CDJ --> CR --> IAM --> CK --> CRD
+    end
+
+    subgraph Zone3["Zone 3: Observations & Remediation"]
+        CSO["CloudSecurityObservation"]
+        CPF["CloudProviderFinding (Security Hub, Defender)"]
+        CA["CloudAction & Evidence (Idempotent Fix)"]
+        CD["CloudDeployment Gating"]
+        CR --> CSO
+        IAM --> CPF
+        CSO --> CA
+        CRD --> CD
+    end
+
+    classDef accent fill:#ffffff,stroke:#ea580c,stroke-width:2px;
+    class CSO,CA accent;
+    </pre>
+  </div>
+
+</body>
+</html>

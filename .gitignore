@@ -1,9 +1,18 @@
-# Environment variables
+# ==============================================================================
+# Environment variables & secrets
+# ==============================================================================
 .env
-.env.local
+.env.*
+!.env.example
 *.env
+*.pem
+*.key
+*.cert
+secrets/
 
-# Python
+# ==============================================================================
+# Python & Virtual Environments
+# ==============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -32,30 +41,105 @@ venv/
 env/
 ENV/
 
-# Node / Frontend
+# ==============================================================================
+# Node / Frontend / Next.js
+# ==============================================================================
 node_modules/
+*/node_modules/
+.next/
+*/.next/
+out/
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-dist/
-dist-ssr/
-*.local
+lerna-debug.log*
+.turbo/
 
-# Database
+# ==============================================================================
+# Databases & Storage
+# ==============================================================================
 postgres_data/
+*.sqlite
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
+backend/dev.db*
 
-# IDE & OS
+# ==============================================================================
+# Large Binary Executables (>50MB / Scanner Binaries)
+# ==============================================================================
+*.exe
+*.dll
+*.dylib
+backend/bin/*.exe
+backend/bin/syft.exe
+backend/bin/trivy.exe
+
+# ==============================================================================
+# Large Media & Video Files (>50MB / Exports)
+# ==============================================================================
+*.mp4
+*.mov
+*.avi
+*.webm
+export-*.mp4
+frontend/public/export-*.mp4
+frontend/public/product-demo.mp4
+
+# ==============================================================================
+# Scratch, Temporary Workspace & Test Artifacts
+# ==============================================================================
+scratch/
+*/scratch/
+backend/scratch/
+backend/scratch/github_workspaces/
+.tempmediaStorage/
+backend/route_audit_report.txt
+backend/routes.txt
+check_*.py
+init_db.py
+backend/check_*.py
+backend/scratch_*.py
+backend/test_auth_api.py
+backend/update_accounts.py
+integration_test.json
+project_payload.json
+register.json
+register_dev.json
+test_login.ps1
+inspect_all.ps1
+inspect_pid.ps1
+reset_password.bat
+
+# ==============================================================================
+# IDE, Editor & OS Files
+# ==============================================================================
 .vscode/
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
 Thumbs.db
+ehthumbs.db
 
+# ==============================================================================
+# Graphify Knowledge Graph & Generated Outputs (>100MB)
+# ==============================================================================
+graphify-out/
+
+# ==============================================================================
 # Logs
+# ==============================================================================
 *.log
 logs/
+*/logs/
+

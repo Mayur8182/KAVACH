@@ -1,0 +1,19 @@
+id: sensitive-data-logs
+title: Sensitive Data Log Exposure
+severity: medium
+risk_level: Medium
+category: Data Exposure
+cwe: CWE-532
+owasp: A09:2021-Security Logging and Monitoring Failures
+cvss_score: "5.3 (Medium)"
+patterns:
+  - "console.log(password"
+  - "console.log(token"
+  - "logger.info(password"
+  - "logger.debug(secret"
+  - "print(user.password"
+description: "Logging sensitive credentials, tokens, or PII into standard log streams or files."
+remediation: "Filter out sensitive keys before logging or redact secrets with asterisks/tokens."
+references:
+  - title: "CWE-532: Insertion of Sensitive Information into Log File"
+    url: "https://cwe.mitre.org/data/definitions/532.html"

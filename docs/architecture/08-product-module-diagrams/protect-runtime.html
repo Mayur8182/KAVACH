@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thing Protect — Runtime, Container & MCP Gateway Protection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --subtle: #94a3b8;
+      --border: #e2e8f0;
+      --accent: #ea580c;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      padding: 48px;
+      line-height: 1.5;
+    }
+    header {
+      max-width: 1400px;
+      margin: 0 auto 36px auto;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+      display: inline-block;
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 2px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 38px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .description {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 880px;
+    }
+    .canvas-card {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      padding: 32px;
+      overflow-x: auto;
+    }
+    svg {
+      display: block;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+    .mermaid-source {
+      max-width: 1400px;
+      margin: 36px auto 0 auto;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 24px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    .mermaid-source pre {
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="eyebrow">Thing Protect Architecture · Container Security, eBPF & MCP Gateway</div>
+    <h1>Container Runtime & AI Agent Security Gateway</h1>
+    <p class="description">
+      Dual protection plane combining kernel-level container runtime defense (eBPF / Falco probes, process execution alerts,
+      filesystem change detection) with enterprise MCP Gateway protection (AI agent tool authorization, schema sanitization,
+      human approval gates, and tamper-evident tool invocation logging).
+    </p>
+  </header>
+
+  <div class="canvas-card">
+    <svg width="1280" height="740" viewBox="0 0 1280 740" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#0f172a" />
+        </marker>
+        <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#ea580c" />
+        </marker>
+      </defs>
+
+      <!-- Region Zone: Container & Cluster Runtime -->
+      <rect x="40" y="40" width="480" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="60" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">PLANE 1: CONTAINER & KUBERNETES RUNTIME DEFENSE</text>
+
+      <!-- Region Zone: MCP Gateway & Agent Firewall -->
+      <rect x="540" y="40" width="700" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="560" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">PLANE 2: MCP SECURITY GATEWAY & TOOL CONTROL</text>
+
+      <!-- Node: Trivy Container Image Scan -->
+      <rect x="70" y="100" width="420" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Container Image Scanning [VERIFIED]</text>
+      <text x="90" y="148" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">backend/app/engines/scanner/trivy.py</text>
+      <text x="90" y="168" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Trivy CLI & container_scan_models</text>
+      <text x="90" y="186" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Base image CVEs & OS package vulnerabilities</text>
+
+      <!-- Node: ContainerRuntimePolicy -->
+      <rect x="70" y="240" width="420" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="268" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">ContainerRuntimePolicy [VERIFIED]</text>
+      <text x="90" y="288" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">container_runtime_policies table</text>
+      <text x="90" y="308" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Kernel eBPF LSM / Falco Probe mechanism</text>
+      <text x="90" y="326" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">policy_type: Blocking | Detection (Alert)</text>
+
+      <!-- Node: ContainerRuntimeEvents -->
+      <rect x="70" y="380" width="420" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="408" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Telemetry Ingestion (eBPF Stream)</text>
+      <text x="90" y="428" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">container_runtime_events table</text>
+      <text x="90" y="448" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Process execution, network, file changes</text>
+      <text x="90" y="466" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">workload_name, namespace, container_id</text>
+
+      <!-- Node: ContainerRuntimeAlert -->
+      <rect x="70" y="520" width="420" height="130" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+      <text x="90" y="548" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">ContainerRuntimeAlert [VERIFIED]</text>
+      <text x="90" y="568" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">container_runtime_alerts table</text>
+      <text x="90" y="588" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">event_type: Suspicious Process, Privilege Esc,</text>
+      <text x="90" y="606" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Crypto Mining, Network Activity</text>
+      <text x="90" y="624" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Evidence: pid, ppid, cmdline, image</text>
+
+      <!-- Connectors Plane 1 -->
+      <path d="M 280 210 L 280 240" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 280 350 L 280 380" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 280 490 L 280 520" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+      <!-- Plane 2: MCP Sessions -->
+      <rect x="570" y="100" width="300" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="590" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">MCPSession [VERIFIED]</text>
+      <text x="590" y="148" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">mcp_sessions table</text>
+      <text x="590" y="168" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">transport: stdio, sse, stream</text>
+      <text x="590" y="186" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">TTL expiration & authenticated_principal</text>
+
+      <!-- Plane 2: MCP Tools Catalog -->
+      <rect x="910" y="100" width="300" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="930" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">MCPTool Registry [VERIFIED]</text>
+      <text x="930" y="148" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">mcp_tools table</text>
+      <text x="930" y="168" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">input/output schema validation</text>
+      <text x="930" y="186" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">risk_level & requires_approval flag</text>
+
+      <!-- Plane 2: Gateway Pipeline Steps -->
+      <rect x="570" y="250" width="640" height="130" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="590" y="278" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Gateway Authorization & Policy Pipeline</text>
+      <text x="590" y="298" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">1. Agent Identity Check &rarr; 2. Role Capability Verification</text>
+      <text x="590" y="318" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">3. OPA Deterministic Policy Check (ALLOW / WARN / BLOCK / REQUIRE_APPROVAL)</text>
+      <text x="590" y="338" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">4. Schema Sanitization & Secret Redaction (input_summary)</text>
+      <text x="590" y="356" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Zero Unrestricted AI Tool Execution (Rule 15)</text>
+
+      <!-- Plane 2: Human Approval Gate -->
+      <rect x="570" y="410" width="300" height="90" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="590" y="438" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Human Approval Gate</text>
+      <text x="590" y="458" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">High / Critical risk tools</text>
+      <text x="590" y="476" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">requires_approval == true</text>
+
+      <!-- Plane 2: MCPToolInvocation Audit -->
+      <rect x="570" y="530" width="640" height="130" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+      <text x="590" y="558" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">MCPToolInvocation (Immutable Audit) [VERIFIED]</text>
+      <text x="590" y="578" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">mcp_tool_invocations table</text>
+      <text x="590" y="598" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">request_id, authorization_decision, policy_decision, approval_id</text>
+      <text x="590" y="618" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">input_summary, output_summary, result_reference</text>
+      <text x="590" y="636" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Status: PENDING &rarr; RUNNING &rarr; COMPLETED | DENIED | BLOCKED</text>
+
+      <!-- Connectors Plane 2 -->
+      <path d="M 720 210 L 720 250" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 1060 210 L 1060 250" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 720 380 L 720 410" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 720 500 L 720 530" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 950 380 L 950 530" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+    </svg>
+  </div>
+
+  <div class="mermaid-source">
+    <div style="color: #94a3b8; margin-bottom: 8px;">// Editable Mermaid Source Definition</div>
+    <pre>
+graph TB
+    subgraph Plane1["Container & Kubernetes Defense"]
+        TIV["Trivy Image Scan (trivy.py)"]
+        CRP["ContainerRuntimePolicy (eBPF / Falco)"]
+        CRE["Telemetry Events (container_runtime_events)"]
+        CRA["Runtime Alerts (container_runtime_alerts)"]
+        TIV --> CRP --> CRE --> CRA
+    end
+
+    subgraph Plane2["MCP Security Gateway"]
+        MCS["MCPSession (TTL & Authenticated Principal)"]
+        MCT["MCPTool Registry (Schemas & Risk Level)"]
+        PIPE["Gateway Pipeline (Identity -> OPA Policy -> Schema Check)"]
+        HAG["Human Approval Gate (High/Critical Risk)"]
+        MTI["MCPToolInvocation (Immutable Audit Record)"]
+        MCS --> PIPE
+        MCT --> PIPE
+        PIPE --> HAG --> MTI
+        PIPE --> MTI
+    end
+
+    classDef accent fill:#ffffff,stroke:#ea580c,stroke-width:2px;
+    class CRA,MTI accent;
+    </pre>
+  </div>
+
+</body>
+</html>

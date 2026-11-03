@@ -54,3 +54,18 @@ class Agent(Base, TimestampMixin):
         "Project",
         back_populates="agents",
     )
+    credentials = relationship(
+        "AgentCredential",
+        back_populates="agent",
+        cascade="all, delete-orphan",
+    )
+    agent_roles = relationship(
+        "AgentRole",
+        back_populates="agent",
+        cascade="all, delete-orphan",
+    )
+    permission_overrides = relationship(
+        "AgentPermissionOverride",
+        back_populates="agent",
+        cascade="all, delete-orphan",
+    )

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer Control Plane — API &amp; Service Execution Flows</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --soft: #94a3b8;
+      --line: #e2e8f0;
+      --line-strong: #cbd5e1;
+      --accent: #ea580c;
+      --accent-tint: rgba(234, 88, 12, 0.08);
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+      --font-mono: "Geist Mono", monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--ink);
+      padding: 40px 24px;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+    header.header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    p.lead {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+      max-width: 860px;
+    }
+    .diagram-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .diagram-scroll {
+      width: 100%;
+      overflow-x: auto;
+      padding: 32px 24px;
+      background: var(--paper);
+    }
+    svg.canvas {
+      display: block;
+      margin: 0 auto;
+      min-width: 1100px;
+    }
+    .diagram-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: #f1f5f9;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .source-panel {
+      margin-top: 24px;
+      background: #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .source-header {
+      padding: 10px 16px;
+      background: #1e293b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cbd5e1;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    pre.code-block {
+      padding: 16px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="eyebrow">Fig. 05 · Execution Sequences</div>
+      <h1>API, Service &amp; Scanning Orchestration Lifecycle</h1>
+      <p class="lead">Step-by-step sequence of security scanning, human-in-the-loop hotspot triage, and the AI patch rescan verification loop grounded in real service handlers.</p>
+    </header>
+
+    <div class="diagram-card">
+      <div class="diagram-scroll">
+        <svg class="canvas" viewBox="0 0 1100 760" width="1100" height="760" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569" />
+            </marker>
+            <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ea580c" />
+            </marker>
+            <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.04" />
+            </filter>
+          </defs>
+
+          <!-- Sequence Actor Columns -->
+          <!-- Actor 1: Frontend Client (x=120) -->
+          <line x1="120" y1="90" x2="120" y2="700" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="4,4" />
+          <g transform="translate(50, 40)" filter="url(#shadow)">
+            <rect width="140" height="45" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="70" y="27" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#0f172a" text-anchor="middle">Next.js Client</text>
+          </g>
+
+          <!-- Actor 2: FastAPI Gateway (x=360) -->
+          <line x1="360" y1="90" x2="360" y2="700" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="4,4" />
+          <g transform="translate(290, 40)" filter="url(#shadow)">
+            <rect width="140" height="45" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="70" y="27" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#0f172a" text-anchor="middle">FastAPI Gateway</text>
+          </g>
+
+          <!-- Actor 3: Task Worker / Queue (x=600) -->
+          <line x1="600" y1="90" x2="600" y2="700" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="4,4" />
+          <g transform="translate(530, 40)" filter="url(#shadow)">
+            <rect width="140" height="45" rx="5" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" />
+            <text x="70" y="27" font-family="'Geist', sans-serif" font-size="12" font-weight="700" fill="#ea580c" text-anchor="middle">TaskWorker</text>
+          </g>
+
+          <!-- Actor 4: Scanners & OPA (x=840) -->
+          <line x1="840" y1="90" x2="840" y2="700" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="4,4" />
+          <g transform="translate(770, 40)" filter="url(#shadow)">
+            <rect width="140" height="45" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="70" y="27" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#0f172a" text-anchor="middle">Semgrep / OPA</text>
+          </g>
+
+          <!-- Actor 5: PostgreSQL Database (x=1020) -->
+          <line x1="1020" y1="90" x2="1020" y2="700" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="4,4" />
+          <g transform="translate(950, 40)" filter="url(#shadow)">
+            <rect width="140" height="45" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="70" y="27" font-family="'Geist', sans-serif" font-size="12" font-weight="600" fill="#0f172a" text-anchor="middle">PostgreSQL DB</text>
+          </g>
+
+          <!-- SEQUENCE STEPS -->
+
+          <!-- Flow 1: Scan Trigger & Enqueue -->
+          <rect x="40" y="110" width="1020" height="150" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+          <text x="50" y="125" font-family="'Geist Mono', monospace" font-size="9" font-weight="700" fill="#ea580c">FLOW 1 · REPOSITORY SCAN REQUEST &amp; ASYNC QUEUING</text>
+
+          <path d="M 120 150 H 350" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <text x="235" y="142" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a" text-anchor="middle">POST /api/v1/scans (repo_id)</text>
+
+          <path d="M 360 170 H 1010" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <text x="685" y="162" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a" text-anchor="middle">INSERT github_security_jobs (status='QUEUED')</text>
+
+          <path d="M 360 195 H 590" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <text x="475" y="187" font-family="'Geist Mono', monospace" font-size="9" fill="#ea580c" text-anchor="middle">Enqueue Task (job_id)</text>
+
+          <path d="M 360 220 H 130" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arrow)" />
+          <text x="245" y="212" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b" text-anchor="middle">HTTP 202 Accepted { job_id }</text>
+
+          <!-- Flow 2: Worker Execution & Scanners -->
+          <rect x="40" y="280" width="1020" height="190" rx="6" fill="#fafafa" stroke="#e2e8f0" stroke-width="1" />
+          <text x="50" y="295" font-family="'Geist Mono', monospace" font-size="9" font-weight="700" fill="#ea580c">FLOW 2 · DETERMINISTIC SCANNING &amp; FINDINGS DEDUPLICATION</text>
+
+          <path d="M 600 320 H 830" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="715" y="312" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a" text-anchor="middle">Execute Semgrep / Gitleaks CLI</text>
+
+          <path d="M 840 355 H 610" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arrow)" />
+          <text x="725" y="347" font-family="'Geist Mono', monospace" font-size="9" fill="#64748b" text-anchor="middle">Raw Findings JSON</text>
+
+          <path d="M 600 390 H 1010" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <text x="805" y="382" font-family="'Geist Mono', monospace" font-size="9" fill="#ea580c" text-anchor="middle">Deduplicate &amp; UPSERT security_findings</text>
+
+          <path d="M 600 425 H 1010" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <text x="805" y="417" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a" text-anchor="middle">UPDATE job (status='COMPLETED', findings_count=N)</text>
+
+          <!-- Flow 3: AI Remediation & Rescan Gate -->
+          <rect x="40" y="490" width="1020" height="200" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+          <text x="50" y="505" font-family="'Geist Mono', monospace" font-size="9" font-weight="700" fill="#ea580c">FLOW 3 · AI REMEDIATION &amp; DETERMINISTIC RESCAN VERIFICATION GATE</text>
+
+          <path d="M 120 535 H 350" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <text x="235" y="527" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a" text-anchor="middle">POST /api/v1/remediation/fix { finding_id }</text>
+
+          <path d="M 360 565 H 590" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <text x="475" y="557" font-family="'Geist Mono', monospace" font-size="9" fill="#ea580c" text-anchor="middle">LLM Synthesizes Minimal Unified Diff</text>
+
+          <path d="M 600 595 H 830" fill="none" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-accent)" />
+          <text x="715" y="587" font-family="'Geist Mono', monospace" font-size="9" font-weight="700" fill="#ea580c" text-anchor="middle">GATE: Rescan Patched Scratch Workspace</text>
+
+          <path d="M 840 625 H 610" fill="none" stroke="#16a34a" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arrow)" />
+          <text x="725" y="617" font-family="'Geist Mono', monospace" font-size="9" fill="#16a34a" text-anchor="middle">0 Vulnerabilities Found (PASS)</text>
+
+          <path d="M 600 655 H 1010" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <text x="805" y="647" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a" text-anchor="middle">Persist Verified Patch &amp; Audit Trail</text>
+
+          <path d="M 360 675 H 130" fill="none" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrow)" />
+          <text x="245" y="667" font-family="'Geist Mono', monospace" font-size="9" font-weight="600" fill="#16a34a" text-anchor="middle">Return Verified Diff Ready for PR</text>
+        </svg>
+      </div>
+      <div class="diagram-footer">
+        <span>FIG. 05 · SERVICE EXECUTION FLOWS</span>
+        <span>STANDALONE SVG · NO EXTERNAL ASSETS</span>
+        <span>GROUND TRUTH: SCAN_ORCHESTRATOR_SERVICE.PY</span>
+      </div>
+    </div>
+
+    <!-- Editable Source Panel -->
+    <div class="source-panel">
+      <div class="source-header">
+        <span>EDITABLE MERMAID SOURCE (FOR MAINTENANCE &amp; GITHUB PREVIEWS)</span>
+        <span>COPY / PASTE READY</span>
+      </div>
+      <pre class="code-block"><code>sequenceDiagram
+    autonumber
+    actor User as Next.js Client
+    participant GW as FastAPI Gateway
+    participant Worker as TaskWorker
+    participant Scanners as Semgrep / OPA
+    participant DB as PostgreSQL DB
+
+    Note over User,DB: Flow 1: Scan Trigger &amp; Enqueue
+    User->>GW: POST /api/v1/scans { repo_id }
+    GW->>DB: INSERT github_security_jobs (status='QUEUED')
+    GW->>Worker: Enqueue Task (job_id)
+    GW-->>User: HTTP 202 Accepted { job_id }
+
+    Note over Worker,DB: Flow 2: Deterministic Scan &amp; Ingest
+    Worker->>Scanners: Execute Semgrep &amp; Gitleaks CLI
+    Scanners-->>Worker: Raw Findings JSON
+    Worker->>DB: UPSERT security_findings (deduplicate)
+    Worker->>DB: UPDATE job (status='COMPLETED', count=N)
+
+    Note over User,DB: Flow 3: AI Remediation &amp; Rescan Gate
+    User->>GW: POST /api/v1/remediation/fix { finding_id }
+    GW->>Worker: LLM Synthesizes Unified Diff
+    Worker->>Scanners: Rescan Patched Scratch Workspace
+    Scanners-->>Worker: 0 Findings (Verification PASS)
+    Worker->>DB: Save Verified Patch &amp; Audit Event
+    GW-->>User: Return Verified Diff for PR</code></pre>
+    </div>
+  </div>
+</body>
+</html>

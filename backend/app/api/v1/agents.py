@@ -1,5 +1,5 @@
 import uuid
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,11 +34,11 @@ async def create_agent(
 @router.get(
     "",
     response_model=List[AgentResponse],
-    summary="List agents for a project",
-    description="Lists all agents assigned to a specific project if the user has ownership permission.",
+    summary="List agents for a project or all owned projects",
+    description="Lists all agents assigned to a specific project or all projects owned by the user.",
 )
 async def list_agents(
-    project_id: uuid.UUID = Query(description="Project ID to query agents for"),
+    project_id: Optional[uuid.UUID] = Query(default=None, description="Optional Project ID to query agents for"),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
@@ -46,7 +46,7 @@ async def list_agents(
 ) -> List[AgentResponse]:
     service = AgentService(db)
     agents = await service.list_agents(
-        project_id=project_id, current_user=current_user, limit=limit, offset=offset
+        current_user=current_user, project_id=project_id, limit=limit, offset=offset
     )
     return [AgentResponse.model_validate(a) for a in agents]
 

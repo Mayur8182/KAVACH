@@ -1,0 +1,122 @@
+"""
+Enums and vocabulary for Step 14 Runtime Security Agent and Controlled Enforcement.
+"""
+
+from enum import Enum
+
+
+class ResponseActionType(str, Enum):
+    NO_ACTION = "NO_ACTION"
+    ALERT = "ALERT"
+    NOTIFY = "NOTIFY"
+    REQUIRE_APPROVAL = "REQUIRE_APPROVAL"
+    BLOCK_REQUEST = "BLOCK_REQUEST"
+    DENY_TOOL_CALL = "DENY_TOOL_CALL"
+    REVOKE_SESSION = "REVOKE_SESSION"
+    REVOKE_DELEGATION = "REVOKE_DELEGATION"
+    SUSPEND_AGENT = "SUSPEND_AGENT"
+    ISOLATE_AGENT = "ISOLATE_AGENT"
+    ISOLATE_WORKLOAD = "ISOLATE_WORKLOAD"
+    QUARANTINE_ARTIFACT = "QUARANTINE_ARTIFACT"
+    DISABLE_INTEGRATION = "DISABLE_INTEGRATION"
+    PAUSE_DEPLOYMENT = "PAUSE_DEPLOYMENT"
+    BLOCK_DEPLOYMENT = "BLOCK_DEPLOYMENT"
+    BLOCK_PIPELINE = "BLOCK_PIPELINE"
+    RESTRICT_DATA_FLOW = "RESTRICT_DATA_FLOW"
+
+
+class ResponseStatus(str, Enum):
+    REQUESTED = "REQUESTED"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    AUTHORIZED = "AUTHORIZED"
+    DENIED = "DENIED"
+    QUEUED = "QUEUED"
+    EXECUTING = "EXECUTING"
+    COMPLETED = "COMPLETED"
+    PARTIALLY_COMPLETED = "PARTIALLY_COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    EXPIRED = "EXPIRED"
+    NOT_EXECUTED = "NOT_EXECUTED"
+
+
+class ResponseMode(str, Enum):
+    OBSERVE = "OBSERVE"
+    ALERT_ONLY = "ALERT_ONLY"
+    REQUIRE_APPROVAL = "REQUIRE_APPROVAL"
+    AUTOMATIC = "AUTOMATIC"
+
+
+class ResponseSeverity(str, Enum):
+    INFORMATIONAL = "INFORMATIONAL"
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class ResponseTargetType(str, Enum):
+    REQUEST = "REQUEST"
+    SESSION = "SESSION"
+    AGENT = "AGENT"
+    DELEGATION = "DELEGATION"
+    MCP_TOOL_CALL = "MCP_TOOL_CALL"
+    DATA_FLOW = "DATA_FLOW"
+    SERVICE = "SERVICE"
+    CONTAINER = "CONTAINER"
+    KUBERNETES_POD = "KUBERNETES_POD"
+    KUBERNETES_DEPLOYMENT = "KUBERNETES_DEPLOYMENT"
+    PIPELINE = "PIPELINE"
+    DEPLOYMENT = "DEPLOYMENT"
+    ARTIFACT = "ARTIFACT"
+    INTEGRATION = "INTEGRATION"
+
+
+class Reversibility(str, Enum):
+    REVERSIBLE = "REVERSIBLE"
+    PARTIALLY_REVERSIBLE = "PARTIALLY_REVERSIBLE"
+    IRREVERSIBLE = "IRREVERSIBLE"
+
+
+class ResponseDecision(str, Enum):
+    NO_ACTION = "NO_ACTION"
+    ALERT = "ALERT"
+    REQUIRE_APPROVAL = "REQUIRE_APPROVAL"
+    BLOCK = "BLOCK"
+    DENY = "DENY"
+    ISOLATE = "ISOLATE"
+    REVOKE = "REVOKE"
+    PAUSE = "PAUSE"
+
+
+class EnforcementRuleStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    EXPIRED = "EXPIRED"
+    REVOKED = "REVOKED"
+
+
+class ExecutionAttemptStatus(str, Enum):
+    STARTED = "STARTED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    TIMEOUT = "TIMEOUT"
+    CANCELLED = "CANCELLED"
+
+
+class IncidentStatus(str, Enum):
+    OPEN = "OPEN"
+    INVESTIGATING = "INVESTIGATING"
+    CONTAINED = "CONTAINED"
+    RESOLVED = "RESOLVED"
+    CLOSED = "CLOSED"
+
+
+class SafetyTier(str, Enum):
+    TIER_0 = "TIER_0"  # Observe only
+    TIER_1 = "TIER_1"  # Notify / alert
+    TIER_2 = "TIER_2"  # Block individual request/tool call
+    TIER_3 = "TIER_3"  # Revoke session/delegation
+    TIER_4 = "TIER_4"  # Isolate workload/integration
+    TIER_5 = "TIER_5"  # High-impact production action

@@ -113,3 +113,39 @@ class ScannerHealthResponse(BaseModel):
     status: str
     version: Optional[str] = None
     message: str
+    is_available: bool = False
+    last_health_check: Optional[str] = None
+
+
+class OrchestratorTriggerRequest(BaseModel):
+    """Payload to trigger asynchronous unified scan orchestration."""
+    target_path: Optional[str] = Field(default=None, description="Optional target path on disk. If omitted, uses project repo or workspace.")
+    requested_scanners: Optional[List[str]] = Field(default=None, description="Optional list of scanners to force-include (e.g. ['gitleaks', 'semgrep']).")
+    exclude_scanners: Optional[List[str]] = Field(default=None, description="Optional list of scanners to exclude.")
+    blueprint_id: Optional[uuid.UUID] = Field(default=None, description="Optional security blueprint to evaluate requirements against.")
+
+
+class OrchestratorTriggerResponse(BaseModel):
+    """Response returned immediately when unified scan orchestration is enqueued."""
+    scan_id: str
+    task_id: str
+    status: str
+    target_path: str
+    project_id: str
+    blueprint_id: Optional[str] = None
+    created_at: str
+
+
+class OrchestratorStatusResponse(BaseModel):
+    """Live progress and status of a running scan orchestration."""
+    scan_id: str
+    status: str
+    progress_percent: int
+    current_step: str
+    target_path: str
+    scanner_count: int
+    finding_count: int
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    error_message: Optional[str] = None
+    executions: List[Dict[str, Any]] = Field(default_factory=list)

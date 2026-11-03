@@ -24,7 +24,10 @@ import type {
   SecurityApproval,
 } from '../types/api';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000/api/v1';
+const API_BASE_URL =
+  ((import.meta as any)?.env?.VITE_API_BASE_URL as string) ||
+  (typeof (globalThis as any).process !== 'undefined' ? (globalThis as any).process.env?.NEXT_PUBLIC_API_URL : undefined) ||
+  'http://localhost:8000/api/v1';
 
 class ApiClient {
   private baseUrl: string;
@@ -408,6 +411,103 @@ class ApiClient {
     token?: string,
   ): Promise<ApiResponse<SecurityApproval[]>> {
     return this.request<SecurityApproval[]>(`/projects/${projectId}/approvals/pending`, {}, token);
+  }
+
+  /** SBOM APIs */
+  public async triggerSBOMGeneration(
+    payload: import('../types/api').SBOMGenerateRequest,
+    token?: string,
+  ): Promise<ApiResponse<import('../types/api').SBOMJob>> {
+    return this.request<import('../types/api').SBOMJob>(
+      '/sbom/generate',
+      { method: 'POST', body: JSON.stringify(payload) },
+      token,
+    );
+  }
+
+  public async getSBOMJob(
+    jobId: string,
+    token?: string,
+  ): Promise<ApiResponse<import('../types/api').SBOMJob>> {
+    return this.request<import('../types/api').SBOMJob>(`/sbom/jobs/${jobId}`, {}, token);
+  }
+
+  public async listSBOMJobs(
+    projectId: string,
+    token?: string,
+  ): Promise<ApiResponse<import('../types/api').SBOMJob[]>> {
+    return this.request<import('../types/api').SBOMJob[]>(
+      `/sbom/jobs?project_id=${projectId}`,
+      {},
+      token,
+    );
+  }
+
+  public async listSBOMDocuments(
+    projectId: string,
+    token?: string,
+  ): Promise<ApiResponse<import('../types/api').SBOMDocument[]>> {
+    return this.request<import('../types/api').SBOMDocument[]>(
+      `/sbom?project_id=${projectId}`,
+      {},
+      token,
+    );
+  }
+
+  public async getSBOMDocument(
+    documentId: string,
+    token?: string,
+  ): Promise<ApiResponse<import('../types/api').SBOMDocument>> {
+    return this.request<import('../types/api').SBOMDocument>(`/sbom/${documentId}`, {}, token);
+  }
+
+  public async getSBOMSummary(
+    documentId: string,
+    token?: string,
+  ): Promise<ApiResponse<import('../types/api').SBOMSummary>> {
+    return this.request<import('../types/api').SBOMSummary>(
+      `/sbom/${documentId}/summary`,
+      {},
+      token,
+    );
+  }
+
+  public async listSBOMComponents(
+    documentId: string,
+    params: {
+      search?: string;
+      component_type?: string;
+      license_name?: string;
+      risk_level?: string;
+      component_status?: string;
+      page?: number;
+      page_size?: number;
+      sort_by?: string;
+      sort_dir?: string;
+    } = {},
+    token?: string,
+  ): Promise<ApiResponse<import('../types/api').SBOMComponentPage>> {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+    });
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request<import('../types/api').SBOMComponentPage>(
+      `/sbom/${documentId}/components${query}`,
+      {},
+      token,
+    );
+  }
+
+  public async getLatestSBOM(
+    projectId: string,
+    token?: string,
+  ): Promise<ApiResponse<import('../types/api').SBOMDocument>> {
+    return this.request<import('../types/api').SBOMDocument>(
+      `/sbom/projects/${projectId}/latest`,
+      {},
+      token,
+    );
   }
 }
 

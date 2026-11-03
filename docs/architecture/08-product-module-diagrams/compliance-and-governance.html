@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thing Compliance — Governance, OPA Policies & Agent Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --subtle: #94a3b8;
+      --border: #e2e8f0;
+      --accent: #ea580c;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      padding: 48px;
+      line-height: 1.5;
+    }
+    header {
+      max-width: 1400px;
+      margin: 0 auto 36px auto;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+      display: inline-block;
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 2px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 38px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .description {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 880px;
+    }
+    .canvas-card {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      padding: 32px;
+      overflow-x: auto;
+    }
+    svg {
+      display: block;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+    .mermaid-source {
+      max-width: 1400px;
+      margin: 36px auto 0 auto;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 24px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    .mermaid-source pre {
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="eyebrow">Thing Compliance Architecture · Frameworks, OPA Policy & Agent Governance</div>
+    <h1>Compliance Frameworks & Agent Governance Engine</h1>
+    <p class="description">
+      Deterministic compliance verification mapping controls (SOC 2, ISO 27001, HIPAA, PCI-DSS) to real technical evidence.
+      Integrates OPA policy evaluation with deep AI agent governance (delegation scoping, capability boundaries, supervisor reviews, and audit trails).
+    </p>
+  </header>
+
+  <div class="canvas-card">
+    <svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#0f172a" />
+        </marker>
+        <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#ea580c" />
+        </marker>
+      </defs>
+
+      <!-- Region Zone: Frameworks & Control Mapping -->
+      <rect x="40" y="40" width="360" height="640" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="60" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 1: FRAMEWORKS & CONTROL EVIDENCE</text>
+
+      <!-- Region Zone: Deterministic OPA Engine -->
+      <rect x="430" y="40" width="420" height="640" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="450" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 2: OPA POLICY & LICENSE ENGINE</text>
+
+      <!-- Region Zone: AI Agent Governance -->
+      <rect x="880" y="40" width="360" height="640" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="900" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 3: AI AGENT GOVERNANCE</text>
+
+      <!-- Node: Framework Definitions -->
+      <rect x="70" y="110" width="300" height="120" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="138" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Compliance Frameworks [VERIFIED]</text>
+      <text x="90" y="158" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">SOC 2 Type II, ISO 27001, HIPAA, PCI-DSS</text>
+      <text x="90" y="178" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Mapped to code, cloud & identity controls</text>
+      <text x="90" y="196" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Continuous evidence ingestion</text>
+
+      <!-- Node: IaC & Cloud Compliance -->
+      <rect x="70" y="260" width="300" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="288" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">IaC & Cloud Controls [VERIFIED]</text>
+      <text x="90" y="308" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">iac_compliance.py models</text>
+      <text x="90" y="328" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">CIS Benchmark rule verifications</text>
+      <text x="90" y="346" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Cloud requirement status tracking</text>
+
+      <!-- Node: Audit Trail & Tamper Evidence -->
+      <rect x="70" y="400" width="300" height="120" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="90" y="428" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Audit Events & Hashed Evidence</text>
+      <text x="90" y="448" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">audit_event.py table</text>
+      <text x="90" y="468" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">SHA-256 payload integrity hash</text>
+      <text x="90" y="486" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Zero mutable audit logs (Rule 20)</text>
+
+      <!-- Connectors Zone 1 -->
+      <path d="M 220 230 L 220 260" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 220 370 L 220 400" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+      <!-- Node: OPA Rego Engine -->
+      <rect x="460" y="110" width="360" height="120" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="480" y="138" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">OPA Deterministic Engine [VERIFIED]</text>
+      <text x="480" y="158" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">backend/app/engines/policy/opa.py</text>
+      <text x="480" y="178" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Evaluates policy rules on every scan & push</text>
+      <text x="480" y="196" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Decisions: ALLOW, BLOCK, REQUIRE_APPROVAL</text>
+
+      <!-- Node: License Compliance Engine -->
+      <rect x="460" y="260" width="360" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="480" y="288" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">License Compliance [VERIFIED]</text>
+      <text x="480" y="308" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">license_compliance.py models</text>
+      <text x="480" y="328" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">GPL, AGPL, MIT, Apache copyleft checks</text>
+      <text x="480" y="346" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Commercial usage incompatibility blocking</text>
+
+      <!-- Node: Security Blueprint Engine -->
+      <rect x="460" y="400" width="360" height="120" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="480" y="428" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Dynamic Security Blueprint [VERIFIED]</text>
+      <text x="480" y="448" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">backend/app/engines/blueprint/</text>
+      <text x="480" y="468" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Derives controls from tech stack & architecture</text>
+      <text x="480" y="486" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">No static checklists (Rule 17)</text>
+
+      <!-- Connectors Zone 1 -> Zone 2 -->
+      <path d="M 370 170 L 460 170" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 370 315 L 460 315" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 640 230 L 640 260" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 640 370 L 640 400" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+      <!-- Node: Agent Governance & Boundaries -->
+      <rect x="910" y="110" width="300" height="130" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="930" y="138" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Agent Governance [VERIFIED]</text>
+      <text x="930" y="158" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">agent_governance.py models</text>
+      <text x="930" y="178" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Permission boundaries & quotas</text>
+      <text x="930" y="196" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Delegation tokens with tight TTL</text>
+      <text x="930" y="214" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Capability matrix validation</text>
+
+      <!-- Node: Supervisor Review Gate -->
+      <rect x="910" y="270" width="300" height="110" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+      <text x="930" y="298" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Supervisor Review Gate [VERIFIED]</text>
+      <text x="930" y="318" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Mandatory human-in-the-loop signoff</text>
+      <text x="930" y="338" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Blocks autonomous privileged actions</text>
+      <text x="930" y="356" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Deterministic authority (Rule 14)</text>
+
+      <!-- Node: Compliance Export & Attestation -->
+      <rect x="910" y="410" width="300" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="930" y="438" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Attestation & Report Generator</text>
+      <text x="930" y="458" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Cryptographic attestation bundles</text>
+      <text x="930" y="478" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Automated auditor evidence export</text>
+      <text x="930" y="496" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">PDF & JSON control matrices</text>
+
+      <!-- Connectors Zone 2 -> Zone 3 -->
+      <path d="M 820 170 L 910 170" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 1060 240 L 1060 270" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 1060 380 L 1060 410" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+
+    </svg>
+  </div>
+
+  <div class="mermaid-source">
+    <div style="color: #94a3b8; margin-bottom: 8px;">// Editable Mermaid Source Definition</div>
+    <pre>
+graph LR
+    subgraph Zone1["Zone 1: Frameworks & Evidence"]
+        CF["Compliance Frameworks (SOC2, ISO27001, HIPAA)"]
+        IAC["IaC & Cloud Controls (iac_compliance)"]
+        AUD["Audit Events & Hashed Evidence (audit_event)"]
+        CF --> IAC --> AUD
+    end
+
+    subgraph Zone2["Zone 2: Deterministic Policy Engine"]
+        OPA["OPA Rego Engine (ALLOW / BLOCK / REQUIRE_APPROVAL)"]
+        LIC["License Compliance (GPL, AGPL, MIT)"]
+        SBP["Dynamic Security Blueprint (Dynamic Rules)"]
+        OPA --> LIC --> SBP
+    end
+
+    subgraph Zone3["Zone 3: AI Agent Governance"]
+        AG["Agent Governance (agent_governance)"]
+        SRG["Supervisor Review Gate (Human Signoff)"]
+        ATT["Attestation & Report Generator"]
+        AG --> SRG --> ATT
+    end
+
+    CF --> OPA
+    OPA --> AG
+
+    classDef accent fill:#ffffff,stroke:#ea580c,stroke-width:2px;
+    class SRG,OPA accent;
+    </pre>
+  </div>
+
+</body>
+</html>

@@ -449,3 +449,102 @@ export interface SimulateDecisionResponse {
   would_allow: boolean;
 }
 
+// ── SBOM Types ─────────────────────────────────────────────────────────────────
+
+export interface SBOMJob {
+  id: string;
+  project_id: string;
+  requested_by: string;
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  sbom_format: string;
+  syft_version?: string;
+  syft_command?: string;
+  exit_code?: number;
+  error_message?: string;
+  started_at?: string;
+  completed_at?: string;
+  duration_ms?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SBOMDocument {
+  id: string;
+  job_id: string;
+  project_id: string;
+  sbom_format: string;
+  sbom_spec_version?: string;
+  source_name?: string;
+  source_version?: string;
+  total_components: number;
+  vulnerable_components: number;
+  open_source_licenses: number;
+  high_risk_licenses: number;
+  critical_vulns: number;
+  high_vulns: number;
+  medium_vulns: number;
+  low_vulns: number;
+  info_vulns: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SBOMSummary {
+  total_components: number;
+  vulnerable_components: number;
+  open_source_licenses: number;
+  high_risk_licenses: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+  type_breakdown: Record<string, number>;
+  top_vulnerable: Array<{
+    id: string;
+    name: string;
+    version?: string;
+    vuln_count: number;
+    risk_level: string;
+    component_type: string;
+  }>;
+  last_scan_at?: string;
+  duration_ms?: number;
+  sbom_format?: string;
+  job_status?: string;
+}
+
+export interface SBOMComponent {
+  id: string;
+  document_id: string;
+  name: string;
+  version?: string;
+  component_type: string;
+  purl?: string;
+  license_name?: string;
+  is_high_risk_license: boolean;
+  vuln_count: number;
+  vuln_critical: number;
+  vuln_high: number;
+  vuln_medium: number;
+  vuln_low: number;
+  risk_level: 'Critical' | 'High' | 'Medium' | 'Low';
+  component_status: 'Vulnerable' | 'Needs Review' | 'Safe';
+  created_at: string;
+}
+
+export interface SBOMComponentPage {
+  items: SBOMComponent[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface SBOMGenerateRequest {
+  project_id: string;
+  target_path?: string;
+  sbom_format?: string;
+}
+
+

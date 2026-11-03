@@ -7,10 +7,21 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Node / Dependencies
+node_modules/
+dist/
+dist-ssr/
+out/
 *.local
+.turbo/
+
+# Next.js build output
+.next/
+*.tsbuildinfo
+
+# Large video files
+*.mp4
+*.webm
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +33,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+Thumbs.db

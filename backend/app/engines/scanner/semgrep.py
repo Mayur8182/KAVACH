@@ -21,8 +21,13 @@ class SemgrepScanner(SecurityScanner):
             self.executable_name,
             "scan",
             "--json",
+            "--config=auto",
             "--metrics=off",
-            "--quiet",
+            "--disable-version-check",
+            "--exclude=node_modules",
+            "--exclude=.venv",
+            "--exclude=venv",
+            "--exclude=.git",
             target.path,
         ]
 

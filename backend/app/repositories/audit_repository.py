@@ -21,15 +21,27 @@ class AuditRepository:
     async def list_events(
         self,
         project_id: Optional[uuid.UUID] = None,
+        organization_id: Optional[uuid.UUID] = None,
+        workspace_id: Optional[uuid.UUID] = None,
         actor_id: Optional[str] = None,
+        action: Optional[str] = None,
+        resource_type: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> List[AuditEvent]:
         stmt = select(AuditEvent)
         if project_id:
             stmt = stmt.where(AuditEvent.project_id == project_id)
+        if organization_id:
+            stmt = stmt.where(AuditEvent.organization_id == organization_id)
+        if workspace_id:
+            stmt = stmt.where(AuditEvent.workspace_id == workspace_id)
         if actor_id:
             stmt = stmt.where(AuditEvent.actor_id == actor_id)
-        stmt = stmt.order_by(AuditEvent.timestamp.desc()).limit(limit).offset(offset)
+        if action:
+            stmt = stmt.where(AuditEvent.action.ilike(f"%{action}%"))
+        if resource_type:
+            stmt = stmt.where(AuditEvent.resource_type.ilike(f"%{resource_type}%"))
+        stmt = stmt.order_by(AuditEvent.timestamp.desc(), AuditEvent.id.desc()).limit(limit).offset(offset)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())

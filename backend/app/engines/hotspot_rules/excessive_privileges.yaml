@@ -1,0 +1,19 @@
+id: excessive-privileges
+title: Excessive Privileges in Service Execution
+severity: high
+risk_level: High
+category: Authorization
+cwe: CWE-250
+owasp: A01:2021-Broken Access Control
+cvss_score: "7.7 (High)"
+patterns:
+  - "sudo"
+  - "chmod(0777"
+  - "chmod 777"
+  - "isAdmin"
+  - "privileged: true"
+description: "Service or script executed with superuser privileges or relaxed file permission modes (0777)."
+remediation: "Follow least privilege principles; execute processes under dedicated unprivileged system accounts and apply strict permissions (0600 / 0750)."
+references:
+  - title: "CWE-250: Execution with Unnecessary Privileges"
+    url: "https://cwe.mitre.org/data/definitions/250.html"

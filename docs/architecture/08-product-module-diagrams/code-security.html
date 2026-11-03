@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer — Thing Code Security Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --soft: #94a3b8;
+      --line: #e2e8f0;
+      --line-strong: #cbd5e1;
+      --accent: #ea580c;
+      --accent-tint: rgba(234, 88, 12, 0.08);
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+      --font-mono: "Geist Mono", monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--ink);
+      padding: 40px 24px;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+    header.header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    p.lead {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+      max-width: 860px;
+    }
+    .diagram-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .diagram-scroll {
+      width: 100%;
+      overflow-x: auto;
+      padding: 32px 24px;
+      background: var(--paper);
+    }
+    svg.canvas {
+      display: block;
+      margin: 0 auto;
+      min-width: 1100px;
+    }
+    .diagram-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: #f1f5f9;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .source-panel {
+      margin-top: 24px;
+      background: #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .source-header {
+      padding: 10px 16px;
+      background: #1e293b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cbd5e1;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    pre.code-block {
+      padding: 16px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="eyebrow">Module 01 · Thing Code</div>
+      <h1>Thing Code: SAST, Secrets, SBOM, Hotspots &amp; Autofix</h1>
+      <p class="lead">Deep architecture of code security: GitHub App synchronization, deterministic AST scanning, Sonar-style hotspot reviews, software bill of materials, and verified AI remediation.</p>
+    </header>
+
+    <div class="diagram-card">
+      <div class="diagram-scroll">
+        <svg class="canvas" viewBox="0 0 1100 700" width="1100" height="700" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569" />
+            </marker>
+            <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ea580c" />
+            </marker>
+            <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.04" />
+            </filter>
+          </defs>
+
+          <!-- Zones -->
+          <rect x="40" y="40" width="260" height="620" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="52" y="32" width="180" height="18" fill="#ffffff" />
+          <text x="56" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b">SCM &amp; INGESTION</text>
+
+          <rect x="340" y="40" width="380" height="620" rx="8" fill="#fafafa" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="352" y="32" width="220" height="18" fill="#ffffff" />
+          <text x="356" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#ea580c">DETERMINISTIC ANALYSIS</text>
+
+          <rect x="760" y="40" width="300" height="620" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,4" />
+          <rect x="772" y="32" width="210" height="18" fill="#ffffff" />
+          <text x="776" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b">REMEDIATION &amp; TRIAGE</text>
+
+          <!-- Connectors -->
+          <path d="M 280 125 H 370" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="325" y="117" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">Clone</text>
+
+          <path d="M 530 175 V 215" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <path d="M 530 305 V 345" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <path d="M 530 435 V 475" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+
+          <path d="M 690 260 H 790" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <text x="740" y="252" font-family="'Geist Mono', monospace" font-size="8" fill="#ea580c" text-anchor="middle">Findings</text>
+
+          <path d="M 690 390 H 790" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <text x="740" y="382" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">Hotspots</text>
+
+          <!-- Nodes: SCM & Ingestion -->
+          <g transform="translate(60, 75)" filter="url(#shadow)">
+            <rect width="220" height="95" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">GITHUB INTEGRATION</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">GitHub App / SCM</text>
+            <text x="14" y="56" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">table: github_repositories</text>
+            <text x="14" y="70" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Webhooks: push, pull_request</text>
+            <text x="14" y="84" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[VERIFIED LIVE INTEGRATION]</text>
+          </g>
+
+          <g transform="translate(60, 215)" filter="url(#shadow)">
+            <rect width="220" height="85" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">PR CHECK RUNS</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Pull Request Reviewer</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Checks API Status Publishing</text>
+            <text x="14" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Blocks merge if policy fails</text>
+          </g>
+
+          <!-- Nodes: Deterministic Analysis -->
+          <g transform="translate(370, 75)" filter="url(#shadow)">
+            <rect width="320" height="100" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" />
+            <text x="16" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">SCAN ORCHESTRATOR</text>
+            <text x="16" y="40" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">ScanOrchestratorService</text>
+            <text x="16" y="58" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Clones into ephemeral scratch/</text>
+            <text x="16" y="72" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Runs Semgrep SAST &amp; Gitleaks CLI</text>
+            <text x="16" y="86" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[RULE #8: REAL TOOLS ONLY]</text>
+          </g>
+
+          <g transform="translate(370, 215)" filter="url(#shadow)">
+            <rect width="320" height="90" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">SCA &amp; SBOM ENGINE</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">SBOM &amp; License Compliance</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Trivy / OSV-Scanner for package.json, poetry</text>
+            <text x="14" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Generates CycloneDX / SPDX JSON</text>
+          </g>
+
+          <g transform="translate(370, 345)" filter="url(#shadow)">
+            <rect width="320" height="90" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">HUMAN AUDIT QUEUE</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Security Hotspots Engine</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">SonarQube-style security-sensitive patterns</text>
+            <text x="14" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Requires auditor review (SAFE/ACK)</text>
+          </g>
+
+          <g transform="translate(370, 475)" filter="url(#shadow)">
+            <rect width="320" height="90" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+            <rect x="0" y="0" width="5" height="90" rx="2" fill="#ea580c" />
+            <text x="16" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">DETERMINISTIC QUALITY GATE</text>
+            <text x="16" y="40" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">OPA Policy Engine</text>
+            <text x="16" y="58" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Rego Rules: Zero Critical Findings Allowed</text>
+            <text x="16" y="72" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[AUTHORITATIVE DECIDER]</text>
+          </g>
+
+          <!-- Nodes: Remediation & Triage -->
+          <g transform="translate(790, 215)" filter="url(#shadow)">
+            <rect width="250" height="90" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">AI REPAIR LOOP</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">AI Remediation Service</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">PatchService synthesizes diff</text>
+            <text x="14" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#ea580c">Mandatory Semgrep Re-scan Gate</text>
+          </g>
+
+          <g transform="translate(790, 345)" filter="url(#shadow)">
+            <rect width="250" height="90" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">MANUAL TRIAGE</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Hotspot Review Actions</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Assign Reviewer, Add Comments</text>
+            <text x="14" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Full Audit History in PostgreSQL</text>
+          </g>
+
+          <!-- Legend -->
+          <g transform="translate(60, 640)">
+            <circle cx="6" cy="6" r="4" fill="#ea580c" />
+            <text x="16" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Focal Security Gate</text>
+            <circle cx="180" cy="6" r="4" fill="#16a34a" />
+            <text x="190" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Verified Live Tooling</text>
+          </g>
+        </svg>
+      </div>
+      <div class="diagram-footer">
+        <span>FIG. 08A · THING CODE ARCHITECTURE</span>
+        <span>STANDALONE SVG · NO EXTERNAL ASSETS</span>
+        <span>GROUND TRUTH: BACKEND/APP/CODE/</span>
+      </div>
+    </div>
+
+    <!-- Editable Source Panel -->
+    <div class="source-panel">
+      <div class="source-header">
+        <span>EDITABLE MERMAID SOURCE (FOR MAINTENANCE &amp; GITHUB PREVIEWS)</span>
+        <span>COPY / PASTE READY</span>
+      </div>
+      <pre class="code-block"><code>graph LR
+    subgraph Ingest["1. SCM &amp; INGESTION"]
+        REPO["GitHub Repository<br/><small>Webhooks &amp; App</small>"]
+        PR["Pull Request Checks<br/><small>GitHub Checks API</small>"]
+    end
+
+    subgraph Scanners["2. DETERMINISTIC ENGINES"]
+        ORCH["ScanOrchestratorService<br/><small>Semgrep + Gitleaks</small>"]
+        SBOM["SBOM &amp; Licenses<br/><small>Trivy / OSV</small>"]
+        HOTSPOT["Hotspots Engine<br/><small>Sensitive Code Patterns</small>"]
+        OPA{"OPA Quality Gate<br/><small>Block / Allow PR</small>"}
+    end
+
+    subgraph Remediation["3. TRIAGE &amp; REMEDIATION"]
+        AI_FIX["AI Remediation<br/><small>Diff + Rescan Gate</small>"]
+        TRIAGE["Hotspot Review Queue<br/><small>Human Security Review</small>"]
+    end
+
+    REPO --> ORCH
+    REPO --> SBOM
+    REPO --> HOTSPOT
+    ORCH --> OPA
+    SBOM --> OPA
+    OPA --> PR
+    ORCH --> AI_FIX
+    HOTSPOT --> TRIAGE
+    AI_FIX -.->|Rescan Gate| ORCH
+
+    classDef focal stroke:#ea580c,stroke-width:2px;
+    class OPA,AI_FIX focal;</code></pre>
+    </div>
+  </div>
+</body>
+</html>

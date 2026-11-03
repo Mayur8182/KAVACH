@@ -1,0 +1,120 @@
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', width: '100vw', backgroundColor: '#ffffff' }}>
+      {/* Left Panel - Dark / Hero */}
+      <div 
+        style={{
+          display: 'none', // Hide on mobile
+          flexDirection: 'column',
+          width: '50%',
+          maxWidth: '600px',
+          padding: '48px',
+          color: '#ffffff',
+          position: 'relative',
+          overflow: 'hidden',
+          backgroundImage: 'linear-gradient(rgba(10,13,20,0.8), rgba(10,13,20,0.9)), url(/hero_illustration.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+        className="auth-left-panel"
+      >
+        {/* Background glow effects */}
+        <div style={{
+          position: 'absolute',
+          top: '-100px',
+          left: '-100px',
+          width: '400px',
+          height: '400px',
+          background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(0,0,0,0) 70%)',
+          borderRadius: '50%',
+        }} />
+        <div style={{
+          position: 'absolute',
+          bottom: '0',
+          right: '0',
+          width: '500px',
+          height: '500px',
+          background: 'radial-gradient(circle, rgba(16,185,129,0.1) 0%, rgba(0,0,0,0) 70%)',
+          borderRadius: '50%',
+        }} />
+
+        {/* Header / Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
+          <div style={{ 
+            width: '32px', height: '32px', 
+            background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+            borderRadius: '8px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0d14" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <span style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.5px' }}>SecuLayer</span>
+        </div>
+
+        {/* Content */}
+        <div style={{ marginTop: 'auto', marginBottom: 'auto', zIndex: 1 }}>
+          <h1 style={{ 
+            fontSize: '48px', 
+            fontWeight: 700, 
+            lineHeight: 1.1, 
+            marginBottom: '24px',
+            background: 'linear-gradient(to right, #ffffff, #a1a1aa)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>
+            One Platform.<br />Complete Security.
+          </h1>
+          <p style={{ fontSize: '16px', color: '#a1a1aa', maxWidth: '400px', lineHeight: 1.5 }}>
+            Secure your code, cloud, APIs, runtime and infrastructure — all in one place.
+          </p>
+          
+          <div style={{ marginTop: '48px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <FeatureItem icon="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" text="Code Security" />
+            <FeatureItem icon="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" text="Cloud Security" />
+            <FeatureItem icon="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" text="API Security" />
+            <FeatureItem icon="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" text="Runtime Protection" />
+            <FeatureItem icon="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" text="AI-Powered Remediation" />
+          </div>
+        </div>
+
+        {/* Footer / Trust badge */}
+        <div style={{ marginTop: 'auto', zIndex: 1 }}>
+          <p style={{ fontSize: '13px', color: '#71717a', marginBottom: '16px' }}>Trusted by modern engineering teams</p>
+          <div style={{ display: 'flex', gap: '24px', opacity: 0.6 }}>
+            {/* Github, AWS, etc simple icons */}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Panel - Dynamic Content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
+        <style>{`
+          @media (min-width: 768px) {
+            .auth-left-panel { display: flex !important; }
+          }
+        `}</style>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function FeatureItem({ icon, text }: { icon: string, text: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d={icon} />
+      </svg>
+      <span style={{ fontSize: '14px', color: '#e4e4e7', fontWeight: 500 }}>{text}</span>
+    </div>
+  )
+}

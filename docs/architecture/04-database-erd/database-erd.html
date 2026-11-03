@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer Control Plane — Physical Database Schema &amp; ERD</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --soft: #94a3b8;
+      --line: #e2e8f0;
+      --line-strong: #cbd5e1;
+      --accent: #ea580c;
+      --accent-tint: rgba(234, 88, 12, 0.08);
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+      --font-mono: "Geist Mono", monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--ink);
+      padding: 40px 24px;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+    header.header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    p.lead {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+      max-width: 900px;
+    }
+    .diagram-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .diagram-scroll {
+      width: 100%;
+      overflow-x: auto;
+      padding: 32px 24px;
+      background: var(--paper);
+    }
+    svg.canvas {
+      display: block;
+      margin: 0 auto;
+      min-width: 1220px;
+    }
+    .diagram-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: #f1f5f9;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .source-panel {
+      margin-top: 24px;
+      background: #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .source-header {
+      padding: 10px 16px;
+      background: #1e293b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cbd5e1;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    pre.code-block {
+      padding: 16px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="eyebrow">Fig. 04 · Data Modeling &amp; Persistence</div>
+      <h1>PostgreSQL Physical Entity-Relationship Diagram</h1>
+      <p class="lead">Relational schema map illustrating key entities across Multi-Tenancy, Code Security, Infrastructure, MCP Gateways, and AI Agent Governance with foreign key references.</p>
+    </header>
+
+    <div class="diagram-card">
+      <div class="diagram-scroll">
+        <svg class="canvas" viewBox="0 0 1220 860" width="1220" height="860" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569" />
+            </marker>
+            <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ea580c" />
+            </marker>
+            <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.04" />
+            </filter>
+          </defs>
+
+          <!-- Schema Groups -->
+          <!-- Group 1: Tenancy & Auth -->
+          <rect x="30" y="40" width="360" height="780" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="42" y="32" width="220" height="18" fill="#ffffff" />
+          <text x="46" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#ea580c">TENANCY, AUTH &amp; AUDITING</text>
+
+          <!-- Group 2: Projects & Code Security -->
+          <rect x="420" y="40" width="370" height="780" rx="8" fill="#fafafa" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="432" y="32" width="220" height="18" fill="#ffffff" />
+          <text x="436" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b">CODE SECURITY &amp; VULNS</text>
+
+          <!-- Group 3: Protect, MCP & Agent Governance -->
+          <rect x="820" y="40" width="370" height="780" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="832" y="32" width="240" height="18" fill="#ffffff" />
+          <text x="836" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b">PROTECT, MCP &amp; GOVERNANCE</text>
+
+          <!-- Connectors (FK Relationships) -->
+          <!-- Organizations -> Users -->
+          <path d="M 210 210 V 260" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Organizations -> Projects -->
+          <path d="M 370 120 H 440" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <text x="405" y="112" font-family="'Geist Mono', monospace" font-size="8" fill="#ea580c" text-anchor="middle">1:N</text>
+
+          <!-- Organizations -> MCP Servers -->
+          <path d="M 370 160 H 410 Q 420 160 420 200 V 710 Q 420 730 450 730 H 840" fill="none" stroke="#475569" stroke-width="1" marker-end="url(#arrow)" />
+
+          <!-- Projects -> GitHub Repositories -->
+          <path d="M 605 185 V 230" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Repositories -> Security Jobs -->
+          <path d="M 605 350 V 390" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Security Jobs -> Security Findings -->
+          <path d="M 605 520 V 560" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+
+          <!-- Findings -> Hotspots (Review Queue) -->
+          <path d="M 605 690 V 725" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- MCP Servers -> MCP Tools -->
+          <path d="M 1005 200 V 240" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- MCP Tools -> Access Logs -->
+          <path d="M 1005 370 V 410" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Agent Identities -> Agent Delegations -->
+          <path d="M 1005 570 V 610" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- ================= ENTITY TABLE CARDS ================= -->
+
+          <!-- Table 1: organizations (Focal Root Tenant) -->
+          <g transform="translate(50, 70)" filter="url(#shadow)">
+            <rect width="320" height="140" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+            <rect x="0" y="0" width="320" height="26" rx="4" fill="#ea580c" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: organizations</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    name : VARCHAR(255) NOT NULL</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#64748b" font-weight="600">UQ</tspan>  slug : VARCHAR(255) NOT NULL</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    domain : VARCHAR(255)</text>
+            <text x="12" y="108" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    data_retention_days : INTEGER DEFAULT 90</text>
+            <text x="12" y="124" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    created_at : TIMESTAMP WITH TIME ZONE</text>
+          </g>
+
+          <!-- Table 2: users -->
+          <g transform="translate(50, 260)" filter="url(#shadow)">
+            <rect width="320" height="155" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="320" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: users</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  organization_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#64748b" font-weight="600">UQ</tspan>  email : VARCHAR(255) NOT NULL</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    hashed_password : VARCHAR(255)</text>
+            <text x="12" y="108" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    mfa_enabled : BOOLEAN DEFAULT FALSE</text>
+            <text x="12" y="124" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    active_sessions : JSON</text>
+            <text x="12" y="140" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    onboarding_completed : BOOLEAN DEFAULT FALSE</text>
+          </g>
+
+          <!-- Table 3: invitations -->
+          <g transform="translate(50, 465)" filter="url(#shadow)">
+            <rect width="320" height="140" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="320" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: invitations</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  organization_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    email : VARCHAR(255) NOT NULL</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    role : VARCHAR(50) DEFAULT 'MEMBER'</text>
+            <text x="12" y="108" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    token_hash : VARCHAR(255) NOT NULL</text>
+            <text x="12" y="124" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    status : VARCHAR(50) (PENDING/ACCEPTED)</text>
+          </g>
+
+          <!-- Table 4: audit_events -->
+          <g transform="translate(50, 655)" filter="url(#shadow)">
+            <rect width="320" height="120" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="320" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: audit_events</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  organization_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    action : VARCHAR(100) NOT NULL</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    evidence_metadata : JSON</text>
+            <text x="12" y="106" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    created_at : TIMESTAMP WITH TIME ZONE</text>
+          </g>
+
+          <!-- Table 5: projects -->
+          <g transform="translate(440, 70)" filter="url(#shadow)">
+            <rect width="330" height="115" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="330" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: projects</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  organization_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    name : VARCHAR(255) NOT NULL</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    environment : VARCHAR(50) DEFAULT 'prod'</text>
+            <text x="12" y="106" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    application_type : VARCHAR(100)</text>
+          </g>
+
+          <!-- Table 6: github_repositories -->
+          <g transform="translate(440, 230)" filter="url(#shadow)">
+            <rect width="330" height="120" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="330" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: github_repositories</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  project_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    full_name : VARCHAR(512) NOT NULL</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    default_branch : VARCHAR(100) DEFAULT 'main'</text>
+            <text x="12" y="106" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    clone_url : VARCHAR(1000)</text>
+          </g>
+
+          <!-- Table 7: github_security_jobs -->
+          <g transform="translate(440, 390)" filter="url(#shadow)">
+            <rect width="330" height="130" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="330" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: github_security_jobs</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  repository_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    status : VARCHAR(50) (QUEUED/RUNNING/DONE)</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    findings_count : INTEGER DEFAULT 0</text>
+            <text x="12" y="108" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    stage_progress : INTEGER (0-100)</text>
+            <text x="12" y="122" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    scan_summary : JSON</text>
+          </g>
+
+          <!-- Table 8: security_findings (Focal Vuln Entity) -->
+          <g transform="translate(440, 560)" filter="url(#shadow)">
+            <rect width="330" height="130" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+            <rect x="0" y="0" width="330" height="26" rx="4" fill="#ea580c" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: security_findings</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  repository_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    severity : VARCHAR(50) (CRITICAL/HIGH...)</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    category : VARCHAR(100) (SAST/SECRET/SCA)</text>
+            <text x="12" y="108" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    file_path : VARCHAR(500), line_start: INT</text>
+            <text x="12" y="122" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    remediation : TEXT</text>
+          </g>
+
+          <!-- Table 9: hotspots -->
+          <g transform="translate(440, 725)" filter="url(#shadow)">
+            <rect width="330" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="330" height="24" rx="4" fill="#334155" />
+            <text x="12" y="16" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: hotspots</text>
+            <text x="12" y="42" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="56" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    status : VARCHAR(50) (TO_REVIEW / SAFE / FIXED)</text>
+            <text x="12" y="68" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    assignee_name : VARCHAR(255)</text>
+          </g>
+
+          <!-- Table 10: mcp_servers -->
+          <g transform="translate(840, 70)" filter="url(#shadow)">
+            <rect width="330" height="130" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="330" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: mcp_servers</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  organization_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    server_name : VARCHAR(255) NOT NULL</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    transport_type : VARCHAR(50) (STDIO/SSE)</text>
+            <text x="12" y="108" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    endpoint_url : VARCHAR(1000)</text>
+            <text x="12" y="122" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    health_status : VARCHAR(50)</text>
+          </g>
+
+          <!-- Table 11: mcp_tools -->
+          <g transform="translate(840, 240)" filter="url(#shadow)">
+            <rect width="330" height="130" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="330" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: mcp_tools</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  server_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    tool_name : VARCHAR(255) NOT NULL</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    risk_level : VARCHAR(50) (LOW/MED/CRIT)</text>
+            <text x="12" y="108" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    requires_approval : BOOLEAN DEFAULT TRUE</text>
+            <text x="12" y="122" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    input_schema : JSON</text>
+          </g>
+
+          <!-- Table 12: mcp_access_logs -->
+          <g transform="translate(840, 410)" filter="url(#shadow)">
+            <rect width="330" height="120" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="330" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: mcp_access_logs</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  tool_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    decision : VARCHAR(50) (ALLOW / BLOCK)</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    caller_agent_id : VARCHAR(255)</text>
+            <text x="12" y="106" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    execution_duration_ms : FLOAT</text>
+          </g>
+
+          <!-- Table 13: agent_identities -->
+          <g transform="translate(840, 560)" filter="url(#shadow)">
+            <rect width="330" height="110" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="330" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: agent_identities</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  organization_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    agent_name : VARCHAR(255) NOT NULL</text>
+            <text x="12" y="92" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    trust_score : FLOAT (0.0 - 1.0)</text>
+          </g>
+
+          <!-- Table 14: agent_delegations -->
+          <g transform="translate(840, 700)" filter="url(#shadow)">
+            <rect width="330" height="100" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <rect x="0" y="0" width="330" height="26" rx="4" fill="#334155" />
+            <text x="12" y="17" font-family="'Geist Mono', monospace" font-size="11" font-weight="700" fill="#ffffff">TABLE: agent_delegations</text>
+            <text x="12" y="44" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">PK</tspan>  id : GUID(36)</text>
+            <text x="12" y="60" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a"><tspan fill="#ea580c" font-weight="700">FK</tspan>  parent_agent_id : GUID(36) INDEX</text>
+            <text x="12" y="76" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    scoped_permissions : JSON</text>
+            <text x="12" y="90" font-family="'Geist Mono', monospace" font-size="9" fill="#0f172a">    token_budget : INTEGER DEFAULT 50000</text>
+          </g>
+
+          <!-- Legend -->
+          <g transform="translate(50, 830)">
+            <text x="0" y="9" font-family="'Geist Mono', monospace" font-size="9" font-weight="700" fill="#ea580c">PK</text>
+            <text x="20" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Primary Key (GUID)</text>
+            <text x="160" y="9" font-family="'Geist Mono', monospace" font-size="9" font-weight="700" fill="#ea580c">FK</text>
+            <text x="180" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Foreign Key Constraint</text>
+            <text x="340" y="9" font-family="'Geist Mono', monospace" font-size="9" font-weight="700" fill="#64748b">UQ</text>
+            <text x="360" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Unique Index</text>
+            <text x="500" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Total Models: 56 PostgreSQL Tables</text>
+          </g>
+        </svg>
+      </div>
+      <div class="diagram-footer">
+        <span>FIG. 04 · DATABASE SCHEMA &amp; ERD</span>
+        <span>STANDALONE SVG · NO EXTERNAL ASSETS</span>
+        <span>GROUND TRUTH: BACKEND/APP/MODELS/</span>
+      </div>
+    </div>
+
+    <!-- Editable Source Panel -->
+    <div class="source-panel">
+      <div class="source-header">
+        <span>EDITABLE MERMAID SOURCE (FOR MAINTENANCE &amp; GITHUB PREVIEWS)</span>
+        <span>COPY / PASTE READY</span>
+      </div>
+      <pre class="code-block"><code>erDiagram
+    organizations ||--o{ users : "has members"
+    organizations ||--o{ invitations : "issues"
+    organizations ||--o{ projects : "owns"
+    organizations ||--o{ mcp_servers : "manages"
+    organizations ||--o{ audit_events : "records"
+    organizations ||--o{ agent_identities : "registers"
+
+    projects ||--o{ github_repositories : "synchronizes"
+    github_repositories ||--o{ github_security_jobs : "executes"
+    github_security_jobs ||--o{ security_findings : "produces"
+    security_findings ||--o{ hotspots : "triaged into"
+
+    mcp_servers ||--o{ mcp_tools : "exposes"
+    mcp_tools ||--o{ mcp_access_logs : "audits invocations"
+    agent_identities ||--o{ agent_delegations : "delegates authority"
+
+    organizations {
+        uuid id PK
+        varchar name
+        varchar slug UK
+        varchar domain
+        timestamp created_at
+    }
+
+    projects {
+        uuid id PK
+        uuid organization_id FK
+        varchar name
+        varchar environment
+    }
+
+    security_findings {
+        uuid id PK
+        uuid repository_id FK
+        varchar severity
+        varchar category
+        varchar file_path
+        integer line_start
+        text remediation
+    }
+
+    hotspots {
+        uuid id PK
+        varchar status
+        varchar assignee_name
+    }</code></pre>
+    </div>
+  </div>
+</body>
+</html>

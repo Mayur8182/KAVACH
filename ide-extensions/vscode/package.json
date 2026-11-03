@@ -1,0 +1,54 @@
+{
+  "name": "thing-security",
+  "displayName": "Thing Security",
+  "description": "Real-time pre-code and during-code security for Thing",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Linters",
+    "Security"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "thing.scan",
+        "title": "Thing Security: Scan Project"
+      },
+      {
+        "command": "thing.fix",
+        "title": "Thing Security: AI Fix"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "thing-security-explorer",
+          "title": "Thing Security",
+          "icon": "resources/shield.svg"
+        }
+      ]
+    },
+    "views": {
+      "thing-security-explorer": [
+        {
+          "id": "thing.views.status",
+          "name": "Status"
+        },
+        {
+          "id": "thing.views.findings",
+          "name": "Findings"
+        },
+        {
+          "id": "thing.views.contracts",
+          "name": "Contracts"
+        }
+      ]
+    }
+  }
+}

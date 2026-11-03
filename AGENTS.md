@@ -108,3 +108,11 @@ Store complete audit logs: who, what, when, where, why, policy evaluation, execu
 Never optimize for UI appearance over underlying functionality.
 Priority:
 REAL FUNCTIONALITY > REAL DATA > REAL SECURITY > REAL INTEGRATIONS > REAL EVIDENCE > REAL ERROR HANDLING > UI POLISH.
+
+---
+
+# UI/UX MASTER RULES & DATA REALITY (MOCKHUNTER)
+For all frontend interface development and data verification, strictly follow the rules defined in:
+`.agents/rules/ui-ux-master-rules.md`, `.agents/rules/ui-reality-rules.md`, `.agents/rules/ui-ux-design-rules.md`, `.agents/rules/ux-audit.md` (`.agents/skills/ux-audit/SKILL.md`), and `.agents/rules/mockhunter.md` (`.agents/skills/mockhunter/SKILL.md`).
+Every screen, button, metric, table, chart, form, and modal must adhere to real backend contracts, real loading/empty/error states, zero fake UI, and verify data provenance (REAL vs MOCK/HARDCODED).
+

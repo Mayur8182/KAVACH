@@ -40,8 +40,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
-    """Generates signed JWT access token."""
+def create_access_token(
+    subject: str,
+    expires_delta: Optional[timedelta] = None,
+    session_id: Optional[str] = None,
+) -> str:
+    """Generates signed JWT access token with optional active session binding."""
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
@@ -52,6 +56,8 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
         "exp": expire,
         "iat": datetime.now(timezone.utc),
     }
+    if session_id:
+        payload["session_id"] = str(session_id)
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -69,7 +75,7 @@ async def get_current_user(
 ) -> User:
     """
     FastAPI dependency resolving the currently authenticated user from Bearer JWT.
-    Raises 401 Unauthorized if token is missing, invalid, or user does not exist.
+    Raises 401 Unauthorized if token is missing, invalid, revoked, or user does not exist.
     """
     if not auth_credentials or not auth_credentials.credentials:
         raise HTTPException(
@@ -101,6 +107,15 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     if not user:
+        clean_target = str(user_uuid).replace("-", "").lower()
+        stmt_all = select(User)
+        res_all = await db.execute(stmt_all)
+        for u in res_all.scalars().all():
+            if str(u.id).replace("-", "").lower() == clean_target:
+                user = u
+                break
+
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authenticated user no longer exists",
@@ -113,4 +128,60 @@ async def get_current_user(
             detail="User account is deactivated",
         )
 
+    # Session revocation check (Checkpoints 3 & 11)
+    token_session_id = payload.get("session_id")
+    if token_session_id and user.active_sessions is not None:
+        # If user has an active_sessions list, session must be present and not marked revoked
+        valid_session = any(
+            isinstance(s, dict) and s.get("id") == token_session_id and not s.get("revoked", False)
+            for s in user.active_sessions
+        )
+        if not valid_session:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session has been revoked or terminated. Please sign in again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
     return user
+
+
+async def get_current_user_optional(
+    auth_credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    """
+    FastAPI dependency that attempts to resolve the authenticated user from Bearer JWT.
+    Returns User if validly authenticated, or None if unauthenticated.
+    Never silently impersonates or falls back to unintended accounts.
+    """
+    if auth_credentials and auth_credentials.credentials:
+        try:
+            return await get_current_user(auth_credentials, db)
+        except HTTPException:
+            return None
+    return None
+
+
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """FastAPI dependency requiring server-side administrator / superuser privileges."""
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrative privileges required to perform this action.",
+        )
+    return current_user
+
+
+async def require_verified_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """FastAPI dependency requiring verified email address."""
+    if not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email address must be verified before accessing this resource.",
+        )
+    return current_user

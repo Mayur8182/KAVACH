@@ -1,6 +1,7 @@
 import uuid
-from typing import TYPE_CHECKING, List
-from sqlalchemy import Boolean, String
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Optional
+from sqlalchemy import Boolean, DateTime, Integer, JSON, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,6 +44,95 @@ class User(Base, TimestampMixin):
         default=False,
         nullable=False,
     )
+    onboarding_completed: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    onboarding_state: Mapped[Optional[dict]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=dict,
+    )
+    completed_tours: Mapped[Optional[list]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=list,
+    )
+
+    # Email Verification
+    is_verified: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    verification_token: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    verification_sent_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # Multi-Factor Authentication
+    mfa_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    mfa_secret: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    mfa_recovery_codes: Mapped[Optional[list]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=list,
+    )
+    mfa_trusted_devices: Mapped[Optional[list]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=list,
+    )
+
+    # Account Security & Lockout
+    is_locked: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    locked_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    failed_login_attempts: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+
+    # Password Recovery
+    password_reset_token: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    password_reset_sent_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # Active Sessions & Login Audit History
+    active_sessions: Mapped[Optional[list]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=list,
+    )
+    login_history: Mapped[Optional[list]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=list,
+    )
 
     # Relationships
     projects: Mapped[List["Project"]] = relationship(
@@ -50,3 +140,4 @@ class User(Base, TimestampMixin):
         back_populates="owner",
         cascade="all, delete-orphan",
     )
+

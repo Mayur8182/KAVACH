@@ -10,6 +10,20 @@ from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models import Base
 from app.models.user import User
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB as PG_JSONB, ARRAY as PG_ARRAY
+
+@compiles(PG_UUID, "sqlite")
+def compile_pg_uuid_sqlite(type_, compiler, **kw):
+    return "CHAR(36)"
+
+@compiles(PG_JSONB, "sqlite")
+def compile_pg_jsonb_sqlite(type_, compiler, **kw):
+    return "JSON"
+
+@compiles(PG_ARRAY, "sqlite")
+def compile_pg_array_sqlite(type_, compiler, **kw):
+    return "JSON"
 
 # In-memory async SQLite engine with static pool for isolated testing
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -100,3 +114,15 @@ def token_user_a(user_a: User) -> str:
 def token_user_b(user_b: User) -> str:
     """Returns valid JWT for User B."""
     return create_access_token(subject=str(user_b.id))
+
+
+@pytest_asyncio.fixture(scope="function")
+async def async_client(client: AsyncClient) -> AsyncClient:
+    """Alias fixture for client."""
+    return client
+
+
+@pytest_asyncio.fixture(scope="function")
+def test_user_token(token_user_a: str) -> str:
+    """Alias fixture for token_user_a."""
+    return token_user_a

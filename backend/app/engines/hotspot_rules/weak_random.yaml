@@ -1,0 +1,19 @@
+id: insecure-random
+title: Insecure Random Number Generation
+severity: medium
+risk_level: Medium
+category: Cryptography
+cwe: CWE-338
+owasp: A02:2021-Cryptographic Failures
+cvss_score: "5.5 (Medium)"
+patterns:
+  - "Math.random("
+  - "random.random("
+  - "random.choice("
+  - "random.randint("
+  - "rand("
+description: "Standard pseudo-random number generator used for sensitive security operations such as password reset tokens, session identifiers, or encryption salts."
+remediation: "Use cryptographically secure pseudo-random generators: crypto.randomBytes() in Node.js, or secrets module in Python."
+references:
+  - title: "CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator"
+    url: "https://cwe.mitre.org/data/definitions/338.html"

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.audit_event import AuditEvent
     from app.models.intent import Intent
     from app.models.blueprint import SecurityBlueprint
+    from app.models.organization import Workspace, Organization
 
 
 class Project(Base, TimestampMixin):
@@ -29,6 +30,18 @@ class Project(Base, TimestampMixin):
         ForeignKey("users.id", ondelete="CASCADE"),
         index=True,
         nullable=False,
+    )
+    workspace_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
+    organization_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
     )
     name: Mapped[str] = mapped_column(
         String(255),
@@ -69,6 +82,11 @@ class Project(Base, TimestampMixin):
         nullable=False,
         default="web_service",
     )
+    default_branch: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        default="main",
+    )
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
@@ -77,6 +95,10 @@ class Project(Base, TimestampMixin):
     # Relationships
     owner: Mapped["User"] = relationship(
         "User",
+        back_populates="projects",
+    )
+    workspace: Mapped[Optional["Workspace"]] = relationship(
+        "Workspace",
         back_populates="projects",
     )
     agents: Mapped[List["Agent"]] = relationship(

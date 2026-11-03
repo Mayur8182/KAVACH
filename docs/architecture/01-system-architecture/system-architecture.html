@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer Control Plane — End-to-End System Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --soft: #94a3b8;
+      --line: #e2e8f0;
+      --line-strong: #cbd5e1;
+      --accent: #ea580c;
+      --accent-tint: rgba(234, 88, 12, 0.08);
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+      --font-mono: "Geist Mono", monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--ink);
+      padding: 40px 24px;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    header.header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    p.lead {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+      max-width: 900px;
+    }
+    .diagram-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .diagram-scroll {
+      width: 100%;
+      overflow-x: auto;
+      padding: 32px 24px;
+      background: var(--paper);
+    }
+    svg.canvas {
+      display: block;
+      margin: 0 auto;
+      min-width: 1200px;
+    }
+    .diagram-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: #f1f5f9;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .source-panel {
+      margin-top: 24px;
+      background: #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .source-header {
+      padding: 10px 16px;
+      background: #1e293b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cbd5e1;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    pre.code-block {
+      padding: 16px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="eyebrow">Fig. 01 · Full Topology</div>
+      <h1>SecuLayer Control Plane: End-to-End System Architecture</h1>
+      <p class="lead">Grounded architectural map tracing data, control, and scanning flows from the Next.js frontend across the FastAPI Gateway, background workers, PostgreSQL data store, scanning engines, and third-party integrations.</p>
+    </header>
+
+    <div class="diagram-card">
+      <div class="diagram-scroll">
+        <svg class="canvas" viewBox="0 0 1200 820" width="1200" height="820" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569" />
+            </marker>
+            <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ea580c" />
+            </marker>
+            <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.04" />
+            </filter>
+          </defs>
+
+          <!-- ================= TIER BOUNDARIES / REGIONS ================= -->
+          <!-- Tier 1: Client & Presentation -->
+          <rect x="30" y="40" width="230" height="740" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4" />
+          <rect x="42" y="32" width="170" height="18" fill="#ffffff" />
+          <text x="46" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b" letter-spacing="0.1em">PRESENTATION LAYER</text>
+
+          <!-- Tier 2: API Gateway & Service Plane -->
+          <rect x="290" y="40" width="300" height="740" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="302" y="32" width="220" height="18" fill="#ffffff" />
+          <text x="306" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#ea580c" letter-spacing="0.1em">FASTAPI CONTROL PLANE</text>
+
+          <!-- Tier 3: Asynchronous Workers & Persistence -->
+          <rect x="620" y="40" width="250" height="740" rx="8" fill="#fafafa" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="632" y="32" width="190" height="18" fill="#ffffff" />
+          <text x="636" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b" letter-spacing="0.1em">DATA &amp; WORKER TIER</text>
+
+          <!-- Tier 4: Execution Engines & Integrations -->
+          <rect x="900" y="40" width="270" height="740" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4" />
+          <rect x="912" y="32" width="200" height="18" fill="#ffffff" />
+          <text x="916" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b" letter-spacing="0.1em">ENGINES &amp; INTEGRATIONS</text>
+
+          <!-- ================= CONNECTORS (Z-ORDER: DRAWN BEHIND NODES) ================= -->
+          <!-- Frontend -> FastAPI Gateway -->
+          <path d="M 230 115 H 320" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="275" y="108" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">REST :8000</text>
+
+          <!-- Middleware Chain -> Router -->
+          <path d="M 440 185 V 220" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Router -> Synchronous Services -->
+          <path d="M 440 310 V 350" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Router -> DB (Auth / Read queries) -->
+          <path d="M 560 260 H 650" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <text x="605" y="252" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">SQLAlchemy</text>
+
+          <!-- Router -> Async Task Queue (Enqueue Scan / Job) -->
+          <path d="M 560 280 H 610 Q 625 280 625 310 V 360 Q 625 380 640 380 H 650" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <text x="605" y="335" font-family="'Geist Mono', monospace" font-size="8" fill="#ea580c" text-anchor="middle">Enqueue</text>
+
+          <!-- Task Worker -> PostgreSQL (Status polling & persistence) -->
+          <path d="M 740 350 V 285" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Task Worker -> Scanners (Semgrep, Gitleaks, Trivy) -->
+          <path d="M 830 380 H 930" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+
+          <!-- Services -> OPA Policy Engine -->
+          <path d="M 560 380 H 600 Q 610 380 610 490 Q 610 500 640 500 H 930" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <text x="750" y="492" font-family="'Geist Mono', monospace" font-size="8" fill="#ea580c" text-anchor="middle">Evaluate Policy</text>
+
+          <!-- Services -> GitHub / Cloud APIs -->
+          <path d="M 560 410 H 930" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <text x="890" y="402" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">SCM/Cloud API</text>
+
+          <!-- Scanners -> Findings Ingestion into DB -->
+          <path d="M 930 400 H 870 Q 850 400 850 260 H 830" fill="none" stroke="#16a34a" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arrow)" />
+          <text x="876" y="330" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a" transform="rotate(-90, 876, 330)" text-anchor="middle">Persist Findings</text>
+
+          <!-- Router -> MCP Gateway -->
+          <path d="M 440 600 V 640" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <path d="M 560 670 H 930" fill="none" stroke="#ea580c" stroke-width="1.2" marker-end="url(#arrow-accent)" />
+
+          <!-- ================= NODES ================= -->
+
+          <!-- 1. Frontend: Next.js 15 UI Surface -->
+          <g transform="translate(50, 70)" filter="url(#shadow)">
+            <rect width="180" height="90" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="22" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">PORT :3002 · REACT 19</text>
+            <text x="14" y="42" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">Next.js Dashboard</text>
+            <text x="14" y="58" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">App Router (271 Routes)</text>
+            <text x="14" y="74" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[VERIFIED: PRODUCTION]</text>
+          </g>
+
+          <!-- 2. Frontend: API Client Singleton -->
+          <g transform="translate(50, 190)" filter="url(#shadow)">
+            <rect width="180" height="70" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">LIB/API/CLIENT.TS</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">Unified API Client</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Session Bearer + X-Org-ID</text>
+          </g>
+
+          <!-- 3. Gateway: Middleware Pipeline -->
+          <g transform="translate(320, 70)" filter="url(#shadow)">
+            <rect width="240" height="115" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">HTTP MIDDLEWARE CHAIN</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">FastAPI Request Pipeline</text>
+            <text x="14" y="56" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">1. RequestAudit (X-Request-ID)</text>
+            <text x="14" y="70" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">2. GZipMiddleware (Payloads)</text>
+            <text x="14" y="84" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">3. RateLimitingMiddleware</text>
+            <text x="14" y="98" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">4. Idempotency &amp; CORS</text>
+          </g>
+
+          <!-- 4. Gateway: Router & Domain Handlers -->
+          <g transform="translate(320, 220)" filter="url(#shadow)">
+            <rect width="240" height="90" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" />
+            <rect x="0" y="0" width="5" height="90" rx="2" fill="#ea580c" />
+            <text x="16" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">PORT :8000 · APP/API/V1</text>
+            <text x="16" y="38" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">API Router (v1_router)</text>
+            <text x="16" y="56" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">40+ Registered Routers</text>
+            <text x="16" y="72" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Auth, Scans, IaC, Cloud, MCP</text>
+          </g>
+
+          <!-- 5. Core Services Tier -->
+          <g transform="translate(320, 350)" filter="url(#shadow)">
+            <rect width="240" height="110" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">BUSINESS LOGIC TIER</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Domain Services</text>
+            <text x="14" y="56" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• ScanOrchestratorService</text>
+            <text x="14" y="70" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• HotspotService &amp; PatchService</text>
+            <text x="14" y="84" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• SecurityGraphService</text>
+            <text x="14" y="98" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• SbomService &amp; CloudScanner</text>
+          </g>
+
+          <!-- 6. Database: PostgreSQL Store -->
+          <g transform="translate(650, 220)" filter="url(#shadow)">
+            <rect width="180" height="85" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">PORT :5432 · PERSISTENCE</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">PostgreSQL Store</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">56 SQLAlchemy Models</text>
+            <text x="14" y="70" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[VERIFIED PERSISTENCE]</text>
+          </g>
+
+          <!-- 7. Background Worker Queue -->
+          <g transform="translate(650, 350)" filter="url(#shadow)">
+            <rect width="180" height="90" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">ASYNC WORKER ENGINE</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Task Worker</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Reconciliation &amp; Retries</text>
+            <text x="14" y="70" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Table: background_tasks</text>
+          </g>
+
+          <!-- 8. Deterministic Scanners Engine -->
+          <g transform="translate(930, 350)" filter="url(#shadow)">
+            <rect width="210" height="95" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">DETERMINISTIC TOOLS</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Security Scanners</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• Semgrep CLI (SAST)</text>
+            <text x="14" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• Gitleaks CLI (Secrets)</text>
+            <text x="14" y="82" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• Trivy &amp; Checkov (IaC/K8s)</text>
+          </g>
+
+          <!-- 9. Policy Engine (OPA) -->
+          <g transform="translate(930, 470)" filter="url(#shadow)">
+            <rect width="210" height="85" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+            <rect x="0" y="0" width="5" height="85" rx="2" fill="#ea580c" />
+            <text x="16" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">AUTHORITATIVE DECISION</text>
+            <text x="16" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">OPA Policy Engine</text>
+            <text x="16" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Rego Zero-Trust Rules</text>
+            <text x="16" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[VERIFIED ENGINE]</text>
+          </g>
+
+          <!-- 10. External Integrations (GitHub, Cloud, CI/CD) -->
+          <g transform="translate(930, 220)" filter="url(#shadow)">
+            <rect width="210" height="95" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">EXTERNAL APIS &amp; SCM</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Cloud &amp; DevOps</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• GitHub App &amp; Webhooks</text>
+            <text x="14" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• AWS, Azure, GCP APIs</text>
+            <text x="14" y="82" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• Kubernetes &amp; Docker SDK</text>
+          </g>
+
+          <!-- 11. Protect / MCP Gateway Component -->
+          <g transform="translate(320, 640)" filter="url(#shadow)">
+            <rect width="240" height="75" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.2" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">MCP EXECUTION GATEWAY</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Model Context Protocol</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Input Schema &amp; Approval Barrier</text>
+          </g>
+
+          <!-- 12. External MCP Tools / Proxied Servers -->
+          <g transform="translate(930, 640)" filter="url(#shadow)">
+            <rect width="210" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">EXECUTION BOUNDARY</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Proxied MCP Servers</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">File Ops, Shell, Terminal, DB</text>
+          </g>
+
+          <!-- Legend Strip -->
+          <g transform="translate(50, 755)">
+            <circle cx="6" cy="6" r="4" fill="#ea580c" />
+            <text x="16" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Authoritative Decision / Focal Node</text>
+            <circle cx="250" cy="6" r="4" fill="#16a34a" />
+            <text x="260" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Verified Live Component</text>
+            <circle cx="450" cy="6" r="4" fill="#64748b" />
+            <text x="460" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Synchronous REST Pipeline</text>
+            <line x1="660" y1="6" x2="685" y2="6" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="3,3" />
+            <text x="692" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Async Background Enqueue / Rescan Flow</text>
+          </g>
+        </svg>
+      </div>
+      <div class="diagram-footer">
+        <span>FIG. 01 · SYSTEM ARCHITECTURE</span>
+        <span>STANDALONE SVG · NO BUILD REQUIRED</span>
+        <span>GROUND TRUTH: BACKEND/APP/MAIN.PY</span>
+      </div>
+    </div>
+
+    <!-- Editable Source Panel -->
+    <div class="source-panel">
+      <div class="source-header">
+        <span>EDITABLE MERMAID SOURCE (FOR MAINTENANCE &amp; GITHUB PREVIEWS)</span>
+        <span>COPY / PASTE READY</span>
+      </div>
+      <pre class="code-block"><code>graph TD
+    subgraph Presentation["1. PRESENTATION LAYER"]
+        UI["Next.js 15 Dashboard<br/><small>:3002 (React 19, 271 Routes)</small>"]
+        CLIENT["Unified API Client<br/><small>frontend/lib/api/client.ts</small>"]
+    end
+
+    subgraph Gateway["2. FASTAPI CONTROL PLANE"]
+        MW["Middleware Chain<br/><small>Audit, GZip, RateLimit, Idempotency</small>"]
+        ROUTER["API Router (v1_router)<br/><small>:8000 (40+ Routers)</small>"]
+        SERVICES["Domain Services<br/><small>Scan, Hotspot, Graph, Patch</small>"]
+        MCP_GW["MCP Security Gateway<br/><small>Tool Proxies &amp; Approvals</small>"]
+    end
+
+    subgraph DataAndWorker["3. DATA &amp; WORKER TIER"]
+        DB[("PostgreSQL DB<br/><small>56 SQLAlchemy Models</small>")]
+        WORKER["Async Task Worker<br/><small>background_tasks &amp; Retries</small>"]
+    end
+
+    subgraph EnginesAndExt["4. ENGINES &amp; INTEGRATIONS"]
+        SCANNERS["Security Scanners<br/><small>Semgrep, Gitleaks, Trivy, Checkov</small>"]
+        OPA{"OPA Policy Engine<br/><small>Deterministic Rego Rules</small>"}
+        EXT["Cloud &amp; DevOps<br/><small>GitHub, AWS, Azure, GCP, K8s</small>"]
+        MCP_TOOLS["Proxied MCP Tools<br/><small>Shell, Files, Exec</small>"]
+    end
+
+    UI --> CLIENT
+    CLIENT -->|REST API :8000| MW
+    MW --> ROUTER
+    ROUTER --> DB
+    ROUTER --> SERVICES
+    ROUTER -->|Enqueue| WORKER
+    ROUTER --> MCP_GW
+    WORKER --> DB
+    WORKER --> SCANNERS
+    SERVICES --> OPA
+    SERVICES --> EXT
+    SCANNERS -.->|Persist Findings| DB
+    MCP_GW -->|Enforce Policy| OPA
+    MCP_GW --> MCP_TOOLS
+
+    classDef focal stroke:#ea580c,stroke-width:2px;
+    classDef verified stroke:#16a34a,stroke-width:1.5px;
+    class OPA,MCP_GW,WORKER focal;
+    class UI,ROUTER,DB,SCANNERS verified;</code></pre>
+    </div>
+  </div>
+</body>
+</html>

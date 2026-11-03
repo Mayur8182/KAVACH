@@ -1,0 +1,21 @@
+id: jwt-token-parsing
+title: JWT Token Parsing Without Verification
+severity: high
+risk_level: High
+category: Authentication
+cwe: CWE-287
+owasp: A07:2021-Identification and Authentication Failures
+cvss_score: "8.1 (High)"
+patterns:
+  - "jwt.decode("
+  - "jwt.verify("
+  - "algorithms: ['none']"
+  - "algorithms=['none']"
+  - "verify_signature=False"
+description: "JWT token decoded without signature verification or with weak algorithm configurations that permit signature bypass."
+remediation: "Always enforce signature verification with explicitly trusted algorithms (e.g. RS256, HS256) and a cryptographically strong secret."
+references:
+  - title: "OWASP JSON Web Token Cheat Sheet"
+    url: "https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html"
+  - title: "CWE-287: Improper Authentication"
+    url: "https://cwe.mitre.org/data/definitions/287.html"

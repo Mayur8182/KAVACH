@@ -1,0 +1,25 @@
+id: command-injection
+title: Potential Command Injection
+severity: critical
+risk_level: Critical
+category: Command Injection
+cwe: CWE-78
+owasp: A03:2021-Injection
+cvss_score: "9.8 (Critical)"
+patterns:
+  - "exec("
+  - "child_process.exec("
+  - "child_process.execSync("
+  - "os.system("
+  - "subprocess.Popen("
+  - "subprocess.run("
+  - "spawn("
+description: "This code constructs a shell command using user input which can lead to command injection if not properly sanitized."
+remediation: "Avoid passing unfiltered input into shell execution. Use parameterized execution APIs such as execFile() with discrete argument lists, or subprocess.run([cmd, arg1, arg2], shell=False)."
+references:
+  - title: "OWASP Command Injection"
+    url: "https://owasp.org/www-community/attacks/Command_Injection"
+  - title: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+    url: "https://cwe.mitre.org/data/definitions/78.html"
+  - title: "SANS Top 25: Command Injection"
+    url: "https://www.sans.org/top25-software-errors/#cat1"

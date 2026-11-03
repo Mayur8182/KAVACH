@@ -1,0 +1,19 @@
+id: auth-bypass-risk
+title: Potential Authentication or Authorization Bypass
+severity: high
+risk_level: High
+category: Authorization
+cwe: CWE-306
+owasp: A07:2021-Identification and Authentication Failures
+cvss_score: "8.4 (High)"
+patterns:
+  - "bypassAuth"
+  - "skipAuth: true"
+  - "allowAnonymous: true"
+  - "security: []"
+  - "next()"
+description: "Middleware routing allows unauthorized access or bypasses standard security inspection checks."
+remediation: "Enforce uniform authentication middleware across all protected routes and maintain a deny-by-default routing configuration."
+references:
+  - title: "CWE-306: Missing Authentication for Critical Function"
+    url: "https://cwe.mitre.org/data/definitions/306.html"

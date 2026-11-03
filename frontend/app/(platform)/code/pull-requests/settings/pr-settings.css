@@ -1,0 +1,459 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PR SETTINGS SUITE (SCREENS 14.1 - 14.8)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.prset-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ── Breadcrumb Bar ── */
+.prset-breadcrumb-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.prset-crumb-link {
+  color: #64748b;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.prset-crumb-link:hover {
+  color: #2563eb;
+}
+
+.prset-crumb-active {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+/* ── Sub-Screen Switcher Pills (14.1 - 14.8) ── */
+.prset-switcher-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  overflow-x: auto;
+  align-items: center;
+}
+
+.prset-switcher-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.prset-switcher-pill:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+.prset-switcher-pill.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+/* ── Content Layout ── */
+.prset-body {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.prset-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.prset-header-block {
+  margin-bottom: 4px;
+}
+
+.prset-header-title {
+  margin: 0 0 4px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.prset-header-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* ── Standard Card ── */
+.prset-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.prset-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.prset-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.prset-card-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── Form Controls & Field Groups ── */
+.prset-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prset-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.prset-helper {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.prset-input {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.prset-input:focus {
+  border-color: #2563eb;
+}
+
+.prset-textarea {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.5;
+}
+
+.prset-textarea:focus {
+  border-color: #2563eb;
+}
+
+.prset-select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #334155;
+  background: #ffffff;
+  outline: none;
+  cursor: pointer;
+}
+
+.prset-select:focus {
+  border-color: #2563eb;
+}
+
+/* ── Toggle Row Component ── */
+.prset-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.prset-toggle-row:last-child {
+  border-bottom: none;
+}
+
+.prset-toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 80%;
+}
+
+.prset-toggle-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.prset-toggle-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ── iOS-style Toggle Switch ── */
+.prset-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.prset-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.prset-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #cbd5e1;
+  transition: 0.2s;
+  border-radius: 22px;
+}
+
+.prset-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+.prset-switch input:checked + .prset-slider {
+  background-color: #2563eb;
+}
+
+.prset-switch input:checked + .prset-slider:before {
+  transform: translateX(18px);
+}
+
+/* ── Checkbox Row Component (14.3) ── */
+.prset-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.prset-checkbox-row input[type="checkbox"] {
+  margin-top: 3px;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Table Styling ── */
+.prset-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.prset-table th {
+  text-align: left;
+  padding: 10px 16px;
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 600;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 12px;
+}
+
+.prset-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.prset-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+/* ── Badges ── */
+.prset-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.prset-badge.active,
+.prset-badge.passing {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.prset-badge.inactive,
+.prset-badge.optional {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.prset-badge.gray {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+/* ── Pill Tags for Recipients (14.6) ── */
+.prset-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.prset-tag-close {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.prset-tag-close:hover {
+  color: #1d4ed8;
+}
+
+/* ── Footer Actions Row ── */
+.prset-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.prset-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: #0f172a;
+  border: 1px solid #0f172a;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.prset-btn-primary:hover {
+  background: #1e293b;
+}
+
+.prset-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.prset-btn-secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.prset-icon-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prset-icon-btn:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+.prset-icon-btn.danger:hover {
+  color: #dc2626;
+  background: #fee2e2;
+}

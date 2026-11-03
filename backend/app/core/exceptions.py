@@ -73,8 +73,14 @@ class ForbiddenError(AppException):
         )
 
 
-def create_error_response(code: str, message: str, status_code: int, details: Optional[Any] = None) -> JSONResponse:
-    """Formats a standardized error payload."""
+def create_error_response(
+    code: str,
+    message: str,
+    status_code: int,
+    details: Optional[Any] = None,
+    request_id: Optional[str] = None,
+) -> JSONResponse:
+    """Formats a standardized error payload with correlation ID support."""
     payload: Dict[str, Any] = {
         "error": {
             "code": code,
@@ -82,9 +88,12 @@ def create_error_response(code: str, message: str, status_code: int, details: Op
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     }
+    if request_id:
+        payload["error"]["request_id"] = request_id
     if details is not None:
         payload["error"]["details"] = details
-    return JSONResponse(status_code=status_code, content=payload)
+    headers = {"X-Request-ID": request_id} if request_id else None
+    return JSONResponse(status_code=status_code, content=payload, headers=headers)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -92,47 +101,59 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(AppException)
     async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+        req_id = getattr(request.state, "request_id", None)
         logger.warning(
             f"AppException [{exc.code}]: {exc.message}",
-            extra={"event": "app_exception", "code": exc.code, "status_code": exc.status_code},
+            extra={"event": "app_exception", "code": exc.code, "status_code": exc.status_code, "request_id": req_id},
         )
         return create_error_response(
             code=exc.code,
             message=exc.message,
             status_code=exc.status_code,
             details=exc.details,
+            request_id=req_id,
         )
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        req_id = getattr(request.state, "request_id", None)
         logger.info(
             f"Request validation failed on {request.url.path}",
-            extra={"event": "validation_error", "errors": exc.errors()},
+            extra={"event": "validation_error", "errors": exc.errors(), "request_id": req_id},
         )
         return create_error_response(
             code="VALIDATION_ERROR",
             message="Invalid request payload or query parameters",
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             details=exc.errors(),
+            request_id=req_id,
         )
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        req_id = getattr(request.state, "request_id", None)
         return create_error_response(
             code=f"HTTP_{exc.status_code}",
             message=str(exc.detail),
             status_code=exc.status_code,
+            request_id=req_id,
         )
 
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        req_id = getattr(request.state, "request_id", None)
         logger.error(
             f"Unhandled exception during {request.method} {request.url.path}: {str(exc)}",
             exc_info=True,
-            extra={"event": "unhandled_exception"},
+            extra={"event": "unhandled_exception", "request_id": req_id},
         )
+        import traceback
+        tb = traceback.format_exc()
         return create_error_response(
             code="INTERNAL_SERVER_ERROR",
-            message="An unexpected server error occurred. Inspect logs for details.",
+            message=f"An unexpected server error occurred: {str(exc)}",
+            details=tb,
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            request_id=req_id,
         )
+

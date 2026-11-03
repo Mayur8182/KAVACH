@@ -1,0 +1,145 @@
+from enum import Enum
+
+
+class ContractStatus(str, Enum):
+    DRAFT = "DRAFT"
+    VALIDATING = "VALIDATING"
+    VALID = "VALID"
+    ACTIVE = "ACTIVE"
+    RETIRED = "RETIRED"
+
+
+class ContractVerificationStatus(str, Enum):
+    VERIFIED = "VERIFIED"
+    VIOLATED = "VIOLATED"
+    UNKNOWN = "UNKNOWN"
+    NOT_VERIFIED = "NOT_VERIFIED"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+    FAILED = "FAILED"
+
+
+class EvaluationTruthValue(str, Enum):
+    """Three-valued logic output."""
+    TRUE = "TRUE"
+    FALSE = "FALSE"
+    UNKNOWN = "UNKNOWN"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+class ViolationStatus(str, Enum):
+    OPEN = "OPEN"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    RESOLVED = "RESOLVED"
+    FALSE_POSITIVE = "FALSE_POSITIVE"
+    SUPPRESSED = "SUPPRESSED"
+    REOPENED = "REOPENED"
+
+
+class ContractScopeType(str, Enum):
+    PROJECT = "PROJECT"
+    REPOSITORY = "REPOSITORY"
+    BRANCH = "BRANCH"
+    PULL_REQUEST = "PULL_REQUEST"
+    SERVICE = "SERVICE"
+    API = "API"
+    AGENT = "AGENT"
+    ENVIRONMENT = "ENVIRONMENT"
+    RESOURCE = "RESOURCE"
+    GLOBAL = "GLOBAL"
+
+
+class DependencyType(str, Enum):
+    REQUIRES = "REQUIRES"
+    CONFLICTS_WITH = "CONFLICTS_WITH"
+    COMPOSES_WITH = "COMPOSES_WITH"
+
+
+class OverrideStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    EXPIRED = "EXPIRED"
+    REVOKED = "REVOKED"
+
+
+class InvariantOperator(str, Enum):
+    EQUALS = "EQUALS"
+    NOT_EQUALS = "NOT_EQUALS"
+    IN = "IN"
+    NOT_IN = "NOT_IN"
+    CONTAINS = "CONTAINS"
+    NOT_CONTAINS = "NOT_CONTAINS"
+    STARTS_WITH = "STARTS_WITH"
+    ENDS_WITH = "ENDS_WITH"
+    MATCHES = "MATCHES"
+    EXISTS = "EXISTS"
+    NOT_EXISTS = "NOT_EXISTS"
+    GREATER_THAN = "GREATER_THAN"
+    GREATER_THAN_OR_EQUAL = "GREATER_THAN_OR_EQUAL"
+    LESS_THAN = "LESS_THAN"
+    LESS_THAN_OR_EQUAL = "LESS_THAN_OR_EQUAL"
+    AND = "AND"
+    OR = "OR"
+    NOT = "NOT"
+
+
+class SubjectType(str, Enum):
+    USER = "USER"
+    AGENT = "AGENT"
+    SERVICE = "SERVICE"
+    WORKLOAD = "WORKLOAD"
+    APPLICATION = "APPLICATION"
+    MCP_CLIENT = "MCP_CLIENT"
+    MCP_SERVER = "MCP_SERVER"
+    SYSTEM = "SYSTEM"
+    AUTHENTICATED_USER = "AUTHENTICATED_USER"
+    UNKNOWN = "UNKNOWN"
+
+
+class ActionType(str, Enum):
+    READ = "READ"
+    WRITE = "WRITE"
+    CREATE = "CREATE"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+    EXECUTE = "EXECUTE"
+    DEPLOY = "DEPLOY"
+    APPROVE = "APPROVE"
+    GRANT = "GRANT"
+    DELEGATE = "DELEGATE"
+    TRANSFER = "TRANSFER"
+    SEND = "SEND"
+    RECEIVE = "RECEIVE"
+    ACCESS = "ACCESS"
+    INVOKE = "INVOKE"
+
+
+class SeverityLevel(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class EvidenceType(str, Enum):
+    STATIC_ANALYSIS = "STATIC_ANALYSIS"
+    DYNAMIC_TEST = "DYNAMIC_TEST"
+    RUNTIME_EVENT = "RUNTIME_EVENT"
+    AUTHORIZATION_DECISION = "AUTHORIZATION_DECISION"
+    MCP_TOOL_EXECUTION = "MCP_TOOL_EXECUTION"
+    AGENT_ACTION = "AGENT_ACTION"
+    DATA_FLOW = "DATA_FLOW"
+    AUDIT_EVENT = "AUDIT_EVENT"
+    GITHUB_CHECK = "GITHUB_CHECK"
+    CI_RESULT = "CI_RESULT"
+    CONTAINER_EVENT = "CONTAINER_EVENT"
+    KUBERNETES_EVENT = "KUBERNETES_EVENT"
+    CLOUD_EVENT = "CLOUD_EVENT"
+    DATABASE_EVENT = "DATABASE_EVENT"
+    NETWORK_EVENT = "NETWORK_EVENT"
+    MANUAL_APPROVAL = "MANUAL_APPROVAL"
+
+
+# Convenient aliases
+VerificationStatus = ContractVerificationStatus
+ThreeValuedLogic = EvaluationTruthValue
+Operator = InvariantOperator
+ScopeType = ContractScopeType

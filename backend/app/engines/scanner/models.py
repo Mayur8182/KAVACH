@@ -65,3 +65,5 @@ class FullScanVerificationResult(BaseModel):
     scanner_count: int
     finding_count: int
     error_message: Optional[str] = None
+    correlated_findings: Optional[List[Any]] = Field(default=None, description="Enriched correlated findings with multi-source evidence")
+    deduplication_summary: Optional[Dict[str, Any]] = Field(default=None, description="Summary of deduplication metrics")

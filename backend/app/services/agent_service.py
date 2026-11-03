@@ -92,24 +92,28 @@ class AgentService:
 
     async def list_agents(
         self,
-        project_id: uuid.UUID,
         current_user: User,
+        project_id: Optional[uuid.UUID] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> List[Agent]:
-        project = await self.project_repo.get_by_id(project_id)
-        if not project:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project '{project_id}' not found",
-            )
-        if project.owner_id != current_user.id and not current_user.is_superuser:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have authorization to view agents for this project",
-            )
+        if project_id is not None:
+            project = await self.project_repo.get_by_id(project_id)
+            if not project:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project '{project_id}' not found",
+                )
+            if project.owner_id != current_user.id and not current_user.is_superuser:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You do not have authorization to view agents for this project",
+                )
+            return await self.repo.list_by_project(project_id=project_id, limit=limit, offset=offset)
 
-        return await self.repo.list_by_project(project_id=project_id, limit=limit, offset=offset)
+        if current_user.is_superuser:
+            return await self.repo.list_all(limit=limit, offset=offset)
+        return await self.repo.list_by_owner(owner_id=current_user.id, limit=limit, offset=offset)
 
     async def update_agent(
         self,

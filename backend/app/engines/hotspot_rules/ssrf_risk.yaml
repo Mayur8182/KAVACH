@@ -1,0 +1,22 @@
+id: ssrf-risk
+title: Potential Server-Side Request Forgery (SSRF)
+severity: high
+risk_level: High
+category: Input Validation
+cwe: CWE-918
+owasp: A10:2021-Server-Side Request Forgery
+cvss_score: "8.6 (High)"
+patterns:
+  - "axios.get("
+  - "axios.post("
+  - "fetch("
+  - "requests.get("
+  - "requests.post("
+  - "urllib.request.urlopen("
+description: "Server initiates network requests to URLs constructed from untrusted client input without destination IP/host validation."
+remediation: "Validate destination URLs against an explicit allowlist and block internal IP ranges (127.0.0.1, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.169.254)."
+references:
+  - title: "OWASP Server-Side Request Forgery Prevention Cheat Sheet"
+    url: "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html"
+  - title: "CWE-918: Server-Side Request Forgery (SSRF)"
+    url: "https://cwe.mitre.org/data/definitions/918.html"

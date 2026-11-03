@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer — Architectural Gaps & Grounded Status Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --subtle: #94a3b8;
+      --border: #e2e8f0;
+      --accent: #ea580c;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      padding: 48px;
+      line-height: 1.5;
+    }
+    header {
+      max-width: 1400px;
+      margin: 0 auto 36px auto;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+      display: inline-block;
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 2px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 38px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .description {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 880px;
+    }
+    .canvas-card {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      padding: 32px;
+      overflow-x: auto;
+    }
+    svg {
+      display: block;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+    .mermaid-source {
+      max-width: 1400px;
+      margin: 36px auto 0 auto;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 24px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    .mermaid-source pre {
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="eyebrow">Production Reality Audit · Verified vs Partial vs Planned</div>
+    <h1>Architectural Gaps & Implementation Status Map</h1>
+    <p class="description">
+      Empirical assessment of feature readiness following the Antigravity Production Engineering Rules.
+      Distinguishes fully verified backend implementations from partially complete modules and unverified UI-only templates.
+    </p>
+  </header>
+
+  <div class="canvas-card">
+    <svg width="1280" height="740" viewBox="0 0 1280 740" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#0f172a" />
+        </marker>
+        <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#ea580c" />
+        </marker>
+      </defs>
+
+      <!-- Zone: Verified Core (Green / Solid) -->
+      <rect x="40" y="40" width="380" height="660" rx="10" fill="#f8fafc" stroke="#16a34a" stroke-width="1.5" />
+      <text x="60" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#16a34a" letter-spacing="0.08em">&#10003; VERIFIED PRODUCTION READY (206 ROUTES)</text>
+
+      <!-- Zone: Partially Implemented (Amber / Dashed) -->
+      <rect x="450" y="40" width="380" height="660" rx="10" fill="#f8fafc" stroke="#d97706" stroke-dasharray="4 4" stroke-width="1.5" />
+      <text x="470" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#d97706" letter-spacing="0.08em">&#9684; PARTIALLY IMPLEMENTED (MODELS BUILT)</text>
+
+      <!-- Zone: UI-Only & Planned (Red-Orange / Dotted) -->
+      <rect x="860" y="40" width="380" height="660" rx="10" fill="#f8fafc" stroke="#ea580c" stroke-dasharray="2 2" stroke-width="1.5" />
+      <text x="880" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#ea580c" letter-spacing="0.08em">&#9675; UI-ONLY & PLANNED (65 ROUTES)</text>
+
+      <!-- Verified 1: SAST, Secrets & Hotspots -->
+      <rect x="60" y="100" width="340" height="110" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.5" />
+      <text x="80" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Thing Code Core Engine</text>
+      <text x="80" y="150" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Semgrep CLI & Gitleaks CLI subprocesses</text>
+      <text x="80" y="170" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Sonar-style regex hotspot engine</text>
+      <text x="80" y="190" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; 100% Deterministic & Persisted</text>
+
+      <!-- Verified 2: Auth & Tenancy -->
+      <rect x="60" y="230" width="340" height="110" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.5" />
+      <text x="80" y="258" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Auth, MFA & Tenancy Isolation</text>
+      <text x="80" y="280" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">HS256 JWT, TOTP pyotp authenticator</text>
+      <text x="80" y="300" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Organizations &rarr; Workspaces &rarr; Projects</text>
+      <text x="80" y="320" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; Zero Cross-Tenant Leaks (Rule 6)</text>
+
+      <!-- Verified 3: OPA Policy Engine -->
+      <rect x="60" y="360" width="340" height="110" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.5" />
+      <text x="80" y="388" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">OPA Rego Policy Authority</text>
+      <text x="80" y="410" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Determines ALLOW, BLOCK, REQUIRE_APPROVAL</text>
+      <text x="80" y="430" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Evaluates licenses, blueprints, tools</text>
+      <text x="80" y="450" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; Non-LLM Authority (Rule 14)</text>
+
+      <!-- Verified 4: GitHub App Sync -->
+      <rect x="60" y="490" width="340" height="110" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.5" />
+      <text x="80" y="518" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">GitHub App Synchronization</text>
+      <text x="80" y="540" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">RS256 JWT App tokens & Webhook decoders</text>
+      <text x="80" y="560" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Commit status & PR checks integration</text>
+      <text x="80" y="580" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; Real Repositories Only (Rule 10)</text>
+
+      <!-- Partial 1: Background Task Worker -->
+      <rect x="470" y="100" width="340" height="110" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.5" />
+      <text x="490" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">In-Process TaskWorker</text>
+      <text x="490" y="150" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Runs inside FastAPI asyncio event loop</text>
+      <text x="490" y="170" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Functional, but lacks Celery/Redis queue</text>
+      <text x="490" y="190" font-family="'Geist Mono', monospace" font-size="11" fill="#d97706">&#9684; Needs Distributed Queue Split</text>
+
+      <!-- Partial 2: Active Cloud Action Runner -->
+      <rect x="470" y="230" width="340" height="110" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.5" />
+      <text x="490" y="258" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Cloud Remediation Runner</text>
+      <text x="490" y="280" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">cloud_actions & evidence schemas built</text>
+      <text x="490" y="300" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Defaults to READ_ONLY safety mode</text>
+      <text x="490" y="320" font-family="'Geist Mono', monospace" font-size="11" fill="#d97706">&#9684; Dry-Run Execution Plane Needed</text>
+
+      <!-- Partial 3: DAST Test Execution -->
+      <rect x="470" y="360" width="340" height="110" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.5" />
+      <text x="490" y="388" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Thing Attack Path Synthesizer</text>
+      <text x="490" y="410" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Targets, tests, evidence fully modeled</text>
+      <text x="490" y="430" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Multi-hop graph generation is rule-based</text>
+      <text x="490" y="450" font-family="'Geist Mono', monospace" font-size="11" fill="#d97706">&#9684; Needs Dedicated Fuzzing Sandbox</text>
+
+      <!-- Planned 1: Secondary VCS -->
+      <rect x="880" y="100" width="340" height="110" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" />
+      <text x="900" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">GitLab / Bitbucket VCS</text>
+      <text x="900" y="150" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Settings configuration cards exist in UI</text>
+      <text x="900" y="170" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">OAuth & webhook sync not connected</text>
+      <text x="900" y="190" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">&#9675; Planned Q2 Integration</text>
+
+      <!-- Planned 2: 65 UI-Only Routes -->
+      <rect x="880" y="230" width="340" height="110" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" />
+      <text x="900" y="258" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">65 Template/Mock Routes</text>
+      <text x="900" y="280" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Identified in APPLICATION_INVENTORY.md</text>
+      <text x="900" y="300" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Tagged with UI-only banners</text>
+      <text x="900" y="320" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">&#9675; Zero Fake Success (Rule 2)</text>
+
+    </svg>
+  </div>
+
+  <div class="mermaid-source">
+    <div style="color: #94a3b8; margin-bottom: 8px;">// Editable Mermaid Source Definition</div>
+    <pre>
+graph LR
+    subgraph Verified["Verified Core (206 Routes)"]
+        V1["Thing Code (Semgrep, Gitleaks, Hotspots)"]
+        V2["Auth, MFA & Multi-Tenant Scoping"]
+        V3["OPA Policy Decision Authority"]
+        V4["GitHub App Synchronization"]
+    end
+
+    subgraph Partial["Partially Implemented"]
+        P1["In-Process TaskWorker (Needs Distributed Queue)"]
+        P2["Cloud Remediation Actions (Gated in READ_ONLY)"]
+        P3["DAST Attack Paths (Needs Dedicated Fuzzer)"]
+    end
+
+    subgraph Planned["UI-Only & Planned (65 Routes)"]
+        U1["GitLab & Bitbucket Connections"]
+        U2["65 Static UI Dashboard Pages"]
+    end
+
+    classDef ok fill:#ffffff,stroke:#16a34a,stroke-width:2px;
+    classDef warn fill:#ffffff,stroke:#d97706,stroke-width:2px;
+    classDef planned fill:#ffffff,stroke:#ea580c,stroke-width:2px;
+
+    class V1,V2,V3,V4 ok;
+    class P1,P2,P3 warn;
+    class U1,U2 planned;
+    </pre>
+  </div>
+
+</body>
+</html>

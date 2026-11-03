@@ -25,6 +25,16 @@ class CheckovScanner(SecurityScanner):
             "json",
             "--quiet",
             "--compact",
+            "--skip-path",
+            "node_modules",
+            "--skip-path",
+            "scratch",
+            "--skip-path",
+            ".venv",
+            "--skip-path",
+            "venv",
+            "--skip-path",
+            ".git",
         ]
 
     def get_tolerated_exit_codes(self) -> List[int]:
@@ -71,11 +81,45 @@ class CheckovScanner(SecurityScanner):
                 fp_raw = f"checkov:{check_id}:{file_path}:{line_range}"
                 fingerprint = hashlib.sha256(fp_raw.encode("utf-8")).hexdigest()
 
+                # Derive provider
+                resource_str = str(check.get("resource") or "").lower()
+                check_id_upper = str(check_id).upper()
+                file_lower = str(file_path or "").lower()
+
+                if resource_str.startswith("aws_") or "_AWS_" in check_id_upper or "aws" in file_lower:
+                    provider = "AWS"
+                elif resource_str.startswith(("azurerm_", "azure_")) or "_AZURE_" in check_id_upper or "azure" in file_lower:
+                    provider = "Azure"
+                elif resource_str.startswith(("google_", "gcp_")) or "_GCP_" in check_id_upper or "gcp" in file_lower:
+                    provider = "GCP"
+                elif (
+                    resource_str.startswith(("kubernetes_", "k8s_"))
+                    or "_K8S_" in check_id_upper
+                    or "k8s" in file_lower
+                    or report.get("check_type") in ["kubernetes", "helm"]
+                ):
+                    provider = "Kubernetes"
+                else:
+                    provider = "AWS"
+
+                # Derive framework
+                check_type_lower = str(report.get("check_type") or "").lower()
+                if "helm" in check_type_lower or "helm" in file_lower or "chart.yaml" in file_lower:
+                    framework = "Helm"
+                elif "terraform" in check_type_lower or file_lower.endswith(".tf"):
+                    framework = "Terraform"
+                elif "cloudformation" in check_type_lower or "cfn" in file_lower:
+                    framework = "CloudFormation"
+                elif "kubernetes" in check_type_lower or file_lower.endswith((".yaml", ".yml")):
+                    framework = "Kubernetes"
+                else:
+                    framework = "Terraform"
+
                 findings.append(
                     NormalizedFindingCandidate(
                         rule_id=check_id,
-                        title=f"IaC Violation: {check_name}",
-                        description=f"{check_name} ({check_id}) in {file_path}. Guideline: {guideline}",
+                        title=check_name,
+                        description=guideline if guideline != check_name else f"{check_name} in {file_path}",
                         severity=severity,
                         file_path=file_path,
                         line_number=line_number,
@@ -86,6 +130,9 @@ class CheckovScanner(SecurityScanner):
                             "resource": check.get("resource"),
                             "guideline": guideline,
                             "engine": "checkov",
+                            "provider": provider,
+                            "framework": framework,
+                            "status": "OPEN",
                         },
                     )
                 )

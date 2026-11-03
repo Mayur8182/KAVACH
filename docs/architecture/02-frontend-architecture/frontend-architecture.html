@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer Control Plane — Frontend Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --soft: #94a3b8;
+      --line: #e2e8f0;
+      --line-strong: #cbd5e1;
+      --accent: #ea580c;
+      --accent-tint: rgba(234, 88, 12, 0.08);
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+      --font-mono: "Geist Mono", monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--ink);
+      padding: 40px 24px;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+    header.header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    p.lead {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+      max-width: 860px;
+    }
+    .diagram-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .diagram-scroll {
+      width: 100%;
+      overflow-x: auto;
+      padding: 32px 24px;
+      background: var(--paper);
+    }
+    svg.canvas {
+      display: block;
+      margin: 0 auto;
+      min-width: 1100px;
+    }
+    .diagram-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: #f1f5f9;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .source-panel {
+      margin-top: 24px;
+      background: #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .source-header {
+      padding: 10px 16px;
+      background: #1e293b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cbd5e1;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    pre.code-block {
+      padding: 16px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="eyebrow">Fig. 02 · Presentation &amp; State</div>
+      <h1>Next.js 15 App Router &amp; Component Architecture</h1>
+      <p class="lead">Component layout, context boundaries, routing, and centralized API client layer connecting Next.js 15 with React 19 to the FastAPI backend control plane.</p>
+    </header>
+
+    <div class="diagram-card">
+      <div class="diagram-scroll">
+        <svg class="canvas" viewBox="0 0 1100 700" width="1100" height="700" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569" />
+            </marker>
+            <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ea580c" />
+            </marker>
+            <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.04" />
+            </filter>
+          </defs>
+
+          <!-- Zones -->
+          <!-- 1. Layout & Shell -->
+          <rect x="40" y="40" width="280" height="620" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="52" y="32" width="170" height="18" fill="#ffffff" />
+          <text x="56" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b">SHELL &amp; PROVIDERS</text>
+
+          <!-- 2. Feature Pages & Views -->
+          <rect x="360" y="40" width="360" height="620" rx="8" fill="#fafafa" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="372" y="32" width="190" height="18" fill="#ffffff" />
+          <text x="376" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#ea580c">FEATURE VIEWS &amp; PAGES</text>
+
+          <!-- 3. Client & Transport -->
+          <rect x="760" y="40" width="300" height="620" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,4" />
+          <rect x="772" y="32" width="200" height="18" fill="#ffffff" />
+          <text x="776" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b">CLIENT TRANSPORT &amp; BACKEND</text>
+
+          <!-- Connectors -->
+          <!-- Root Layout -> Nav & Header -->
+          <path d="M 180 140 V 175" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+          <path d="M 180 245 V 280" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Nav -> Feature Views -->
+          <path d="M 280 210 H 380" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="330" y="202" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">Route Switch</text>
+
+          <!-- Feature Views -> Unified API Client -->
+          <path d="M 680 180 H 780" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <path d="M 680 290 H 780" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <path d="M 680 400 H 780" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <path d="M 680 510 H 780" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+
+          <!-- API Client -> FastAPI Gateway -->
+          <path d="M 910 400 V 450" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+
+          <!-- Nodes: Shell & Providers -->
+          <g transform="translate(60, 70)" filter="url(#shadow)">
+            <rect width="240" height="70" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">APP/LAYOUT.TSX</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">Root Layout &amp; Tokens</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Geist Sans, Mono, Theme, CSS</text>
+          </g>
+
+          <g transform="translate(60, 175)" filter="url(#shadow)">
+            <rect width="240" height="70" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">COMPONENTS/SIDEBAR.TSX</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">14-Module Sidebar</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Code, Cloud, Attack, Protect...</text>
+          </g>
+
+          <g transform="translate(60, 280)" filter="url(#shadow)">
+            <rect width="240" height="70" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">CONTEXT/AUTHCONTEXT.TSX</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">Tenant &amp; Auth State</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Session Bearer, Active Org ID</text>
+          </g>
+
+          <!-- Nodes: Feature Views -->
+          <g transform="translate(380, 145)" filter="url(#shadow)">
+            <rect width="300" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">APP/CODE/* · /CODE/SAST</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Code Security &amp; Hotspots</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Semgrep Findings, Hotspot Audit Queue</text>
+          </g>
+
+          <g transform="translate(380, 255)" filter="url(#shadow)">
+            <rect width="300" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">APP/CLOUD/* · /CODE/IAC</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Cloud &amp; IaC Security</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">AWS/Azure/GCP, Drift, Terraform Checkov</text>
+          </g>
+
+          <g transform="translate(380, 365)" filter="url(#shadow)">
+            <rect width="300" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">APP/PROTECT/* · APP/AGENT/*</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Protect &amp; Agent Governance</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">MCP Tool Approvals, Delegation Chains</text>
+          </g>
+
+          <g transform="translate(380, 475)" filter="url(#shadow)">
+            <rect width="300" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">APP/ATTACK/* · APP/QA/*</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Attack Surface &amp; QA Automation</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">DAST, Endpoint Discovery, Test Suites</text>
+          </g>
+
+          <!-- Nodes: Client & Transport -->
+          <g transform="translate(780, 150)" filter="url(#shadow)">
+            <rect width="260" height="250" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+            <rect x="0" y="0" width="6" height="250" rx="2" fill="#ea580c" />
+            <text x="18" y="22" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">LIB/API/CLIENT.TS · FOCAL SINGLETON</text>
+            <text x="18" y="42" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">Unified API Client (apiClient)</text>
+            <text x="18" y="60" font-family="'Geist Mono', monospace" font-size="8" fill="#475569">Direct Fetch to Backend (:8000)</text>
+            <text x="18" y="80" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• apiClient.auth</text>
+            <text x="18" y="96" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• apiClient.scans &amp; findings</text>
+            <text x="18" y="112" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• apiClient.hotspots (Review Queue)</text>
+            <text x="18" y="128" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• apiClient.invitations (Members/Roles)</text>
+            <text x="18" y="144" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• apiClient.iac (Scans/Drift/Rules)</text>
+            <text x="18" y="160" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• apiClient.protect &amp; agent</text>
+            <text x="18" y="176" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• apiClient.cloud &amp; attack</text>
+            <text x="18" y="192" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• apiClient.qa (Suites/Runs)</text>
+            <text x="18" y="212" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[VERIFIED ZERO-MOCK BINDINGS]</text>
+          </g>
+
+          <g transform="translate(780, 450)" filter="url(#shadow)">
+            <rect width="260" height="85" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+            <text x="16" y="22" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">PORT :8000 · REST / SSE</text>
+            <text x="16" y="42" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">FastAPI Control Plane</text>
+            <text x="16" y="60" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Correlation Header: X-Request-ID</text>
+            <text x="16" y="74" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[STRICT DATA PROVENANCE]</text>
+          </g>
+
+          <!-- Legend -->
+          <g transform="translate(60, 640)">
+            <circle cx="6" cy="6" r="4" fill="#ea580c" />
+            <text x="16" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Focal API Client Singleton</text>
+            <circle cx="220" cy="6" r="4" fill="#16a34a" />
+            <text x="230" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Verified Production Contract</text>
+            <line x1="430" y1="6" x2="455" y2="6" stroke="#ea580c" stroke-width="1.5" />
+            <text x="462" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Typed Domain API Call</text>
+          </g>
+        </svg>
+      </div>
+      <div class="diagram-footer">
+        <span>FIG. 02 · FRONTEND ARCHITECTURE</span>
+        <span>STANDALONE SVG · NO EXTERNAL ASSETS</span>
+        <span>GROUND TRUTH: LIB/API/CLIENT.TS</span>
+      </div>
+    </div>
+
+    <!-- Editable Source Panel -->
+    <div class="source-panel">
+      <div class="source-header">
+        <span>EDITABLE MERMAID SOURCE (FOR MAINTENANCE &amp; GITHUB PREVIEWS)</span>
+        <span>COPY / PASTE READY</span>
+      </div>
+      <pre class="code-block"><code>graph LR
+    subgraph Shell["1. SHELL &amp; PROVIDERS"]
+        LAYOUT["Root Layout &amp; Tokens<br/><small>app/layout.tsx</small>"]
+        SIDEBAR["14-Module Sidebar<br/><small>components/sidebar.tsx</small>"]
+        AUTH_CTX["Auth &amp; Tenant Context<br/><small>context/AuthContext.tsx</small>"]
+    end
+
+    subgraph Views["2. FEATURE VIEWS &amp; PAGES"]
+        CODE_VIEW["Code Security &amp; Hotspots<br/><small>/code, /code/sast</small>"]
+        CLOUD_VIEW["Cloud &amp; IaC Security<br/><small>/cloud, /code/iac</small>"]
+        PROTECT_VIEW["Protect &amp; Agent Governance<br/><small>/protect, /agent</small>"]
+        ATTACK_VIEW["Attack Surface &amp; QA<br/><small>/attack, /qa</small>"]
+    end
+
+    subgraph Transport["3. CLIENT TRANSPORT &amp; BACKEND"]
+        API_CLIENT["Unified API Client<br/><small>lib/api/client.ts (apiClient)</small>"]
+        BACKEND["FastAPI Control Plane<br/><small>REST API :8000</small>"]
+    end
+
+    LAYOUT --> SIDEBAR
+    LAYOUT --> AUTH_CTX
+    SIDEBAR --> CODE_VIEW
+    SIDEBAR --> CLOUD_VIEW
+    SIDEBAR --> PROTECT_VIEW
+    SIDEBAR --> ATTACK_VIEW
+    CODE_VIEW -->|apiClient.scans / hotspots| API_CLIENT
+    CLOUD_VIEW -->|apiClient.cloud / iac| API_CLIENT
+    PROTECT_VIEW -->|apiClient.protect / agent| API_CLIENT
+    ATTACK_VIEW -->|apiClient.attack / qa| API_CLIENT
+    API_CLIENT -->|Bearer Token + X-Org-ID| BACKEND
+
+    classDef focal stroke:#ea580c,stroke-width:2px;
+    class API_CLIENT focal;</code></pre>
+    </div>
+  </div>
+</body>
+</html>

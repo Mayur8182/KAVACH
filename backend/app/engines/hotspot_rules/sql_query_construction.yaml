@@ -1,0 +1,24 @@
+id: sql-query-construction
+title: SQL Query Construction via String Formatting
+severity: critical
+risk_level: Critical
+category: Input Validation
+cwe: CWE-89
+owasp: A03:2021-Injection
+cvss_score: "9.3 (Critical)"
+patterns:
+  - "SELECT * FROM"
+  - "SELECT "
+  - "INSERT INTO"
+  - "UPDATE "
+  - "DELETE FROM"
+  - "f\"SELECT"
+  - "f'SELECT"
+  - "${userInput}"
+description: "SQL query constructed dynamically via string interpolation or concatenation instead of parameterized prepared statements."
+remediation: "Always use parameterized queries, prepared statements, or ORM abstraction to pass parameters safely."
+references:
+  - title: "OWASP SQL Injection Prevention"
+    url: "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"
+  - title: "CWE-89: SQL Injection"
+    url: "https://cwe.mitre.org/data/definitions/89.html"

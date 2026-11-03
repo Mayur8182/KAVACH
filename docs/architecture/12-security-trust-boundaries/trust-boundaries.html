@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer — Security & Trust Boundaries Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --subtle: #94a3b8;
+      --border: #e2e8f0;
+      --accent: #ea580c;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      padding: 48px;
+      line-height: 1.5;
+    }
+    header {
+      max-width: 1400px;
+      margin: 0 auto 36px auto;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+      display: inline-block;
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 2px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 38px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .description {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 880px;
+    }
+    .canvas-card {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      padding: 32px;
+      overflow-x: auto;
+    }
+    svg {
+      display: block;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+    .mermaid-source {
+      max-width: 1400px;
+      margin: 36px auto 0 auto;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 24px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    .mermaid-source pre {
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="eyebrow">Zero-Trust Boundaries · Perimeter, OPA Authority & Isolation</div>
+    <h1>Security Perimeter & Trust Boundaries Architecture</h1>
+    <p class="description">
+      Formal verification of isolation planes, deterministic policy authority, credential vaults, and egress filters.
+      Enforces the Golden Rule: LLMs propose, deterministic engines decide, and runtime evidence proves.
+    </p>
+  </header>
+
+  <div class="canvas-card">
+    <svg width="1280" height="740" viewBox="0 0 1280 740" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#0f172a" />
+        </marker>
+        <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#ea580c" />
+        </marker>
+      </defs>
+
+      <!-- Trust Zone 0: Public Untrusted Internet -->
+      <rect x="40" y="40" width="220" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="60" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 0: UNTRUSTED</text>
+
+      <!-- Trust Boundary Line 1 (TLS / Edge) -->
+      <line x1="280" y1="40" x2="280" y2="700" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 6" />
+      <text x="285" y="60" font-family="'Geist Mono', monospace" font-size="10" fill="#ea580c" font-weight="600">BOUNDARY 1: TLS 1.3 / WAF</text>
+
+      <!-- Trust Zone 1: Demilitarized Ingress & Gateway -->
+      <rect x="300" y="40" width="300" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="320" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 1: AUTH & GATEWAY</text>
+
+      <!-- Trust Boundary Line 2 (Tenant & Policy Boundary) -->
+      <line x1="620" y1="40" x2="620" y2="700" stroke="#0f172a" stroke-width="2" stroke-dasharray="6 6" />
+      <text x="625" y="60" font-family="'Geist Mono', monospace" font-size="10" fill="#0f172a" font-weight="600">BOUNDARY 2: TENANT & OPA AUTHORITY</text>
+
+      <!-- Trust Zone 2: Trusted Application Core -->
+      <rect x="640" y="40" width="320" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="660" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 2: TRUSTED CORE & DB</text>
+
+      <!-- Trust Boundary Line 3 (Egress & Sandbox Boundary) -->
+      <line x1="980" y1="40" x2="980" y2="700" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 6" />
+      <text x="985" y="60" font-family="'Geist Mono', monospace" font-size="10" fill="#ea580c" font-weight="600">BOUNDARY 3: SANDBOX & EGRESS</text>
+
+      <!-- Trust Zone 3: External Inference & Sandboxes -->
+      <rect x="1000" y="40" width="240" height="660" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+      <text x="1020" y="70" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#64748b" letter-spacing="0.08em">ZONE 3: SANDBOXES & AI</text>
+
+      <!-- Zone 0 Components: Web Client & Attacker Probes -->
+      <rect x="60" y="100" width="180" height="90" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="75" y="128" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">Browser Client</text>
+      <text x="75" y="148" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">React 19 Frontend</text>
+      <text x="75" y="168" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">No stored credentials</text>
+
+      <rect x="60" y="240" width="180" height="90" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="75" y="268" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">GitHub Webhook</text>
+      <text x="75" y="288" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Inbound push events</text>
+      <text x="75" y="308" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">HMAC signature required</text>
+
+      <!-- Zone 1 Components: Starlette Middleware & Auth Decoders -->
+      <rect x="320" y="100" width="260" height="130" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="340" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Perimeter Middleware</text>
+      <text x="340" y="150" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">1. SecurityHeadersMiddleware</text>
+      <text x="340" y="170" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">2. RequestCorrelationMiddleware</text>
+      <text x="340" y="190" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">3. RateLimiter (Token Bucket)</text>
+      <text x="340" y="210" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; Rejects Malformed Payloads</text>
+
+      <rect x="320" y="260" width="260" height="120" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="340" y="288" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Identity Decoder</text>
+      <text x="340" y="310" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">JWT signature verification</text>
+      <text x="340" y="330" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Extracts user_id, tenant_id</text>
+      <text x="340" y="350" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Enforces TOTP MFA state</text>
+
+      <!-- Zone 2 Components: Core Services, OPA & Database -->
+      <rect x="660" y="100" width="280" height="130" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+      <text x="680" y="128" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">Deterministic OPA Engine</text>
+      <text x="680" y="150" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Sole Security Authority (Rule 14)</text>
+      <text x="680" y="170" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">ALLOW / WARN / BLOCK</text>
+      <text x="680" y="190" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Zero LLM policy bypasses</text>
+      <text x="680" y="210" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Audit logged on every call</text>
+
+      <rect x="660" y="260" width="280" height="120" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="680" y="288" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">PostgreSQL DB Perimeter</text>
+      <text x="680" y="310" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Multi-tenant query scoping</text>
+      <text x="680" y="330" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Tenant ID enforced on WHERE clause</text>
+      <text x="680" y="350" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; No raw cloud keys stored</text>
+
+      <rect x="660" y="410" width="280" height="110" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="680" y="438" font-family="'Geist', sans-serif" font-size="14" font-weight="600" fill="#0f172a">TaskWorker & Scanners</text>
+      <text x="680" y="460" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">In-process worker orchestrator</text>
+      <text x="680" y="480" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Spawns isolated CLI subprocesses</text>
+      <text x="680" y="500" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Enforces execution timeouts</text>
+
+      <!-- Zone 3 Components: Sandboxes & External AI Gateways -->
+      <rect x="1020" y="100" width="200" height="130" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+      <text x="1035" y="128" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">Scanner Subprocesses</text>
+      <text x="1035" y="150" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Semgrep / Gitleaks</text>
+      <text x="1035" y="170" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Trivy / Checkov</text>
+      <text x="1035" y="190" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Restricted workspace dir</text>
+      <text x="1035" y="210" font-family="'Geist Mono', monospace" font-size="11" fill="#16a34a">&#10003; Killed on timeout</text>
+
+      <rect x="1020" y="260" width="200" height="130" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+      <text x="1035" y="288" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">External AI Models</text>
+      <text x="1035" y="310" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Anthropic / OpenAI</text>
+      <text x="1035" y="330" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Prompt sanitization</text>
+      <text x="1035" y="350" font-family="'Geist Mono', monospace" font-size="11" fill="#64748b">Secrets redaction filter</text>
+      <text x="1035" y="370" font-family="'Geist Mono', monospace" font-size="11" fill="#ea580c">Zero authority to apply</text>
+
+      <!-- Connectors crossing boundaries -->
+      <path d="M 240 145 L 320 145" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 580 165 L 660 165" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+      <path d="M 800 230 L 800 260" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 800 380 L 800 410" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 940 465 L 1020 165" stroke="#0f172a" stroke-width="1.5" marker-end="url(#arrow)" />
+      <path d="M 940 165 L 1020 325" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+
+    </svg>
+  </div>
+
+  <div class="mermaid-source">
+    <div style="color: #94a3b8; margin-bottom: 8px;">// Editable Mermaid Source Definition</div>
+    <pre>
+graph LR
+    subgraph Zone0["Zone 0: Untrusted Internet"]
+        CLI["Browser Client"]
+        GH["GitHub Webhooks"]
+    end
+
+    subgraph Zone1["Zone 1: Perimeter & Gateway"]
+        MID["Starlette Security Middlewares"]
+        DEC["JWT & Tenant Identity Decoder"]
+        CLI --> MID --> DEC
+        GH --> MID
+    end
+
+    subgraph Zone2["Zone 2: Trusted Application Core"]
+        OPA["OPA Deterministic Policy Authority"]
+        DB["PostgreSQL (Tenant-Isolated Queries)"]
+        WORK["TaskWorker Scanner Orchestrator"]
+        DEC --> OPA
+        DEC --> DB
+        OPA --> WORK
+    end
+
+    subgraph Zone3["Zone 3: Sandboxes & External AI"]
+        SAND["Scanner Subprocess Sandbox"]
+        AI["External AI Gateway (Anthropic/OpenAI)"]
+        WORK --> SAND
+        OPA --> AI
+    end
+
+    classDef accent fill:#ffffff,stroke:#ea580c,stroke-width:2px;
+    class OPA,AI accent;
+    </pre>
+  </div>
+
+</body>
+</html>

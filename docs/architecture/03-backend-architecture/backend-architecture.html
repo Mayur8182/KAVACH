@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecuLayer Control Plane — Backend Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --soft: #94a3b8;
+      --line: #e2e8f0;
+      --line-strong: #cbd5e1;
+      --accent: #ea580c;
+      --accent-tint: rgba(234, 88, 12, 0.08);
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+      --font-mono: "Geist Mono", monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--ink);
+      padding: 40px 24px;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+    header.header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+    }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    p.lead {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+      max-width: 860px;
+    }
+    .diagram-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .diagram-scroll {
+      width: 100%;
+      overflow-x: auto;
+      padding: 32px 24px;
+      background: var(--paper);
+    }
+    svg.canvas {
+      display: block;
+      margin: 0 auto;
+      min-width: 1100px;
+    }
+    .diagram-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: #f1f5f9;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .source-panel {
+      margin-top: 24px;
+      background: #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .source-header {
+      padding: 10px 16px;
+      background: #1e293b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cbd5e1;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    pre.code-block {
+      padding: 16px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="eyebrow">Fig. 03 · Control Plane Gateway</div>
+      <h1>FastAPI Gateway, Middleware Chain &amp; Task Worker</h1>
+      <p class="lead">Internal structure of the backend application: HTTP request filtering, security headers, correlation tracking, domain routing, asynchronous background execution, and database connection pooling.</p>
+    </header>
+
+    <div class="diagram-card">
+      <div class="diagram-scroll">
+        <svg class="canvas" viewBox="0 0 1100 700" width="1100" height="700" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569" />
+            </marker>
+            <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ea580c" />
+            </marker>
+            <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.04" />
+            </filter>
+          </defs>
+
+          <!-- Zones -->
+          <!-- Zone 1: Ingress & Middleware -->
+          <rect x="40" y="40" width="280" height="620" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="52" y="32" width="180" height="18" fill="#ffffff" />
+          <text x="56" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b">HTTP INGRESS &amp; FILTERS</text>
+
+          <!-- Zone 2: Routing & Core Services -->
+          <rect x="360" y="40" width="360" height="620" rx="8" fill="#fafafa" stroke="#cbd5e1" stroke-width="1" />
+          <rect x="372" y="32" width="200" height="18" fill="#ffffff" />
+          <text x="376" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#ea580c">ROUTERS &amp; DOMAIN SERVICES</text>
+
+          <!-- Zone 3: Asynchronous Workers & DB -->
+          <rect x="760" y="40" width="300" height="620" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,4" />
+          <rect x="772" y="32" width="190" height="18" fill="#ffffff" />
+          <text x="776" y="45" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" fill="#64748b">WORKER &amp; PERSISTENCE</text>
+
+          <!-- Connectors -->
+          <!-- Ingress -> RequestAudit -->
+          <path d="M 180 135 V 170" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- RequestAudit -> GZip & Idempotency -->
+          <path d="M 180 240 V 275" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Middleware -> Main Router -->
+          <path d="M 290 310 H 380" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="335" y="302" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">Filtered</text>
+
+          <!-- Main Router -> Domain Subrouters -->
+          <path d="M 540 345 V 380" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Subrouters -> Domain Services -->
+          <path d="M 540 455 V 490" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Domain Services -> Database (Read / Write) -->
+          <path d="M 700 520 H 780" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+          <text x="740" y="512" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b" text-anchor="middle">SQLAlchemy</text>
+
+          <!-- Domain Services -> Task Worker Enqueue -->
+          <path d="M 700 280 H 780" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-accent)" />
+          <text x="740" y="272" font-family="'Geist Mono', monospace" font-size="8" fill="#ea580c" text-anchor="middle">Enqueue Task</text>
+
+          <!-- Task Worker -> DB Status polling -->
+          <path d="M 910 320 V 470" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)" />
+
+          <!-- Nodes: Ingress & Middleware -->
+          <g transform="translate(60, 70)" filter="url(#shadow)">
+            <rect width="240" height="65" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">PORT :8000</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">HTTP Ingress Connection</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Uvicorn ASGI Server</text>
+          </g>
+
+          <g transform="translate(60, 170)" filter="url(#shadow)">
+            <rect width="240" height="70" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">CORRELATION &amp; AUDIT</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">RequestAuditMiddleware</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Injects X-Request-ID &amp; Timers</text>
+          </g>
+
+          <g transform="translate(60, 275)" filter="url(#shadow)">
+            <rect width="240" height="80" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">PROTECTION CHAIN</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">GZip &amp; Rate Limiter</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Idempotency Token Verification</text>
+            <text x="14" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">CORS Allowed Origins Check</text>
+          </g>
+
+          <!-- Nodes: Routing & Services -->
+          <g transform="translate(380, 265)" filter="url(#shadow)">
+            <rect width="320" height="80" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="2" />
+            <rect x="0" y="0" width="6" height="80" rx="2" fill="#ea580c" />
+            <text x="18" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">API ROUTER DISPATCHER</text>
+            <text x="18" y="40" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">v1_router (api/v1/__init__.py)</text>
+            <text x="18" y="58" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Central Mount for 40+ Domain Routers</text>
+            <text x="18" y="70" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[VERIFIED: ZERO PLACEHOLDERS]</text>
+          </g>
+
+          <g transform="translate(380, 380)" filter="url(#shadow)">
+            <rect width="320" height="75" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">DOMAIN SUBROUTERS</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="600" fill="#0f172a">Auth, Code, Scans, Cloud, MCP</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Pydantic Request &amp; Response Validation</text>
+          </g>
+
+          <g transform="translate(380, 490)" filter="url(#shadow)">
+            <rect width="320" height="85" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">BUSINESS LOGIC ENGINES</text>
+            <text x="14" y="38" font-family="'Geist', sans-serif" font-size="13" font-weight="700" fill="#0f172a">Domain Service Tier</text>
+            <text x="14" y="54" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• ScanOrchestratorService</text>
+            <text x="14" y="68" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">• HotspotService &amp; PatchService</text>
+          </g>
+
+          <!-- Nodes: Worker & Persistence -->
+          <g transform="translate(780, 240)" filter="url(#shadow)">
+            <rect width="260" height="80" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#ea580c">ASYNC WORKER ENGINE</text>
+            <text x="14" y="40" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">Task Worker (task_worker.py)</text>
+            <text x="14" y="56" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Polls table: background_tasks</text>
+            <text x="14" y="70" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">Reconciliation of Interrupted Tasks</text>
+          </g>
+
+          <g transform="translate(780, 470)" filter="url(#shadow)">
+            <rect width="260" height="90" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+            <text x="14" y="20" font-family="'Geist Mono', monospace" font-size="8" font-weight="600" fill="#64748b">PORT :5432 · ASYNCPG</text>
+            <text x="14" y="40" font-family="'Geist', sans-serif" font-size="14" font-weight="700" fill="#0f172a">PostgreSQL Connection Pool</text>
+            <text x="14" y="58" font-family="'Geist Mono', monospace" font-size="8" fill="#64748b">AsyncSessionLocal &amp; Engine</text>
+            <text x="14" y="72" font-family="'Geist Mono', monospace" font-size="8" fill="#16a34a">[56 MODELS PERSISTED]</text>
+          </g>
+
+          <!-- Legend -->
+          <g transform="translate(60, 640)">
+            <circle cx="6" cy="6" r="4" fill="#ea580c" />
+            <text x="16" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Focal Router / Worker Hub</text>
+            <circle cx="230" cy="6" r="4" fill="#16a34a" />
+            <text x="240" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Verified Production Component</text>
+            <line x1="470" y1="6" x2="495" y2="6" stroke="#ea580c" stroke-width="1.5" />
+            <text x="502" y="9" font-family="'Geist Mono', monospace" font-size="9" fill="#475569">Asynchronous Job Enqueue</text>
+          </g>
+        </svg>
+      </div>
+      <div class="diagram-footer">
+        <span>FIG. 03 · FASTAPI ARCHITECTURE</span>
+        <span>STANDALONE SVG · NO EXTERNAL ASSETS</span>
+        <span>GROUND TRUTH: BACKEND/APP/MAIN.PY</span>
+      </div>
+    </div>
+
+    <!-- Editable Source Panel -->
+    <div class="source-panel">
+      <div class="source-header">
+        <span>EDITABLE MERMAID SOURCE (FOR MAINTENANCE &amp; GITHUB PREVIEWS)</span>
+        <span>COPY / PASTE READY</span>
+      </div>
+      <pre class="code-block"><code>graph LR
+    subgraph Ingress["1. HTTP INGRESS &amp; FILTERS"]
+        PORT["Uvicorn ASGI Server<br/><small>:8000</small>"]
+        AUDIT["RequestAuditMiddleware<br/><small>X-Request-ID &amp; Timers</small>"]
+        SECURITY["GZip &amp; RateLimiter<br/><small>Idempotency &amp; CORS</small>"]
+    end
+
+    subgraph Routing["2. ROUTERS &amp; SERVICES"]
+        ROUTER["API Router (v1_router)<br/><small>app/api/v1/__init__.py</small>"]
+        SUBROUTERS["Domain Subrouters<br/><small>Auth, Scans, Cloud, MCP</small>"]
+        SERVICES["Domain Services<br/><small>ScanOrchestrator, Hotspots</small>"]
+    end
+
+    subgraph WorkerDB["3. WORKER &amp; PERSISTENCE"]
+        WORKER["Task Worker<br/><small>background_tasks Queue</small>"]
+        DB[("PostgreSQL Database<br/><small>AsyncSessionPool</small>")]
+    end
+
+    PORT --> AUDIT
+    AUDIT --> SECURITY
+    SECURITY --> ROUTER
+    ROUTER --> SUBROUTERS
+    SUBROUTERS --> SERVICES
+    SERVICES -->|Enqueue Async Task| WORKER
+    SERVICES -->|Read / Write| DB
+    WORKER -->|Poll &amp; Update Job State| DB
+
+    classDef focal stroke:#ea580c,stroke-width:2px;
+    class ROUTER,WORKER focal;</code></pre>
+    </div>
+  </div>
+</body>
+</html>

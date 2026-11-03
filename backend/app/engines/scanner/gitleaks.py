@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 from typing import List
 
 from app.engines.scanner.base import SecurityScanner
@@ -37,7 +38,7 @@ class GitleaksScanner(SecurityScanner):
             "--report-format",
             "json",
             "--report-path",
-            "/dev/stdout" if os_name != "nt" else "-",
+            "/dev/stdout" if os.name != "nt" else "-",
         ]
 
     def get_tolerated_exit_codes(self) -> List[int]:
