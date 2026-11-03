@@ -27,6 +27,10 @@ BACKEND_PID=$!
 # 2. Poll until backend is responsive (max 30 seconds)
 echo "--> Waiting for backend service readiness..."
 for i in $(seq 1 30); do
+  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+    echo "--> WARNING: Backend process exited prematurely."
+    break
+  fi
   if curl -s http://127.0.0.1:8000/api/v1/health/live > /dev/null 2>&1 || curl -s http://127.0.0.1:8000/ > /dev/null 2>&1; then
     echo "--> Backend is online (PID: $BACKEND_PID)."
     break
