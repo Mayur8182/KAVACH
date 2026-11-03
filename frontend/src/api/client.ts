@@ -27,7 +27,7 @@ import type {
 const API_BASE_URL =
   ((import.meta as any)?.env?.VITE_API_BASE_URL as string) ||
   (typeof (globalThis as any).process !== 'undefined' ? (globalThis as any).process.env?.NEXT_PUBLIC_API_URL : undefined) ||
-  'http://localhost:8000/api/v1';
+  (typeof window !== 'undefined' ? '/api/v1' : 'http://127.0.0.1:8000/api/v1');
 
 class ApiClient {
   private baseUrl: string;

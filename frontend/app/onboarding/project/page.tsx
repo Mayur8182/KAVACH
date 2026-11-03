@@ -358,7 +358,7 @@ function OnboardingProjectContent() {
                             if (res?.url) window.location.href = res.url;
                           } catch {
                             const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || 'Ov23likjqoMrdpB35SRt';
-                            const redirectUri = encodeURIComponent(process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI || 'http://localhost:3002/auth/callback/github');
+                            const redirectUri = encodeURIComponent(process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI || (typeof window !== 'undefined' ? `${window.location.origin}/auth/callback/github` : 'https://kavachsecurity.me/auth/callback/github'));
                             window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=read:user,user:email,repo`;
                           }
                         }}

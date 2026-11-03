@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     app_host: str = Field(default="0.0.0.0", description="Host to bind server")
     app_port: int = Field(default=8000, description="Port to bind server")
     api_v1_prefix: str = Field(default="/api/v1", description="Prefix for v1 REST endpoints")
-    public_app_url: str = Field(default="http://localhost:3002", description="Public URL for frontend portal")
+    public_app_url: str = Field(default="https://kavachsecurity.me", description="Public URL for frontend portal")
     log_level: str = Field(default="INFO", description="Logging verbosity")
 
     # Security settings
@@ -76,6 +76,7 @@ class Settings(BaseSettings):
             "https://kavachsecurity.me",
             "https://app.kavachsecurity.me",
             "https://api.kavachsecurity.me",
+            "https://kavach-2brv.onrender.com",
         ],
         description="Allowed CORS origin domains",
     )
@@ -128,7 +129,7 @@ class Settings(BaseSettings):
         description="GitHub OAuth App Client Secret",
     )
     github_redirect_uri: str = Field(
-        default="http://localhost:3002/auth/callback/github",
+        default="https://kavachsecurity.me/auth/callback/github",
         description="GitHub OAuth Redirect URI",
     )
     github_workspace_dir: str = Field(
@@ -146,7 +147,7 @@ class Settings(BaseSettings):
         description="Google OAuth Client Secret",
     )
     google_redirect_uri: str = Field(
-        default="http://localhost:3002/auth/callback/google",
+        default="https://kavachsecurity.me/auth/callback/google",
         description="Google OAuth Redirect URI",
     )
 
@@ -160,7 +161,7 @@ class Settings(BaseSettings):
         description="SSO Entity ID / Issuer",
     )
     sso_redirect_uri: str = Field(
-        default="http://localhost:3002/auth/callback/sso",
+        default="https://kavachsecurity.me/auth/callback/sso",
         description="SSO SAML / OIDC Callback URI",
     )
 

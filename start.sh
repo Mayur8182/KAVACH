@@ -27,6 +27,9 @@ BACKEND_PID=$!
 echo "--> FastAPI Backend launched (PID: $BACKEND_PID)."
 
 # 2. Start Next.js Frontend directly on public 0.0.0.0:$PORT
-echo "--> Starting Next.js Frontend on 0.0.0.0:$PORT..."
 cd "$ROOT_DIR/frontend"
-exec ./node_modules/.bin/next start -H 0.0.0.0 -p "$PORT"
+if [ -x "./node_modules/.bin/next" ]; then
+  exec ./node_modules/.bin/next start -H 0.0.0.0 -p "$PORT"
+else
+  exec npx next start -H 0.0.0.0 -p "$PORT"
+fi

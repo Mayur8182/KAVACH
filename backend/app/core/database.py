@@ -19,13 +19,16 @@ import os
 
 # Resolve database URL robustly (especially for SQLite file paths and MongoDB URLs)
 raw_db_url = settings.database_url
-if raw_db_url.startswith(("mongodb://", "mongodb+srv://")):
+if raw_db_url and raw_db_url.startswith(("mongodb://", "mongodb+srv://")):
     # SQLAlchemy requires an async SQL dialect, whereas MongoDB is managed by app.core.mongo
     if not getattr(settings, "mongodb_url", None):
         settings.mongodb_url = raw_db_url
     raw_db_url = getattr(settings, "sql_database_url", "sqlite+aiosqlite:///backend/dev.db")
 
-if raw_db_url.startswith("sqlite+aiosqlite:///"):
+if not raw_db_url:
+    raw_db_url = getattr(settings, "sql_database_url", "sqlite+aiosqlite:///backend/dev.db")
+
+if raw_db_url and raw_db_url.startswith("sqlite+aiosqlite:///"):
     sqlite_path = raw_db_url.replace("sqlite+aiosqlite:///", "")
     # If not absolute, search in expected locations
     if not os.path.isabs(sqlite_path) and not os.path.exists(sqlite_path):
