@@ -1,0 +1,44 @@
+# Git & IDE
+.git
+.github
+.gitignore
+.vscode
+.idea
+.gemini
+.agents
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/dev.db
+backend/dev.db-journal
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+env/
+
+# Node / Next.js
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/dist/
+frontend/build/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files & logs
+*.log
+scratch/
+backend/scratch/
+frontend/scratch/
+.env
+.env.local
+backend/.env
+backend/.env.local
