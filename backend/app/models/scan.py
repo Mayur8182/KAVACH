@@ -580,8 +580,6 @@ class ExecutionEvent(Base):
     """
     __tablename__ = "execution_events"
     __table_args__ = (
-        Index("ix_execution_events_exec_id", "execution_id"),
-        Index("ix_execution_events_scan_id", "scan_id"),
         Index("ix_execution_events_created_at", "created_at"),
     )
 

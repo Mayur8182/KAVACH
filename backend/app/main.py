@@ -211,12 +211,16 @@ async def _run_startup_migrations() -> None:
         import app.models  # ensure all models including QA are registered
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            
+            # Cache table columns to avoid repetitive PRAGMA queries
+            table_columns_cache: dict = {}
             for table, col, col_type in required_columns:
-                # Check if column exists via PRAGMA
-                result = await conn.execute(text(f"PRAGMA table_info({table})"))
-                cols = [row[1] for row in result.fetchall()]
-                if col not in cols:
+                if table not in table_columns_cache:
+                    result = await conn.execute(text(f"PRAGMA table_info({table})"))
+                    table_columns_cache[table] = [row[1] for row in result.fetchall()]
+                if col not in table_columns_cache[table]:
                     await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                    table_columns_cache[table].append(col)
                     logger.info(f"[startup-migration] Added column {col} to {table}")
     except Exception as exc:
         # Log but don't crash — table may not exist yet (first run before alembic)
