@@ -1,0 +1,61 @@
+databases:
+  - name: kavach-postgres
+    plan: free
+    databaseName: kavach
+    user: kavach_user
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. Kavach Backend Web Service (FastAPI)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: kavach-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health/live
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kavach-postgres
+          property: connectionString
+      - key: SQL_DATABASE_URL
+        fromDatabase:
+          name: kavach-postgres
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
+
+  # ---------------------------------------------------------------------------
+  # 2. Kavach Frontend Web Service (Next.js)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: kavach-frontend
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: BACKEND_URL
+        fromService:
+          type: web
+          name: kavach-backend
+          property: host
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: kavach-backend
+          property: host
