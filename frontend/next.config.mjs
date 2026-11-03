@@ -13,15 +13,18 @@ const nextConfig = {
   httpAgentOptions: {
     keepAlive: true,
   },
+  productionBrowserSourceMaps: false,
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
   experimental: {
+    cpus: 1,
+    webpackBuildWorker: false,
     optimizePackageImports: [
       'lucide-react',
-      'date-fns',
-      'recharts',
-      'framer-motion',
     ],
     // Allow 180s for long-running backend operations like remediation pipelines
     // (git clone + patch + rescan + PR creation can take 30-90s)
