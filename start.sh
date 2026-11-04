@@ -19,6 +19,12 @@ echo "  KAVACH SECURITY — UNIFIED CONTROL PLANE"
 echo "  Deploying Frontend + Backend on single port $PORT"
 echo "=================================================="
 
+# Do not let the frontend appear healthy when the API failed to start.
+if ! python -c "import uvicorn" >/dev/null 2>&1; then
+  echo "ERROR: uvicorn is not installed. Install backend/requirements.txt in the Render build command." >&2
+  exit 1
+fi
+
 # 1. Start FastAPI Backend in background on internal localhost:8000
 echo "--> Starting FastAPI Backend on 127.0.0.1:8000..."
 cd "$ROOT_DIR/backend"
