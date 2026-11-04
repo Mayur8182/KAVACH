@@ -13,7 +13,7 @@ RUN npm ci
 COPY frontend ./
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-RUN npm run build
+RUN npm run build:clean
 
 # ── Stage 2: Unified Production Runner ───────────────────────────────────────
 FROM python:3.11-slim-bookworm AS runner

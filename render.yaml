@@ -42,8 +42,8 @@ services:
     runtime: node
     plan: free
     rootDir: frontend
-    buildCommand: npm install && npm run build
-    startCommand: npm run start
+    buildCommand: npm ci && npm run build:clean
+    startCommand: npm run start -- -p $PORT
     envVars:
       - key: NODE_ENV
         value: production
