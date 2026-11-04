@@ -32,7 +32,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        value: "*"
+        value: "https://kavachsecurity.me,https://www.kavachsecurity.me"
 
   # ---------------------------------------------------------------------------
   # 2. Kavach Frontend Web Service (Next.js)
@@ -49,6 +49,8 @@ services:
         value: production
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://kavachsecurity.me
       - key: BACKEND_URL
         fromService:
           type: web
