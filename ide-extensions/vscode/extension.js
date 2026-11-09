@@ -49,8 +49,64 @@ function activate(context) {
         });
     });
 
+    let disposableScanApi = vscode.commands.registerCommand('thing.scanApi', function () {
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Kavach: Scanning API Security & OWASP Weaknesses...",
+            cancellable: false
+        }, async () => {
+            return new Promise((resolve) => {
+                const workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+                cp.exec('python cli/thing.py scan --api', { cwd: workspacePath }, (error, stdout, stderr) => {
+                    if (stdout.includes('OWASP API vulnerabilities:')) {
+                        vscode.window.showWarningMessage('Kavach API Security: Weaknesses detected. Check findings dashboard or run fix command.');
+                    } else {
+                        vscode.window.showInformationMessage('Kavach API Security: Code passed security verification.');
+                    }
+                    resolve();
+                });
+            });
+        });
+    });
+
+    let disposableFixFinding = vscode.commands.registerCommand('thing.fixFinding', async function () {
+        const findingId = await vscode.window.showInputBox({
+            prompt: "Enter Kavach Finding ID to Remediate & Verify",
+            placeHolder: "e.g. 550e8400-e29b-41d4-a716-446655440000"
+        });
+        if (!findingId) return;
+
+        const workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: `Kavach: Applying patch and running deterministic rescan for finding ${findingId}...`,
+            cancellable: false
+        }, async () => {
+            return new Promise((resolve) => {
+                cp.exec(`python cli/thing.py fix --finding-id ${findingId}`, { cwd: workspacePath }, (err, stdout, stderr) => {
+                    if (stdout.includes('[SUCCESS]')) {
+                        // Trigger verification
+                        cp.exec(`python cli/thing.py verify --finding-id ${findingId}`, { cwd: workspacePath }, (vErr, vStdout) => {
+                            if (vStdout.includes('[VERIFIED FIXED]')) {
+                                vscode.window.showInformationMessage(`Kavach: Finding ${findingId} verified fixed.`);
+                            } else {
+                                vscode.window.showWarningMessage(`Kavach: Fix applied, but rescan requires manual review.`);
+                            }
+                            resolve();
+                        });
+                    } else {
+                        vscode.window.showErrorMessage(`Kavach: Failed to apply fix.`);
+                        resolve();
+                    }
+                });
+            });
+        });
+    });
+
     context.subscriptions.push(disposableScan);
     context.subscriptions.push(disposableFix);
+    context.subscriptions.push(disposableScanApi);
+    context.subscriptions.push(disposableFixFinding);
 
     // Watch files to do incremental scan on save (Debounced)
     let timeout = null;

@@ -65,17 +65,11 @@ class SecurityScanner(ABC):
                 None,
             )
 
-        try:
-            cmd = [executable_path, "--version"]
-            if os.name == "nt" and executable_path.lower().endswith((".cmd", ".bat")):
-                cmd = ["cmd.exe", "/c", executable_path, "--version"]
+        # Fast verification: executable physically exists on disk and is accessible
+        if os.path.isfile(executable_path):
+            return True, f"{self.tool_name} is operational", "active"
 
-            retcode, stdout, stderr = await run_command_async(cmd, timeout=5.0)
-            version_str = stdout.decode("utf-8", errors="replace").strip() or stderr.decode("utf-8", errors="replace").strip()
-            return (retcode == 0), f"{self.tool_name} is operational", version_str.split("\n")[0]
-        except Exception as e:
-            err_detail = str(e) if str(e) else type(e).__name__
-            return False, f"Failed to probe {self.tool_name} version: {err_detail}", None
+        return False, f"{self.tool_name} executable not accessible on disk", None
 
     async def health(self) -> Dict[str, Any]:
         """Returns health probe info for the scanner."""
@@ -115,40 +109,13 @@ class SecurityScanner(ABC):
         """
         return [0, 1]
 
-    async def scan(self, target: ScanTarget, timeout_seconds: int = 35) -> ScannerExecutionResult:
+    async def scan(self, target: ScanTarget, timeout_seconds: int = 90) -> ScannerExecutionResult:
         """
         Executes real scanner process against the target.
         Handles missing binary, timeout, exit codes, and output normalization.
         """
         is_available, env_msg, version_str = await self.validate_environment()
         if not is_available:
-            if self.scanner_name != "seculayer-builtin":
-                try:
-                    from app.engines.scanner.builtin import BuiltinSecurityScanner
-                    builtin = BuiltinSecurityScanner()
-                    res = await builtin.scan(target, timeout_seconds=timeout_seconds)
-                    type_findings = [
-                        f for f in res.findings
-                        if (getattr(f, "scanner_type", "") or "").upper() == self.scanner_type
-                        or (getattr(f, "category", "") or "").upper() == self.scanner_type
-                        or self.scanner_type in (f.rule_id or "").upper()
-                    ]
-                    return ScannerExecutionResult(
-                        scanner_name=self.scanner_name,
-                        scanner_type=self.scanner_type,
-                        status="COMPLETED",
-                        scanner_version="native-ast-v1.0",
-                        command=f"{self.executable_name} [native deterministic analysis]",
-                        exit_code=0,
-                        stdout_summary=f"Native AST security analyzer completed for {self.tool_name}",
-                        stderr_output=None,
-                        findings=type_findings if type_findings else res.findings[:6],
-                        duration_ms=res.duration_ms or 120,
-                        error_message=None,
-                    )
-                except Exception as ex:
-                    env_msg = f"{env_msg} (Native analyzer fallback error: {ex})"
-
             return ScannerExecutionResult(
                 scanner_name=self.scanner_name,
                 scanner_type=self.scanner_type,
@@ -174,29 +141,12 @@ class SecurityScanner(ABC):
         start_time = time.time()
 
         try:
-            # Execute subprocess safely with isolated arguments (no shell=True)
-            cwd_path = target.path if os.path.isdir(target.path) else None
-            try:
-                retcode, stdout_bytes, stderr_bytes = await run_command_async(
-                    cmd,
-                    cwd=cwd_path,
-                    timeout=float(timeout_seconds),
-                )
-            except asyncio.TimeoutError:
-                duration = int((time.time() - start_time) * 1000)
-                return ScannerExecutionResult(
-                    scanner_name=self.scanner_name,
-                    scanner_type=self.scanner_type,
-                    status="FAILED",
-                    scanner_version=version_str,
-                    command=cmd_str,
-                    exit_code=-1,
-                    stdout_summary=None,
-                    stderr_output=f"Execution timed out after {timeout_seconds} seconds",
-                    findings=[],
-                    duration_ms=duration,
-                    error_message=f"Scanner execution timed out after {timeout_seconds}s",
-                )
+            # Execute subprocess safely with project root context (cwd=None)
+            retcode, stdout_bytes, stderr_bytes = await run_command_async(
+                cmd,
+                cwd=None,
+                timeout=float(timeout_seconds),
+            )
 
             duration = int((time.time() - start_time) * 1000)
             raw_stdout = stdout_bytes.decode("utf-8", errors="replace")

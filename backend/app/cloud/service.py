@@ -93,7 +93,6 @@ class CloudService:
     async def get_overview(self, project_id: Optional[str] = None) -> CloudOverviewResponse:
         now = datetime.now(timezone.utc)
         proj_uuid = uuid.UUID(project_id) if project_id else None
-        proj_uuid = await self.ensure_baseline_cloud_data_seeded(proj_uuid)
 
         # Connections count & status per provider
         conn_q = select(CloudConnection)
@@ -1117,182 +1116,19 @@ class CloudService:
     # 13. Dynamic Seeding & Asynchronous Scan Engine
     # ─────────────────────────────────────────────
 
-    async def ensure_baseline_cloud_data_seeded(self, project_id: Optional[uuid.UUID] = None) -> uuid.UUID:
-        """Seeds realistic initial cloud infrastructure state if none exists in DB."""
-        if not project_id:
-            from app.models.project import Project
-            proj = (await self.db.execute(select(Project).limit(1))).scalars().first()
-            if proj:
-                project_id = proj.id
-            else:
-                project_id = uuid.uuid4()
-                new_proj = Project(
-                    id=project_id,
-                    name="Production Cloud Infrastructure",
-                    description="Primary cloud security project",
-                    environment="production",
-                )
-                self.db.add(new_proj)
-                await self.db.flush()
-
-        check = await self.db.execute(
-            select(func.count(CloudConnection.id)).where(CloudConnection.project_id == project_id)
-        )
-        if (check.scalar() or 0) > 0:
-            return project_id
-
-        now = datetime.now(timezone.utc)
-
-        # 1. Cloud Connections
-        aws_conn = CloudConnection(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            provider="AWS",
-            connection_name="Production AWS Multi-Account",
-            status="CONNECTED",
-            authentication_method="IAM_ROLE",
-            account_identifier="123456789012",
-            default_region="us-east-1",
-            permissions_mode="READ_ONLY",
-            last_verified_at=now,
-        )
-        gcp_conn = CloudConnection(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            provider="GCP",
-            connection_name="Production GCP Org",
-            status="CONNECTED",
-            authentication_method="WORKLOAD_IDENTITY",
-            gcp_project_identifier="seculayer-prod-102",
-            default_region="us-central1",
-            permissions_mode="READ_ONLY",
-            last_verified_at=now,
-        )
-        azure_conn = CloudConnection(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            provider="AZURE",
-            connection_name="Azure Core Tenant",
-            status="NOT_CONFIGURED",
-            authentication_method="MANAGED_IDENTITY",
-        )
-        self.db.add_all([aws_conn, gcp_conn, azure_conn])
-        await self.db.flush()
-
-        # 2. Cloud Resources
-        r_s3 = CloudResource(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            cloud_connection_id=aws_conn.id,
-            provider="AWS",
-            resource_type="AWS_S3_BUCKET",
-            resource_name="production-user-assets",
-            provider_resource_id="arn:aws:s3:::production-user-assets",
-            region="us-east-1",
-            configuration={"versioning": False, "mfa_delete": False, "encryption": "AES256", "is_public": True},
-        )
-        r_rds = CloudResource(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            cloud_connection_id=aws_conn.id,
-            provider="AWS",
-            resource_type="AWS_RDS_CLUSTER",
-            resource_name="prod-aurora-postgres",
-            provider_resource_id="arn:aws:rds:us-east-1:123456789012:cluster:prod-aurora",
-            region="us-east-1",
-            configuration={"engine": "aurora-postgresql", "kms_encrypted": True, "deletion_protection": True, "is_public": False},
-        )
-        r_alb = CloudResource(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            cloud_connection_id=aws_conn.id,
-            provider="AWS",
-            resource_type="AWS_ELB",
-            resource_name="prod-ingress-alb",
-            provider_resource_id="arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-ingress-alb",
-            region="us-east-1",
-            configuration={"scheme": "internet-facing", "ssl_policy": "ELBSecurityPolicy-TLS13-1-2-2021-06", "is_public": True},
-        )
-        r_gcs = CloudResource(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            cloud_connection_id=gcp_conn.id,
-            provider="GCP",
-            resource_type="GCP_GCS_BUCKET",
-            resource_name="seculayer-logs-archive",
-            provider_resource_id="gs://seculayer-logs-archive",
-            region="us-central1",
-            configuration={"uniform_bucket_level_access": True, "is_public": False},
-        )
-        self.db.add_all([r_s3, r_rds, r_alb, r_gcs])
-        await self.db.flush()
-
-        # 3. Security Observations
-        obs1 = CloudSecurityObservation(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            cloud_resource_id=r_s3.id,
-            provider="AWS",
-            observation_type="MISCONFIGURATION",
-            source="NATIVE_CHECK",
-            rule_id="CIS_AWS_2.1.5_S3_PUBLIC_READ",
-            severity="CRITICAL",
-            status="OPEN",
-            observation_metadata={"issue": "Bucket ACL grants AllUsers READ access", "recommendation": "Enable S3 Block Public Access"},
-            detected_at=now,
-        )
-        obs2 = CloudSecurityObservation(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            cloud_resource_id=r_alb.id,
-            provider="AWS",
-            observation_type="MISCONFIGURATION",
-            source="NATIVE_CHECK",
-            rule_id="CIS_AWS_4.1_SECURITY_GROUP_INGRESS",
-            severity="HIGH",
-            status="OPEN",
-            observation_metadata={"issue": "Security Group allows inbound traffic from 0.0.0.0/0 on port 22", "port": 22},
-            detected_at=now,
-        )
-        obs3 = CloudSecurityObservation(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            cloud_resource_id=r_rds.id,
-            provider="AWS",
-            observation_type="MISCONFIGURATION",
-            source="NATIVE_CHECK",
-            rule_id="CIS_AWS_3.1_KMS_KEY_ROTATION",
-            severity="MEDIUM",
-            status="OPEN",
-            observation_metadata={"issue": "Annual CMK automatic key rotation disabled"},
-            detected_at=now,
-        )
-        self.db.add_all([obs1, obs2, obs3])
-
-        # 4. Firewall Rule for Exposures
-        fw = CloudFirewallRule(
-            id=uuid.uuid4(),
-            cloud_connection_id=aws_conn.id,
-            provider="AWS",
-            rule_name="sg-ingress-public-ssh",
-            provider_rule_id="sg-ingress-rule-1",
-            direction="INGRESS",
-            action="ALLOW",
-            protocol="TCP",
-            port_range="22",
-            source_cidr="0.0.0.0/0",
-            is_public_ingress=True,
-        )
-        self.db.add(fw)
-
-        await self.db.commit()
+    async def ensure_baseline_cloud_data_seeded(self, project_id: Optional[uuid.UUID] = None) -> Optional[uuid.UUID]:
+        """
+        No-op in production. Never seeds fabricated cloud accounts or mock resources (Rules 1, 3, 10).
+        """
         return project_id
+
+
+
+
 
     async def trigger_cloud_scan(self, project_id_str: Optional[str], provider: str = "ALL") -> Dict[str, Any]:
         """Enqueues an asynchronous Cloud Infrastructure Security Scan in the unified Task Queue."""
         proj_uuid = uuid.UUID(project_id_str) if project_id_str else None
-        if not proj_uuid:
-            proj_uuid = await self.ensure_baseline_cloud_data_seeded()
 
         from app.services.task_queue_service import TaskQueueService
         task_svc = TaskQueueService(self.db)
@@ -1314,17 +1150,15 @@ class CloudService:
             "created_at": task.created_at.isoformat(),
         }
 
-    async def execute_cloud_scan(self, project_id: uuid.UUID, provider: str = "ALL") -> Dict[str, Any]:
+    async def execute_cloud_scan(self, project_id: Optional[uuid.UUID], provider: str = "ALL") -> Dict[str, Any]:
         """Worker execution function: runs live security verification against cloud resources."""
         start_time = datetime.now(timezone.utc)
 
-        # Ensure seed data exists
-        await self.ensure_baseline_cloud_data_seeded(project_id)
-
         # Update connections last_verified_at
-        conns = (await self.db.execute(
-            select(CloudConnection).where(CloudConnection.project_id == project_id)
-        )).scalars().all()
+        conns_q = select(CloudConnection)
+        if project_id:
+            conns_q = conns_q.where(CloudConnection.project_id == project_id)
+        conns = (await self.db.execute(conns_q)).scalars().all()
 
         for c in conns:
             if c.status == "CONNECTED":

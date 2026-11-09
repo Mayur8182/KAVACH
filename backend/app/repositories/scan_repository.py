@@ -79,7 +79,17 @@ class ScanRepository:
             self.session.add(execution)
             await self.session.flush()
 
+            from app.services.unified_findings_service import classify_finding_module
+
+            repo_ref = scan.target_reference or "codebase"
+            clean_repo = repo_ref.split("/")[-1].replace(".git", "")
+
             for f in exec_res.findings:
+                # Determine module category robustly
+                initial_cat = getattr(f, "category", None) or exec_res.scanner_type or "SAST"
+                mod = classify_finding_module(exec_res.scanner_name, f.rule_id, initial_cat)
+                finding_cat = mod.value if mod else initial_cat
+
                 finding = SecurityFinding(
                     scan_id=scan.id,
                     scanner_execution_id=execution.id,
@@ -94,6 +104,12 @@ class ScanRepository:
                     snippet=f.snippet,
                     fingerprint=f.fingerprint,
                     raw_metadata=f.raw_metadata,
+                    category=finding_cat,
+                    project_id=scan.project_id,
+                    repository=clean_repo,
+                    branch=getattr(scan, "branch", None) or "main",
+                    detected_at=scan.started_at or datetime.now(timezone.utc),
+                    status="open",
                 )
                 self.session.add(finding)
 

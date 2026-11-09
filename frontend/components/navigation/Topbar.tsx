@@ -45,6 +45,10 @@ import {
   Menu,
   ChevronRight,
   Boxes,
+  Layers,
+  Container,
+  FileCheck2,
+  Link2,
 } from 'lucide-react';
 import { KavachMark, KavachLogo } from '@/components/common/KavachLogo';
 
@@ -101,9 +105,9 @@ export const ALL_WORKSPACES: WorkspaceProduct[] = [
     color: '#0F172A',
     bg: '#F8FAFC',
     border: '#E2E8F0',
-    scopeLabel: 'Project',
-    defaultScope: 'All Projects',
-    scopes: ['All Projects'],
+    scopeLabel: 'Repository',
+    defaultScope: 'All Repositories',
+    scopes: ['All Repositories'],
   },
 
   // 1. Quality Engineering
@@ -127,8 +131,8 @@ export const ALL_WORKSPACES: WorkspaceProduct[] = [
     id: 'code',
     name: 'Code Security',
     category: 'Code & Build',
-    desc: 'SAST, SCA, Secrets, SBOM & Supply Chain',
-    route: '/code/secrets',
+    desc: 'SAST, AST Static Analysis, Secrets & Supply Chain',
+    route: '/code/sast',
     icon: Code2,
     color: '#0F172A',
     bg: '#F8FAFC',
@@ -144,6 +148,34 @@ export const ALL_WORKSPACES: WorkspaceProduct[] = [
     desc: 'Software Composition Analysis, Vulnerabilities, SBOM & Licenses',
     route: '/code/dependencies',
     icon: Boxes,
+    color: '#0F172A',
+    bg: '#F8FAFC',
+    border: '#E2E8F0',
+    scopeLabel: 'Repository',
+    defaultScope: 'All Repositories',
+    scopes: ['All Repositories'],
+  },
+  {
+    id: 'iac',
+    name: 'IaC Security',
+    category: 'Code & Build',
+    desc: 'Terraform, CloudFormation, Helm & Kubernetes Manifests',
+    route: '/code/iac',
+    icon: Layers,
+    color: '#0F172A',
+    bg: '#F8FAFC',
+    border: '#E2E8F0',
+    scopeLabel: 'Repository',
+    defaultScope: 'All Repositories',
+    scopes: ['All Repositories'],
+  },
+  {
+    id: 'containers',
+    name: 'Container Security',
+    category: 'Code & Build',
+    desc: 'Container Image Vulnerabilities, Base Image Upgrades & Dockerfiles',
+    route: '/code/container-security',
+    icon: Container,
     color: '#0F172A',
     bg: '#F8FAFC',
     border: '#E2E8F0',
@@ -397,11 +429,13 @@ export const Topbar: React.FC<TopbarProps> = ({
     governance: 'All Frameworks',
   });
 
-  const currentScope = activeWorkspace.id === 'code'
+  const isCodeOrWorkspace = activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace';
+
+  const currentScope = isCodeOrWorkspace
     ? (currentRepository ? currentRepository.name : 'All Repositories')
     : (selectedScopes[activeWorkspace.id] || activeWorkspace.defaultScope);
 
-  const availableScopes = activeWorkspace.id === 'code'
+  const availableScopes = isCodeOrWorkspace
     ? Array.from(new Set(['All Repositories', ...repositories.map((r) => r.name)]))
     : activeWorkspace.scopes;
 
@@ -502,7 +536,7 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   const handleSelectScope = (scope: string) => {
     setSelectedScopes((prev) => ({ ...prev, [activeWorkspace.id]: scope }));
-    if (activeWorkspace.id === 'code') {
+    if (activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace') {
       if (scope === 'All Repositories') {
         setCurrentRepository(null);
       } else {
@@ -857,7 +891,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                   fontSize: '12.5px',
                   fontWeight: 500,
                   color: '#0F172A',
-                  maxWidth: '120px',
+                  maxWidth: '260px',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -1103,7 +1137,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                 e.currentTarget.style.backgroundColor = '#ffffff';
               }}
             >
-              {activeWorkspace.id === 'code' ? (
+              {isCodeOrWorkspace ? (
                 <GithubIcon size={14} color="#0F172A" />
               ) : (
                 <ActiveIcon size={13} color={activeWorkspace.color} />
@@ -1144,6 +1178,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                 </div>
                 {availableScopes.map((scope) => {
                   const isSelected = currentScope === scope;
+                  const isAll = scope === 'All Repositories';
                   return (
                     <button
                       key={scope}
@@ -1164,8 +1199,13 @@ export const Topbar: React.FC<TopbarProps> = ({
                         textAlign: 'left',
                       }}
                     >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{scope}</span>
-                      {isSelected && <Check size={14} color="#0F172A" />}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                        {isCodeOrWorkspace && !isAll ? (
+                          <FolderGit2 size={13} color={isSelected ? '#0F172A' : '#64748B'} style={{ flexShrink: 0 }} />
+                        ) : null}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{scope}</span>
+                      </div>
+                      {isSelected && <Check size={14} color="#0F172A" style={{ flexShrink: 0 }} />}
                     </button>
                   );
                 })}

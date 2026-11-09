@@ -17,7 +17,7 @@ from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user_optional
+from app.core.security import get_current_user_optional, get_current_user
 from app.models.audit_event import AuditEvent
 from app.models.organization import Organization, Workspace
 from app.models.project import Project
@@ -25,6 +25,20 @@ from app.models.user import User
 from app.services.audit_service import AuditService
 
 router = APIRouter(tags=["Onboarding & Workspaces"])
+
+
+class OnboardingStateUpdatePayload(BaseModel):
+    current_step: Optional[str] = None
+    completed_steps: Optional[List[str]] = None
+    selected_products: Optional[List[str]] = None
+    status: Optional[str] = None
+    onboarding_completed: Optional[bool] = None
+    setup_deferred: Optional[bool] = None
+    last_step: Optional[str] = None
+    organization_name: Optional[str] = None
+    workspace_name: Optional[str] = None
+    tech_stack: Optional[List[str]] = None
+    extra_data: Optional[Dict[str, Any]] = None
 
 
 # =============================================================================
@@ -1010,6 +1024,102 @@ async def get_onboarding_configuration(
 # =============================================================================
 # Onboarding Status & Completion Aggregator
 # =============================================================================
+
+@router.get(
+    "/onboarding/state",
+    summary="Get user onboarding progress and completion state",
+)
+async def get_onboarding_state(
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    if not current_user:
+        current_user = await _get_or_create_default_user(db)
+
+    state = dict(current_user.onboarding_state or {})
+    return {
+        "status": state.get("status", "IN_PROGRESS"),
+        "current_step": state.get("current_step", "workspace"),
+        "completed_steps": state.get("completed_steps", []),
+        "selected_products": state.get("selected_products", ["thing_code"]),
+        "onboarding_completed": bool(current_user.onboarding_completed),
+        "setup_deferred": bool(state.get("setup_deferred", False)),
+        "is_verified": bool(current_user.is_verified),
+        "mfa_enabled": bool(current_user.mfa_enabled),
+        "mfa_skipped": bool(state.get("mfa_skipped", False)),
+        "last_step": state.get("last_step", "workspace"),
+        "state": state,
+    }
+
+
+@router.put(
+    "/onboarding/state",
+    summary="Update user onboarding progress and completion state",
+)
+async def update_onboarding_state(
+    payload: OnboardingStateUpdatePayload,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    if not current_user:
+        current_user = await _get_or_create_default_user(db)
+
+    state = dict(current_user.onboarding_state or {})
+    if payload.current_step is not None:
+        state["current_step"] = payload.current_step
+    if payload.completed_steps is not None:
+        state["completed_steps"] = payload.completed_steps
+    if payload.selected_products is not None:
+        state["selected_products"] = payload.selected_products
+    if payload.status is not None:
+        state["status"] = payload.status
+    if payload.setup_deferred is not None:
+        state["setup_deferred"] = payload.setup_deferred
+    if payload.last_step is not None:
+        state["last_step"] = payload.last_step
+    if payload.organization_name is not None:
+        state["organization_name"] = payload.organization_name
+    if payload.workspace_name is not None:
+        state["workspace_name"] = payload.workspace_name
+    if payload.tech_stack is not None:
+        state["tech_stack"] = payload.tech_stack
+    if payload.extra_data:
+        state.update(payload.extra_data)
+
+    if payload.onboarding_completed is not None:
+        current_user.onboarding_completed = payload.onboarding_completed
+        state["onboarding_completed"] = payload.onboarding_completed
+    elif payload.status == "COMPLETED" or payload.current_step == "complete":
+        current_user.onboarding_completed = True
+        state["onboarding_completed"] = True
+
+    current_user.onboarding_state = state
+    await db.commit()
+
+    # Log audit event
+    audit = AuditService(db)
+    await audit.log_event(
+        action="USER_ONBOARDING_STATE_UPDATED",
+        resource_type="onboarding",
+        actor_type="user",
+        actor_id=str(current_user.id),
+        resource_id=str(current_user.id),
+        status="SUCCESS",
+        metadata={
+            "onboarding_completed": current_user.onboarding_completed,
+            "current_step": state.get("current_step"),
+            "status": state.get("status"),
+        },
+    )
+    await db.commit()
+
+    return {
+        "status": state.get("status", "SUCCESS"),
+        "onboarding_completed": current_user.onboarding_completed,
+        "current_step": state.get("current_step"),
+        "state": state,
+    }
+
 
 @router.get(
     "/onboarding/summary",

@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   ArrowRight,
+  ArrowUpRight,
   ExternalLink,
   ChevronDown,
   Code2,
@@ -28,6 +29,8 @@ import {
 } from 'lucide-react';
 import { SearchModal } from '@/components/common/SearchModal';
 import { KavachMark, KavachLogo } from '@/components/common/KavachLogo';
+import { api } from '@/lib/api/client';
+import type { UserProfile } from '@/types/api/auth';
 
 interface SecuLayerHeaderProps {
   onOpenSearch?: () => void;
@@ -57,9 +60,71 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
   const [currentHash, setCurrentHash] = useState('');
 
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
   useEffect(() => {
-    setIsLoggedIn(!!getAuthToken());
+    const token = getAuthToken();
+    setIsLoggedIn(!!token);
+    if (token) {
+      api.auth
+        .me()
+        .then((u) => {
+          if (u) setCurrentUser(u);
+        })
+        .catch(() => {
+          setCurrentUser(null);
+        });
+    } else {
+      setCurrentUser(null);
+    }
   }, [pathname]);
+
+  const isOnboardingRoute =
+    pathname?.startsWith('/verify-email') ||
+    pathname?.startsWith('/mfa') ||
+    pathname?.startsWith('/onboarding') ||
+    pathname?.startsWith('/account-locked') ||
+    pathname?.startsWith('/account-recovery');
+
+  const handleConsoleClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (isOnboardingRoute) {
+      toast.warning('Onboarding In Progress', {
+        description: 'Please complete your email verification and workspace setup before entering the Console.',
+      });
+      return;
+    }
+
+    let user = currentUser;
+    if (!user) {
+      try {
+        user = await api.auth.me();
+        if (user) setCurrentUser(user);
+      } catch {
+        router.push('/login');
+        return;
+      }
+    }
+
+    if (user && !user.is_superuser) {
+      if (user.is_verified === false) {
+        toast.warning('Verification Required', {
+          description: 'Please verify your email address before accessing the Console.',
+        });
+        router.push(`/verify-email?email=${encodeURIComponent(user.email)}`);
+        return;
+      }
+      if (user.onboarding_completed === false) {
+        toast.warning('Setup Incomplete', {
+          description: 'Please finish setting up your workspace to access the Console.',
+        });
+        router.push(`/onboarding?email=${encodeURIComponent(user.email)}`);
+        return;
+      }
+    }
+
+    router.push('/home');
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -641,6 +706,9 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Link
                 href="/home"
+                onClick={(e) => {
+                  void handleConsoleClick(e);
+                }}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -659,7 +727,7 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#09090B')}
               >
                 <span>Console</span>
-                <ArrowRight size={14} />
+                <ArrowUpRight size={14} />
               </Link>
               <button
                 type="button"
@@ -910,7 +978,10 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <Link
                 href="/home"
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={(e) => {
+                  setMobileMenuOpen(false);
+                  void handleConsoleClick(e);
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -925,8 +996,8 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                   textDecoration: 'none',
                 }}
               >
-                <span>Go to Console</span>
-                <ArrowRight size={15} />
+                <span>Console</span>
+                <ArrowUpRight size={15} />
               </Link>
               <button
                 type="button"
@@ -1031,7 +1102,7 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeInSlide {
           from {
             opacity: 0;

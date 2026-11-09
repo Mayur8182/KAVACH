@@ -7,6 +7,7 @@ import { Topbar } from '../navigation/Topbar';
 import { useScope } from '@/context/ScopeContext';
 
 import { RouteGuard } from '../auth/RouteGuard';
+import { AssistantDrawer } from '../assistant/AssistantDrawer';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -49,6 +50,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     <div
       style={{
         display: 'flex',
+        height: '100vh',
         minHeight: '100vh',
         width: '100%',
         backgroundColor: '#F8FAFC',
@@ -102,6 +104,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         </main>
       </div>
 
+      {/* 4. Global Contextual AI Copilot Drawer (⌘K) */}
+      <AssistantDrawer />
     </div>
   );
 };

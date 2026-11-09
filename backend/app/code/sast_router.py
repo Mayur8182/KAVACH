@@ -514,4 +514,23 @@ async def get_sast_rule_detail(
     return detail
 
 
+# =========================================================================
+# SAST Agent Status & Telemetry
+# =========================================================================
+@router.get("/agent/status")
+async def get_sast_agent_status(
+    project_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.code.sast_agent_orchestrator import SASTAgentOrchestrator
+    import uuid
+    service = SASTService(db, current_user)
+    _, p_uuids = await service._resolve_scoped_project_ids(project_id)
+    target_p_uuid = p_uuids[0] if p_uuids else uuid.uuid4()
+    orch = SASTAgentOrchestrator(db, current_user)
+    return await orch.get_agent_status_summary(target_p_uuid)
+
+
+
 

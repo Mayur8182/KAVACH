@@ -8,6 +8,7 @@ class DecisionType(str, Enum):
     ALLOW = "ALLOW"
     WARN = "WARN"
     BLOCK = "BLOCK"
+    DENY = "DENY"
     REQUIRE_APPROVAL = "REQUIRE_APPROVAL"
     NOT_EVALUATED = "NOT_EVALUATED"
 

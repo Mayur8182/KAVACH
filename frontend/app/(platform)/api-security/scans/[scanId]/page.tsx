@@ -608,17 +608,14 @@ function ScanDetailsContent() {
               <span>
                 Scan ID: <strong style={{ fontFamily: 'monospace', color: '#334155' }}>{scanId?.slice(0, 16)}</strong>
               </span>
-              <span>•</span>
               <span>
                 Endpoints Tested: <strong style={{ color: '#0F172A' }}>{endpointsCount} routes</strong>
               </span>
-              <span>•</span>
               <span>
                 Elapsed: <strong style={{ color: '#0F172A' }}>{formatTime(elapsedSeconds)}</strong>
               </span>
               {scan?.started_at && (
                 <>
-                  <span>•</span>
                   <span>Started: {new Date(scan.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </>
               )}
@@ -2143,7 +2140,7 @@ function ScanDetailsContent() {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          Inspect Finding →
+                          Inspect Finding
                         </button>
                       )}
                     </div>

@@ -1,15 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  Check,
-  Search,
-  Bell,
-  HelpCircle,
-} from 'lucide-react';
+import { ShieldCheck, HelpCircle } from 'lucide-react';
 import { KavachMark } from '@/components/common/KavachLogo';
+import { HorizontalOnboardingStepper } from '@/components/onboarding/HorizontalOnboardingStepper';
 
 export interface OnboardingLayoutProps {
   currentStep: 1 | 2 | 3 | 4 | 5 | 6;
@@ -18,15 +14,6 @@ export interface OnboardingLayoutProps {
   children: React.ReactNode;
 }
 
-const ONBOARDING_STEPS = [
-  { step: 1, label: 'Organization', href: '/onboarding/organization' },
-  { step: 2, label: 'Workspace', href: '/onboarding/workspace' },
-  { step: 3, label: 'Project', href: '/onboarding/project' },
-  { step: 4, label: 'Environment', href: '/onboarding/environment' },
-  { step: 5, label: 'Select Products', href: '/onboarding/products' },
-  { step: 6, label: 'Configuration', href: '/onboarding/configuration' },
-];
-
 export const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
   currentStep,
   title,
@@ -34,15 +21,14 @@ export const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
   children,
 }) => {
   const router = useRouter();
-  const [userInitials, setUserInitials] = useState('M');
-  const [userName, setUserName] = useState('Mayur');
+  const [userInitials, setUserInitials] = useState('K');
+  const [userName, setUserName] = useState('Engineer');
 
-  React.useEffect(() => {
+  useEffect(() => {
     import('@/lib/api/client').then(({ api }) => {
-      api.auth.me().then(u => {
-        const userObj = u as any;
-        if (userObj?.name || userObj?.full_name) {
-          const name = userObj.name || userObj.full_name;
+      api.auth.me().then((u: any) => {
+        if (u?.name || u?.full_name) {
+          const name = u.name || u.full_name;
           setUserName(name);
           const parts = name.trim().split(/\s+/);
           setUserInitials((parts[0][0] + (parts[1]?.[0] || '')).toUpperCase());
@@ -55,113 +41,107 @@ export const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
     });
   }, []);
 
+  // Map steps to the 4 horizontal stages:
+  // 1: Org / Workspace
+  // 2: Project / Environment
+  // 3: Security Products (currentStep 5)
+  // 4: Configuration / Complete (currentStep 6)
+  const mappedHorizontalStep =
+    currentStep <= 2 ? 1 : currentStep <= 4 ? 2 : currentStep === 5 ? 3 : 4;
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC', fontFamily: 'var(--font-sans, -apple-system, sans-serif)' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#F8FAFC',
+        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+        color: '#0F172A',
+      }}
+    >
       {/* Top Header Navigation */}
       <header
-        className="onboarding-header-root"
         style={{
-          height: '60px',
-          padding: '0 28px',
+          height: '64px',
+          padding: '0 32px',
           backgroundColor: '#FFFFFF',
           borderBottom: '1px solid #E2E8F0',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          zIndex: 40,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
-          <Link href="/code" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-            <img
-              src="/kavach-logo.png"
-              alt="Kavach"
-              style={{ height: '28px', width: 'auto', display: 'block', maxWidth: '120px', objectFit: 'contain' }}
-              onError={(e) => {
-                // If logo fails, fallback to shield mark
-                e.currentTarget.style.display = 'none';
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <Link href="/overview" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: '#EEF2FF',
+                border: '1px solid #C7D2FE',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#4F46E5',
               }}
-            />
+            >
+              <KavachMark size={20} />
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.06em', color: '#0F172A', lineHeight: 1.1 }}>
+              <span style={{ fontSize: '14px', fontWeight: 800, letterSpacing: '0.04em', color: '#0F172A', lineHeight: 1.1 }}>
                 KAVACH
               </span>
-              <span style={{ fontSize: '9px', fontWeight: 600, color: '#64748B', letterSpacing: '0.04em' }}>
-                SECURITY PLATFORM
+              <span style={{ fontSize: '9.5px', fontWeight: 600, color: '#64748B', letterSpacing: '0.03em' }}>
+                SECURITY CONTROL PLANE
               </span>
             </div>
           </Link>
 
-          <div className="kavach-hide-small-mobile" style={{ width: '1px', height: '22px', backgroundColor: '#E2E8F0', flexShrink: 0 }} />
+          <div style={{ width: '1px', height: '20px', backgroundColor: '#E2E8F0', margin: '0 4px' }} />
 
-          <div className="kavach-hide-small-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>
-              Workspace Setup
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span
               style={{
                 fontSize: '11px',
-                fontWeight: 600,
+                fontWeight: 700,
                 padding: '2px 8px',
-                borderRadius: '12px',
-                backgroundColor: '#EFF6FF',
-                color: '#2563EB',
-                border: '1px solid #DBEAFE',
-                whiteSpace: 'nowrap',
+                borderRadius: '4px',
+                backgroundColor: '#F1F5F9',
+                color: '#475569',
               }}
             >
-              Step {currentStep} of 6
+              ONBOARDING
             </span>
           </div>
         </div>
 
-        {/* Right Header Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-          <Link
-            href="/code"
-            className="kavach-hide-small-mobile"
-            style={{
-              fontSize: '12px',
-              fontWeight: 500,
-              color: '#64748B',
-              textDecoration: 'none',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: '1px solid #E2E8F0',
-              backgroundColor: '#FFFFFF',
-              transition: 'all 0.15s ease',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Exit to Console →
-          </Link>
-
-          {/* User Info & Avatar */}
+        {/* Right Nav Utilities */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div className="kavach-hide-small-mobile" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.2 }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {userName || 'Mayur'}
-              </span>
-              <span style={{ fontSize: '10px', color: '#64748B' }}>
-                Security Admin
-              </span>
-            </div>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#334155' }}>
+              {userName}
+            </span>
             <div
               style={{
                 width: '32px',
                 height: '32px',
                 borderRadius: '50%',
-                backgroundColor: '#2563EB',
+                backgroundColor: '#0F172A',
                 color: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '12px',
                 fontWeight: 700,
-                flexShrink: 0,
+                border: '1px solid #334155',
               }}
-              title={userName || 'Current User'}
             >
-              {userInitials || 'M'}
+              {userInitials}
             </div>
           </div>
         </div>
@@ -169,146 +149,56 @@ export const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
 
       {/* Main Container */}
       <main
-        className="onboarding-main-root"
         style={{
           flex: 1,
-          maxWidth: '1340px',
+          maxWidth: '920px',
           width: '100%',
           margin: '0 auto',
-          padding: '32px 32px 64px',
+          padding: '32px 24px 64px',
           boxSizing: 'border-box',
         }}
       >
+        {/* Horizontal Stepper */}
+        <HorizontalOnboardingStepper currentStep={mappedHorizontalStep} totalSteps={4} />
+
+        {/* Focused Card */}
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: '220px minmax(0, 1fr)',
-            gap: '36px',
-            alignItems: 'start',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: '16px',
+            padding: '36px',
+            boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.04)',
           }}
-          className="onboarding-grid"
         >
-          {/* LEFT SIDEBAR STEPPER (6 Steps) */}
-          <aside className="onboarding-stepper" style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '4px' }}>
-            <h2
+          {/* Header Titles */}
+          <div style={{ marginBottom: '28px', borderBottom: '1px solid #F1F5F9', paddingBottom: '20px' }}>
+            <h1
               style={{
-                fontSize: '14px',
-                fontWeight: 700,
+                fontSize: '22px',
+                fontWeight: 800,
                 color: '#0F172A',
-                margin: '0 0 16px',
-                letterSpacing: '-0.01em',
+                letterSpacing: '-0.02em',
+                margin: '0 0 6px 0',
               }}
             >
-              Onboarding
-            </h2>
+              {title}
+            </h1>
+            <p
+              style={{
+                fontSize: '13.5px',
+                color: '#64748B',
+                margin: 0,
+                lineHeight: 1.5,
+              }}
+            >
+              {subtitle}
+            </p>
+          </div>
 
-            <div className="onboarding-stepper-items" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {ONBOARDING_STEPS.map((stepItem) => {
-                const isCompleted = stepItem.step < currentStep;
-                const isCurrent = stepItem.step === currentStep;
-                const isClickable = isCompleted || isCurrent;
-
-                return (
-                  <div
-                    key={stepItem.step}
-                    className="onboarding-stepper-item"
-                    onClick={() => {
-                      if (isClickable) router.push(stepItem.href);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '6px 8px',
-                      borderRadius: '6px',
-                      backgroundColor: isCurrent ? '#EFF6FF' : 'transparent',
-                      cursor: isClickable ? 'pointer' : 'default',
-                    }}
-                  >
-                    {isCompleted ? (
-                      <div
-                        style={{
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '50%',
-                          backgroundColor: '#16A34A',
-                          color: '#FFFFFF',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Check size={12} strokeWidth={3} />
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '50%',
-                          backgroundColor: isCurrent ? '#2563EB' : '#FFFFFF',
-                          color: isCurrent ? '#FFFFFF' : '#64748B',
-                          border: isCurrent ? 'none' : '1.5px solid #CBD5E1',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {stepItem.step}
-                      </div>
-                    )}
-
-                    <span
-                      style={{
-                        fontSize: '13px',
-                        fontWeight: isCurrent ? 700 : 500,
-                        color: isCurrent ? '#2563EB' : isCompleted ? '#334155' : '#64748B',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {stepItem.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </aside>
-
-          {/* RIGHT MAIN CONTENT */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
-            {/* Header Titles */}
-            <div>
-              <h1
-                style={{
-                  fontSize: '26px',
-                  fontWeight: 800,
-                  color: '#0F172A',
-                  letterSpacing: '-0.025em',
-                  margin: '0 0 6px 0',
-                }}
-              >
-                {title}
-              </h1>
-              <p
-                style={{
-                  fontSize: '13px',
-                  color: '#64748B',
-                  margin: 0,
-                  lineHeight: 1.5,
-                }}
-              >
-                {subtitle}
-              </p>
-            </div>
-
-            {/* Page Body Content */}
-            <div style={{ width: '100%', marginTop: '6px' }}>
-              {children}
-            </div>
+          {/* Page Body Content */}
+          <div style={{ width: '100%' }}>
+            {children}
           </div>
         </div>
       </main>

@@ -212,7 +212,7 @@ function IaCPlansContent() {
               cursor: 'pointer',
             }}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'motion-safe:animate-spin motion-reduce:animate-none' : ''} />
             Refresh
           </button>
 
@@ -243,7 +243,7 @@ function IaCPlansContent() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {loading ? (
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '50px', textAlign: 'center', color: '#64748B' }}>
-            <RefreshCw size={22} className="animate-spin" style={{ margin: '0 auto 10px auto', color: '#2563EB' }} />
+            <RefreshCw size={22} className="motion-safe:animate-spin motion-reduce:animate-none" style={{ margin: '0 auto 10px auto', color: '#2563EB' }} />
             Loading evaluated plans...
           </div>
         ) : plans.length === 0 ? (

@@ -1,3 +1,4 @@
+import os
 import hashlib
 import json
 from typing import List
@@ -17,18 +18,20 @@ class CheckovScanner(SecurityScanner):
     executable_name = "checkov"
 
     def build_command(self, target: ScanTarget) -> List[str]:
+        target_path = os.path.abspath(target.path) if not os.path.isabs(target.path) else target.path
+        path_flag = "-f" if os.path.isfile(target_path) else "-d"
         return [
             self.executable_name,
-            "-d",
-            target.path,
+            path_flag,
+            target_path,
             "-o",
             "json",
             "--quiet",
             "--compact",
+            "--framework",
+            "terraform,kubernetes,dockerfile,github_actions,cloudformation",
             "--skip-path",
             "node_modules",
-            "--skip-path",
-            "scratch",
             "--skip-path",
             ".venv",
             "--skip-path",
@@ -38,8 +41,8 @@ class CheckovScanner(SecurityScanner):
         ]
 
     def get_tolerated_exit_codes(self) -> List[int]:
-        # Checkov exits with 0 on pass or 1 when failed checks exist
-        return [0, 1]
+        # Checkov exits with 0 on pass, 1 on failed checks (findings), 2 on syntax checks
+        return [0, 1, 2]
 
     async def normalize(
         self,
@@ -67,7 +70,8 @@ class CheckovScanner(SecurityScanner):
             for check in failed_checks:
                 check_id = check.get("check_id", "CKV_GENERIC")
                 check_name = check.get("check_name", "IaC Security Policy Violation")
-                file_path = check.get("file_path")
+                raw_path = check.get("file_path") or check.get("repo_file_path") or ""
+                file_path = raw_path.replace("\\", "/").lstrip("/")
                 line_range = check.get("file_line_range", [])
                 line_number = line_range[0] if line_range else None
                 guideline = check.get("guideline") or check_name

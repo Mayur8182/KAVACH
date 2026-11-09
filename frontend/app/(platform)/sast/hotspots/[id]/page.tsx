@@ -330,10 +330,52 @@ export default function HotspotDetailPage() {
           </div>
         </div>
 
-        {/* Top Header Actions (Screenshot 10.3) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Top Header Actions — Explicit Security Lifecycle (Review -> Risk/Safe -> Verify) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {hotspot.status === 'TO_REVIEW' && (
+            <button
+              onClick={() => handleUpdateStatus('IN_REVIEW', 'Reviewer started active code investigation')}
+              style={{
+                padding: '8px 14px',
+                backgroundColor: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#1D4ED8',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Clock size={14} color="#1D4ED8" />
+              Start Review
+            </button>
+          )}
+
           <button
-            onClick={() => handleUpdateStatus('SAFE')}
+            onClick={() => handleUpdateStatus('CONFIRMED_RISK', reviewComment.trim() || 'Security risk confirmed by reviewer. Remediation task created.')}
+            style={{
+              padding: '8px 14px',
+              backgroundColor: '#FFF7ED',
+              border: '1px solid #FFEDD5',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: '#EA580C',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <AlertTriangle size={14} color="#EA580C" />
+            Confirm Risk
+          </button>
+
+          <button
+            onClick={() => handleUpdateStatus('SAFE', reviewComment.trim() || 'Audited and determined to be safe / false positive')}
             style={{
               padding: '8px 14px',
               backgroundColor: '#FFFFFF',
@@ -352,25 +394,27 @@ export default function HotspotDetailPage() {
             Mark Safe
           </button>
 
-          <button
-            onClick={() => handleUpdateStatus('ACKNOWLEDGED')}
-            style={{
-              padding: '8px 14px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #BFDBFE',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 600,
-              color: '#2563EB',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <AlertTriangle size={14} color="#2563EB" />
-            Acknowledge
-          </button>
+          {(hotspot.status === 'CONFIRMED_RISK' || hotspot.status === 'REMEDIATION' || hotspot.status === 'FIXED') && (
+            <button
+              onClick={() => handleUpdateStatus('FIXED_VERIFIED', 'Code remediation tested and verified')}
+              style={{
+                padding: '8px 14px',
+                backgroundColor: '#F0FDF4',
+                border: '1px solid #BBF7D0',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#15803D',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <CheckCircle2 size={14} color="#15803D" />
+              Verify Fix
+            </button>
+          )}
 
           <button
             onClick={() => setShowIssueModal(true)}
@@ -1014,11 +1058,13 @@ export default function HotspotDetailPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="TO_REVIEW">To Review</option>
-                      <option value="ACKNOWLEDGED">Acknowledged</option>
-                      <option value="SAFE">Safe</option>
-                      <option value="FALSE_POSITIVE">False Positive</option>
-                      <option value="FIXED">Fixed</option>
+                      <option value="TO_REVIEW">To Review (New)</option>
+                      <option value="IN_REVIEW">In Review (Investigating)</option>
+                      <option value="CONFIRMED_RISK">Confirmed Risk (Remediation Needed)</option>
+                      <option value="SAFE">Safe (Audited & Justified)</option>
+                      <option value="FALSE_POSITIVE">False Positive (Scanner Heuristic)</option>
+                      <option value="REMEDIATION">Remediation in Progress</option>
+                      <option value="FIXED_VERIFIED">Fixed & Verified</option>
                     </select>
                   </div>
 

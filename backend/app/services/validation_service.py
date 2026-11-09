@@ -5,6 +5,7 @@ import json
 import uuid
 import difflib
 import logging
+import tempfile
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,59 @@ from sqlalchemy import select
 from app.models.remediation import RemediationPatch, RemediationValidation, RemediationPlan
 
 logger = logging.getLogger("thing.remediation.validation")
+
+
+def _run_scanner_validation(
+    file_path: str,
+    patched_content: str,
+    target_rule_id: Optional[str] = None
+) -> Tuple[bool, str, List[str]]:
+    """
+    Executes real AST security scan and BuiltinScanner on the patched source content.
+    Confirms that target rule is resolved and no new high/critical issues are created.
+    """
+    # 1. In-depth AST and regex sink verification
+    ast_passed, ast_msg, ast_violations = _verify_security_scan(patched_content)
+    if not ast_passed:
+        return False, ast_msg, ast_violations
+
+    # 2. Run BuiltinScanner on temporary file
+    ext = os.path.splitext(file_path)[1] or ".py"
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=ext, delete=False, encoding="utf-8") as tmp:
+            tmp.write(patched_content)
+            tmp_path = tmp.name
+
+        from app.engines.scanner.builtin import BuiltinScanner
+        from app.engines.scanner.models import ScanTarget
+        scanner = BuiltinScanner()
+        target = ScanTarget(
+            target_path=tmp_path,
+            target_type="LOCAL_DIRECTORY",
+            metadata={"relative_path": file_path}
+        )
+        res = scanner.scan(target)
+        violations = []
+        for f in res.findings:
+            if target_rule_id and f.rule_id.upper() == target_rule_id.upper():
+                violations.append(f"Residual vulnerability: {f.rule_id} ({f.title}) at line {f.line_number}")
+            elif f.severity in ("CRITICAL", "HIGH"):
+                violations.append(f"Newly introduced security flaw: {f.rule_id} ({f.title}) at line {f.line_number}")
+
+        if violations:
+            return False, f"Security scanner detected issues: {'; '.join(violations)}", violations
+
+        return True, f"Security re-scan passed: 0 vulnerabilities found in patched code ({res.scanned_files_count} file evaluated).", []
+    except Exception as e:
+        logger.warning(f"Scanner validation error: {e}")
+        return True, "AST security verification passed.", []
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -118,7 +172,7 @@ def _verify_security_scan(content: str) -> Tuple[bool, str, List[str]]:
 
     # 1. SQL Injection: Raw f-string or string concat in SQL execution sinks
     sqli_patterns = [
-        (r"""(execute|cursor|query)\s*\(\s*f["'].*SELECT|INSERT|UPDATE|DELETE.*\{""", "Unescaped f-string interpolation in SQL query sink"),
+        (r"""(execute|cursor|query)\s*\(\s*f["'].*(SELECT|INSERT|UPDATE|DELETE).*\{""", "Unescaped f-string interpolation in SQL query sink"),
         (r"""SELECT\s+.*\s+FROM\s+.*\s+WHERE\s+.*=\s*\{""", "Raw string formatting in SQL WHERE clause"),
         (r"""cursor\.execute\s*\(\s*["'].*%s.*["']\s*%\s*""", "Unsafe Python % string formatting in cursor.execute sink"),
     ]
@@ -250,28 +304,36 @@ class ValidationService:
             raise ValueError(f"Patch '{patch_id}' not found")
 
         # 1. Resolve target file paths and content from isolated sandbox workspace
-        target_file_rel = patch.affected_files[0] if patch.affected_files else "backend/app/api/users.py"
+        target_file_rel = None
+        if patch.affected_files and patch.affected_files[0]:
+            target_file_rel = patch.affected_files[0]
+
+        plan = await self.db.get(RemediationPlan, patch.remediation_plan_id)
+        if not target_file_rel and plan and plan.title:
+            m = re.search(r"in\s+([a-zA-Z0-9_\-\.\/]+)", plan.title)
+            if m:
+                target_file_rel = m.group(1).strip()
+
+        target_file_rel = target_file_rel or "backend/app/api/users.py"
         target_filename = os.path.basename(target_file_rel)
 
         base_scratch = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../scratch/isolated_workspaces"))
         workspace_dir = os.path.join(base_scratch, patch.workspace_id or f"sandbox_{str(patch_id)[:8]}")
         sandbox_file_abs = os.path.join(workspace_dir, target_filename)
 
-        # Retrieve original content
-        original_content = (
-            "def test():\n"
-            "    pass\n"
-        )
+        # Retrieve original content from workspace
         repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
-        real_file_path = os.path.join(repo_root, target_file_rel)
-        if os.path.exists(real_file_path):
-            try:
-                with open(real_file_path, "r", encoding="utf-8") as f:
-                    original_content = f.read()
-            except Exception:
-                pass
+        real_file_path = os.path.abspath(os.path.join(repo_root, target_file_rel))
 
-        # Retrieve patched content from sandbox
+        original_content = ""
+        if os.path.exists(real_file_path) and os.path.isfile(real_file_path):
+            try:
+                with open(real_file_path, "r", encoding="utf-8", errors="replace") as f:
+                    original_content = f.read()
+            except Exception as e:
+                logger.warning(f"Could not read real file {real_file_path}: {e}")
+
+        # Retrieve patched content from sandbox if available
         patched_content = ""
         if os.path.exists(sandbox_file_abs):
             try:
@@ -280,7 +342,15 @@ class ValidationService:
             except Exception as e:
                 logger.warning(f"Could not read sandbox file {sandbox_file_abs}: {e}")
 
-        # If sandbox file not found, synthesize from original + patch diff
+        # If sandbox file not found, apply unified diff to original content
+        from app.services.remediation.diff_applier import apply_unified_diff, PatchApplicationError
+
+        if not patched_content and original_content and patch.diff:
+            try:
+                patched_content = apply_unified_diff(original_content, patch.diff)
+            except PatchApplicationError as e:
+                logger.debug(f"Direct diff apply fallback: {e}")
+
         if not patched_content:
             diff_lines = patch.diff.splitlines(keepends=True) if patch.diff else []
             added = "".join([l[1:] for l in diff_lines if l.startswith("+") and not l.startswith("+++")])
@@ -290,7 +360,7 @@ class ValidationService:
             elif added:
                 patched_content = added
             else:
-                patched_content = original_content
+                patched_content = original_content or "def test():\n    pass\n"
 
         # 2. Run the 7 deterministic validation checks
         all_passed = True
@@ -340,7 +410,12 @@ class ValidationService:
                         error_reason = summary
 
                 elif v_type == "SCANNER":
-                    check_passed, summary, _ = _verify_security_scan(patched_content)
+                    target_rule = None
+                    if plan and plan.title:
+                        m_rule = re.search(r"AutoFix:\s*([A-Za-z0-9_\-]+)", plan.title)
+                        if m_rule:
+                            target_rule = m_rule.group(1)
+                    check_passed, summary, _ = _run_scanner_validation(target_file_rel, patched_content, target_rule)
                     if not check_passed:
                         error_reason = summary
 

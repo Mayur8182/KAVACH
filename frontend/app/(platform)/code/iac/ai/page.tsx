@@ -299,7 +299,7 @@ function IaCAssistantContent() {
                   color: '#2563EB',
                 }}
               >
-                <RefreshCw size={16} className="animate-spin" />
+                <RefreshCw size={16} className="motion-safe:animate-spin motion-reduce:animate-none" />
               </div>
               <span>Kavach AI is synthesizing repository manifests and policy evidence...</span>
             </div>

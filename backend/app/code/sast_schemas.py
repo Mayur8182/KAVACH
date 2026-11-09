@@ -112,10 +112,27 @@ class SASTRecentFindingItem(BaseModel):
     repository: str
     repository_id: Optional[str] = None
     detected_at: Optional[str] = None
+    first_detected: Optional[str] = None
+    last_detected: Optional[str] = None
     status: str
     assigned_to: Optional[str] = None
     snippet: Optional[str] = None
     rule_id: str
+    cwe: Optional[str] = None
+    cwe_title: Optional[str] = None
+    owasp: Optional[str] = None
+    confidence: Optional[str] = "HIGH"
+    reachability: Optional[str] = "REACHABLE"
+    is_confirmed: bool = True
+    is_new: bool = False
+    remediation_advice: Optional[str] = None
+    remediation_patch: Optional[str] = None
+    scanner_source: Optional[str] = "Semgrep AST Engine"
+    detecting_agent: Optional[str] = "SAST Agent"
+    commit_sha: Optional[str] = None
+    branch: Optional[str] = "main"
+    fingerprint: Optional[str] = None
+    source_sink_flow: Optional[Dict[str, Any]] = None
 
 
 class SASTRecentFindingsResponse(BaseModel):
@@ -132,7 +149,15 @@ class SASTScanItem(BaseModel):
     repository_id: Optional[str] = None
     branch: str
     commit_sha: Optional[str] = None
-    status: str  # Running, Completed, Failed, Queued, Scheduled
+    status: str  # Running, Completed, Failed, Queued, Scheduled, Partial
+    orchestration_status: Optional[str] = "COMPLETED"
+    process_status: Optional[str] = "Exit Code 0: Clean"
+    security_result: Optional[str] = None
+    files_scanned: int = 0
+    files_skipped: int = 0
+    overall_quality: str = "COMPLETE"  # COMPLETE, PARTIAL, INCOMPLETE
+    scanner_name: Optional[str] = "Semgrep"
+    scanner_version: Optional[str] = "1.68.0"
     progress: int = 0
     findings_count: int = 0
     started_at: Optional[str] = None

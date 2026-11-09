@@ -568,28 +568,30 @@ async def validate_proposal(
     if not patch:
         raise HTTPException(status_code=400, detail="No code patch found for this proposal")
 
-    # Record validation run
-    validation = RemediationValidation(
-        patch_id=patch.id,
-        validation_type="SCANNER",
-        status="PASSED",
-        command_or_tool="semgrep scan --config auto",
-        result_summary="Deterministic verification passed: 0 vulnerabilities found in patched region.",
-        started_at=datetime.now(timezone.utc),
-        completed_at=datetime.now(timezone.utc),
-    )
-    db.add(validation)
+    # Execute real deterministic validation pipeline (Rules 1, 2, 8, 13, 18)
+    from app.services.validation_service import ValidationService
+    val_svc = ValidationService(db)
+    validation_passed = await val_svc.run_validations(patch.id)
 
-    plan.status = "READY_TO_MERGE"
-    patch.status = "VALIDATED"
+    if validation_passed:
+        plan.status = "READY_TO_MERGE"
+        patch.status = "VALIDATED"
+    else:
+        plan.status = "VALIDATION_FAILED"
+        patch.status = "FAILED"
+
     await db.commit()
 
     return {
-        "success": True,
+        "success": validation_passed,
         "proposal_id": proposal_id,
-        "status": "PASSED",
-        "message": "Deterministic verification passed. 0 findings detected in patched code.",
-        "validated_at": validation.completed_at.isoformat(),
+        "status": "PASSED" if validation_passed else "FAILED",
+        "message": (
+            "Deterministic verification passed. 0 findings detected in patched code."
+            if validation_passed
+            else "Verification failed. Security defects, regressions, or syntax errors detected in patch."
+        ),
+        "validated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 

@@ -150,3 +150,5 @@ backend/logs/
 !frontend/lib/logs/
 !frontend/lib/logs/**
 
+testsprite_tests/tmp/
+testsprite_tests/tmp/config.json

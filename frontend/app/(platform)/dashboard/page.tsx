@@ -7,7 +7,7 @@ export default function DashboardRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/home');
+    router.replace('/overview');
   }, [router]);
 
   return (

@@ -328,6 +328,64 @@ def _initialize_registry():
         backend_method="_handle_create_pr",
     ))
 
+    # 6.4 MULTI-FILE REMEDIATION (PHASE 4)
+    CentralToolRegistry.register(ToolDefinition(
+        id="remediation.multi_file_plan",
+        name="Plan Multi-File Autonomous Remediation",
+        description="Analyzes code graph relationships to build a coordinated, minimal multi-file remediation plan.",
+        category="Remediation",
+        supported_intents=["multi-file fix", "multi-file plan", "fix across files", "coordinate fix", "plan multi-file"],
+        input_schema={
+            "type": "object",
+            "properties": {"finding_id": {"type": "string"}, "repository": {"type": "string"}},
+        },
+        output_schema={"type": "object", "properties": {"plan_id": {"type": "string"}, "files": {"type": "array"}, "plan_hash": {"type": "string"}}},
+        required_permissions=["developer", "admin"],
+        risk_level=ToolRiskLevel.LOW_RISK,
+        requires_approval=False,
+        execution_timeout_seconds=30,
+        ui_component=UIComponentType.CODE_DIFF,
+        backend_method="_handle_multi_file_plan",
+    ))
+
+    CentralToolRegistry.register(ToolDefinition(
+        id="remediation.multi_file_apply",
+        name="Apply Multi-File Remediation Transaction",
+        description="Applies multi-file patch set atomically in an isolated workspace with cryptographic approval token.",
+        category="Remediation",
+        supported_intents=["apply multi-file fix", "execute multi-file patch", "commit multi-file remediation"],
+        input_schema={
+            "type": "object",
+            "properties": {"patch_set_id": {"type": "string"}, "approval_token": {"type": "string"}},
+        },
+        output_schema={"type": "object", "properties": {"transaction_id": {"type": "string"}, "status": {"type": "string"}}},
+        required_permissions=["admin", "security_engineer"],
+        risk_level=ToolRiskLevel.SENSITIVE,
+        requires_approval=True,
+        execution_timeout_seconds=45,
+        ui_component=UIComponentType.APPROVAL_REQUEST,
+        backend_method="_handle_multi_file_apply",
+    ))
+
+    CentralToolRegistry.register(ToolDefinition(
+        id="remediation.multi_file_verify",
+        name="Verify Multi-File Remediation Pipeline",
+        description="Executes 5 layers of verification on patched workspace (integrity, static, tests, security, invariants).",
+        category="Remediation",
+        supported_intents=["verify multi-file", "verify patch set", "test multi-file patch"],
+        input_schema={
+            "type": "object",
+            "properties": {"patch_set_id": {"type": "string"}},
+        },
+        output_schema={"type": "object", "properties": {"outcome": {"type": "string"}, "layers": {"type": "array"}}},
+        required_permissions=["developer", "admin"],
+        risk_level=ToolRiskLevel.READ_ONLY,
+        requires_approval=False,
+        execution_timeout_seconds=45,
+        ui_component=UIComponentType.SCAN_RESULTS,
+        backend_method="_handle_multi_file_verify",
+    ))
+
     # 7. API SECURITY TESTING ENGINE (OWASP API Top 10)
     CentralToolRegistry.register(ToolDefinition(
         id="api_security.scan",
@@ -452,6 +510,104 @@ def _initialize_registry():
         execution_timeout_seconds=30,
         ui_component=UIComponentType.POLICY_CARD,
         backend_method="_handle_create_policy_intent",
+    ))
+
+    CentralToolRegistry.register(ToolDefinition(
+        id="policy.draft",
+        name="Draft Security Policy with AI Assistant",
+        description="Translates natural language security requirements into structured Policy DSL with positive/negative test cases.",
+        category="Governance",
+        supported_intents=[
+            "draft policy", "ai draft policy", "generate policy", "propose policy",
+            "write policy for", "new security rule", "draft rule"
+        ],
+        input_schema={
+            "type": "object",
+            "required": ["prompt"],
+            "properties": {"prompt": {"type": "string"}, "scope": {"type": "string", "default": "PROJECT"}},
+        },
+        output_schema={"type": "object", "properties": {"policy_id": {"type": "string"}, "version_id": {"type": "string"}}},
+        required_permissions=["admin", "security_engineer"],
+        risk_level=ToolRiskLevel.LOW_RISK,
+        requires_approval=False,
+        execution_timeout_seconds=30,
+        ui_component=UIComponentType.POLICY_CARD,
+        backend_method="_handle_draft_policy_action",
+    ))
+
+    CentralToolRegistry.register(ToolDefinition(
+        id="policy.evaluate",
+        name="Evaluate Security Policy Gate",
+        description="Deterministically evaluates an operation or context against active policies with 5 canonical outcomes.",
+        category="Governance",
+        supported_intents=[
+            "evaluate policy", "check policy", "check gate", "can I deploy",
+            "policy check", "is this allowed", "compliance check"
+        ],
+        input_schema={
+            "type": "object",
+            "required": ["operation"],
+            "properties": {"operation": {"type": "object"}, "environment": {"type": "string", "default": "development"}},
+        },
+        output_schema={"type": "object", "properties": {"outcome": {"type": "string"}, "reason": {"type": "string"}}},
+        required_permissions=["viewer", "developer", "admin", "security_engineer"],
+        risk_level=ToolRiskLevel.READ_ONLY,
+        requires_approval=False,
+        execution_timeout_seconds=20,
+        ui_component=UIComponentType.POLICY_CARD,
+        backend_method="_handle_evaluate_policy_action",
+    ))
+
+    CentralToolRegistry.register(ToolDefinition(
+        id="policy.simulate",
+        name="Simulate Security Policy Impact",
+        description="Dry-run evaluates a policy version against historical scan snapshots without enforcement side effects.",
+        category="Governance",
+        supported_intents=[
+            "simulate policy", "test policy impact", "what would policy block",
+            "dry run policy", "preview policy impact"
+        ],
+        input_schema={
+            "type": "object",
+            "required": ["version_id"],
+            "properties": {"version_id": {"type": "string"}, "lookback_days": {"type": "integer", "default": 30}},
+        },
+        output_schema={"type": "object", "properties": {"blocker_delta": {"type": "integer"}, "remediation_burden": {"type": "string"}}},
+        required_permissions=["admin", "security_engineer"],
+        risk_level=ToolRiskLevel.READ_ONLY,
+        requires_approval=False,
+        execution_timeout_seconds=30,
+        ui_component=UIComponentType.POLICY_CARD,
+        backend_method="_handle_simulate_policy_action",
+    ))
+
+    CentralToolRegistry.register(ToolDefinition(
+        id="policy.exception_request",
+        name="Request Temporary Policy Waiver",
+        description="Requests a time-bound, scoped policy exception with designated risk owner and compensating controls.",
+        category="Governance",
+        supported_intents=[
+            "request exception", "policy waiver", "exempt repository", "request waiver",
+            "temporary exception", "bypass policy"
+        ],
+        input_schema={
+            "type": "object",
+            "required": ["policy_id", "target", "justification", "risk_owner"],
+            "properties": {
+                "policy_id": {"type": "string"},
+                "target": {"type": "string"},
+                "justification": {"type": "string"},
+                "risk_owner": {"type": "string"},
+                "duration_days": {"type": "integer", "default": 30},
+            },
+        },
+        output_schema={"type": "object", "properties": {"exception_id": {"type": "string"}, "status": {"type": "string"}}},
+        required_permissions=["developer", "admin", "security_engineer"],
+        risk_level=ToolRiskLevel.SENSITIVE,
+        requires_approval=True,
+        execution_timeout_seconds=20,
+        ui_component=UIComponentType.APPROVAL_REQUEST,
+        backend_method="_handle_exception_request_action",
     ))
 
     CentralToolRegistry.register(ToolDefinition(

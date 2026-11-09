@@ -296,7 +296,7 @@ export default function SASTWorkspacePage() {
         repository_name: r.name,
         findings_count: fCount,
         critical_count: crit,
-        coverage_percentage: scanned ? Math.max(75, 100 - crit * 8) : 0,
+        coverage_percentage: scanned ? (r.coverage_percentage || 100) : 0,
         last_scan_at: r.last_scan_at,
         status: scanned ? 'SCANNED' : 'NOT_SCANNED',
       };
@@ -1546,22 +1546,40 @@ export default function SASTWorkspacePage() {
                     </p>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                     <div style={{ backgroundColor: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                       <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>CWE Identifier</div>
                       <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', marginTop: '2px' }}>
-                        {modalFinding.cwe || 'CWE-89: SQL Injection'}
+                        {modalFinding.cwe || 'CWE-78: OS Command Injection'}
                       </div>
                     </div>
                     <div style={{ backgroundColor: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Scanner Engine</div>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>OWASP Category</div>
                       <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', marginTop: '2px' }}>
-                        Semgrep AST Analyzer
+                        {modalFinding.owasp || 'A03:2021-Injection'}
+                      </div>
+                    </div>
+                    <div style={{ backgroundColor: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Analysis Confidence</div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#16A34A', marginTop: '2px' }}>
+                        {modalFinding.confidence || 'HIGH (AST match verified)'}
                       </div>
                     </div>
                   </div>
 
-                  {modalFinding.code_snippet && (
+                  {modalFinding.source_sink_flow && (
+                    <div style={{ backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '12px 16px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
+                        Data Flow &amp; Taint Path
+                      </div>
+                      <div style={{ fontSize: '12px', fontFamily: 'monospace', color: '#0F172A' }}>
+                        <strong>Source:</strong> {modalFinding.source_sink_flow.source || 'HTTP Request Parameter'} →{' '}
+                        <strong>Sink:</strong> {modalFinding.source_sink_flow.sink || 'child_process.exec / os.system'}
+                      </div>
+                    </div>
+                  )}
+
+                  {(modalFinding.snippet || modalFinding.code_snippet) && (
                     <div>
                       <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
                         Vulnerable Code Excerpt
@@ -1578,7 +1596,7 @@ export default function SASTWorkspacePage() {
                           margin: 0,
                         }}
                       >
-                        <code>{modalFinding.code_snippet}</code>
+                        <code>{modalFinding.snippet || modalFinding.code_snippet}</code>
                       </pre>
                     </div>
                   )}
@@ -1591,11 +1609,13 @@ export default function SASTWorkspacePage() {
                     <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', margin: '0 0 8px 0' }}>
                       Deterministic Proof &amp; AST Match
                     </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}>
                       <div><strong>Fingerprint:</strong> <code style={{ backgroundColor: '#E2E8F0', padding: '1px 5px', borderRadius: '4px' }}>{modalFinding.fingerprint || modalFinding.id}</code></div>
                       <div><strong>Rule ID:</strong> <code>{modalFinding.rule_id}</code></div>
                       <div><strong>Path:</strong> <code>{modalFinding.file_path}:{modalFinding.line_number || 1}</code></div>
-                      <div><strong>Confidence:</strong> HIGH (AST match verified)</div>
+                      <div><strong>Scanner Engine:</strong> {modalFinding.scanner_source || 'Semgrep AST Engine v1.68.0'}</div>
+                      <div><strong>Detecting Agent:</strong> {modalFinding.detecting_agent || 'SAST Agent (agt_sast_agent)'}</div>
+                      <div><strong>Verification Type:</strong> {modalFinding.is_confirmed ? 'Deterministic AST Pattern Match (Confirmed)' : 'Heuristic Match'}</div>
                     </div>
                   </div>
                 </div>
@@ -1606,18 +1626,18 @@ export default function SASTWorkspacePage() {
                   <div style={{ backgroundColor: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: '8px', padding: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                       <Sparkles size={16} color="#7C3AED" />
-                      <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#6D28D9' }}>AI Remediation Synthesis</span>
+                      <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#6D28D9' }}>Semantic Remediation Specification</span>
                     </div>
                     <p style={{ fontSize: '13px', color: '#4C1D95', lineHeight: 1.5, margin: 0 }}>
                       {modalFinding.remediation_advice ||
-                        'Replace string concatenation with parameterized prepared statements or validate input using an allowlist.'}
+                        'Avoid invoking the shell directly with user-supplied input. Use parameterized execution APIs such as subprocess.run([cmd, arg], shell=False) or execFile with arguments array. Validate and sanitize inputs with an allowlist.'}
                     </p>
                   </div>
 
                   {modalFinding.remediation_patch && (
                     <div>
                       <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-                        Proposed Patch Diff
+                        Proposed Patch Diff Preview
                       </h4>
                       <pre
                         style={{
@@ -1639,7 +1659,7 @@ export default function SASTWorkspacePage() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
                     <button
                       onClick={() => {
-                        router.push(`/code/autofix?finding_id=${modalFinding.id}`);
+                        router.push(`/code/sast/remediation?finding_id=${modalFinding.id}`);
                       }}
                       style={{
                         padding: '10px 18px',

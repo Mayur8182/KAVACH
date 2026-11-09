@@ -77,267 +77,202 @@ function OnboardingWorkspaceContent() {
     <OnboardingLayout
       currentStep={2}
       title="Create Your Workspace"
-      subtitle="A workspace helps you organize projects, teams and environments."
+      subtitle="A workspace isolates your repositories, security policies, and team permissions."
     >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.4fr) 300px',
-          gap: '32px',
-          alignItems: 'start',
-        }}
-        className="onboarding-split"
-      >
-        {/* Left Form Card */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '10px',
-            padding: '28px 32px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-          }}
-        >
-          <div style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', marginBottom: '20px' }}>
-            Workspace Details
-          </div>
-
-          {error && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '6px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', fontSize: '13px', marginBottom: '18px' }}>
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            {/* Workspace Name */}
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                Workspace Name <span style={{ color: '#EF4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Core Engineering or Production Services"
-                required
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  color: '#0F172A',
-                  outline: 'none',
-                }}
-              />
-            </div>
-
-            {/* Description (Optional) */}
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                Description (Optional)
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Primary workspace for developer repositories, pipelines, and runtime protection."
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  color: '#0F172A',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  resize: 'vertical',
-                }}
-              />
-            </div>
-
-            {/* Visibility */}
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>
-                Visibility <span style={{ color: '#EF4444' }}>*</span>
-              </label>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {[
-                  {
-                    id: 'Private',
-                    icon: Lock,
-                    label: 'Private',
-                    desc: 'Only invited members can access',
-                  },
-                  {
-                    id: 'Internal',
-                    icon: Building,
-                    label: 'Internal',
-                    desc: 'All organization members can access',
-                  },
-                  {
-                    id: 'Public',
-                    icon: Globe,
-                    label: 'Public',
-                    desc: 'Anyone in the organization can access',
-                  },
-                ].map((option) => {
-                  const Icon = option.icon;
-                  const isChecked = visibility === option.id;
-
-                  return (
-                    <label
-                      key={option.id}
-                      onClick={() => setVisibility(option.id as any)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '10px 14px',
-                        borderRadius: '6px',
-                        border: isChecked ? '1.5px solid #2563EB' : '1px solid #CBD5E1',
-                        backgroundColor: isChecked ? '#F8FAFC' : '#FFFFFF',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="visibility"
-                        value={option.id}
-                        checked={isChecked}
-                        onChange={() => setVisibility(option.id as any)}
-                        style={{ accentColor: '#2563EB', width: '16px', height: '16px', cursor: 'pointer' }}
-                      />
-                      <Icon size={16} style={{ color: isChecked ? '#2563EB' : '#64748B' }} />
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
-                          {option.label}
-                        </span>
-                        <span style={{ fontSize: '12px', color: '#64748B' }}>
-                          {option.desc}
-                        </span>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '16px', borderTop: '1px solid #F1F5F9' }}>
-              <button
-                type="button"
-                onClick={() => router.push('/onboarding/organization')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 18px',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: '#475569',
-                  cursor: 'pointer',
-                }}
-                className="hover:bg-slate-50"
-              >
-                <ArrowLeft size={14} />
-                <span>Back</span>
-              </button>
-
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 20px',
-                  backgroundColor: '#2563EB',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: '#FFFFFF',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(37,99,235,0.25)',
-                }}
-                className="hover:bg-blue-700"
-              >
-                <span>{loading ? 'Saving...' : 'Next: Project'}</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Right Info Card: Workspaces in SecuLayer */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '10px',
-            padding: '24px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          }}
-        >
+      <div style={{ maxWidth: '640px', margin: '0 auto', width: '100%' }}>
+        {error && (
           <div
             style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '8px',
-              backgroundColor: '#EFF6FF',
-              color: '#2563EB',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '16px',
+              gap: '8px',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              backgroundColor: '#FEF2F2',
+              border: '1px solid #FECACA',
+              color: '#B91C1C',
+              fontSize: '13px',
+              marginBottom: '20px',
             }}
           >
-            <Folder size={20} />
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Workspace Name */}
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#0F172A', marginBottom: '6px' }}>
+              Workspace Name <span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Production Services or Core Security"
+              required
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                fontSize: '14px',
+                color: '#0F172A',
+                backgroundColor: '#FFFFFF',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
           </div>
 
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: '0 0 16px 0' }}>
-            Workspaces in Kavach
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {[
-              'Isolate projects and environments',
-              'Manage team access',
-              'Apply security policies',
-              'Separate dev, staging and prod',
-              'Multiple workspaces per organization',
-            ].map((text, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                <span
-                  style={{
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '50%',
-                    border: '1.5px solid #94A3B8',
-                    color: '#64748B',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    flexShrink: 0,
-                    marginTop: '1px',
-                  }}
-                >
-                  {i + 1}
-                </span>
-                <span>{text}</span>
-              </div>
-            ))}
+          {/* Description */}
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#0F172A', marginBottom: '6px' }}>
+              Description <span style={{ color: '#64748B', fontWeight: 400 }}>(Optional)</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Primary workspace for code repositories, CI/CD pipelines, and runtime security monitoring."
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                fontSize: '14px',
+                color: '#0F172A',
+                backgroundColor: '#FFFFFF',
+                outline: 'none',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
+            />
           </div>
-        </div>
+
+          {/* Visibility */}
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#0F172A', marginBottom: '10px' }}>
+              Visibility <span style={{ color: '#EF4444' }}>*</span>
+            </label>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                {
+                  id: 'Private',
+                  icon: Lock,
+                  label: 'Private',
+                  desc: 'Only explicitly invited team members can access',
+                },
+                {
+                  id: 'Internal',
+                  icon: Building,
+                  label: 'Internal',
+                  desc: 'All authenticated members of your organization can view',
+                },
+                {
+                  id: 'Public',
+                  icon: Globe,
+                  label: 'Public',
+                  desc: 'Accessible across your organization workspace directory',
+                },
+              ].map((option) => {
+                const Icon = option.icon;
+                const isChecked = visibility === option.id;
+
+                return (
+                  <label
+                    key={option.id}
+                    onClick={() => setVisibility(option.id as any)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      border: isChecked ? '1.5px solid #09090B' : '1px solid #CBD5E1',
+                      backgroundColor: isChecked ? '#F4F4F5' : '#FFFFFF',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value={option.id}
+                      checked={isChecked}
+                      onChange={() => setVisibility(option.id as any)}
+                      style={{ accentColor: '#09090B', width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    <Icon size={16} style={{ color: isChecked ? '#09090B' : '#64748B' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+                        {option.label}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#64748B' }}>
+                        — {option.desc}
+                      </span>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Navigation Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '16px', borderTop: '1px solid #F1F5F9' }}>
+            <button
+              type="button"
+              onClick={() => router.push('/onboarding/organization')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 18px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#475569',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+            >
+              <ArrowLeft size={14} />
+              <span>Back</span>
+            </button>
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '11px 24px',
+                backgroundColor: '#09090B',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#FFFFFF',
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#27272A')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#09090B')}
+            >
+              <span>{loading ? 'Saving...' : 'Next: Project'}</span>
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        </form>
       </div>
     </OnboardingLayout>
   );

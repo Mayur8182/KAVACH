@@ -367,8 +367,6 @@ async def _handle_cloud_security_scan(
     svc = CloudService(db)
 
     proj_uuid = uuid.UUID(project_id_str) if project_id_str else None
-    if not proj_uuid:
-        proj_uuid = await svc.ensure_baseline_cloud_data_seeded()
 
     await update_progress(40, "Auditing cloud storage encryption, firewalls, and public ingress rules")
     await update_progress(70, "Evaluating CIS Foundations Benchmarks and SOC 2 Type II controls")

@@ -31,14 +31,14 @@ const nextConfig = {
         permanent: true,
       },
       {
-        source: '/findings',
-        destination: '/code/findings',
-        permanent: true,
+        source: '/code/findings',
+        destination: '/findings',
+        permanent: false,
       },
       {
-        source: '/repositories',
-        destination: '/code/repositories',
-        permanent: true,
+        source: '/code/repositories',
+        destination: '/repositories',
+        permanent: false,
       },
       {
         source: '/sast',

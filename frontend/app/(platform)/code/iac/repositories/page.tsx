@@ -214,7 +214,7 @@ export default function IaCRepositoriesPage() {
               cursor: 'pointer',
             }}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'motion-safe:animate-spin motion-reduce:animate-none' : ''} />
             Refresh
           </button>
 
@@ -391,7 +391,7 @@ export default function IaCRepositoriesPage() {
               {loading ? (
                 <tr>
                   <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-                    <RefreshCw size={18} className="animate-spin" style={{ margin: '0 auto 8px auto', color: '#2563EB' }} />
+                    <RefreshCw size={18} className="motion-safe:animate-spin motion-reduce:animate-none" style={{ margin: '0 auto 8px auto', color: '#2563EB' }} />
                     Loading repository coverage...
                   </td>
                 </tr>
@@ -523,7 +523,7 @@ export default function IaCRepositoriesPage() {
                             cursor: 'pointer',
                           }}
                         >
-                          <Play size={12} className={scanningRepoId === repo.name ? 'animate-spin' : ''} />
+                          <Play size={12} className={scanningRepoId === repo.name ? 'motion-safe:animate-spin motion-reduce:animate-none' : ''} />
                           {scanningRepoId === repo.name ? 'Scanning' : 'Scan'}
                         </button>
 

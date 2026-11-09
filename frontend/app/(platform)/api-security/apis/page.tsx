@@ -293,7 +293,7 @@ export default function ApiInventoryPage() {
                   boxShadow: '0 1px 3px rgba(37,99,235,0.2)',
                 }}
               >
-                <span>Start Repository Discovery →</span>
+                <span>Start Repository Discovery</span>
               </Link>
               <button
                 type="button"

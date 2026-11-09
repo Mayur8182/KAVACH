@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Search, Check, FolderGit2, GitBranch, ChevronDown, Loader2 } from 'lucide-react';
+import { X, Search, Check, FolderGit2, GitBranch, ChevronDown, Loader2, AlertCircle } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { KavachMark } from '@/components/common/KavachLogo';
 
@@ -52,11 +52,13 @@ export function SelectRepositoriesModal({
   const [repoUrlInput, setRepoUrlInput] = useState('');
   const [addingUrl, setAddingUrl] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [addErrorDetails, setAddErrorDetails] = useState<string | null>(null);
 
   const handleAddUrl = async () => {
     if (!repoUrlInput.trim()) return;
     setAddingUrl(true);
     setAddError(null);
+    setAddErrorDetails(null);
     try {
       const res = await api.assistant.addRepoByUrl(repoUrlInput.trim());
       if (res?.repository) {
@@ -69,6 +71,9 @@ export function SelectRepositoriesModal({
       }
     } catch (err: any) {
       setAddError(err?.message || 'Failed to add repository.');
+      setAddErrorDetails(
+        [err?.request_id ? `Request ID: ${err.request_id}` : '', err?.remediation].filter(Boolean).join(' ')
+      );
     } finally {
       setAddingUrl(false);
     }
@@ -244,14 +249,9 @@ export function SelectRepositoriesModal({
               }}
             >
               {addingUrl ? <Loader2 size={13} className="animate-spin" /> : <FolderGit2 size={13} />}
-              <span>{addingUrl ? 'Cloning...' : 'Add & Scan'}</span>
+              <span>{addingUrl ? 'Adding...' : 'Add & Scan'}</span>
             </button>
           </div>
-          {addError && (
-            <div style={{ fontSize: 11, color: '#DC2626', fontWeight: 500 }}>
-              {addError}
-            </div>
-          )}
         </div>
 
         {/* Search & Filters */}
@@ -339,6 +339,15 @@ export function SelectRepositoriesModal({
                 Last updated
               </span>
             </div>
+            {addError && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, color: '#B91C1C', fontSize: 12 }}>
+                <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>
+                  {addError}
+                  {addErrorDetails && <><br /><small>{addErrorDetails}</small></>}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

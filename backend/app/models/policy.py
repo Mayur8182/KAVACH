@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from app.models.project import Project
     from app.models.blueprint import SecurityBlueprint
     from app.models.scan import SecurityScan
+    from app.models.organization import Organization
+    from app.models.user import User
 
 
 class SecurityPolicy(Base, TimestampMixin):
@@ -31,6 +33,12 @@ class SecurityPolicy(Base, TimestampMixin):
         index=True,
         nullable=True,
     )
+    organization_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
     name: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
@@ -44,6 +52,11 @@ class SecurityPolicy(Base, TimestampMixin):
         String(50),
         nullable=False,
         default="PROJECT",  # PROJECT, ENVIRONMENT, OPERATION, GLOBAL
+    )
+    domain: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="APPLICATION",  # APPLICATION, DEPENDENCY, CONTAINER, INFRASTRUCTURE, IDENTITY, AI_AGENT
     )
     status: Mapped[str] = mapped_column(
         String(50),
@@ -78,6 +91,15 @@ class SecurityPolicy(Base, TimestampMixin):
         DateTime(timezone=True),
         nullable=True,
     )
+    review_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    tags: Mapped[Optional[List[str]]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=list,
+    )
 
     # Relationships
     versions: Mapped[List["SecurityPolicyVersion"]] = relationship(
@@ -85,6 +107,11 @@ class SecurityPolicy(Base, TimestampMixin):
         back_populates="policy",
         cascade="all, delete-orphan",
         order_by="desc(SecurityPolicyVersion.version)",
+    )
+    exceptions: Mapped[List["PolicyException"]] = relationship(
+        "PolicyException",
+        back_populates="policy",
+        cascade="all, delete-orphan",
     )
 
 
@@ -135,11 +162,58 @@ class SecurityPolicyVersion(Base):
         nullable=False,
         default=True,
     )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="DRAFT",  # DRAFT, STATIC_VALIDATED, TESTED, SIMULATED, UNDER_REVIEW, APPROVED, STAGED, ACTIVE, DEPRECATED
+    )
+    policy_content_hash: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        index=True,
+    )
+    policy_language: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="KAVACH_DSL",  # KAVACH_DSL, REGO, JSON_SCHEMA
+    )
+    reviewer_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    approver_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    approved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    effective_from: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    effective_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     # Relationships
     policy: Mapped["SecurityPolicy"] = relationship(
         "SecurityPolicy",
         back_populates="versions",
+    )
+    rules: Mapped[List["PolicyRule"]] = relationship(
+        "PolicyRule",
+        back_populates="version",
+        cascade="all, delete-orphan",
+    )
+    test_cases: Mapped[List["PolicyTestCase"]] = relationship(
+        "PolicyTestCase",
+        back_populates="version",
+        cascade="all, delete-orphan",
     )
 
 
@@ -236,6 +310,11 @@ class SecurityDecision(Base):
     )
     approvals: Mapped[List["SecurityApproval"]] = relationship(
         "SecurityApproval",
+        back_populates="decision",
+        cascade="all, delete-orphan",
+    )
+    enforcement_events: Mapped[List["PolicyEnforcementEvent"]] = relationship(
+        "PolicyEnforcementEvent",
         back_populates="decision",
         cascade="all, delete-orphan",
     )
@@ -376,4 +455,260 @@ class SecurityApproval(Base):
     decision: Mapped["SecurityDecision"] = relationship(
         "SecurityDecision",
         back_populates="approvals",
+    )
+
+
+class PolicyRule(Base, TimestampMixin):
+    """
+    Normalized, queryable policy rule entity associated with an immutable policy version.
+    """
+    __tablename__ = "policy_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    policy_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("security_policy_versions.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    rule_key: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(
+        String(200),
+        nullable=False,
+    )
+    description: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    severity: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="HIGH",  # CRITICAL, HIGH, MEDIUM, LOW, INFO
+    )
+    decision: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="DENY",  # ALLOW, DENY, WARN, REQUIRE_APPROVAL
+    )
+    reason_code: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        default="POLICY_VIOLATION",
+    )
+    resource_scope: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    condition: Mapped[Dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+    )
+    remediation_guidance: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    is_non_exemptible: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    # Relationships
+    version: Mapped["SecurityPolicyVersion"] = relationship(
+        "SecurityPolicyVersion",
+        back_populates="rules",
+    )
+    exceptions: Mapped[List["PolicyException"]] = relationship(
+        "PolicyException",
+        back_populates="rule",
+    )
+
+
+class PolicyTestCase(Base, TimestampMixin):
+    """
+    Positive and negative test fixture for validating policy behavior prior to activation.
+    """
+    __tablename__ = "policy_test_cases"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    policy_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("security_policy_versions.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(
+        String(200),
+        nullable=False,
+    )
+    description: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    input_fixture: Mapped[Dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+    )
+    expected_decision: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )  # ALLOW, DENY, WARN, REQUIRE_APPROVAL, NOT_APPLICABLE, INDETERMINATE
+    last_run_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    last_actual_decision: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="PENDING",
+    )  # PASSED, FAILED, PENDING
+
+    # Relationships
+    version: Mapped["SecurityPolicyVersion"] = relationship(
+        "SecurityPolicyVersion",
+        back_populates="test_cases",
+    )
+
+
+class PolicyException(Base, TimestampMixin):
+    """
+    Time-bound, resource-scoped waiver with explicit risk ownership and expiration.
+    Cannot override non-exemptible controls.
+    """
+    __tablename__ = "policy_exceptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    policy_rule_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("policy_rules.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
+    policy_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("security_policies.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
+    resource_scope: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        default="*",
+    )
+    justification: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    risk_owner: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+    requested_by: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+    approved_by: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    compensating_controls: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="PENDING",
+        index=True,
+    )  # PENDING, ACTIVE, EXPIRED, REVOKED
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    review_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # Relationships
+    policy: Mapped["SecurityPolicy"] = relationship(
+        "SecurityPolicy",
+        back_populates="exceptions",
+    )
+    rule: Mapped[Optional["PolicyRule"]] = relationship(
+        "PolicyRule",
+        back_populates="exceptions",
+    )
+
+
+class PolicyEnforcementEvent(Base, TimestampMixin):
+    """
+    Immutable audit record linking a policy decision to an actual enforcement point.
+    """
+    __tablename__ = "policy_enforcement_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    decision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("security_decisions.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    enforcement_point: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        index=True,
+    )  # GITHUB_PR, CI_CD, MCP_GATEWAY, CLOUD_RUNTIME, DEPLOYMENT
+    action_attempted: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+    result: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        index=True,
+    )  # BLOCKED, ALLOWED, WARNED, BYPASSED_OVERRIDE, FAILED
+    external_reference: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    metadata_snapshot: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
+    # Relationships
+    decision: Mapped["SecurityDecision"] = relationship(
+        "SecurityDecision",
+        back_populates="enforcement_events",
     )

@@ -460,7 +460,7 @@ export const ContainerRuntimeSecurityView: React.FC<ContainerRuntimeSecurityView
             <div className="bg-[#111827]/70 border border-slate-800 rounded-xl p-4">
               <span className="text-xs text-slate-400">Runtime Alerts</span>
               <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl font-bold text-white">{overview?.summary.runtime_alerts ?? 38}</span>
+                <span className="text-2xl font-bold text-white">{overview?.summary?.runtime_alerts ?? 38}</span>
                 <span className="text-xs font-medium text-rose-400 flex items-center gap-0.5">
                   ↑ 15%
                 </span>
@@ -471,7 +471,7 @@ export const ContainerRuntimeSecurityView: React.FC<ContainerRuntimeSecurityView
               <span className="text-xs text-slate-400">Process Events</span>
               <div className="flex items-baseline justify-between mt-2">
                 <span className="text-2xl font-bold text-white">
-                  {overview?.summary.process_events ? overview.summary.process_events.toLocaleString() : '1,284'}
+                  {overview?.summary?.process_events ? overview.summary.process_events.toLocaleString() : '1,284'}
                 </span>
                 <span className="text-xs font-medium text-emerald-400 flex items-center gap-0.5">
                   ↑ 22%
@@ -547,7 +547,7 @@ export const ContainerRuntimeSecurityView: React.FC<ContainerRuntimeSecurityView
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                     <span className="text-2xl font-bold text-white leading-tight">
-                      {overview?.summary.runtime_alerts ?? 38}
+                      {overview?.summary?.runtime_alerts ?? 38}
                     </span>
                     <span className="text-[10px] text-slate-400 uppercase tracking-wider">Alerts</span>
                   </div>

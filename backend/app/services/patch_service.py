@@ -53,6 +53,12 @@ def _apply_unified_diff(original_text: str, diff_text: str) -> Tuple[bool, str, 
     if not original_text.strip() and added_block:
         return True, added_block, ""
 
+    # Fallback return when no direct hunk matches
+    if added_block.strip():
+        return False, added_block, "Direct match not found in original source"
+
+    return False, original_text, "Could not locate matching target region in source code"
+
 def _extract_original_and_patched_from_diff(diff_text: str) -> Tuple[str, str]:
     """
     Extracts (original_text, patched_text) from unified diff hunks.

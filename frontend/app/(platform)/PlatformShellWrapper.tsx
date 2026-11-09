@@ -28,8 +28,8 @@ export function PlatformShellWrapper({
     if (!token) {
       clearAuthToken();
       setIsAuthenticated(false);
-      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/code';
-      router.replace(`/login?redirect=${encodeURIComponent(currentPath || '/code')}`);
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/home';
+      router.replace(`/login?redirect=${encodeURIComponent(currentPath === '/' ? '/home' : (currentPath || '/home'))}`);
       return;
     }
 
@@ -39,20 +39,34 @@ export function PlatformShellWrapper({
       .then((user) => {
         if (!isMounted) return;
         if (user && (user.id || user.email)) {
+          if (user.is_superuser) {
+            setIsAuthenticated(true);
+            return;
+          }
+          if (user.is_verified === false) {
+            setIsAuthenticated(false);
+            router.replace(`/verify-email?email=${encodeURIComponent(user.email)}`);
+            return;
+          }
+          if (user.onboarding_completed === false) {
+            setIsAuthenticated(false);
+            router.replace(`/onboarding?email=${encodeURIComponent(user.email)}`);
+            return;
+          }
           setIsAuthenticated(true);
         } else {
           clearAuthToken();
           setIsAuthenticated(false);
-          const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/code';
-          router.replace(`/login?redirect=${encodeURIComponent(currentPath || '/code')}`);
+          const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/home';
+          router.replace(`/login?redirect=${encodeURIComponent(currentPath === '/' ? '/home' : (currentPath || '/home'))}`);
         }
       })
       .catch(() => {
         if (!isMounted) return;
         clearAuthToken();
         setIsAuthenticated(false);
-        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/code';
-        router.replace(`/login?redirect=${encodeURIComponent(currentPath || '/code')}`);
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/home';
+        router.replace(`/login?redirect=${encodeURIComponent(currentPath === '/' ? '/home' : (currentPath || '/home'))}`);
       });
 
     return () => {
@@ -91,15 +105,6 @@ export function PlatformShellWrapper({
           <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
       </div>
-    );
-  }
-
-  if (pathname?.startsWith('/assistant')) {
-    return (
-      <ScopeProvider>
-        <NetworkStatusBanner className="m-3" />
-        {children}
-      </ScopeProvider>
     );
   }
 

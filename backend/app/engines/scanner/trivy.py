@@ -23,6 +23,7 @@ class TrivyScanner(SecurityScanner):
             return [
                 self.executable_name,
                 "image",
+                "--skip-db-update",
                 "--format",
                 "json",
                 "--quiet",
@@ -32,6 +33,7 @@ class TrivyScanner(SecurityScanner):
         return [
             self.executable_name,
             "fs",
+            "--skip-db-update",
             "--format",
             "json",
             "--quiet",
@@ -62,6 +64,14 @@ class TrivyScanner(SecurityScanner):
 
         for item in results:
             target_file = item.get("Target", target.path)
+            tf_lower = str(target_file).lower()
+            is_container = (
+                target.target_type == "CONTAINER_IMAGE"
+                or tf_lower.endswith(("dockerfile", ".dockerfile", "containerfile"))
+                or "docker" in tf_lower
+            )
+            vuln_cat = "CONTAINER" if is_container else "DEPENDENCIES"
+            vuln_prefix = "Container CVE: " if is_container else "Dependency CVE: "
 
             # 1. Vulnerabilities
             for vuln in item.get("Vulnerabilities", []):
@@ -83,13 +93,14 @@ class TrivyScanner(SecurityScanner):
                 findings.append(
                     NormalizedFindingCandidate(
                         rule_id=vuln_id,
-                        title=f"Container CVE: {title}",
+                        title=f"{vuln_prefix}{title}",
                         description=f"{desc} (Package {pkg_name} version {installed_ver} in {target_file})",
                         severity=severity,
                         file_path=target_file,
                         line_number=None,
                         snippet=f"{pkg_name} {installed_ver}",
                         fingerprint=fingerprint,
+                        category=vuln_cat,
                         raw_metadata={
                             "package": pkg_name,
                             "installed_version": installed_ver,
@@ -119,13 +130,14 @@ class TrivyScanner(SecurityScanner):
                 findings.append(
                     NormalizedFindingCandidate(
                         rule_id=check_id,
-                        title=f"Container Misconfiguration: {title}",
+                        title=f"Container Misconfiguration: {title}" if is_container else f"IaC Misconfiguration: {title}",
                         description=full_desc,
                         severity=severity,
                         file_path=target_file,
                         line_number=None,
                         snippet=misconf.get("Resolution"),
                         fingerprint=fingerprint,
+                        category="CONTAINER" if is_container else "IAC",
                         raw_metadata={
                             "resolution": misconf.get("Resolution"),
                             "type": misconf.get("Type"),

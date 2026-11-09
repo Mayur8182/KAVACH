@@ -15,6 +15,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.tenant import TenantContext, get_current_tenant_context
 from app.models.user import User
+from app.models.github import GitHubRepository, GitHubSecurityJob
 
 from app.code.schemas import (
     CodeOverviewResponse,
@@ -794,9 +795,9 @@ async def connect_code_repository(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from sqlalchemy import select, and_, text
-    from app.models.github import GitHubRepository
+    from sqlalchemy import select, update, and_, text
     from app.models.project import Project
+    from app.models.scan import SecurityScan
     import logging
     logger = logging.getLogger("code.repository")
 
@@ -879,7 +880,7 @@ async def connect_code_repository(
                     if getattr(current_user, "is_superuser", False) or cand.owner_id == current_user.id:
                         project = cand
                     else:
-                        from app.models.workspace import OrganizationMember
+                        from app.models.invitation import OrganizationMember
                         if cand.organization_id:
                             m_stmt = select(OrganizationMember.id).where(
                                 and_(
@@ -921,7 +922,7 @@ async def connect_code_repository(
 
         if not project:
             try:
-                from app.models.workspace import OrganizationMember
+                from app.models.invitation import OrganizationMember
                 m_proj_stmt = (
                     select(Project)
                     .join(OrganizationMember, OrganizationMember.organization_id == Project.organization_id)
@@ -974,9 +975,6 @@ async def connect_code_repository(
                 repo.project_id = project.id
                 if target_ws_id:
                     repo.workspace_id = target_ws_id
-                from app.models.github import GitHubSecurityJob
-                from app.models.scan import SecurityScan
-                from sqlalchemy import update
                 await db.execute(
                     update(GitHubSecurityJob)
                     .where(GitHubSecurityJob.repository_id == repo.id)
@@ -1029,7 +1027,6 @@ async def connect_code_repository(
         scan_job_id = None
         if payload.trigger_scan:
             try:
-                from app.services.github_service import GitHubService
                 from app.schemas.github import TriggerRepositoryScanRequest
                 service = GitHubService(db)
                 scan_job = await service.trigger_manual_scan(
@@ -4119,9 +4116,6 @@ async def get_pipeline_configuration_endpoint(
         project_id=project_id,
         repository=repository,
     )
-
-
-
 
 
 

@@ -87,7 +87,7 @@ export default function IaCFindingDetailPage() {
   if (loading) {
     return (
       <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', padding: '60px', textAlign: 'center', color: '#64748B' }}>
-        <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px auto', color: '#2563EB' }} />
+        <RefreshCw size={24} className="motion-safe:animate-spin motion-reduce:animate-none" style={{ margin: '0 auto 12px auto', color: '#2563EB' }} />
         <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>Loading finding details...</div>
       </div>
     );
@@ -249,7 +249,7 @@ export default function IaCFindingDetailPage() {
                 cursor: actionLoading ? 'not-allowed' : 'pointer',
               }}
             >
-              <Sparkles size={14} className={actionLoading === 'fix' ? 'animate-spin' : ''} />
+              <Sparkles size={14} className={actionLoading === 'fix' ? 'motion-safe:animate-spin motion-reduce:animate-none' : ''} />
               {actionLoading === 'fix' ? 'Applying...' : 'Apply Fix'}
             </button>
 

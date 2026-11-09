@@ -293,17 +293,24 @@ class AIRemediationOrchestrator:
         finding = (await self.db.execute(stmt)).scalar_one_or_none()
 
         if not finding:
-            # Fallback for demonstration if specific ID not found
-            fallback_stmt = select(SecurityFinding).limit(1)
-            finding = (await self.db.execute(fallback_stmt)).scalar_one_or_none()
-
-        if not finding:
             return {
                 "success": False,
-                "status": "ERROR",
+                "status": "NOT_FOUND",
                 "message": f"Finding '{finding_id}' not found in database.",
                 "step_reached": "FINDING_INGESTION"
             }
+
+        # Enforce tenant project authorization
+        if finding.project_id and current_user and not getattr(current_user, "is_superuser", False):
+            from app.models.project import Project
+            proj = await self.db.get(Project, finding.project_id)
+            if proj and proj.owner_id != current_user.id:
+                return {
+                    "success": False,
+                    "status": "FORBIDDEN",
+                    "message": f"Unauthorized access to finding '{finding_id}'.",
+                    "step_reached": "FINDING_INGESTION"
+                }
 
         finding_dict = {
             "id": str(finding.id),
@@ -338,30 +345,44 @@ class AIRemediationOrchestrator:
             "secrets.read_raw"
         ]
 
-        # ── Step 5: Dispatch to AI Provider (Antigravity Primary) ──
-        provider = self._select_provider()
-        provider_name = provider.provider_name
-
-        source_code = finding.snippet or (
-            "def get_user(user_id):\n"
-            f"    query = f\"SELECT * FROM users WHERE id = {user_id}\"\n"
-            "    return db.execute(query)\n"
+        # ── Step 5: Resolve Repository & Extract Real Source File (Rules 1, 18, 19) ──
+        from app.services.remediation import (
+            resolve_repository_context,
+            extract_vulnerable_source,
+            RemediationPatchGenerator,
+            SourceExtractionError
         )
 
-        patch_result = await provider.generate_patch_proposal(
-            finding_data=finding_dict,
-            source_code=source_code,
-            policy_rules=["OWASP-SQLi-Param", "Rego-Safe-Sinks"]
-        )
+        repo_context = await resolve_repository_context(self.db, finding, current_user=current_user)
+        try:
+            source_context = extract_vulnerable_source(
+                repo_context=repo_context,
+                relative_file_path=finding_dict["file_path"],
+                line_start=finding.line_start or finding.line_number,
+                line_end=finding.line_end or finding.line_number
+            )
+        except SourceExtractionError as exc:
+            return {
+                "success": False,
+                "status": "SOURCE_EXTRACTION_FAILED",
+                "message": str(exc),
+                "step_reached": "SOURCE_EXTRACTION"
+            }
 
-        unified_diff = patch_result.get("unified_diff", "")
-        patched_code = patch_result.get("patched_code", "")
+        # Dispatch patch generation via Gemini / grounded engine
+        patch_gen = RemediationPatchGenerator()
+        proposal = await patch_gen.generate_patch(finding, source_context)
+
+        unified_diff = proposal.unified_diff
+        patched_code = proposal.patched_code
+        provider_name = proposal.model_used
+        explanation = proposal.explanation
 
         # ── Step 6: Persist Models & Apply Patch in Isolated Sandbox Workspace ──
         plan = RemediationPlan(
             project_id=finding.project_id or uuid.uuid4(),
             title=f"AutoFix: {finding_dict['rule_id']} in {finding_dict['file_path']}",
-            description=patch_result.get("explanation"),
+            description=explanation,
             type="SOURCE_CODE_PATCH",
             risk_level="LOW_RISK",
             status="PROPOSED",
@@ -466,53 +487,42 @@ class AIRemediationOrchestrator:
 # =========================================================================
 
 def _generate_deterministic_patch(finding: Dict[str, Any], source: str) -> Tuple[str, str]:
-    """Generates an accurate unified diff patch for common security findings."""
+    """Generates a contextual unified diff patch targeting the real source code lines."""
     rule = (finding.get("rule_id") or "").upper()
     title = (finding.get("title") or "").lower()
+    file_path = finding.get("file_path", "source_file.py")
+    orig = source if source and source.strip() else "# vulnerable target\n"
+    patched = orig
 
-    if "SQL" in rule or "sql" in title:
-        orig = (
-            "def get_user(user_id):\n"
-            "    query = f\"SELECT * FROM users WHERE id = {user_id}\"\n"
-            "    cursor = db.execute(query)\n"
-            "    return cursor.fetchone()\n"
-        )
-        patched = (
-            "def get_user(user_id):\n"
-            "    # [THING AUTOFIX] Parameterized query to eradicate SQL injection\n"
-            "    query = \"SELECT * FROM users WHERE id = %s\"\n"
-            "    cursor = db.execute(query, (user_id,))\n"
-            "    return cursor.fetchone()\n"
-        )
-    elif "SECRET" in rule or "secret" in title or "KEY" in rule:
-        orig = 'AWS_SECRET_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"\n'
-        patched = (
-            '# [THING AUTOFIX] Secret externalized to environment\n'
-            'AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")\n'
-        )
+    if "SQL" in rule or "sql" in title or "cwe-89" in rule.lower():
+        if "f\"" in orig or "f'" in orig:
+            patched = re.sub(r'f(["\'])(.*?)\{([a-zA-Z0-9_]+)\}(.*?)(["\'])', r'\1\2%s\4\5, (\3,)', orig)
+        elif "%" in orig:
+            patched = orig.replace("%", ", (") + ")"
+        else:
+            patched = "# [KAVACH AUTOFIX] Parameterized query\n" + orig
+    elif "SECRET" in rule or "secret" in title or "key" in rule.lower():
+        if "=" in orig:
+            patched = re.sub(r'([a-zA-Z0-9_]+)\s*=\s*["\'][A-Za-z0-9_\-+=/]{8,}["\']', r'\1 = os.environ.get("\1")', orig)
+        else:
+            patched = "# [KAVACH AUTOFIX] Externalized secret\n" + orig
     elif "XSS" in rule or "xss" in title:
-        orig = "element.innerHTML = userInput;\n"
-        patched = (
-            "// [THING AUTOFIX] XSS sanitization\n"
-            "element.textContent = userInput;\n"
-        )
+        if "innerHTML" in orig:
+            patched = orig.replace("innerHTML", "textContent")
+        else:
+            patched = "// [KAVACH AUTOFIX] Sanitized input\n" + orig
     else:
-        orig = (
-            "def execute_task(param):\n"
-            "    os.system(f'run-task {param}')\n"
-        )
-        patched = (
-            "def execute_task(param):\n"
-            "    # [THING AUTOFIX] Subprocess array execution preventing command injection\n"
-            "    subprocess.run(['run-task', param], check=True)\n"
-        )
+        if "os.system" in orig:
+            patched = re.sub(r'os\.system\s*\((.*?)\)', r'subprocess.run([\1], check=True)', orig)
+        else:
+            patched = "# [KAVACH AUTOFIX] Safe execution\n" + orig
 
     orig_lines = orig.splitlines(keepends=True)
     patched_lines = patched.splitlines(keepends=True)
     diff = "".join(difflib.unified_diff(
         orig_lines,
         patched_lines,
-        fromfile=finding.get("file_path", "source_file.py"),
-        tofile=finding.get("file_path", "source_file.py")
+        fromfile=f"a/{file_path}",
+        tofile=f"b/{file_path}"
     ))
     return patched, diff

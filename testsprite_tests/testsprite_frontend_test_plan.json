@@ -1,0 +1,586 @@
+[
+  {
+    "id": "TC001",
+    "title": "Sign in and reach the platform dashboard",
+    "description": "This verifies that an existing user can sign in with valid credentials and access the main platform dashboard.",
+    "category": "User Authentication",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the platform dashboard is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Create a new account",
+    "description": "This verifies that a new user can create an account with valid registration details and proceed into the onboarding flow.",
+    "category": "User Registration",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /signup"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the full name field with a valid name"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the company email field with a valid company email"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with a valid password"
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the next onboarding step is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Block unauthenticated access to organization onboarding",
+    "description": "This verifies that a user without an active session cannot open the organization onboarding page and is kept out of the protected flow.",
+    "category": "Organization Onboarding",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /onboarding/organization"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify access to the protected onboarding flow is blocked"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Set up a project and connect a repository",
+    "description": "This verifies that an authenticated user can create a project, choose GitHub as the provider, select scanner modules, and continue onboarding.",
+    "category": "Project Onboarding",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /onboarding/project"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the project name field with a valid project name"
+      },
+      {
+        "type": "action",
+        "description": "Select GitHub as the repository provider"
+      },
+      {
+        "type": "action",
+        "description": "Select the SAST scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Select the Secrets scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Select the SCA scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Continue the onboarding flow"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the platform dashboard is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "Complete organization onboarding and continue",
+    "description": "This verifies that an authenticated user can enter organization details and continue to the next onboarding step.",
+    "category": "Organization Onboarding",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /onboarding/organization"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the organization name field with a valid organization name"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the organization details field with valid organization details"
+      },
+      {
+        "type": "action",
+        "description": "Continue the onboarding flow"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the next onboarding step is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Create a project and finish onboarding",
+    "description": "An authenticated user can create a project during onboarding and reach the platform dashboard after continuing.",
+    "category": "Project Onboarding",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /onboarding/project"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the project name field with a unique project name"
+      },
+      {
+        "type": "action",
+        "description": "Select GitHub as the repository provider"
+      },
+      {
+        "type": "action",
+        "description": "Select the SAST scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Select the Secrets scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Select the SCA scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Continue with onboarding"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the platform dashboard"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "Review open findings on the platform dashboard",
+    "description": "A signed-in user can reach the platform dashboard and view open security findings grouped by severity.",
+    "category": "Security Scans and Findings Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /platform"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify open security findings are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify findings are grouped by severity"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC008",
+    "title": "Show validation feedback for an invalid email on sign in",
+    "description": "This verifies that the login form blocks submission with an invalid email format and shows validation feedback.",
+    "category": "User Authentication",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with an invalid email address"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with a valid password"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an email validation error is visible"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC009",
+    "title": "Set up a project with only the required onboarding choices",
+    "description": "An authenticated user can complete project onboarding with the expected core inputs and proceed to the platform dashboard.",
+    "category": "Project Onboarding",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /onboarding/project"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the project name field with a unique project name"
+      },
+      {
+        "type": "action",
+        "description": "Select GitHub as the repository provider"
+      },
+      {
+        "type": "action",
+        "description": "Select the SAST scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Continue with onboarding"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the platform dashboard is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the newly created project is available in the platform"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC010",
+    "title": "Start project onboarding from an authenticated session",
+    "description": "A returning authenticated user can open project onboarding directly, complete setup, and finish on the platform dashboard.",
+    "category": "Project Onboarding",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /onboarding/project"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the project name field with a unique project name"
+      },
+      {
+        "type": "action",
+        "description": "Select GitHub as the repository provider"
+      },
+      {
+        "type": "action",
+        "description": "Select the SCA scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Continue with onboarding"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the platform dashboard"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC011",
+    "title": "Select scanner modules during project setup",
+    "description": "An authenticated user can choose scanner modules during project onboarding and see those selections reflected after continuing.",
+    "category": "Project Onboarding",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /onboarding/project"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the project name field with a unique project name"
+      },
+      {
+        "type": "action",
+        "description": "Select GitHub as the repository provider"
+      },
+      {
+        "type": "action",
+        "description": "Select the SAST scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Select the Secrets scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Continue with onboarding"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the platform dashboard is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the selected scanner modules are available in the platform"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC012",
+    "title": "Open remediation guidance for a finding",
+    "description": "This verifies that a user can drill into a finding from the platform dashboard and view remediation guidance.",
+    "category": "Security Visibility",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /platform"
+      },
+      {
+        "type": "action",
+        "description": "Open a security finding from the dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify remediation guidance is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC013",
+    "title": "Review policy evaluation results and audit history",
+    "description": "This verifies that a governance reviewer can inspect policy evaluation results and audit trail entries from the platform dashboard.",
+    "category": "Governance and Compliance",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /platform"
+      },
+      {
+        "type": "action",
+        "description": "Open the policy evaluation view"
+      },
+      {
+        "type": "action",
+        "description": "Open the audit trail or execution history view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify compliance evaluation results are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify audit trail entries or execution history are displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC014",
+    "title": "Require a project name before continuing onboarding",
+    "description": "An authenticated user cannot continue project onboarding until a project name is provided.",
+    "category": "Project Onboarding",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /onboarding/project"
+      },
+      {
+        "type": "action",
+        "description": "Select GitHub as the repository provider"
+      },
+      {
+        "type": "action",
+        "description": "Select the SAST scanner module"
+      },
+      {
+        "type": "action",
+        "description": "Continue with onboarding"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a project name validation error is visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC015",
+    "title": "Show validation feedback for incomplete registration details",
+    "description": "This verifies that the registration form prevents account creation when required fields are missing and shows validation feedback.",
+    "category": "User Registration",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /signup"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the full name field with a valid name"
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify registration validation feedback is visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC016",
+    "title": "Handle an empty platform state cleanly",
+    "description": "A signed-in user sees a clear empty state on the platform when there are no findings or audit records to review.",
+    "category": "Security Scans and Findings Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /platform"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an empty state message is visible"
+      }
+    ],
+    "priority": "Low"
+  }
+]

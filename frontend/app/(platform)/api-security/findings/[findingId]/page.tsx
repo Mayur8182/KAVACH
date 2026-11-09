@@ -407,7 +407,7 @@ export default function FindingDetailPage() {
                         }}
                       >
                         <ShieldCheck size={14} />
-                        <span>Remediate in Fix & Verify →</span>
+                        <span>Remediate in Fix & Verify</span>
                       </Link>
                     </div>
 

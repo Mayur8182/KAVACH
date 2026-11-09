@@ -1203,16 +1203,9 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
   // Nav Tabs Specification from Reference
   const TABS = [
     { id: 'Overview', label: 'Overview', icon: LayoutGrid },
-    { id: 'Code', label: 'Code', icon: Code2, hideIcon: true, labelDisplay: '</> Code' },
-    { id: 'Security Findings', label: 'Security Findings', icon: ShieldCheck, badge: totalFindings, badgeColor: totalFindings > 0 ? '#EF4444' : '#10B981' },
-    { id: 'SAST', label: 'SAST', icon: Target, badge: sastFindings.length, badgeColor: sastFindings.length > 0 ? '#EA580C' : '#94A3B8' },
-    { id: 'Secrets', label: 'Secrets', icon: Key, badge: secretsFindings.length, badgeColor: secretsFindings.length > 0 ? '#DC2626' : '#94A3B8' },
-    { id: 'Dependencies', label: 'Dependencies', icon: GitBranch, badge: 0, badgeColor: '#94A3B8' },
-    { id: 'SBOM', label: 'SBOM', icon: Box },
-    { id: 'Container Security', label: 'Container Security', icon: Container, badge: containerFindings.length, badgeColor: containerFindings.length > 0 ? '#F59E0B' : '#94A3B8' },
-    { id: 'Supply Chain', label: 'Supply Chain', icon: Link2 },
-    { id: 'Security Jobs', label: 'Security Jobs', icon: ExternalLink },
-    { id: 'Settings', label: 'Settings', icon: Settings },
+    { id: 'Code', label: 'Files Scanned', icon: Code2, hideIcon: true, labelDisplay: '</> Files Scanned' },
+    { id: 'Security Findings', label: 'Findings', icon: ShieldCheck, badge: totalFindings, badgeColor: totalFindings > 0 ? '#EF4444' : '#10B981' },
+    { id: 'Security Jobs', label: 'Security Runs', icon: ExternalLink },
   ];
 
   const coverage = repo?.coverage || {

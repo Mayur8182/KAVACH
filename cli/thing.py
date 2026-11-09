@@ -157,12 +157,43 @@ def explain(args):
     print("Explaining finding AI... (Integration requires valid backend logic)")
     
 def fix(args):
-    print("Generating AI Fix... (Requires backend AI agent adapter)")
-    print("FIX GENERATED -> PENDING VERIFICATION")
+    finding_id = getattr(args, "finding_id", None)
+    if not finding_id:
+        print("Please specify a finding ID: thing fix --finding-id <ID>")
+        return
     
+    print(f"Applying automated remediation patch for finding {finding_id}...")
+    try:
+        req = urllib.request.Request(f"http://localhost:8000/api/v1/api-security/findings/{finding_id}/apply-fix", method="POST")
+        req.add_header('Content-Type', 'application/json')
+        with urllib.request.urlopen(req, data=json.dumps({}).encode("utf-8")) as resp:
+            data = json.loads(resp.read().decode())
+            print(f"[SUCCESS] {data.get('message')}")
+            if data.get("patch"):
+                print("\nApplied Unified Diff Patch:")
+                print(data["patch"])
+            print(f"\nTo deterministically verify this fix, run:\n  thing verify --finding-id {finding_id}")
+    except Exception as e:
+        print(f"[ERROR] Failed to apply fix: {e}")
+
 def verify(args):
-    print("Running verification against Contracts...")
-    print("VERIFICATION COMPLETED. ALL CONTRACTS SATISFIED.")
+    finding_id = getattr(args, "finding_id", None)
+    if not finding_id:
+        print("Please specify a finding ID: thing verify --finding-id <ID>")
+        return
+
+    print(f"Running deterministic rescan verification for finding {finding_id}...")
+    try:
+        req = urllib.request.Request(f"http://localhost:8000/api/v1/api-security/findings/{finding_id}/verify-fix", method="POST")
+        req.add_header('Content-Type', 'application/json')
+        with urllib.request.urlopen(req, data=json.dumps({}).encode("utf-8")) as resp:
+            data = json.loads(resp.read().decode())
+            print(f"[VERIFIED FIXED] {data.get('message')}")
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode()
+        print(f"[RESCAN FAILED] Verification rejected: {err_body}")
+    except Exception as e:
+        print(f"[ERROR] Verification failed: {e}")
 
 def run_scanner(name, cmd):
     try:
@@ -178,7 +209,7 @@ def run_scanner(name, cmd):
 def scan(args):
     config = load_config()
     git_root = get_git_root()
-    if not git_root or not config.get("bindings", {}).get(git_root):
+    if (not git_root or not config.get("bindings", {}).get(git_root)) and not getattr(args, "api", False):
         print("NOT CONNECTED")
         sys.exit(1)
         
@@ -190,10 +221,10 @@ def scan(args):
     elif args.changed:
         files_to_scan = get_changed_files()
     
-    ctx = get_context()
+    ctx = get_context() if config.get("bindings", {}).get(git_root) else {}
     policy_action = ctx.get("policy", {}).get("default_action", "ALLOW") if ctx.get("policy") else "ALLOW"
     
-    scanners_to_run = ["semgrep", "gitleaks"]
+    scanners_to_run = [] if getattr(args, "api", False) else ["semgrep", "gitleaks"]
     
     if any(f.endswith("Dockerfile") for f in files_to_scan):
         scanners_to_run.append("trivy")
@@ -230,6 +261,63 @@ def scan(args):
         elif s == "osv-scanner":
             out, success = run_scanner("OSV-Scanner", ["osv-scanner", "--json", "-r", git_root])
             if not success: has_failure = True
+
+    # Run Kavach Code-Based API Security Analyzer
+    api_findings = []
+    print("\n--- Running Kavach Code-Based API Security Analyzer ---")
+    source_files = {}
+    scan_dir = git_root or "."
+    for root, dirs, files in os.walk(scan_dir):
+        dirs[:] = [d for d in dirs if d not in [".git", "node_modules", "venv", ".venv", ".next", "__pycache__", "graphify-out", "dist", "build", ".gsd"]]
+        for fname in files:
+            if any(fname.endswith(ext) for ext in [".ts", ".js", ".py", ".go", ".java"]):
+                fpath = os.path.join(root, fname)
+                rel = os.path.relpath(fpath, scan_dir).replace("\\", "/")
+                # Focus scan on application code
+                if any(kw in rel.lower() for kw in ["src/", "routes", "controller", "api", "handler", "service"]):
+                    try:
+                        with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                            source_files[rel] = f.read()
+                    except Exception:
+                        pass
+                if len(source_files) >= 50:
+                    break
+        if len(source_files) >= 50:
+            break
+
+    # Try backend API first
+    backend_succeeded = False
+    try:
+        req = urllib.request.Request("http://localhost:8000/api/v1/api-security/code/scan", method="POST")
+        req.add_header('Content-Type', 'application/json')
+        payload = json.dumps({"files": source_files, "name": os.path.basename(scan_dir)}).encode("utf-8")
+        with urllib.request.urlopen(req, data=payload, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+            api_findings = data.get("findings", [])
+            backend_succeeded = True
+    except Exception:
+        pass
+
+    # Local engine fallback
+    if not backend_succeeded:
+        try:
+            sys.path.insert(0, os.path.join(scan_dir, "backend"))
+            from app.services.code_api_security_engine import code_api_security_engine
+            local_res = code_api_security_engine.analyze_codebase(source_files, os.path.basename(scan_dir))
+            api_findings = local_res.get("findings", [])
+        except Exception as ex:
+            print(f"[Notice] Local API security engine fallback: {ex}")
+
+    if api_findings:
+        print(f"\nKavach API Security Engine identified {len(api_findings)} OWASP API vulnerabilities:")
+        for af in api_findings:
+            sev = af.get("severity", "HIGH")
+            print(f"[{sev}] {af.get('title')}")
+            print(f"  Location: {af.get('file_path')}")
+            print(f"  OWASP Category: {af.get('owasp_category')} ({af.get('cwe')})")
+            print(f"  Root Cause: {af.get('description', '')[:120]}")
+            if af.get("id"):
+                print(f"  Remediation: Run 'thing fix --finding-id {af.get('id')}' to apply verified patch\n")
 
     if has_failure:
         if policy_action == "BLOCK":
@@ -342,8 +430,13 @@ def main():
     subparsers.add_parser("contracts")
     subparsers.add_parser("policy")
     subparsers.add_parser("findings")
-    subparsers.add_parser("verify")
-    subparsers.add_parser("fix")
+    
+    verify_parser = subparsers.add_parser("verify")
+    verify_parser.add_argument("--finding-id", type=str, help="Finding ID to deterministically rescan")
+    
+    fix_parser = subparsers.add_parser("fix")
+    fix_parser.add_argument("--finding-id", type=str, help="Finding ID to apply remediation patch")
+    
     subparsers.add_parser("explain")
     
     # scan
@@ -352,6 +445,7 @@ def main():
     scan_parser.add_argument("--staged", action="store_true")
     scan_parser.add_argument("--commit", type=str)
     scan_parser.add_argument("--format", type=str, default="human")
+    scan_parser.add_argument("--api", action="store_true", help="Run OWASP API Security code analysis")
     
     # hook
     hook_parser = subparsers.add_parser("hook")

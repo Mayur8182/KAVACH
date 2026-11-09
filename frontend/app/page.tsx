@@ -472,7 +472,7 @@ export default function KavachHomePage() {
               >
                 {/* Clear Primary CTA */}
                 <Link
-                  href="/code"
+                  href="/home"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -817,7 +817,7 @@ export default function KavachHomePage() {
             >
               <span>Click any finding row above to inspect the signed diff &amp; deterministic remediation proof.</span>
               <Link
-                href="/code"
+                href="/runs/482/findings"
                 style={{
                   color: '#2563EB',
                   fontWeight: 600,
@@ -827,7 +827,7 @@ export default function KavachHomePage() {
                   gap: '4px',
                 }}
               >
-                <span>Open in Code Security console</span>
+                <span>Open Live Multi-Agent Findings</span>
                 <ArrowRight size={13} />
               </Link>
             </div>
@@ -1072,7 +1072,7 @@ export default function KavachHomePage() {
             </h2>
 
             <Link
-              href="/code"
+              href="/runs/482"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',

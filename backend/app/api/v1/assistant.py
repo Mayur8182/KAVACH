@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func, or_, and_, String
@@ -90,6 +90,51 @@ class AssistantInviteMemberRequest(BaseModel):
     email: str
     role: Optional[str] = "Viewer"
     project_id: Optional[str] = None
+
+
+class WorkflowPlanRequest(BaseModel):
+    goal: str = Field(..., min_length=1)
+    project_id: Optional[str] = None
+    repository: Optional[str] = None
+    branch: Optional[str] = "main"
+    finding_id: Optional[str] = None
+
+
+class WorkflowApproveStepRequest(BaseModel):
+    plan_id: str
+    step_id: str = "step-5-pull-request"
+    approval_token: str
+
+
+class AttackPathAgentRequest(BaseModel):
+    finding_id: str
+    project_id: Optional[str] = None
+    repository: Optional[str] = None
+    entrypoint: Optional[str] = None
+
+
+class RemediationPlanAgentRequest(BaseModel):
+    finding_id: str
+    project_id: Optional[str] = None
+
+
+class RemediationExecuteAgentRequest(BaseModel):
+    finding_id: str
+    plan_id: str
+    project_id: Optional[str] = None
+
+
+class VerificationAgentRequest(BaseModel):
+    patch_id: str
+    project_id: Optional[str] = None
+
+
+class DynamicDAGWorkflowRequest(BaseModel):
+    goal: str
+    steps: List[Dict[str, Any]]
+    project_id: Optional[str] = None
+    repository: Optional[str] = None
+    branch: Optional[str] = "main"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -233,7 +278,8 @@ async def get_assistant_landing_overview(
         settings = get_settings()
         if getattr(settings, "github_token", None) or os.getenv("GITHUB_TOKEN"):
             gh_connected = True
-            gh_username = "Mayur8182"
+            # Use actual logged-in user's name, never hardcode
+            gh_username = current_user.name or (current_user.email.split("@")[0] if current_user.email else "Connected")
 
     # 2. Recent Scans (Card 1)
     scans_q = select(SecurityScan).order_by(desc(SecurityScan.created_at)).limit(6)
@@ -438,16 +484,48 @@ async def chat_with_assistant(
         except ValueError:
             pass
 
-    result = await orchestrator.process_user_query(
-        query=payload.message,
-        current_user=current_user,
-        conversation_id=conv_id,
-        project_id=proj_id,
-        selected_repositories=payload.repositories,
-        branch=payload.branch or "main",
-        attachments=payload.attachments,
-    )
-    return result
+    try:
+        return await orchestrator.process_user_query(
+            query=payload.message,
+            current_user=current_user,
+            conversation_id=conv_id,
+            project_id=proj_id,
+            selected_repositories=payload.repositories,
+            branch=payload.branch or "main",
+            attachments=payload.attachments,
+        )
+    except Exception as exc:
+        logger.exception(
+            "Assistant chat request failed",
+            extra={
+                "user_id": str(current_user.id),
+                "project_id": str(proj_id) if proj_id else None,
+                "conversation_id": str(conv_id) if conv_id else None,
+                "message_length": len(payload.message),
+            },
+        )
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        return {
+            "conversation_id": str(conv_id or uuid.uuid4()),
+            "message_id": str(uuid.uuid4()),
+            "content": (
+                f"⚠️ **Security Engine Notice**: The request encountered an issue.\n\n"
+                f"- **What Failed**: AI Assistant processing\n"
+                f"- **Technical Reason**: `{type(exc).__name__}: {str(exc)}`\n"
+                f"- **Actionable Step**: Check repository workspace connectivity and retry."
+            ),
+            "agent_type": "orchestrator",
+            "structured_data": {
+                "status": "ERROR",
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+            },
+            "action_execution": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -493,14 +571,46 @@ async def execute_quick_action(
             pass
 
     orchestrator = CentralActionOrchestrator(db)
-    result = await orchestrator.process_user_query(
-        query=natural_query,
-        current_user=current_user,
-        project_id=proj_id,
-        selected_repositories=payload.repositories,
-        branch=payload.branch or "main",
-    )
-    return result
+    try:
+        return await orchestrator.process_user_query(
+            query=natural_query,
+            current_user=current_user,
+            project_id=proj_id,
+            selected_repositories=payload.repositories,
+            branch=payload.branch or "main",
+        )
+    except Exception as exc:
+        logger.exception(
+            "Assistant quick action failed",
+            extra={
+                "user_id": str(current_user.id),
+                "action_key": payload.action_key,
+                "project_id": str(proj_id) if proj_id else None,
+            },
+        )
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        return {
+            "conversation_id": str(uuid.uuid4()),
+            "message_id": str(uuid.uuid4()),
+            "content": (
+                f"⚠️ **Security Engine Notice**: Quick action `{payload.action_key}` encountered an issue.\n\n"
+                f"- **What Failed**: Execution of {payload.action_key}\n"
+                f"- **Technical Reason**: `{type(exc).__name__}: {str(exc)}`\n"
+                f"- **Actionable Step**: Ensure active repository workspace is accessible and retry."
+            ),
+            "agent_type": "orchestrator",
+            "structured_data": {
+                "status": "ERROR",
+                "action_key": payload.action_key,
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+            },
+            "action_execution": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -528,6 +638,239 @@ async def approve_action_execution(
         return res
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4.5 Autonomous Security Workflow APIs
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/workflow/plan",
+    summary="Create Autonomous Security Workflow Plan",
+    description="Decomposes high-level security goal into DAG steps with risk classification and approval gates.",
+)
+async def create_workflow_plan(
+    payload: WorkflowPlanRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.intelligence.execution.plan_executor import PlanExecutor
+
+    proj = await resolve_target_project(db, current_user, payload.project_id)
+    plan = PlanExecutor.create_autonomous_workflow_plan(
+        project_id=proj.id,
+        user_id=current_user.id,
+        goal=payload.goal,
+        repository=payload.repository or proj.name,
+        branch=payload.branch or "main",
+        finding_id=payload.finding_id,
+    )
+    return plan.model_dump()
+
+
+@router.post(
+    "/workflow/execute",
+    summary="Execute Autonomous Security Workflow",
+    description="Executes workflow DAG steps up to the human approval gate (pull request).",
+)
+async def execute_workflow(
+    payload: WorkflowPlanRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.intelligence.execution.plan_executor import PlanExecutor
+
+    proj = await resolve_target_project(db, current_user, payload.project_id)
+    plan = PlanExecutor.create_autonomous_workflow_plan(
+        project_id=proj.id,
+        user_id=current_user.id,
+        goal=payload.goal,
+        repository=payload.repository or proj.name,
+        branch=payload.branch or "main",
+        finding_id=payload.finding_id,
+    )
+    executed_plan = await PlanExecutor.execute_plan(plan, db, current_user)
+    return executed_plan.model_dump()
+
+
+@router.post(
+    "/workflow/approve-step",
+    summary="Approve and Resume Workflow Step",
+    description="Validates cryptographic approval token and executes sensitive mutation (e.g. pull request).",
+)
+async def approve_workflow_step(
+    payload: WorkflowApproveStepRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.intelligence.execution.plan_executor import PlanExecutor
+
+    try:
+        updated_plan = await PlanExecutor.approve_and_execute_step(
+            plan_id=payload.plan_id,
+            step_id=payload.step_id,
+            approval_token=payload.approval_token,
+            db=db,
+            current_user=current_user,
+        )
+        return updated_plan.model_dump()
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/agents/attack-path",
+    summary="Execute Specialist Attack Path Analysis Agent",
+    description="Calculates realistic entrypoint-to-sink reachability, call hops, preconditions, mitigations, and blast radius.",
+)
+async def analyze_attack_path(
+    payload: AttackPathAgentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.intelligence.agents.attack_path_agent import AttackPathAgent
+    proj = await resolve_target_project(db, current_user, payload.project_id)
+    try:
+        out = await AttackPathAgent.run(
+            db=db,
+            current_user=current_user,
+            project_id=proj.id,
+            finding_id=payload.finding_id,
+            repository=payload.repository,
+            entrypoint=payload.entrypoint,
+        )
+        return out
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"AttackPathAgent execution error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post(
+    "/agents/remediation-plan",
+    summary="Execute Remediation Planner Agent",
+    description="Formulates strategic invariant-preserving blueprints and rollback criteria, persisting RemediationPlan in PostgreSQL.",
+)
+async def plan_remediation(
+    payload: RemediationPlanAgentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.intelligence.agents.remediation_planner_agent import RemediationPlannerAgent
+    proj = await resolve_target_project(db, current_user, payload.project_id)
+    try:
+        out = await RemediationPlannerAgent.run(
+            db=db,
+            current_user=current_user,
+            project_id=proj.id,
+            finding_id=payload.finding_id,
+        )
+        return out
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"RemediationPlannerAgent execution error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post(
+    "/agents/remediation-execute",
+    summary="Execute Remediation Executor Agent",
+    description="Synthesizes unified diffs in isolated workspaces and persists RemediationPatch records.",
+)
+async def execute_remediation(
+    payload: RemediationExecuteAgentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.intelligence.agents.remediation_executor_agent import RemediationExecutorAgent
+    proj = await resolve_target_project(db, current_user, payload.project_id)
+    try:
+        out = await RemediationExecutorAgent.run(
+            db=db,
+            current_user=current_user,
+            project_id=proj.id,
+            plan_id=payload.plan_id,
+            finding_id=payload.finding_id,
+        )
+        return out
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"RemediationExecutorAgent execution error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post(
+    "/agents/verify",
+    summary="Execute Independent Verification Agent",
+    description="Validates patch syntax and re-runs deterministic scanner checks in an isolated sandbox.",
+)
+async def verify_patch(
+    payload: VerificationAgentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.intelligence.agents.verification_agent import VerificationAgent
+    try:
+        out = await VerificationAgent.run(
+            db=db,
+            current_user=current_user,
+            patch_id=payload.patch_id,
+        )
+        return out
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"VerificationAgent execution error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post(
+    "/workflow/dag",
+    summary="Execute Dynamic DAG Workflow",
+    description="Validates DAG acyclicity and executes arbitrary specialist agent dependencies.",
+)
+async def execute_dynamic_dag_workflow(
+    payload: DynamicDAGWorkflowRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.intelligence.execution.plan_executor import PlanExecutor
+    from app.intelligence.execution.schemas import AgentStepSchema, RiskClassification, StepStatus
+    proj = await resolve_target_project(db, current_user, payload.project_id)
+
+    step_objs = []
+    for s in payload.steps:
+        step_objs.append(
+            AgentStepSchema(
+                step_id=s["step_id"],
+                agent_type=s.get("agent_type", "scan_agent"),
+                tool_id=s.get("tool_id", "scan.trigger"),
+                title=s.get("title", s["step_id"]),
+                description=s.get("description", ""),
+                risk_level=RiskClassification(s.get("risk_level", "READ_ONLY")),
+                requires_approval=s.get("requires_approval", False),
+                depends_on=s.get("depends_on", []),
+                status=StepStatus.PENDING,
+                input_params=s.get("input_params", {}),
+            )
+        )
+
+    try:
+        plan = PlanExecutor.create_dynamic_workflow_plan(
+            project_id=proj.id,
+            user_id=current_user.id,
+            goal=payload.goal,
+            steps=step_objs,
+            repository=payload.repository or proj.name,
+            branch=payload.branch or "main",
+        )
+        executed_plan = await PlanExecutor.execute_plan(plan, db, current_user)
+        return executed_plan.model_dump()
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -748,6 +1091,34 @@ class AddRepoUrlRequest(BaseModel):
     project_id: Optional[str] = None
 
 
+def _clone_repository(url: str, workspace_dir: str) -> None:
+    """Clone without holding the HTTP request open; failures remain visible in backend logs."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "clone", "--depth", "1", url, workspace_dir],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=35,
+        )
+        if result.returncode:
+            logger.error(
+                "Repository clone failed",
+                extra={
+                    "repository_url": url,
+                    "workspace_dir": workspace_dir,
+                    "return_code": result.returncode,
+                    "stderr": (result.stderr or "")[-2000:],
+                },
+            )
+            return
+        logger.info("Repository cloned", extra={"repository_url": url, "workspace_dir": workspace_dir})
+    except Exception:
+        logger.exception("Repository clone worker failed", extra={"repository_url": url, "workspace_dir": workspace_dir})
+
+
 @router.post(
     "/repositories/add-url",
     summary="Add Repository by URL or Name",
@@ -755,6 +1126,7 @@ class AddRepoUrlRequest(BaseModel):
 )
 async def add_repository_by_url(
     payload: AddRepoUrlRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -781,11 +1153,7 @@ async def add_repository_by_url(
     ws_dir = os.path.abspath(f"scratch/github_workspaces/{repo_name}")
     os.makedirs(os.path.dirname(ws_dir), exist_ok=True)
     if not os.path.exists(ws_dir) and ("github.com" in url or "/" in url or url.startswith("http")):
-        try:
-            import subprocess
-            subprocess.run(["git", "clone", "--depth", "1", url, ws_dir], check=False, capture_output=True, timeout=35)
-        except Exception as e:
-            logger.warning(f"Failed to clone {url}: {e}")
+        background_tasks.add_task(_clone_repository, url, ws_dir)
 
     # Register in GitHubRepository if not already present
     q = select(GitHubRepository).where(
@@ -997,4 +1365,3 @@ async def assistant_invite_member(
         current_user=current_user,
         project_id=proj_id,
     )
-

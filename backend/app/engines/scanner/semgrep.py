@@ -1,3 +1,4 @@
+import os
 import hashlib
 import json
 from typing import List
@@ -17,23 +18,25 @@ class SemgrepScanner(SecurityScanner):
     executable_name = "semgrep"
 
     def build_command(self, target: ScanTarget) -> List[str]:
+        target_path = os.path.abspath(target.path) if not os.path.isabs(target.path) else target.path
         return [
             self.executable_name,
             "scan",
             "--json",
-            "--config=auto",
-            "--metrics=off",
+            "--config=p/owasp-top-ten",
             "--disable-version-check",
             "--exclude=node_modules",
             "--exclude=.venv",
             "--exclude=venv",
             "--exclude=.git",
-            target.path,
+            "--exclude=.next",
+            "--exclude=.gemini",
+            target_path,
         ]
 
     def get_tolerated_exit_codes(self) -> List[int]:
-        # Semgrep exits with 0 on no findings or with findings, 1 on finding in certain modes, 2 on blocking
-        return [0, 1]
+        # Semgrep exits with 0 on no findings, 1 on findings detected, and 2 on blocking findings
+        return [0, 1, 2]
 
     async def normalize(
         self,
@@ -87,6 +90,7 @@ class SemgrepScanner(SecurityScanner):
                     column_number=col,
                     snippet=lines_snippet[:500] if lines_snippet else None,
                     fingerprint=fingerprint,
+                    category="SAST",
                     raw_metadata={
                         "metadata": extra.get("metadata", {}),
                         "engine": "semgrep",

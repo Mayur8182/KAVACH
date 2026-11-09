@@ -99,6 +99,7 @@ import {
   HardDrive,
   Activity,
   Rocket,
+  Home,
   X,
 } from 'lucide-react';
 
@@ -145,8 +146,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const pathname = usePathname() || '/code';
+  const [workspacesExpanded, setWorkspacesExpanded] = useState(false);
 
   // Workspace Context Detection
+  const isKavachCoreRoute =
+    pathname === '/home' ||
+    pathname.startsWith('/runs') ||
+    pathname.startsWith('/repositories') ||
+    pathname.startsWith('/findings') ||
+    pathname === '/agent' ||
+    pathname === '/assistant' ||
+    pathname === '/overview' ||
+    pathname === '/dashboard' ||
+    pathname === '/';
+
   const isApiSecurityWorkspace = pathname.startsWith('/api-security');
   const isDependenciesWorkspace =
     pathname.startsWith('/dependencies') ||
@@ -176,17 +189,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
     (pathname.startsWith('/code') ||
       pathname === '/overview' ||
       pathname === '/' ||
+      pathname.startsWith('/runs') ||
+      pathname.startsWith('/fixes') ||
+      pathname.startsWith('/reports') ||
+      pathname.startsWith('/assistant') ||
+      pathname.startsWith('/home') ||
       pathname.startsWith('/projects') ||
       pathname.startsWith('/policies') ||
       pathname.startsWith('/integrations') ||
       pathname.startsWith('/audit-logs') ||
       pathname.startsWith('/states') ||
-      pathname === '/repositories' ||
-      pathname === '/findings' ||
-      pathname === '/scans');
+      pathname.startsWith('/repositories') ||
+      pathname.startsWith('/findings') ||
+      pathname.startsWith('/scans'));
 
   const isCloudWorkspace =
-    pathname.startsWith('/cloud') ||
+    (pathname.startsWith('/cloud') && !pathname.includes('/docker') && !pathname.includes('/iac')) ||
     pathname.startsWith('/attack') ||
     pathname.startsWith('/kubernetes') ||
     pathname.startsWith('/compliance');
@@ -201,16 +219,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       pathname.startsWith('/soc') ||
       pathname.startsWith('/qa'));
 
-  const isGlobalWorkspace =
-    !isApiSecurityWorkspace &&
-    !isDependenciesWorkspace &&
-    !isSastWorkspace &&
-    !isContainerSecurityWorkspace &&
-    !isIacWorkspace &&
-    !isSalesWorkspace &&
-    !isCloudWorkspace &&
-    !isAdminWorkspace &&
-    !isDefenseWorkspace;
+  const isSpecializedSuite =
+    isApiSecurityWorkspace ||
+    isDependenciesWorkspace ||
+    isSastWorkspace ||
+    isContainerSecurityWorkspace ||
+    isIacWorkspace ||
+    isCloudWorkspace ||
+    isAdminWorkspace ||
+    isDefenseWorkspace ||
+    isSalesWorkspace;
+
+  const isGlobalWorkspace = !isSpecializedSuite;
 
   const { currentProject } = useProject();
 
@@ -249,26 +269,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => { active = false; };
   }, [currentProject?.id]);
 
-  // ── 0. UNIFIED PLATFORM WORKSPACE NAVIGATION (Rule 6 Master Navigation) ──
-  const workspaceItems: NavItem[] = [
-    { id: 'ws-assistant', label: 'AI Security Assistant', href: '/assistant', icon: Bot, badge: 'AI', badgeBg: '#0F172A' },
+  // ── 0. UNIFIED CORE WORKSPACE NAVIGATION (Daily DevSecOps Flow, Zero Duplicates) ──
+  const coreWorkspaceItems: NavItem[] = [
     { id: 'ws-overview', label: 'Overview', href: '/overview', icon: LayoutGrid },
-    { id: 'ws-projects', label: 'Projects', href: '/projects', icon: FolderKanban },
-    { id: 'ws-repositories', label: 'Repositories', href: '/code/repositories', icon: FolderGit2 },
-    { 
-      id: 'ws-findings', 
-      label: 'Findings', 
-      href: '/code/findings', 
-      icon: ShieldAlert, 
-      badge: badgeCounts.findings && badgeCounts.findings > 0 ? badgeCounts.findings : undefined, 
-      badgeBg: '#EF4444' 
+    { id: 'ws-assets', label: 'Assets', href: '/assets', icon: FolderGit2 },
+    {
+      id: 'ws-findings',
+      label: 'Findings',
+      href: '/findings',
+      icon: ShieldAlert,
+      badge: badgeCounts.findings && badgeCounts.findings > 0 ? badgeCounts.findings : undefined,
+      badgeBg: '#EF4444',
     },
-    { id: 'ws-scans', label: 'Scans', href: '/code/sast/scans', icon: Workflow },
-    { id: 'ws-policies', label: 'Policies', href: '/code/policies', icon: FileCheck2 },
-    { id: 'ws-integrations', label: 'Integrations', href: '/integrations', icon: Link2 },
-    { id: 'ws-audit-logs', label: 'Audit Logs', href: '/audit-logs', icon: ShieldCheck },
-    { id: 'ws-states', label: 'UI State Matrix', href: '/states', icon: Activity, badge: '15 Cats', badgeBg: '#0F172A' },
+    { id: 'ws-fixes', label: 'Fixes & Patches', href: '/fixes', icon: Sparkles },
+    { id: 'ws-runs', label: 'Security Runs', href: '/runs', icon: PlayCircle },
+    { id: 'ws-assistant', label: 'Assistant', href: '/assistant', icon: Bot, badge: 'AI', badgeBg: '#2563EB' },
+    { id: 'ws-reports', label: 'Reports', href: '/reports', icon: FileText },
   ];
+
+  // ── 1. CORE CODE SECURITY SCANNERS (Unified, Clean, No Duplicates) ──
+  const coreScannerItems: NavItem[] = [
+    { id: 'sc-repositories', label: 'Repositories', href: '/repositories', icon: FolderGit2 },
+    {
+      id: 'sc-sast',
+      label: 'SAST Analysis',
+      href: '/code/sast',
+      icon: Target,
+      badge: badgeCounts.sast && badgeCounts.sast > 0 ? badgeCounts.sast : undefined,
+      badgeBg: '#EF4444',
+    },
+    {
+      id: 'sc-secrets',
+      label: 'Secrets Detection',
+      href: '/code/secrets',
+      icon: Key,
+      badge: badgeCounts.secrets && badgeCounts.secrets > 0 ? badgeCounts.secrets : undefined,
+      badgeBg: '#EF4444',
+    },
+    {
+      id: 'sc-deps',
+      label: 'Dependencies & SCA',
+      href: '/code/dependencies',
+      icon: Box,
+      badge: badgeCounts.dependencies && badgeCounts.dependencies > 0 ? badgeCounts.dependencies : undefined,
+      badgeBg: '#EF4444',
+    },
+    { id: 'sc-iac', label: 'IaC Security', href: '/code/iac', icon: Layers },
+    { id: 'sc-containers', label: 'Container Security', href: '/code/container-security', icon: Container },
+    { id: 'sc-api-security', label: 'API Security', href: '/api-security', icon: Network, badge: 'New', badgeBg: '#18181B' },
+  ];
+
+  // ── 2. GOVERNANCE & POLICIES ──
+  const coreGovernanceItems: NavItem[] = [
+    { id: 'gov-policies', label: 'Policies (OPA)', href: '/code/policies', icon: FileCheck2 },
+    { id: 'gov-audit', label: 'Audit Logs', href: '/audit-logs', icon: ShieldCheck },
+  ];
+
+  // ── 3. SPECIALIZED PRODUCT WORKSPACES (Quick Access Drawer) ──
+  const specializedProductItems: NavItem[] = [
+    { id: 'sp-cloud', label: 'Cloud Security', href: '/cloud', icon: Cloud },
+    { id: 'sp-attack', label: 'Attack Surface', href: '/attack/surface', icon: Crosshair },
+    { id: 'sp-protect', label: 'Protect & MCP Gateway', href: '/protect', icon: ShieldCheck },
+    { id: 'sp-agent', label: 'Autonomous Agent Guard', href: '/agent', icon: Bot },
+    { id: 'sp-soc', label: 'SOC & Triage', href: '/soc', icon: Activity },
+    { id: 'sp-qa', label: 'Nexora QA', href: '/qa', icon: CheckSquare },
+  ];
+
+  // ── 4. ADMINISTRATION (De-duplicated & Clean) ──
+  const coreAdminItems: NavItem[] = [
+    { id: 'adm-integrations', label: 'Integrations', href: '/integrations', icon: Link2 },
+    { id: 'adm-settings', label: 'Settings', href: '/settings', icon: Settings },
+  ];
+
+  // Legacy fallback lists retained for specialized sub-workspaces
+  const workspaceItems: NavItem[] = coreWorkspaceItems;
 
   // ── 1. SECULAYER / THING CODE NAVIGATION (LOGICAL DEVSECOPS LIFECYCLE) ──
   const codeSourceItems: NavItem[] = [
@@ -278,44 +352,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const codeScannerItems: NavItem[] = [
-    { 
-      id: 'code-sast', 
-      label: 'SAST Analysis', 
-      href: '/code/sast', 
-      icon: Target, 
-      badge: badgeCounts.sast && badgeCounts.sast > 0 ? badgeCounts.sast : undefined, 
+    {
+      id: 'code-sast',
+      label: 'SAST Analysis',
+      href: '/code/sast',
+      icon: Target,
+      badge: badgeCounts.sast && badgeCounts.sast > 0 ? badgeCounts.sast : undefined,
       badgeBg: '#EF4444',
       children: [
         { id: 'sast-overview', label: 'Overview', href: '/code/sast' },
-        { id: 'sast-repos', label: 'Repositories & Coverage', href: '/code/repositories' },
-        { id: 'sast-findings', label: 'Findings Hub', href: '/code/findings' },
+        { id: 'sast-agent', label: 'Autonomous Agent', href: '/code/sast/agent' },
+        { id: 'sast-findings', label: 'Findings', href: '/code/sast/findings' },
         { id: 'sast-hotspots', label: 'Security Hotspots', href: '/code/sast/hotspots' },
-        { id: 'sast-prs', label: 'Pull Request Security', href: '/code/pull-requests' },
-        { id: 'sast-ai-assistant', label: 'AI Security Assistant', href: '/code/ai-security' },
-        { id: 'sast-autofix', label: 'AI Fixes & Remediation', href: '/code/autofix' },
-        { id: 'sast-scans', label: 'Scans & History', href: '/code/sast/scans' },
+        { id: 'sast-scans', label: 'Scans & Pipeline', href: '/code/sast/scans' },
         { id: 'sast-rules', label: 'Rules & Policies', href: '/code/sast/rules' },
-        { id: 'sast-baselines', label: 'Baselines & Drift', href: '/code/sast/baselines' },
-        { id: 'sast-exceptions', label: 'Risk Exceptions', href: '/code/sast/exceptions' },
-        { id: 'sast-integrations', label: 'Integrations & CI/CD', href: '/code/integrations' },
-        { id: 'sast-evidence', label: 'Evidence & Reports', href: '/code/evidence' },
-        { id: 'sast-settings', label: 'Settings', href: '/code/settings' },
+        { id: 'sast-remediation', label: 'Remediation', href: '/code/sast/remediation' },
+        { id: 'sast-reports', label: 'Reports & Evidence', href: '/code/evidence' },
+        { id: 'sast-settings', label: 'Integrations & Settings', href: '/code/sast/integrations' },
       ],
     },
-    { 
-      id: 'code-secrets', 
-      label: 'Secrets', 
-      href: '/code/secrets', 
-      icon: Key, 
-      badge: badgeCounts.secrets && badgeCounts.secrets > 0 ? badgeCounts.secrets : undefined, 
-      badgeBg: '#EF4444' 
+    {
+      id: 'code-secrets',
+      label: 'Secrets',
+      href: '/code/secrets',
+      icon: Key,
+      badge: badgeCounts.secrets && badgeCounts.secrets > 0 ? badgeCounts.secrets : undefined,
+      badgeBg: '#EF4444'
     },
-    { 
-      id: 'code-deps', 
-      label: 'Dependencies', 
-      href: '/code/dependencies', 
-      icon: Box, 
-      badge: badgeCounts.dependencies && badgeCounts.dependencies > 0 ? badgeCounts.dependencies : undefined, 
+    {
+      id: 'code-deps',
+      label: 'Dependencies',
+      href: '/code/dependencies',
+      icon: Box,
+      badge: badgeCounts.dependencies && badgeCounts.dependencies > 0 ? badgeCounts.dependencies : undefined,
       badgeBg: '#EF4444',
       children: [
         { id: 'deps-overview', label: 'Overview', href: '/code/dependencies' },
@@ -337,36 +406,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     { id: 'code-sbom', label: 'SBOM', href: '/code/sbom', icon: FileCode2 },
     { id: 'code-supply-chain', label: 'Supply Chain', href: '/code/supply-chain', icon: Network },
-    { 
-      id: 'code-iac', 
-      label: 'IaC Security', 
-      href: '/code/iac', 
+    {
+      id: 'code-iac',
+      label: 'IaC Security',
+      href: '/code/iac',
       icon: Layers,
     },
-    { 
-      id: 'code-containers', 
-      label: 'Container Security', 
-      href: '/container-security', 
+    {
+      id: 'code-containers',
+      label: 'Container Security',
+      href: '/code/container-security',
       icon: Container,
     },
-    { 
-      id: 'code-api-security', 
-      label: 'API Security', 
-      href: '/api-security', 
+    {
+      id: 'code-api-security',
+      label: 'API Security',
+      href: '/api-security',
       icon: Network,
       badge: 'New',
-      badgeBg: '#18181B' 
+      badgeBg: '#18181B'
     },
   ];
 
   const codeTriageItems: NavItem[] = [
-    { 
-      id: 'code-findings', 
-      label: 'Security Findings', 
-      href: '/code/findings', 
-      icon: ShieldAlert, 
-      badge: badgeCounts.findings && badgeCounts.findings > 0 ? badgeCounts.findings : undefined, 
-      badgeBg: '#EF4444' 
+    {
+      id: 'code-findings',
+      label: 'Security Findings',
+      href: '/code/findings',
+      icon: ShieldAlert,
+      badge: badgeCounts.findings && badgeCounts.findings > 0 ? badgeCounts.findings : undefined,
+      badgeBg: '#EF4444'
     },
     { id: 'code-autofix', label: 'Autofix & Patches', href: '/code/autofix', icon: Sparkles },
     { id: 'code-evidence', label: 'Evidence Store', href: '/code/evidence', icon: ShieldCheck },
@@ -414,7 +483,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'adm-settings', label: 'Settings', href: '/settings', icon: Settings },
   ];
 
-  // ── 4. API SECURITY & DEFENSE ENGINES ──
+  // ── 4. BACK ITEMS FOR WORKSPACES ──
+  const cloudBackItem: NavItem = {
+    id: 'cloud-back-dashboard',
+    label: '← Back to Dashboard',
+    href: '/overview',
+    icon: ArrowLeft,
+  };
+
+  const adminBackItem: NavItem = {
+    id: 'admin-back-dashboard',
+    label: '← Back to Dashboard',
+    href: '/overview',
+    icon: ArrowLeft,
+  };
+
+  const defenseBackItem: NavItem = {
+    id: 'defense-back-dashboard',
+    label: '← Back to Dashboard',
+    href: '/overview',
+    icon: ArrowLeft,
+  };
+
+  const salesBackItem: NavItem = {
+    id: 'sales-back-dashboard',
+    label: '← Back to Dashboard',
+    href: '/overview',
+    icon: ArrowLeft,
+  };
+
   const apiSecurityBackItem: NavItem = {
     id: 'api-back-dashboard',
     label: '← Back to Dashboard',
@@ -472,23 +569,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const sastItems: NavItem[] = [
     { id: 'sast-overview', label: 'Overview', href: '/code/sast', icon: LayoutGrid },
-    { 
-      id: 'sast-findings', 
-      label: 'Vulnerability Findings', 
-      href: '/code/sast/findings', 
-      icon: ShieldAlert, 
-      badge: badgeCounts.sast && badgeCounts.sast > 0 ? badgeCounts.sast : undefined, 
-      badgeBg: '#EF4444' 
+    {
+      id: 'sast-agent',
+      label: 'Autonomous Agent',
+      href: '/code/sast/agent',
+      icon: Bot,
+      badge: 'LIVE',
+      badgeBg: '#10B981',
     },
-    { id: 'sast-rules', label: 'Rules & Policies', href: '/code/sast/rules', icon: CheckSquare },
+    {
+      id: 'sast-findings',
+      label: 'Findings',
+      href: '/code/sast/findings',
+      icon: ShieldAlert,
+      badge: badgeCounts.sast && badgeCounts.sast > 0 ? badgeCounts.sast : undefined,
+      badgeBg: '#EF4444',
+    },
     { id: 'sast-hotspots', label: 'Security Hotspots', href: '/code/sast/hotspots', icon: Flame },
-    { id: 'sast-scans', label: 'Scans & Telemetry', href: '/code/sast/scans', icon: Workflow },
-    { id: 'sast-baselines', label: 'Baselines & Drift', href: '/code/sast/baselines', icon: Layers },
-    { id: 'sast-exceptions', label: 'Risk Exceptions', href: '/code/sast/exceptions', icon: ShieldCheck },
-    { id: 'sast-autofix', label: 'AI AutoFix & Patches', href: '/code/autofix', icon: Sparkles },
-    { id: 'sast-integrations', label: 'Integrations & CI/CD', href: '/code/sast/integrations', icon: Link2 },
+    { id: 'sast-scans', label: 'Scans & Pipeline', href: '/code/sast/scans', icon: Workflow },
+    { id: 'sast-rules', label: 'Rules & Policies', href: '/code/sast/rules', icon: CheckSquare },
+    { id: 'sast-remediation', label: 'Remediation', href: '/code/sast/remediation', icon: Sparkles },
     { id: 'sast-reports', label: 'Reports & Evidence', href: '/code/evidence', icon: FileText },
-    { id: 'sast-settings', label: 'Settings', href: '/code/settings', icon: Settings },
+    { id: 'sast-integrations', label: 'Integrations & Settings', href: '/code/sast/integrations', icon: Settings },
   ];
 
   // ── 4C. KAVACH / CONTAINER SECURITY EXCLUSIVE NAVIGATION ──
@@ -763,65 +865,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return pathname === '/compliance' || pathname.startsWith('/cloud/compliance');
     }
 
-    // 4. Workspace items
-    if (href === '/projects') {
-      return pathname === '/projects' || pathname.startsWith('/projects/');
+    // 4. Permanent Core Items
+    if (href === '/overview') {
+      return pathname === '/overview' || pathname === '/home' || pathname === '/dashboard' || pathname === '/code' || pathname === '/';
     }
-    if (href === '/repositories' || href === '/code/repositories') {
-      return pathname.startsWith('/code/repositories') || pathname === '/repositories';
+    if (href === '/assistant') {
+      return pathname.startsWith('/assistant') || pathname.startsWith('/agent');
     }
-    if (href === '/api-security/discovery') {
-      return pathname.startsWith('/api-security/discovery');
+    if (href === '/repositories') {
+      return pathname.startsWith('/repositories') || pathname.startsWith('/code/repositories');
     }
-    if (href === '/findings' || href === '/code/findings') {
-      return pathname === '/findings' || pathname.startsWith('/code/findings');
+    if (href === '/runs') {
+      return pathname.startsWith('/runs') || pathname.startsWith('/scans') || pathname.startsWith('/code/sast/scans') || pathname.startsWith('/code/scans');
     }
-    if (href === '/scans' || href === '/code/sast/scans') {
-      return pathname === '/scans' || pathname.startsWith('/code/sast/scans') || pathname.startsWith('/code/scans');
+    if (href === '/findings') {
+      return pathname.startsWith('/findings') || pathname.startsWith('/code/findings');
     }
-    if (href === '/policies' || href === '/code/policies') {
+    if (href === '/fixes') {
+      return pathname.startsWith('/fixes') || pathname.startsWith('/code/autofix');
+    }
+    if (href === '/reports') {
+      return pathname.startsWith('/reports') || pathname.startsWith('/code/evidence');
+    }
+    if (href === '/policies') {
       return (
         pathname === '/policies' ||
+        pathname.startsWith('/policies/') ||
         pathname.startsWith('/code/policies') ||
         pathname.startsWith('/code/settings/policies')
       );
     }
-    if (href === '/integrations') {
+    if (href === '/settings') {
       return (
+        pathname === '/settings' ||
+        pathname.startsWith('/settings/') ||
         pathname === '/integrations' ||
         pathname.startsWith('/integrations/') ||
-        pathname === '/code/integrations' ||
-        pathname.startsWith('/code/settings/integrations') ||
-        pathname.startsWith('/code/secrets/integrations')
+        pathname.startsWith('/code/settings')
       );
-    }
-    if (href === '/audit-logs') {
-      return (
-        pathname === '/audit-logs' ||
-        pathname.startsWith('/audit-logs/') ||
-        pathname.startsWith('/protect/evidence') ||
-        pathname.startsWith('/cloud/evidence')
-      );
-    }
-
-    // 5. Administration
-    if (href === '/settings/members') {
-      return pathname.startsWith('/settings/members');
-    }
-    if (href === '/settings/roles') {
-      return pathname.startsWith('/settings/roles');
-    }
-    if (href === '/settings/api-keys') {
-      return pathname === '/settings/api-keys';
-    }
-    if (href === '/settings/sso') {
-      return pathname === '/settings/sso';
-    }
-    if (href === '/settings/billing') {
-      return pathname.startsWith('/settings/billing');
-    }
-    if (href === '/settings') {
-      return pathname === '/settings';
     }
 
     // 6. Specialized Defense & API Security
@@ -892,48 +973,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: isEffectiveCollapsed ? 'center' : 'space-between',
-            padding: isEffectiveCollapsed ? '9px 0' : '6px 10px',
-            borderRadius: '6px',
-            backgroundColor: isActive && !hasChildren ? '#F1F5F9' : isChildrenExpanded ? '#F8FAFC' : 'transparent',
-            color: isActive || isChildrenExpanded ? '#09090B' : '#334155',
+            padding: isEffectiveCollapsed ? '9px 0' : '7px 12px',
+            borderRadius: '7px',
+            backgroundColor: isActive && !hasChildren ? '#F0FDF4' : isChildrenExpanded ? '#F8FAFC' : 'transparent',
+            border: isActive && !hasChildren ? '1px solid #BBF7D0' : '1px solid transparent',
+            color: isActive ? '#0F172A' : isChildrenExpanded ? '#09090B' : '#475569',
             fontWeight: isActive || isChildrenExpanded ? 600 : 500,
             fontSize: '13px',
             textDecoration: 'none',
-            transition: 'background-color 120ms ease, color 120ms ease',
-            margin: '1px 0',
+            transition: 'background-color 120ms ease, color 120ms ease, border-color 120ms ease',
+            margin: '2px 0',
           }}
           onMouseEnter={(e) => {
             if (!isActive && !isChildrenExpanded) {
-              e.currentTarget.style.backgroundColor = '#F1F5F9';
+              e.currentTarget.style.backgroundColor = '#F8FAFC';
               e.currentTarget.style.color = '#0F172A';
             }
           }}
           onMouseLeave={(e) => {
             if (!isActive && !isChildrenExpanded) {
               e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = '#334155';
+              e.currentTarget.style.color = '#475569';
             }
           }}
         >
-          {/* Visual indicator for active item without children */}
-          {isActive && !hasChildren && (
-            <div
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: '4px',
-                bottom: '4px',
-                width: '3px',
-                borderRadius: '0 3px 3px 0',
-                backgroundColor: '#09090B',
-              }}
-            />
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
             <Icon
               size={16}
-              color={isActive || isChildrenExpanded ? '#09090B' : '#64748B'}
+              color={isActive ? '#16A34A' : isChildrenExpanded ? '#09090B' : '#64748B'}
               style={{ flexShrink: 0 }}
             />
             {!isEffectiveCollapsed && (
@@ -1231,31 +1298,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-        {/* ── 0. UNIFIED PLATFORM WORKSPACE (Rule 6 Master Navigation) ── */}
-        {!isIacWorkspace && !isContainerSecurityWorkspace && !isApiSecurityWorkspace && !isSastWorkspace && !isDependenciesWorkspace && (
+        {/* ── 0. UNIFIED PLATFORM WORKSPACE (Ultra Clean, Essential Daily Flow) ── */}
+        {!isSpecializedSuite && (
           <>
             {headerRenderer('Workspace')}
-            {workspaceItems.map(itemRenderer)}
-          </>
-        )}
+            {coreWorkspaceItems.map(itemRenderer)}
 
-        {/* ── 1. SECULAYER / THING CODE WORKSPACE NAVIGATION ── */}
-        {(isCodeWorkspace || isGlobalWorkspace) && (
-          <>
             {headerRenderer('Security Scanners')}
-            {codeScannerItems.map(itemRenderer)}
+            {coreScannerItems.map(itemRenderer)}
 
-            {headerRenderer('Triage & Remediation')}
-            {codeTriageItems.map(itemRenderer)}
-
-            {headerRenderer('CI/CD & Gateways')}
-            {codeGatewayItems.map(itemRenderer)}
+            {headerRenderer('Governance & Settings')}
+            {coreGovernanceItems.map(itemRenderer)}
+            {coreAdminItems.map(itemRenderer)}
           </>
         )}
 
         {/* ── 2. THING CLOUD WORKSPACE EXCLUSIVE NAVIGATION ── */}
         {isCloudWorkspace && (
           <>
+            <div style={{ marginBottom: '4px' }}>
+              {itemRenderer(cloudBackItem)}
+            </div>
             {headerRenderer('Cloud & Infrastructure')}
             {cloudInfraItems.map(itemRenderer)}
 
@@ -1270,6 +1333,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* ── 3. ADMINISTRATION EXCLUSIVE NAVIGATION ── */}
         {isAdminWorkspace && (
           <>
+            <div style={{ marginBottom: '4px' }}>
+              {itemRenderer(adminBackItem)}
+            </div>
             {headerRenderer('Access & Identity')}
             {adminAccessItems.map(itemRenderer)}
 
@@ -1308,6 +1374,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             {headerRenderer('SAST Analysis Engine')}
             {sastItems.map(itemRenderer)}
+
+            {headerRenderer('AI & Multi-Agent Guard')}
+            {itemRenderer({
+              id: 'sast-nav-assistant',
+              label: 'AI Security Assistant',
+              href: '/assistant',
+              icon: Bot,
+              badge: 'AI',
+              badgeBg: '#2563EB',
+            })}
+            {itemRenderer({
+              id: 'sast-nav-agent-guard',
+              label: 'Autonomous Agent Guard',
+              href: '/agent',
+              icon: Bot,
+            })}
+            {itemRenderer({
+              id: 'sast-nav-runs',
+              label: 'Multi-Agent Runs',
+              href: '/runs',
+              icon: PlayCircle,
+            })}
           </>
         )}
 
@@ -1344,8 +1432,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {containerGovernanceItems.map(itemRenderer)}
           </>
         )}
+
+        {/* ── 6. SPECIALIZED DEFENSE WORKSPACE NAVIGATION ── */}
         {isDefenseWorkspace && (
           <>
+            <div style={{ marginBottom: '4px' }}>
+              {itemRenderer(defenseBackItem)}
+            </div>
             {headerRenderer('Runtime & Gateways')}
             {defenseRuntimeItems.map(itemRenderer)}
 
@@ -1357,6 +1450,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* ── 7. SALES & ENTERPRISE WORKSPACE EXCLUSIVE NAVIGATION ── */}
         {isSalesWorkspace && (
           <>
+            <div style={{ marginBottom: '4px' }}>
+              {itemRenderer(salesBackItem)}
+            </div>
             {headerRenderer('Sales Dashboard')}
             {salesCoreItems.map(itemRenderer)}
 
@@ -1557,15 +1653,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   width: '26px',
                   height: '26px',
                   borderRadius: '6px',
-                  backgroundColor: '#EFF6FF',
-                  color: '#2563EB',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
-                <FileCode2 size={15} />
+                <img
+                  src="/kavach-cube.png"
+                  alt="Kavach"
+                  style={{ width: '16px', height: '16px', objectFit: 'contain' }}
+                />
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, color: '#0F172A', lineHeight: 1.2 }}>
@@ -1595,7 +1695,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 textDecoration: 'none',
               }}
             >
-              <FileCode2 size={15} />
+              <img
+                src="/kavach-cube.png"
+                alt="Kavach"
+                style={{ width: '16px', height: '16px', objectFit: 'contain' }}
+              />
             </Link>
           </div>
         )}

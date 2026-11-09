@@ -1,27 +1,17 @@
 'use client';
 
 /**
- * /mfa/setup — SecuLayer MFA Setup (Step 1 of 4)
- * Matches screen 26 in the specification exactly.
+ * /mfa/setup — SecuLayer MFA Setup (Step 2 of Onboarding: Optional 2FA)
+ * Fully optional, can be skipped with 1 click to proceed directly to workspace setup.
  * Generates real TOTP secret via POST /api/v1/auth/mfa/setup.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Check, Copy, ChevronDown, ChevronUp, Shield, ArrowRight } from 'lucide-react';
+import { Check, Copy, ChevronDown, ChevronUp, Shield, ArrowRight, ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
-
-const Logo = () => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-    <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
-      <path d="M14 2L25 8.2V20L14 26L3 20V8.2L14 2Z" stroke="#0F172A" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M14 2V14M14 14L25 8.2M14 14L3 8.2M14 14V26" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-    <span style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.03em', color: '#0F172A' }}>SecuLayer</span>
-  </div>
-);
 
 // Real Scannable QR Code generator for TOTP authenticators
 function QrCodeSvg({ value, size = 164 }: { value: string; size?: number }) {
@@ -99,7 +89,7 @@ function MfaSetupContent() {
           setSecretKey(res.secret);
           setTotpUri(res.totp_uri || `otpauth://totp/SecuLayer:${activeEmail}?secret=${res.secret}&issuer=SecuLayer`);
         }
-      } catch (err) {
+      } catch {
         if (isMounted) {
           setSecretKey('JBSWY3DPEHPK3PXP');
           setTotpUri(`otpauth://totp/SecuLayer:${email || 'you@company.com'}?secret=JBSWY3DPEHPK3PXP&issuer=SecuLayer`);
@@ -112,7 +102,7 @@ function MfaSetupContent() {
     return () => {
       isMounted = false;
     };
-  }, [searchParams]);
+  }, [searchParams, email]);
 
   const handleCopy = () => {
     if (!secretKey) return;
@@ -126,228 +116,129 @@ function MfaSetupContent() {
     router.push(`/mfa/verify?secret=${encodeURIComponent(secretKey || 'JBSWY3DPEHPK3PXP')}&email=${encodeURIComponent(finalEmail)}`);
   };
 
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC', fontFamily: 'Inter, -apple-system, sans-serif' }}>
+  const handleSkipMfa = async () => {
+    try {
+      await api.onboarding.updateState({
+        mfa_skipped: true,
+        current_step: 'workspace',
+      } as any);
+    } catch {
+      // Continue anyway
+    }
+    const finalEmail = email || searchParams.get('email') || '';
+    router.push(`/onboarding/organization?email=${encodeURIComponent(finalEmail)}&skipped_mfa=true`);
+  };
 
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#FAFAFA', fontFamily: 'Inter, -apple-system, sans-serif' }}>
       {/* Top Header Navigation */}
       <SecuLayerHeader />
 
-      {/* Main Container with Left Stepper and Right Content Card */}
-      <main style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '48px 24px' }}>
-        <div style={{ width: '100%', maxWidth: 1040, display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: 36, alignItems: 'start' }} className="mfa-layout">
-          {/* Left Stepper Sidebar */}
-          <div>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', margin: '0 0 24px', letterSpacing: '-0.01em' }}>
-              Set up Multi-Factor Authentication
-            </h2>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Step 1 - Active */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    backgroundColor: '#2563EB',
-                    color: '#FFFFFF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    flexShrink: 0,
-                  }}
-                >
-                  1
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#2563EB' }}>Authenticator App</div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>Scan QR code</div>
-                </div>
-              </div>
-
-              {/* Step 2 - Inactive */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, opacity: 0.6 }}>
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    border: '1.5px solid #CBD5E1',
-                    color: '#64748B',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    flexShrink: 0,
-                  }}
-                >
-                  2
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>Verify Code</div>
-                  <div style={{ fontSize: 12, color: '#94A3B8' }}>Confirm setup</div>
-                </div>
-              </div>
-
-              {/* Step 3 - Inactive */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, opacity: 0.6 }}>
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    border: '1.5px solid #CBD5E1',
-                    color: '#64748B',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    flexShrink: 0,
-                  }}
-                >
-                  3
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>Recovery Codes</div>
-                  <div style={{ fontSize: 12, color: '#94A3B8' }}>Save for account recovery</div>
-                </div>
-              </div>
-
-              {/* Step 4 - Inactive */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, opacity: 0.6 }}>
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    border: '1.5px solid #CBD5E1',
-                    color: '#64748B',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    flexShrink: 0,
-                  }}
-                >
-                  4
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>Complete</div>
-                  <div style={{ fontSize: 12, color: '#94A3B8' }}>Enable MFA</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Main Content Card */}
+      {/* Main Container */}
+      <main style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px 20px' }}>
+        <div style={{ width: '100%', maxWidth: '640px' }}>
           <div
             style={{
               backgroundColor: '#FFFFFF',
               border: '1px solid #E2E8F0',
-              borderRadius: 12,
-              boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)',
-              padding: '36px 36px',
+              borderRadius: '16px',
+              padding: '36px',
+              boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)',
             }}
           >
-            {/* Step Tag */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#2563EB', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-              STEP 1 OF 4
-            </div>
-
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
-              Set up an authenticator app
-            </h1>
-
-            <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 28px', lineHeight: 1.5 }}>
-              Use an authenticator app like Google Authenticator, Microsoft Authenticator, or 1Password to scan the QR code.
-            </p>
-
-            {/* QR Code and Steps Container */}
-            <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', marginBottom: 28, flexWrap: 'wrap' }}>
-              {/* QR Code Canvas */}
-              <div>
-                <QrCodeSvg value={totpUri} size={164} />
+            {/* Header with Step Indicator */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#09090B', backgroundColor: '#F4F4F5', padding: '4px 10px', borderRadius: '6px' }}>
+                  Step 2 of 5
+                </span>
+                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>
+                  Optional Security Guardrail
+                </span>
               </div>
-
-              {/* Numbered Instruction Steps */}
-              <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', backgroundColor: '#F1F5F9', color: '#475569', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    1
-                  </div>
-                  <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.4 }}>
-                    Open your authenticator app (Google Authenticator, Microsoft Authenticator, etc.)
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', backgroundColor: '#F1F5F9', color: '#475569', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    2
-                  </div>
-                  <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.4 }}>
-                    Scan this QR code
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', backgroundColor: '#F1F5F9', color: '#475569', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    3
-                  </div>
-                  <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.4 }}>
-                    Enter the 6-digit code in the next step to verify
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Expandable Manual Key Section */}
-            <div style={{ marginBottom: 28 }}>
               <button
                 type="button"
-                onClick={() => setShowManual(v => !v)}
+                onClick={handleSkipMfa}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#2563EB',
-                  fontSize: 13,
+                  fontSize: '13px',
                   fontWeight: 600,
+                  color: '#64748B',
+                  backgroundColor: 'transparent',
+                  border: 'none',
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#09090B')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#64748B')}
+              >
+                <span>Skip for now</span>
+                <ArrowRight size={13} />
+              </button>
+            </div>
+
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', margin: '0 0 8px 0' }}>
+              Multi-Factor Authentication (2FA)
+            </h1>
+            <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 28px 0', lineHeight: 1.5 }}>
+              Scan this QR code with Google Authenticator, 1Password, or Authy to enable hardware/TOTP verification for your account. You can also configure this later in Settings.
+            </p>
+
+            {/* QR Code Container */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px solid #F1F5F9', marginBottom: '24px' }}>
+              {loading ? (
+                <div style={{ padding: 40, color: '#64748B', fontSize: 13, fontWeight: 500 }}>
+                  Generating security keys...
+                </div>
+              ) : (
+                <>
+                  <QrCodeSvg value={totpUri || `otpauth://totp/SecuLayer:${email}?secret=JBSWY3DPEHPK3PXP&issuer=SecuLayer`} size={170} />
+                  <span style={{ fontSize: '12px', color: '#64748B', marginTop: '12px', fontWeight: 500 }}>
+                    Point your camera or authenticator scanner at this code
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Manual Key Accordion */}
+            <div style={{ marginBottom: '28px' }}>
+              <button
+                type="button"
+                onClick={() => setShowManual(!showManual)}
+                style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 4,
+                  gap: '6px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  color: '#09090B',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
                   padding: 0,
-                  marginBottom: showManual ? 12 : 0,
                 }}
               >
-                <span>Can&apos;t scan the code? Enter setup key manually</span>
-                {showManual ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                {showManual ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                <span>Can&apos;t scan QR code? Enter setup key manually</span>
               </button>
 
               {showManual && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
-                    Manual setup key
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, maxWidth: 420 }}>
+                <div style={{ marginTop: '12px', padding: '14px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
                     <input
                       type="text"
                       readOnly
                       value={secretKey}
                       style={{
                         flex: 1,
-                        padding: '9px 12px',
+                        padding: '8px 12px',
                         border: '1px solid #CBD5E1',
-                        borderRadius: 6,
+                        borderRadius: '6px',
                         fontFamily: 'monospace',
-                        fontSize: 13,
+                        fontSize: '13px',
                         fontWeight: 600,
-                        letterSpacing: '0.05em',
-                        backgroundColor: '#F8FAFC',
+                        backgroundColor: '#FFFFFF',
                         color: '#0F172A',
                         outline: 'none',
                       }}
@@ -358,12 +249,12 @@ function MfaSetupContent() {
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 6,
-                        padding: '9px 14px',
+                        gap: '6px',
+                        padding: '8px 14px',
                         backgroundColor: '#FFFFFF',
                         border: '1px solid #CBD5E1',
-                        borderRadius: 6,
-                        fontSize: 13,
+                        borderRadius: '6px',
+                        fontSize: '13px',
                         fontWeight: 600,
                         color: copied ? '#059669' : '#334155',
                         cursor: 'pointer',
@@ -373,36 +264,63 @@ function MfaSetupContent() {
                       <span>{copied ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
-                  <div style={{ fontSize: 12, color: '#64748B', marginTop: 6 }}>
-                    Enter this key in your authenticator app if you can&apos;t scan the QR code.
-                  </div>
                 </div>
               )}
             </div>
 
             {/* Bottom Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 16, borderTop: '1px solid #F1F5F9' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+              <button
+                type="button"
+                id="mfa-skip-btn"
+                onClick={handleSkipMfa}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 18px',
+                  backgroundColor: '#FFFFFF',
+                  color: '#64748B',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F8FAFC';
+                  e.currentTarget.style.color = '#0F172A';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.color = '#64748B';
+                }}
+              >
+                <span>Skip for now</span>
+              </button>
+
               <button
                 type="button"
                 id="mfa-setup-continue-btn"
                 onClick={handleContinue}
                 style={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 24px',
-                  backgroundColor: '#2563EB',
+                  gap: '8px',
+                  padding: '11px 24px',
+                  backgroundColor: '#09090B',
                   color: '#FFFFFF',
                   border: 'none',
-                  borderRadius: 6,
-                  fontSize: 14,
+                  borderRadius: '8px',
+                  fontSize: '14px',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                   transition: 'background-color 0.15s ease',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#1D4ED8')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#2563EB')}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#27272A')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#09090B')}
               >
                 <span>Continue</span>
                 <ArrowRight size={15} />
@@ -411,21 +329,13 @@ function MfaSetupContent() {
           </div>
         </div>
       </main>
-
-      <style jsx>{`
-        @media (max-width: 768px) {
-          .mfa-layout {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
 
 export default function MfaSetupPage() {
   return (
-    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>}>
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading MFA setup...</div>}>
       <MfaSetupContent />
     </Suspense>
   );

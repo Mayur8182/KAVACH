@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 from typing import List
 
 from app.engines.scanner.base import SecurityScanner
@@ -17,9 +18,37 @@ class OsvScanner(SecurityScanner):
     executable_name = "osv-scanner"
 
     def build_command(self, target: ScanTarget) -> List[str]:
+        target_dir = target.path if os.path.isdir(target.path) else os.path.dirname(target.path)
+        lockfile_names = [
+            "package-lock.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            "requirements.txt",
+            "Pipfile.lock",
+            "poetry.lock",
+            "go.mod",
+            "Cargo.lock",
+        ]
+        found_lockfiles = []
+        if os.path.isdir(target_dir):
+            for lf in lockfile_names:
+                cand = os.path.join(target_dir, lf)
+                if os.path.isfile(cand):
+                    found_lockfiles.append(cand)
+
+        if found_lockfiles:
+            cmd = [self.executable_name, "scan", "source", "--format", "json"]
+            for lf in found_lockfiles:
+                cmd.extend(["-L", lf])
+            return cmd
+
         return [
             self.executable_name,
-            "--json",
+            "scan",
+            "source",
+            "--format",
+            "json",
+            "--allow-no-lockfiles",
             "-r",
             target.path,
         ]

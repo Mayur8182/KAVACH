@@ -3,7 +3,6 @@ import sqlite3
 
 app = Flask(__name__)
 
-# User route with finding CWE-89
 @app.route('/user', methods=['GET'])
 def get_user():
     user_id = request.args.get('id')

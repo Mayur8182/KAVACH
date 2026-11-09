@@ -101,7 +101,7 @@ export default function OnboardingConfigurationPage() {
       } catch (compErr) {
         console.warn('Could not mark onboarding complete:', compErr);
       }
-      router.push('/code');
+      router.push('/onboarding/complete');
     } catch (err: any) {
       console.error('Failed to save configuration:', err);
       setError(err?.message || 'Failed to finalize setup. Please verify your settings and try again.');
@@ -116,17 +116,7 @@ export default function OnboardingConfigurationPage() {
       title="Configure Selected Products"
       subtitle="Set up the initial configuration for your selected products."
     >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.45fr) 300px',
-          gap: '32px',
-          alignItems: 'start',
-        }}
-        className="onboarding-split"
-      >
-        {/* Left Configuration Container */}
-        <div>
+      <div style={{ maxWidth: '680px', margin: '0 auto', width: '100%' }}>
           {error && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '6px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', fontSize: '13px', marginBottom: '18px' }}>
               <AlertCircle size={16} />
@@ -563,90 +553,25 @@ export default function OnboardingConfigurationPage() {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '9px 24px',
-                backgroundColor: '#2563EB',
+                gap: '8px',
+                padding: '11px 26px',
+                backgroundColor: '#09090B',
                 border: 'none',
-                borderRadius: '6px',
-                fontSize: '13px',
+                borderRadius: '8px',
+                fontSize: '14px',
                 fontWeight: 600,
                 color: '#FFFFFF',
                 cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(37,99,235,0.25)',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                transition: 'background-color 0.15s ease',
               }}
-              className="hover:bg-blue-700"
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#27272A')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#09090B')}
             >
-              <Check size={15} strokeWidth={2.5} />
-              <span>{loading ? 'Finalizing Setup...' : 'Finish Setup'}</span>
+              <Check size={16} strokeWidth={2.5} />
+              <span>{loading ? 'Finalizing Setup...' : 'Finish Setup & Launch'}</span>
             </button>
           </div>
-        </div>
-
-        {/* Right Info Card: You're Almost Ready! */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '10px',
-            padding: '24px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          }}
-        >
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '8px',
-              backgroundColor: '#EFF6FF',
-              color: '#2563EB',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '16px',
-            }}
-          >
-            <Rocket size={20} />
-          </div>
-
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: '0 0 6px 0' }}>
-            You&apos;re Almost Ready!
-          </h3>
-
-          <p style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.45, margin: '0 0 18px 0' }}>
-            Your organization, workspace, project and environment are configured. Review the settings and finish the setup.
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[
-              'Organization created',
-              'Workspace created',
-              'Project created',
-              'Environment configured',
-              'Products selected',
-              'Configuration completed',
-            ].map((text, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#16A34A', fontWeight: 500 }}>
-                <div
-                  style={{
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '50%',
-                    backgroundColor: '#ECFDF5',
-                    color: '#16A34A',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '11px',
-                    flexShrink: 0,
-                  }}
-                >
-                  ✓
-                </div>
-                <span>{text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </OnboardingLayout>
   );

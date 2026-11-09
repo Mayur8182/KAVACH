@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 class HotspotSummaryResponse(BaseModel):
     total: int = Field(..., description="Total detected security hotspots")
     review: int = Field(..., description="Hotspots pending review")
+    in_review: int = Field(default=0, description="Hotspots currently under active investigation")
+    confirmed_risk: int = Field(default=0, description="Hotspots confirmed as actual security risk")
     acknowledged: int = Field(..., description="Hotspots acknowledged with accepted risk")
     safe: int = Field(..., description="Hotspots manually verified safe")
     fixed: int = Field(..., description="Hotspots remediated and verified fixed")
@@ -103,8 +105,8 @@ class HotspotCodeResponse(BaseModel):
 
 
 class UpdateStatusRequest(BaseModel):
-    status: str = Field(..., description="Target review status: TO_REVIEW, ACKNOWLEDGED, SAFE, FALSE_POSITIVE, FIXED")
-    comment: Optional[str] = Field(None, description="Optional review justification comment")
+    status: str = Field(..., description="Target review status: TO_REVIEW, IN_REVIEW, CONFIRMED_RISK, SAFE, FALSE_POSITIVE, FIXED, FIXED_VERIFIED, ACKNOWLEDGED")
+    comment: Optional[str] = Field(None, description="Mandatory or recommended review justification comment")
 
 
 class AssignUserRequest(BaseModel):

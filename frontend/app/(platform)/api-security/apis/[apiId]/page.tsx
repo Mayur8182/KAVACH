@@ -1053,7 +1053,7 @@ export default function ApiDetailPage() {
                       href={`/api-security/findings?endpoint=${encodeURIComponent(selectedEndpointDetail.path)}&apiId=${apiId}`}
                       style={{ fontSize: '12px', color: '#2563EB', fontWeight: 600, textDecoration: 'none' }}
                     >
-                      View All in Findings →
+                      View All in Findings
                     </Link>
                   )}
                 </div>

@@ -155,25 +155,7 @@ function OnboardingProjectContent() {
       title="Create Your First Project"
       subtitle="A project is your application or system that you want to secure."
     >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.4fr) 300px',
-          gap: '32px',
-          alignItems: 'start',
-        }}
-        className="onboarding-split"
-      >
-        {/* Left Form Card */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '10px',
-            padding: '28px 32px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-          }}
-        >
+      <div style={{ maxWidth: '640px', margin: '0 auto', width: '100%' }}>
           <div style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', marginBottom: '20px' }}>
             Project Details
           </div>
@@ -460,89 +442,27 @@ function OnboardingProjectContent() {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 20px',
-                  backgroundColor: '#2563EB',
+                  gap: '8px',
+                  padding: '11px 24px',
+                  backgroundColor: '#09090B',
                   border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '13px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
                   fontWeight: 600,
                   color: '#FFFFFF',
                   cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(37,99,235,0.25)',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  transition: 'background-color 0.15s ease',
                 }}
-                className="hover:bg-blue-700"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#27272A')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#09090B')}
               >
                 <span>{loading ? 'Creating...' : 'Next: Environment'}</span>
-                <ArrowRight size={14} />
+                <ArrowRight size={15} />
               </button>
             </div>
           </form>
         </div>
-
-        {/* Right Info Card: Projects in SecuLayer */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '10px',
-            padding: '24px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          }}
-        >
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '8px',
-              backgroundColor: '#EFF6FF',
-              color: '#2563EB',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '16px',
-            }}
-          >
-            <Code2 size={20} />
-          </div>
-
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: '0 0 16px 0' }}>
-            Projects in Kavach
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {[
-              'Link your source code repositories',
-              'Enable automated security scanning',
-              'Track vulnerabilities and compliance',
-              'Monitor builds and deployments',
-              'Support for multiple environments',
-            ].map((text, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                <span
-                  style={{
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '50%',
-                    border: '1.5px solid #94A3B8',
-                    color: '#64748B',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    flexShrink: 0,
-                    marginTop: '1px',
-                  }}
-                >
-                  {i + 1}
-                </span>
-                <span>{text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
     </OnboardingLayout>
   );
 }

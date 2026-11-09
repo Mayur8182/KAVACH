@@ -343,8 +343,16 @@ Only return raw JSON. No markdown code fences outside JSON."""
 
         strategies = self._derive_strategies(finding, patch)
 
+        # Determine if this is a known, well-understood rule (affects confidence)
+        is_known_rule = any([
+            "SEC-003" in rule, "uri" in title.lower() or "credential" in title.lower(),
+            "IAC-001" in rule, "root user" in title.lower() or "dockerfile" in file_path.lower(),
+            "SAST-001" in rule, "sql" in title.lower() or "injection" in title.lower(),
+            "SEC-001" in rule, "SEC-002" in rule, "key" in title.lower(),
+        ])
+
         return {
-            "is_fixable": True,
+            "is_fixable": is_known_rule,  # Only True for patterns with known fix patterns
             "root_cause": root_cause,
             "explanation": explanation,
             "files_changed": [file_path],
@@ -352,8 +360,17 @@ Only return raw JSON. No markdown code fences outside JSON."""
             "tests": tests,
             "security_validation_required": True,
             "risk": "low" if "SEC" in rule else "medium",
-            "confidence": 0.95,
+            "confidence": 0.90 if is_known_rule else 0.60,  # Honest confidence score
             "strategies": strategies,
             "engine": "gemini-2.5-flash-lite (with control plane verification)",
             "diagnostics": {"api_call_status": "executed" if not error_reason else f"fallback: {error_reason}"},
+            # CRITICAL remediation state fields — UI must read these
+            "remediation_state": "PATCH_GENERATED",
+            "state_label": "Patch Ready for Review",
+            "requires_approval": True,
+            "is_verified": False,  # NEVER True at patch generation stage
+            "verification_note": (
+                "This patch has been generated but NOT yet verified. "
+                "Approval required before applying. After applying, run a re-scan to confirm the fix."
+            ),
         }

@@ -95,9 +95,13 @@ export const HotspotStatusBadge: React.FC<{ status: string; size?: 'sm' | 'md' }
     { label: string; bg: string; text: string; border: string; icon: React.ComponentType<any> }
   > = {
     TO_REVIEW: { label: 'To Review', bg: '#FEF2F2', text: '#DC2626', border: '#FECACA', icon: Clock },
+    IN_REVIEW: { label: 'In Review', bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE', icon: Clock },
+    CONFIRMED_RISK: { label: 'Confirmed Risk', bg: '#FFF7ED', text: '#EA580C', border: '#FFEDD5', icon: AlertTriangle },
     ACKNOWLEDGED: { label: 'Acknowledged', bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE', icon: AlertTriangle },
     SAFE: { label: 'Safe', bg: '#F0FDF4', text: '#16A34A', border: '#BBF7D0', icon: ShieldCheck },
     FIXED: { label: 'Fixed', bg: '#ECFDF5', text: '#059669', border: '#A7F3D0', icon: CheckCircle2 },
+    FIXED_VERIFIED: { label: 'Fixed & Verified', bg: '#F0FDF4', text: '#16A34A', border: '#BBF7D0', icon: CheckCircle2 },
+    REMEDIATION: { label: 'Remediation', bg: '#F5F3FF', text: '#7C3AED', border: '#DDD6FE', icon: AlertTriangle },
     FALSE_POSITIVE: { label: 'False Positive', bg: '#F1F5F9', text: '#64748B', border: '#E2E8F0', icon: ShieldAlert },
   };
 

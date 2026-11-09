@@ -17,8 +17,18 @@ async def _safe_run_subprocess(cmd: List[str], cwd: Optional[str] = None, timeou
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never", "GIT_ASKPASS": "echo"}
     if cmd:
         resolved = shutil.which(cmd[0])
+        if not resolved and cmd[0].lower() == "git" and os.name == "nt":
+            for candidate in (
+                os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Git", "cmd", "git.exe"),
+                os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Git", "bin", "git.exe"),
+            ):
+                if os.path.isfile(candidate):
+                    resolved = candidate
+                    break
         if resolved:
             cmd = [resolved] + cmd[1:]
+    if cwd and not os.path.isdir(cwd):
+        return 2, b"", f"Working directory does not exist: {cwd}".encode()
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,

@@ -218,7 +218,7 @@ export default function AttackPathsPage() {
                           gap: '4px',
                         }}
                       >
-                        <span>Inspect Linked Findings →</span>
+                        <span>Inspect Linked Findings</span>
                       </Link>
                     </div>
 

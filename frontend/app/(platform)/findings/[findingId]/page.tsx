@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import FindingDetailPage from '../../code/findings/[findingId]/page';
+import { FindingDetailView } from '@/components/runs/FindingDetailView';
 
 export default function GlobalFindingDetailPage() {
-  return <FindingDetailPage />;
+  return <FindingDetailView />;
 }

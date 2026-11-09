@@ -1220,7 +1220,7 @@ class GitHubService:
             or project.owner_id == current_user.id
         )
         if not is_authorized and project and project.organization_id:
-            from app.models.workspace import OrganizationMember
+            from app.models.invitation import OrganizationMember
             mem_stmt = select(OrganizationMember.id).where(
                 and_(
                     OrganizationMember.organization_id == project.organization_id,
@@ -1311,7 +1311,7 @@ class GitHubService:
             or project.owner_id == current_user.id
         )
         if not is_authorized and project and project.organization_id:
-            from app.models.workspace import OrganizationMember
+            from app.models.invitation import OrganizationMember
             mem_stmt = select(OrganizationMember.id).where(
                 and_(
                     OrganizationMember.organization_id == project.organization_id,

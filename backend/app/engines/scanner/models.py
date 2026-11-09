@@ -27,6 +27,7 @@ class NormalizedFindingCandidate(BaseModel):
     column_number: Optional[int] = None
     snippet: Optional[str] = None
     fingerprint: str = Field(description="Deterministic cryptographic or location hash for deduplication")
+    category: Optional[str] = Field(default=None, description="SAST, SECRETS, DEPENDENCIES, CONTAINER, IAC")
     raw_metadata: Dict[str, Any] = Field(default_factory=dict)
 
 

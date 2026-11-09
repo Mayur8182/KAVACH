@@ -155,7 +155,8 @@ class SecurityAgentCoordinator:
             res = await self.db.execute(q)
             for a in res.scalars().all():
                 db_agents_map[a.agent_type.lower()] = a
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to query registered agents: %s", exc, exc_info=True)
             pass
 
         # 2. Check latest scans and running state
@@ -166,7 +167,8 @@ class SecurityAgentCoordinator:
                 sq = sq.where(SecurityScan.project_id == project_id)
             s_res = await self.db.execute(sq)
             recent_scans = s_res.scalars().all()
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to query recent scans for live agents: %s", exc, exc_info=True)
             pass
 
         running_scans = [s for s in recent_scans if s.status == "RUNNING"]
@@ -202,7 +204,8 @@ class SecurityAgentCoordinator:
                 iq = iq.where(Integration.project_id == project_id)
             ires = await self.db.execute(iq)
             configured_providers = set(p.lower() for p in ires.scalars().all() if p)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to query configured integrations: %s", exc, exc_info=True)
             pass
 
         output: List[Dict[str, Any]] = []
@@ -241,11 +244,11 @@ class SecurityAgentCoordinator:
                 elif exec_item.status == "RUNNING":
                     status = "Running"
                 elif exec_item.status in ["FAILED", "ERROR"]:
-                    status = "Completed"
-                    subtitle = "AST fallback completed"
+                    status = "Failed"
+                    subtitle = "Execution failed"
                 elif exec_item.status in ["NOT_AVAILABLE", "NOT_CONFIGURED"]:
-                    status = "Completed"
-                    subtitle = "Native AST inspector active"
+                    status = "Not Configured"
+                    subtitle = "Scanner tool not installed"
 
                 issues_count = exec_item.finding_count or 0
                 if exec_item.duration_ms:
@@ -261,7 +264,7 @@ class SecurityAgentCoordinator:
                 if defn.key == "dast_agent":
                     try:
                         from app.models.api_security import ApiSecurityScan
-                        api_s_q = select(ApiSecurityScan).order_by(desc(ApiSecurityScan.created_at)).limit(1)
+                        api_s_q = select(ApiSecurityScan).order_by(desc(ApiSecurityScan.started_at)).limit(1)
                         api_s = (await self.db.execute(api_s_q)).scalars().first()
                         if api_s:
                             status = "Completed" if api_s.status in ("COMPLETED", "FINISHED") else "Running"
@@ -284,13 +287,11 @@ class SecurityAgentCoordinator:
                         status = "Idle"
                         subtitle = "GitHub Not Connected"
                 elif defn.key == "policy_agent":
-                    status = "Completed"
-                    subtitle = "OPA Deterministic Policy Gate Active"
-                    duration = "1s"
+                    status = "Idle"
+                    subtitle = "Ready for deterministic policy evaluation"
                 elif defn.key == "remediation_agent":
-                    status = "Completed"
-                    subtitle = "AST Patch & PR Synthesizer Active"
-                    duration = "1s"
+                    status = "Idle"
+                    subtitle = "Ready for evidence-backed remediation"
                 elif defn.key == "cloud_agent":
                     if any(p in configured_providers for p in ["aws", "gcp", "azure"]):
                         status = "Completed"

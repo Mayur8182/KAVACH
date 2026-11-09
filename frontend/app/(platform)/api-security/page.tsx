@@ -650,7 +650,7 @@ export default function ApiSecurityAutonomousPipelinePage() {
             </div>
 
             {/* Mode Switcher: Connected Repos vs Custom URL */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#F1F5F9', padding: '3px', borderRadius: '8px' }}>
               <button
                 type="button"
                 onClick={() => setRepoInputMode('select')}
@@ -659,11 +659,12 @@ export default function ApiSecurityAutonomousPipelinePage() {
                   borderRadius: '6px',
                   fontSize: '12px',
                   fontWeight: 600,
-                  border: repoInputMode === 'select' ? '1px solid #09090B' : '1px solid #CBD5E1',
-                  backgroundColor: repoInputMode === 'select' ? '#09090B' : '#FFFFFF',
-                  color: repoInputMode === 'select' ? '#FFFFFF' : '#475569',
+                  border: repoInputMode === 'select' ? '1px solid #CBD5E1' : '1px solid transparent',
+                  backgroundColor: repoInputMode === 'select' ? '#FFFFFF' : 'transparent',
+                  color: repoInputMode === 'select' ? '#0F172A' : '#64748B',
+                  boxShadow: repoInputMode === 'select' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
                   cursor: 'pointer',
-                  transition: 'all 0.12s ease',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 Connected Repositories ({repositories.length})
@@ -676,14 +677,15 @@ export default function ApiSecurityAutonomousPipelinePage() {
                   borderRadius: '6px',
                   fontSize: '12px',
                   fontWeight: 600,
-                  border: repoInputMode === 'custom' ? '1px solid #09090B' : '1px solid #CBD5E1',
-                  backgroundColor: repoInputMode === 'custom' ? '#09090B' : '#FFFFFF',
-                  color: repoInputMode === 'custom' ? '#FFFFFF' : '#475569',
+                  border: repoInputMode === 'custom' ? '1px solid #CBD5E1' : '1px solid transparent',
+                  backgroundColor: repoInputMode === 'custom' ? '#FFFFFF' : 'transparent',
+                  color: repoInputMode === 'custom' ? '#0F172A' : '#64748B',
+                  boxShadow: repoInputMode === 'custom' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
                   cursor: 'pointer',
-                  transition: 'all 0.12s ease',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                + Enter Custom Repo URL
+                + Custom URL
               </button>
             </div>
           </div>
@@ -749,8 +751,8 @@ export default function ApiSecurityAutonomousPipelinePage() {
             </div>
           ) : repositories.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 340px', minWidth: '240px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) 200px', gap: '16px', maxWidth: '720px' }}>
+                <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>
                     Target Repository ({repositories.length} Available)
                   </label>
@@ -787,13 +789,13 @@ export default function ApiSecurityAutonomousPipelinePage() {
                           {repo.full_name || repo.name} ({repo.default_branch || 'main'})
                         </option>
                       ))}
-                      <option value="__custom__">+ Enter custom repository URL...</option>
+                      <option value="__custom__">+ Enter custom repository URL…</option>
                     </select>
                     <FolderGit2 size={16} color="#0F172A" style={{ position: 'absolute', left: '12px', top: '12px' }} />
                   </div>
                 </div>
 
-                <div style={{ width: '180px' }}>
+                <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>
                     Target Branch
                   </label>
@@ -818,44 +820,6 @@ export default function ApiSecurityAutonomousPipelinePage() {
                     <GitBranch size={15} color="#64748B" style={{ position: 'absolute', left: '11px', top: '12px' }} />
                   </div>
                 </div>
-              </div>
-
-              {/* Connected Repos Quick Switcher Chips */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingTop: '8px', marginTop: '4px' }}>
-                <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-                  Quick select:
-                </span>
-                {repositories.map((repo) => {
-                  const isSelected = selectedRepo?.id === repo.id;
-                  return (
-                    <button
-                      key={repo.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedRepo(repo);
-                        setSelectedBranch(repo.default_branch || 'main');
-                      }}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        border: isSelected ? '1px solid #09090B' : '1px solid #E2E8F0',
-                        backgroundColor: isSelected ? '#F8FAFC' : '#FFFFFF',
-                        color: isSelected ? '#09090B' : '#475569',
-                        fontSize: '12px',
-                        fontWeight: isSelected ? 600 : 500,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        transition: 'all 0.12s ease',
-                      }}
-                    >
-                      <FolderGit2 size={13} color={isSelected ? '#09090B' : '#64748B'} />
-                      <span>{repo.name || repo.full_name}</span>
-                    </button>
-                  );
-                })}
               </div>
             </div>
           ) : (
@@ -886,7 +850,7 @@ export default function ApiSecurityAutonomousPipelinePage() {
                   }}
                 >
                   <Sparkles size={13} />
-                  <span>Start Repository Discovery →</span>
+                  <span>Start Repository Discovery</span>
                 </Link>
               </div>
 
@@ -911,32 +875,7 @@ export default function ApiSecurityAutonomousPipelinePage() {
           )}
 
           {/* Primary Action Button (Fitts's Law) */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '16px', borderTop: '1px solid #F1F5F9', flexWrap: 'wrap', gap: '14px' }}>
-            <div
-              role="status"
-              aria-live="polite"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                backgroundColor: '#F8FAFC',
-                border: '1px solid #E2E8F0',
-                fontSize: '12.5px',
-                color: '#64748B',
-              }}
-            >
-              <FolderGit2 size={14} color="#0F172A" />
-              <span>Target:</span>
-              <strong style={{ color: '#0F172A', fontWeight: 600 }}>
-                {repoInputMode === 'custom' ? (customRepoUrl || 'Custom Repository') : (selectedRepo?.full_name || customRepoUrl || 'No repository selected')}
-              </strong>
-              <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#E2E8F0', color: '#334155', fontWeight: 600 }}>
-                {selectedBranch}
-              </span>
-            </div>
-
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #F1F5F9' }}>
             <button
               type="button"
               onClick={handleRunAutonomousWorkflow}
@@ -967,7 +906,7 @@ export default function ApiSecurityAutonomousPipelinePage() {
               {pipelineState.includes('ING') ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Executing Security Pipeline ({pipelineProgress}%)...</span>
+                  <span>Executing Security Pipeline ({pipelineProgress}%)…</span>
                 </>
               ) : (
                 <>
@@ -1258,7 +1197,7 @@ export default function ApiSecurityAutonomousPipelinePage() {
                 {isBatchCreatingPr ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    <span>Creating Pull Requests...</span>
+                    <span>Creating Pull Requests…</span>
                   </>
                 ) : (
                   <>
@@ -1372,7 +1311,7 @@ export default function ApiSecurityAutonomousPipelinePage() {
                             {finding.pr_status === 'CREATING' ? (
                               <>
                                 <Loader2 size={14} className="animate-spin" />
-                                <span>Pushing PR...</span>
+                                <span>Pushing PR…</span>
                               </>
                             ) : (
                               <>

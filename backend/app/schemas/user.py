@@ -26,6 +26,8 @@ class UserResponse(BaseModel):
     name: str
     is_active: bool
     is_superuser: bool
+    is_verified: bool = False
+    onboarding_completed: bool = False
     created_at: datetime
     updated_at: datetime
 

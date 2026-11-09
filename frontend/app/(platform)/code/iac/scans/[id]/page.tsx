@@ -73,7 +73,7 @@ import type {
 // ── Resource Brand Icons ────────────────────────────────────────────────────────
 
 const AwsBrandIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
     <rect width="24" height="24" rx="4" fill="#232F3E" />
     <path
       d="M6.5 13.5C9.5 15.5 14.5 15.5 17.5 13.5M16 11.5L18 13.5L15.5 14.5"
@@ -92,7 +92,7 @@ const AwsBrandIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
 );
 
 const KubernetesBrandIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
     <rect width="24" height="24" rx="4" fill="#326CE5" />
     <circle cx="12" cy="12" r="5" stroke="#FFFFFF" strokeWidth="1.5" />
     <path
@@ -455,7 +455,7 @@ export default function IaCScanDetailPage() {
     return (
       <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', padding: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', color: '#64748B' }}>
-          <RefreshCw size={28} className="animate-spin" color="#2563EB" />
+          <RefreshCw size={28} className="motion-safe:animate-spin motion-reduce:animate-none" color="#2563EB" />
           <p style={{ fontSize: '14px', fontWeight: 500, margin: 0 }}>Loading scan details and engine verification…</p>
         </div>
       </div>
@@ -553,9 +553,9 @@ export default function IaCScanDetailPage() {
           </div>
 
           <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0' }}>
-            Scheduled scan of main branch{' '}
-            <span style={{ color: '#94A3B8', margin: '0 4px' }}>•</span> Triggered by {scanData.triggered_by}{' '}
-            <span style={{ color: '#94A3B8', margin: '0 4px' }}>•</span> {scanData.start_time} - {scanData.duration}
+            <span>Scheduled scan of main branch</span>
+            <span>Triggered by {scanData.triggered_by}</span>
+            <span>{scanData.start_time} - {scanData.duration}</span>
           </p>
         </div>
 
@@ -579,7 +579,7 @@ export default function IaCScanDetailPage() {
               boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             }}
           >
-            <RotateCcw size={14} className={rerunning ? 'animate-spin' : ''} />
+            <RotateCcw size={14} className={rerunning ? 'motion-safe:animate-spin motion-reduce:animate-none' : ''} />
             {rerunning ? 'Re-running…' : 'Re-run'}
           </button>
 
@@ -809,7 +809,7 @@ export default function IaCScanDetailPage() {
 
             {/* Interactive SVG Trend Chart */}
             <div style={{ position: 'relative', width: '100%', height: '240px' }}>
-              <svg width="100%" height="100%" viewBox="0 0 600 200" preserveAspectRatio="none">
+              <svg aria-hidden="true" width="100%" height="100%" viewBox="0 0 600 200" preserveAspectRatio="none">
                 {/* Y-axis grid lines & labels */}
                 {[0, 10, 20, 30, 40].map((val, idx) => {
                   const y = 170 - (val / 40) * 140;

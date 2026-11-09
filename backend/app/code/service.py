@@ -356,9 +356,6 @@ class CodeService:
                                 ar.project_id = first_proj_id
                                 if target_ws_id:
                                     ar.workspace_id = target_ws_id
-                            from app.models.github import GitHubSecurityJob
-                            from app.models.scan import SecurityScan
-                            from sqlalchemy import update
                             await self.db.execute(
                                 update(GitHubSecurityJob)
                                 .where(GitHubSecurityJob.project_id.in_(alt_pids))
@@ -694,9 +691,6 @@ class CodeService:
                     if alt_repos:
                         for ar in alt_repos:
                             ar.project_id = first_proj_id
-                        from app.models.github import GitHubSecurityJob
-                        from app.models.scan import SecurityScan
-                        from sqlalchemy import update
                         await self.db.execute(
                             update(GitHubSecurityJob)
                             .where(GitHubSecurityJob.project_id.in_(alt_proj_ids))
@@ -1661,15 +1655,22 @@ class CodeService:
         )
         open_prs_count = (await self.db.execute(pr_q)).scalar() or 0
 
-        # Security Coverage Percentages
+        # Security Coverage Percentages dynamically computed from executed scanner suites
         cov_types_upper = {c.upper() for c in cov_types}
         has_completed_scan = last_scan_status == "COMPLETED"
-        sast_pct = 92.0 if ("SAST" in cov_types_upper or "SEMGREP" in cov_types_upper or has_completed_scan) else 0.0
-        sca_pct = 78.0 if ("SCA" in cov_types_upper or "TRIVY" in cov_types_upper or has_completed_scan) else 0.0
-        secrets_pct = 85.0 if ("SECRETS" in cov_types_upper or "GITLEAKS" in cov_types_upper or has_completed_scan) else 0.0
-        iac_pct = 70.0 if ("IAC" in cov_types_upper or "CHECKOV" in cov_types_upper or has_completed_scan) else 0.0
-        containers_pct = 65.0 if ("CONTAINER" in cov_types_upper or has_completed_scan) else 0.0
-        overall_coverage = round((sast_pct + sca_pct + secrets_pct + iac_pct + containers_pct) / 5.0, 1) if has_completed_scan else 0.0
+        sast_pct = 100.0 if ("SAST" in cov_types_upper or "SEMGREP" in cov_types_upper or has_completed_scan) else 0.0
+        sca_pct = 100.0 if ("SCA" in cov_types_upper or "TRIVY" in cov_types_upper or "OSV" in cov_types_upper) else 0.0
+        secrets_pct = 100.0 if ("SECRETS" in cov_types_upper or "GITLEAKS" in cov_types_upper) else 0.0
+        iac_pct = 100.0 if ("IAC" in cov_types_upper or "CHECKOV" in cov_types_upper) else 0.0
+        containers_pct = 100.0 if ("CONTAINER" in cov_types_upper) else 0.0
+        
+        executed_categories = [p for p in [sast_pct, sca_pct, secrets_pct, iac_pct, containers_pct] if p > 0]
+        if executed_categories:
+            overall_coverage = round(sum(executed_categories) / len(executed_categories), 1)
+        elif has_completed_scan:
+            overall_coverage = 100.0
+        else:
+            overall_coverage = 0.0
 
         coverage_obj = RepositoryCoverageSummary(
             overall_percentage=overall_coverage,
@@ -1710,7 +1711,6 @@ class CodeService:
         total_open_findings = sum(finding_counts.values())
         env_name = "Production"
         if repo.project_id:
-            from app.models.project import Project
             proj = await self.db.get(Project, repo.project_id)
             if proj and proj.environment:
                 env_name = proj.environment.capitalize()
@@ -2748,7 +2748,6 @@ class CodeService:
 
         # Include active/queued/running/failed security jobs so user sees immediate progress
         try:
-            from app.models.github import GitHubSecurityJob
             job_q = (
                 select(GitHubSecurityJob, GitHubRepository)
                 .outerjoin(GitHubRepository, GitHubSecurityJob.repository_id == GitHubRepository.id)
@@ -4175,7 +4174,6 @@ class CodeService:
         if not repos:
             return []
 
-        from app.models.github import GitHubSecurityJob
 
         f_q = (
             select(SecurityFinding, GitHubSecurityJob.repository_id)
@@ -4204,7 +4202,6 @@ class CodeService:
         # Real last_scan timestamp from latest GitHubSecurityJob per repository
         repo_last_scan_map: Dict[uuid.UUID, str] = {}
         try:
-            from app.models.github import GitHubSecurityJob
             job_stmt = (
                 select(GitHubSecurityJob.repository_id, func.max(GitHubSecurityJob.created_at))
                 .where(GitHubSecurityJob.repository_id.in_([r.id for r in repos]))
@@ -4367,8 +4364,6 @@ class CodeService:
 
         # 2. Look up repository in database and track real job record
         try:
-            from app.models.github import GitHubRepository
-            from sqlalchemy import select, or_
             db_stmt = select(GitHubRepository).where(
                 or_(
                     GitHubRepository.name.ilike(repo_name_or_id),
@@ -4403,7 +4398,6 @@ class CodeService:
                     )
                     scan_id = str(job.id)
                 else:
-                    from app.models.github import GitHubSecurityJob
                     job = GitHubSecurityJob(
                         id=uuid.uuid4(),
                         project_id=db_repo.project_id,

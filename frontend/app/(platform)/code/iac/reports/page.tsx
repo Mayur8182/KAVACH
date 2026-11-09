@@ -146,7 +146,7 @@ function IaCReportsContent() {
               cursor: 'pointer',
             }}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'motion-safe:animate-spin motion-reduce:animate-none' : ''} />
             Refresh
           </button>
         </div>
@@ -236,7 +236,7 @@ function IaCReportsContent() {
               {loading ? (
                 <tr>
                   <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-                    <RefreshCw size={18} className="animate-spin" style={{ margin: '0 auto 8px auto', color: '#2563EB' }} />
+                    <RefreshCw size={18} className="motion-safe:animate-spin motion-reduce:animate-none" style={{ margin: '0 auto 8px auto', color: '#2563EB' }} />
                     Loading audit reports...
                   </td>
                 </tr>

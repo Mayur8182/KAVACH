@@ -116,9 +116,14 @@ class SecurityRAGPipeline:
         f_res = await self.db.execute(f_query)
         findings = f_res.scalars().all()
 
-        # Fallback to any recent findings if scoped project is newly created and has 0 findings
-        if not findings:
-            fallback_f_query = select(SecurityFinding).order_by(desc(SecurityFinding.detected_at), desc(SecurityFinding.created_at)).limit(30)
+        # Fallback to any recent findings WITHIN authorized projects only (tenant isolation)
+        if not findings and target_proj_ids:
+            fallback_f_query = (
+                select(SecurityFinding)
+                .where(SecurityFinding.project_id.in_(target_proj_ids))
+                .order_by(desc(SecurityFinding.detected_at), desc(SecurityFinding.created_at))
+                .limit(30)
+            )
             findings = (await self.db.execute(fallback_f_query)).scalars().all()
 
         for f in findings:
@@ -142,8 +147,13 @@ class SecurityRAGPipeline:
             s_query = s_query.where(SecurityScan.project_id.in_(target_proj_ids))
         s_res = await self.db.execute(s_query)
         scans = s_res.scalars().all()
-        if not scans:
-            fallback_s_query = select(SecurityScan).order_by(desc(SecurityScan.created_at)).limit(10)
+        if not scans and target_proj_ids:
+            fallback_s_query = (
+                select(SecurityScan)
+                .where(SecurityScan.project_id.in_(target_proj_ids))
+                .order_by(desc(SecurityScan.created_at))
+                .limit(10)
+            )
             scans = (await self.db.execute(fallback_s_query)).scalars().all()
 
         for s in scans:
@@ -329,7 +339,7 @@ Please provide a comprehensive, actionable response.
         # Try Gemini first if key available
         if self.gemini_key:
             try:
-                gemini_resp = await self._call_gemini(system_instruction, user_prompt)
+                gemini_resp = await self._call_gemini(system_instruction, user_prompt, conversation_history=conversation_history)
                 if gemini_resp:
                     return {
                         "content": gemini_resp,
@@ -343,16 +353,24 @@ Please provide a comprehensive, actionable response.
         # Deterministic Grounded Fallback
         return self._generate_deterministic_response(query, context)
 
-    async def _call_gemini(self, system_instruction: str, prompt: str) -> Optional[str]:
+    async def _call_gemini(self, system_instruction: str, prompt: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> Optional[str]:
         """Direct call to Gemini API."""
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_model}:generateContent?key={self.gemini_key}"
+        # Build contents with conversation history for follow-up understanding
+        contents = []
+        if conversation_history:
+            for hist_msg in conversation_history[-8:]:  # Last 8 messages
+                role = "user" if hist_msg.get("role") == "user" else "model"
+                content_text = hist_msg.get("content", "").strip()
+                if content_text:
+                    contents.append({"role": role, "parts": [{"text": content_text}]})
+        # Always append current query last
+        contents.append({
+            "role": "user",
+            "parts": [{"text": f"{system_instruction}\n\n{prompt}"}]
+        })
         payload = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": f"{system_instruction}\n\n{prompt}"}]
-                }
-            ],
+            "contents": contents,
             "generationConfig": {
                 "temperature": 0.2,
                 "maxOutputTokens": 2048,

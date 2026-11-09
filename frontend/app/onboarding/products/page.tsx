@@ -12,22 +12,29 @@ import {
   ArrowLeft,
   AlertCircle,
   Sparkles,
+  Layers,
+  Zap,
+  CheckCircle2,
+  Terminal,
 } from 'lucide-react';
 import { OnboardingLayout } from '@/components/onboarding/OnboardingLayout';
 import { api } from '@/lib/api/client';
 
-interface ProductCard {
+interface SecurityProduct {
   id: string;
   name: string;
-  subtitle: string;
+  tagline: string;
   description: string;
-  icon: any;
-  badge: string;
-  badgeColor: string;
+  icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
+  categoryBadge: string;
   badgeBg: string;
-  accentColor: string;
+  badgeColor: string;
+  accentBorder: string;
+  accentText: string;
   checked: boolean;
-  features: string[];
+  isCore?: boolean;
+  engines: string[];
+  capabilities: string[];
 }
 
 function OnboardingProductsContent() {
@@ -40,58 +47,87 @@ function OnboardingProductsContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [products, setProducts] = useState<ProductCard[]>([
+  const [products, setProducts] = useState<SecurityProduct[]>([
     {
       id: 'thing_code',
       name: 'Kavach Code',
-      subtitle: 'Code quality and application security',
-      description: 'Deterministic SAST, secrets detection, dependency checks, SBOM generator, and automated PR security gates.',
+      tagline: 'Source Code & Application Security',
+      description: 'Comprehensive static analysis, hardcoded secret elimination, dependency vulnerability tracking, and automated GitHub PR security checks.',
       icon: Code2,
-      badge: 'AppSec',
-      badgeColor: '#2563EB',
-      badgeBg: '#EFF6FF',
-      accentColor: '#2563EB',
+      categoryBadge: 'Essential AppSec',
+      badgeBg: '#EEF2FF',
+      badgeColor: '#4F46E5',
+      accentBorder: '#6366F1',
+      accentText: '#4F46E5',
       checked: true,
-      features: ['SAST (Semgrep)', 'Secrets (Gitleaks)', 'Dependencies (OSV)', 'CycloneDX SBOM', 'PR Security Reviews'],
+      isCore: true,
+      engines: ['Semgrep SAST', 'Gitleaks Secrets', 'OSV & Trivy SCA', 'CycloneDX SBOM'],
+      capabilities: [
+        'Deterministic AST vulnerability detection',
+        'High-entropy API key & token scanning',
+        'Open-source dependency CVE resolution',
+        'Automated PR review & fix proposals',
+      ],
     },
     {
       id: 'thing_cloud',
       name: 'Kavach Cloud',
-      subtitle: 'Cloud infrastructure security',
-      description: 'Cloud security posture management (CSPM), Kubernetes cluster auditing, Docker hardening, and IaC drift detection.',
+      tagline: 'Cloud Infrastructure & Container Security',
+      description: 'Cloud Security Posture Management (CSPM), Kubernetes cluster CIS hardening, Docker daemon inspection, and Terraform IaC drift defense.',
       icon: Cloud,
-      badge: 'Infrastructure',
-      badgeColor: '#0284C7',
+      categoryBadge: 'Infrastructure CNAPP',
       badgeBg: '#F0F9FF',
-      accentColor: '#0284C7',
-      checked: false,
-      features: ['CSPM / CNAPP Posture', 'Kubernetes CIS Hardening', 'Docker Host Security', 'IaC Drift Detection'],
+      badgeColor: '#0284C7',
+      accentBorder: '#0EA5E9',
+      accentText: '#0284C7',
+      checked: true,
+      engines: ['Checkov CIS Rules', 'Trivy Image Scanner', 'Kubernetes Audit', 'Terraform AST'],
+      capabilities: [
+        'Multi-cloud posture & misconfiguration audit',
+        'Container base image CVE vulnerability scan',
+        'Kubernetes RBAC & pod security standards',
+        'IaC security baseline enforcement',
+      ],
     },
     {
       id: 'thing_attack',
       name: 'Kavach Attack',
-      subtitle: 'DAST, API testing and authorized security testing',
-      description: 'Dynamic Application Security Testing (DAST), automated API endpoint fuzzing, external attack surface reconnaissance, and pentest verification.',
+      tagline: 'Dynamic API Security & Pentesting',
+      description: 'Dynamic Application Security Testing (DAST), automated API endpoint route discovery, OWASP API Top 10 fuzzing, and verified exploit reproduction.',
       icon: Crosshair,
-      badge: 'Offensive',
-      badgeColor: '#E11D48',
+      categoryBadge: 'Offensive DAST',
       badgeBg: '#FFF1F2',
-      accentColor: '#E11D48',
+      badgeColor: '#E11D48',
+      accentBorder: '#F43F5E',
+      accentText: '#E11D48',
       checked: false,
-      features: ['DAST Engine', 'API Fuzzing & Discovery', 'Attack Surface Mapping', 'Pentest Scenarios'],
+      engines: ['OWASP API Fuzzer', 'Route Discovery AST', 'Auth Matrix Prober', 'Burst Tester'],
+      capabilities: [
+        'Automated REST & GraphQL route discovery',
+        'OWASP API Top 10 fuzzing (BOLA, BFLA, Auth)',
+        'Sensitive data exposure & burst rate testing',
+        'Verifiable attack reproduction telemetry',
+      ],
     },
     {
       id: 'thing_protect',
       name: 'Kavach Protect',
-      subtitle: 'Runtime and application defense',
-      description: 'Zero-trust runtime defense, official MCP tool security gateway, autonomous AI agent guardrails, and instant break-glass controls.',
+      tagline: 'Runtime Defense & MCP Security Gateway',
+      description: 'Zero-trust runtime firewall, official MCP execution gateway wrapping AI tools with identity, deterministic policy enforcement, and audit proof.',
       icon: ShieldCheck,
-      badge: 'Runtime Zero-Trust',
-      badgeColor: '#059669',
+      categoryBadge: 'Runtime Zero-Trust',
       badgeBg: '#ECFDF5',
-      accentColor: '#059669',
-      checked: false,
-      features: ['Runtime Threat Defense', 'MCP Security Gateway', 'Autonomous Agent Guard', 'Break-Glass Approvals'],
+      badgeColor: '#059669',
+      accentBorder: '#10B981',
+      accentText: '#059669',
+      checked: true,
+      engines: ['MCP Tool Gateway', 'OPA Rego Policies', 'Cryptographic Approvals', 'Immutable Audit'],
+      capabilities: [
+        'Official MCP protocol security proxy',
+        'Deterministic OPA rule policy gate',
+        'Cryptographic human-in-the-loop approvals',
+        'Complete verifiable audit trail logging',
+      ],
     },
   ]);
 
@@ -111,7 +147,7 @@ function OnboardingProductsContent() {
           );
         }
       } catch (err) {
-        // use default
+        // default state preserved
       }
     }
     loadSelected();
@@ -120,15 +156,14 @@ function OnboardingProductsContent() {
     };
   }, []);
 
-  const selectedProducts = products.filter((p) => p.checked);
-  const selectedCount = selectedProducts.length;
+  const selectedCount = products.filter((p) => p.checked).length;
 
   const toggleProduct = (id: string) => {
     setProducts((prev) =>
       prev.map((item) => {
         if (item.id === id) {
           if (item.checked && selectedCount <= 1) {
-            setError('Please keep at least one product selected for your workspace.');
+            setError('Please keep at least one core security product selected.');
             return item;
           }
           setError(null);
@@ -172,8 +207,8 @@ function OnboardingProductsContent() {
   return (
     <OnboardingLayout
       currentStep={5}
-      title="Choose Your Security Products"
-      subtitle="Select the products your workspace needs. You can add more later as your security requirements grow."
+      title="Select Your Security Capabilities"
+      subtitle="Choose the protection modules for your workspace. Engines can be customized and expanded at any time."
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {error && (
@@ -195,84 +230,13 @@ function OnboardingProductsContent() {
           </div>
         )}
 
-        {/* Action Toolbar placed ABOVE product cards for immediate access on 730px viewports */}
-        <div
-          className="onboarding-button-row"
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '10px',
-            padding: '14px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-            flexWrap: 'wrap',
-            gap: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button
-              type="button"
-              onClick={navigateBack}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 14px',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #CBD5E1',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#475569',
-                cursor: 'pointer',
-              }}
-            >
-              <ArrowLeft size={14} />
-              <span>Back: Environment</span>
-            </button>
-
-            <span style={{ fontSize: '13px', color: '#64748B' }}>
-              <strong>{selectedCount}</strong> {selectedCount === 1 ? 'product' : 'products'} selected
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button
-              type="button"
-              id="continue-products-btn"
-              onClick={handleContinue}
-              disabled={loading}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '9px 20px',
-                backgroundColor: '#2563EB',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                boxShadow: '0 1px 3px rgba(37, 99, 235, 0.25)',
-              }}
-            >
-              <span>{loading ? 'Saving Products...' : 'Next: Configuration'}</span>
-              <ArrowRight size={14} />
-            </button>
-          </div>
-        </div>
-
-        {/* 4 Interactive Product Cards */}
+        {/* 4 Interactive Security Product Cards */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
             gap: '18px',
           }}
-          className="product-cards-grid"
         >
           {products.map((item) => {
             const Icon = item.icon;
@@ -284,123 +248,267 @@ function OnboardingProductsContent() {
                 onClick={() => toggleProduct(item.id)}
                 style={{
                   backgroundColor: '#FFFFFF',
-                  borderRadius: '10px',
-                  border: isChecked ? `2px solid ${item.accentColor}` : '1px solid #CBD5E1',
-                  padding: '20px 22px',
+                  borderRadius: '12px',
+                  border: isChecked ? `2px solid ${item.accentBorder}` : '1px solid #E2E8F0',
+                  padding: '22px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px',
+                  justifyContent: 'space-between',
+                  gap: '16px',
                   cursor: 'pointer',
                   position: 'relative',
-                  boxShadow: isChecked ? '0 4px 12px rgba(37, 99, 235, 0.08)' : '0 1px 3px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
+                  boxShadow: isChecked
+                    ? '0 6px 20px -2px rgba(99, 102, 241, 0.12)'
+                    : '0 1px 3px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.2s ease',
+                  userSelect: 'none',
                 }}
               >
-                {/* Header row: Icon, Name, Badge, and Checkbox */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div>
+                  {/* Top Header: Icon, Badges, Checkbox */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div
+                        style={{
+                          width: '42px',
+                          height: '42px',
+                          borderRadius: '10px',
+                          backgroundColor: item.badgeBg,
+                          color: item.badgeColor,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          border: `1px solid ${item.badgeBg}`,
+                        }}
+                      >
+                        <Icon size={22} />
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                            {item.name}
+                          </h2>
+                          {item.isCore && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                backgroundColor: '#EEF2FF',
+                                color: '#4F46E5',
+                              }}
+                            >
+                              RECOMMENDED
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            color: item.badgeColor,
+                            letterSpacing: '0.02em',
+                          }}
+                        >
+                          {item.categoryBadge}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Styled Selection Checkbox */}
                     <div
                       style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '8px',
-                        backgroundColor: item.badgeBg,
-                        color: item.badgeColor,
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '6px',
+                        backgroundColor: isChecked ? item.accentBorder : '#FFFFFF',
+                        border: isChecked ? `2px solid ${item.accentBorder}` : '2px solid #CBD5E1',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        flexShrink: 0,
+                        color: '#FFFFFF',
+                        transition: 'all 0.15s ease',
                       }}
                     >
-                      <Icon size={20} />
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-                          {item.name}
-                        </h2>
-                        <span
-                          style={{
-                            fontSize: '10px',
-                            fontWeight: 700,
-                            padding: '1px 6px',
-                            borderRadius: '4px',
-                            backgroundColor: item.badgeBg,
-                            color: item.badgeColor,
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          {item.badge}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0 0' }}>
-                        {item.subtitle}
-                      </p>
+                      {isChecked && <Check size={16} strokeWidth={3} />}
                     </div>
                   </div>
 
-                  {/* Checkbox */}
-                  <div
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '5px',
-                      backgroundColor: isChecked ? item.accentColor : '#FFFFFF',
-                      border: isChecked ? `1px solid ${item.accentColor}` : '1.5px solid #CBD5E1',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#FFFFFF',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {isChecked && <Check size={13} strokeWidth={3} />}
+                  <p style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.5, margin: '0 0 14px 0' }}>
+                    {item.description}
+                  </p>
+
+                  {/* Capabilities List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
+                    {item.capabilities.map((cap, cIdx) => (
+                      <div key={cIdx} style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '12px', color: '#334155' }}>
+                        <CheckCircle2 size={13} color={isChecked ? '#10B981' : '#94A3B8'} strokeWidth={2.5} style={{ shrink: 0 }} />
+                        <span>{cap}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Description */}
-                <p style={{ fontSize: '12.5px', color: '#475569', margin: 0, lineHeight: 1.45 }}>
-                  {item.description}
-                </p>
-
-                {/* Feature Tags */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: 'auto', paddingTop: '6px' }}>
-                  {item.features.map((feat, idx) => (
-                    <span
-                      key={idx}
-                      style={{
-                        fontSize: '11px',
-                        color: '#475569',
-                        backgroundColor: '#F1F5F9',
-                        padding: '2px 7px',
-                        borderRadius: '4px',
-                      }}
-                    >
-                      {feat}
-                    </span>
-                  ))}
+                {/* Bottom Engine Badges */}
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '12px' }}>
+                  <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
+                    Deterministic Engines
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                    {item.engines.map((eng, eIdx) => (
+                      <span
+                        key={eIdx}
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          color: '#475569',
+                          fontFamily: 'monospace',
+                        }}
+                      >
+                        {eng}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
 
-      </div>
+        {/* Live Workspace Coverage Summary */}
+        <div
+          style={{
+            padding: '16px 20px',
+            backgroundColor: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                backgroundColor: '#EEF2FF',
+                color: '#4F46E5',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                {selectedCount} of 4 Protection Modules Active
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748B' }}>
+                All selected engines run with zero mock data and store complete cryptographic audit trails.
+              </div>
+            </div>
+          </div>
 
-      <style jsx>{`
-        @media (max-width: 768px) {
-          .product-cards-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span
+              style={{
+                fontSize: '11.5px',
+                fontWeight: 700,
+                padding: '3px 10px',
+                borderRadius: '9999px',
+                backgroundColor: '#ECFDF5',
+                color: '#059669',
+                border: '1px solid #A7F3D0',
+              }}
+            >
+              Zero-Trust Policy Gate Ready
+            </span>
+          </div>
+        </div>
+
+        {/* Action Button Navigation Row */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: '8px',
+          }}
+        >
+          <button
+            type="button"
+            onClick={navigateBack}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 18px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #CBD5E1',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: '#475569',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <ArrowLeft size={15} />
+            <span>Back to Environment</span>
+          </button>
+
+          <button
+            type="button"
+            id="continue-products-btn"
+            onClick={handleContinue}
+            disabled={loading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '11px 24px',
+              backgroundColor: '#4F46E5',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.28)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>{loading ? 'Saving Capabilities...' : 'Continue: Configure Repository'}</span>
+            <ArrowRight size={15} />
+          </button>
+        </div>
+      </div>
     </OnboardingLayout>
   );
 }
 
 export default function OnboardingProductsPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Loading products setup...</div>}>
+    <Suspense
+      fallback={
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: '#64748B' }}>
+            Loading security capabilities...
+          </div>
+        </div>
+      }
+    >
       <OnboardingProductsContent />
     </Suspense>
   );

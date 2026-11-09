@@ -664,6 +664,18 @@ class ThingApiClient {
           if (baseScope) {
             apiCache.invalidate(baseScope);
           }
+          // Assistant / Scan / Action synchronization: Invalidate dashboard & findings caches
+          if (endpoint.includes('/assistant') || endpoint.includes('/scans') || endpoint.includes('/findings')) {
+            apiCache.invalidate('/findings');
+            apiCache.invalidate('/scans');
+            apiCache.invalidate('/code');
+            apiCache.invalidate('/home');
+            apiCache.invalidate('/overview');
+            apiCache.invalidate('/api-security');
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('kavach:data_invalidated', { detail: { endpoint } }));
+            }
+          }
         }
 
         return { data, requestId: correlationId };
@@ -677,6 +689,15 @@ class ThingApiClient {
         }
 
         const normalized = normalizeNetworkError(err, correlationId);
+        console.error('API request failed', {
+          endpoint,
+          method: options.method || 'GET',
+          attempt: attempts,
+          requestId: normalized.request_id,
+          code: normalized.code,
+          message: normalized.message,
+          remediation: normalized.remediation,
+        });
         recordTelemetry({
           name: `API Network Failure: ${endpoint}`,
           category: 'error',
@@ -6490,7 +6511,7 @@ class ThingApiClient {
       return res.data;
     },
 
-    aiAssistant: async (payload: { prompt: string; context?: any }): Promise<any> => {
+    aiAssistant: async (payload: { prompt: string; context?: any; projectId?: string | null }): Promise<any> => {
       const res = await this.request<any>('/api/v1/containers/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -13600,6 +13621,15 @@ class ThingApiClient {
       });
       return res.data;
     },
+    scanCode: async (payload: { files: Record<string, string>; name?: string; project_id?: string | null; branch?: string }): Promise<any> => {
+      const res = await this.request<any>('/api/v1/api-security/code/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        timeoutMs: 180000,
+      });
+      return res.data;
+    },
     analyzeRepository: async (repositoryId: string, branch?: string, repoData?: any): Promise<any> => {
       const q = branch ? `?branch=${encodeURIComponent(branch)}` : '';
       const res = await this.request<any>(`/api/v1/api-security/repositories/${encodeURIComponent(repositoryId)}/analyze${q}`, {
@@ -13894,8 +13924,6 @@ class ThingApiClient {
 
 export const api = new ThingApiClient();
 export default api;
-
-
 
 
 

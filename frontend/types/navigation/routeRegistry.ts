@@ -108,13 +108,13 @@ export const CANONICAL_ROUTES: Record<string, RouteContract> = {
     parentRouteId: null,
     product: 'platform',
     requiredPermission: 'authenticated',
-    navigationLabel: 'Security HQ',
-    breadcrumb: [{ label: 'Security HQ' }],
+    navigationLabel: 'Overview',
+    breadcrumb: [{ label: 'Overview' }],
     ownershipDomain: 'PLATFORM',
     ownershipSummary: 'Executive posture summary, high-priority action queue, and system-wide telemetry.',
     emptyState: { title: 'NO ACTIVE SECURITY INCIDENTS', description: 'All connected products report nominal baseline posture.' },
     loadingState: { type: 'skeleton-dashboard', hint: 'Aggregating security telemetry...' },
-    errorState: { title: 'Failed to load Security HQ', remediation: 'Verify backend API connectivity.' },
+    errorState: { title: 'Failed to load Overview', remediation: 'Verify backend API connectivity.' },
   },
   OVERVIEW: {
     id: 'OVERVIEW',
@@ -137,7 +137,7 @@ export const CANONICAL_ROUTES: Record<string, RouteContract> = {
     product: 'thing_protect',
     requiredPermission: 'protect:read',
     navigationLabel: 'SOC & Incidents',
-    breadcrumb: [{ label: 'Security HQ', href: '/home' }, { label: 'SOC & Incidents' }],
+    breadcrumb: [{ label: 'Overview', href: '/overview' }, { label: 'SOC & Incidents' }],
     ownershipDomain: 'PROTECT',
     ownershipSummary: 'Real-time Security Operations Center triaging active alerts and security incidents.',
     emptyState: { title: 'NO ACTIVE INCIDENTS', description: 'Zero security incidents detected in the current monitoring window.' },
@@ -1422,7 +1422,7 @@ export function getRouteByPath(pathname: string): RouteContract | undefined {
 export function getBreadcrumbsForPath(pathname: string): BreadcrumbStep[] {
   const clean = pathname.split('?')[0].replace(/\/+$/, '') || '/';
   if (clean === '/home' || clean === '/') {
-    return [{ label: 'Security HQ' }];
+    return [{ label: 'Overview' }];
   }
 
   const route = getRouteByPath(clean);
@@ -1445,5 +1445,5 @@ export function getBreadcrumbsForPath(pathname: string): BreadcrumbStep[] {
       href: isLast ? undefined : accum,
     });
   }
-  return steps.length > 0 ? steps : [{ label: 'Security HQ' }];
+  return steps.length > 0 ? steps : [{ label: 'Overview' }];
 }

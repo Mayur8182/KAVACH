@@ -332,9 +332,11 @@ class HotspotService:
 
         total = sum(status_counts.values())
         review = status_counts.get("TO_REVIEW", 0)
+        in_review = status_counts.get("IN_REVIEW", 0)
+        confirmed_risk = status_counts.get("CONFIRMED_RISK", 0)
         acknowledged = status_counts.get("ACKNOWLEDGED", 0)
         safe = status_counts.get("SAFE", 0)
-        fixed = status_counts.get("FIXED", 0)
+        fixed = status_counts.get("FIXED", 0) + status_counts.get("FIXED_VERIFIED", 0)
         false_positive = status_counts.get("FALSE_POSITIVE", 0)
 
         # Severity counts
@@ -372,6 +374,8 @@ class HotspotService:
         return {
             "total": total,
             "review": review,
+            "in_review": in_review,
+            "confirmed_risk": confirmed_risk,
             "acknowledged": acknowledged,
             "safe": safe,
             "fixed": fixed,
@@ -680,12 +684,22 @@ class HotspotService:
         Creates immutable HotspotHistory audit record and platform AuditEvent.
         """
         hotspot = await self.get_by_id(hotspot_id, organization_id)
-        valid_statuses = {"TO_REVIEW", "ACKNOWLEDGED", "SAFE", "FALSE_POSITIVE", "FIXED"}
+        valid_statuses = {
+            "TO_REVIEW",
+            "IN_REVIEW",
+            "CONFIRMED_RISK",
+            "SAFE",
+            "FALSE_POSITIVE",
+            "REMEDIATION",
+            "FIXED",
+            "FIXED_VERIFIED",
+            "ACKNOWLEDGED",
+        }
         norm_status = new_status.upper().replace(" ", "_")
         if norm_status not in valid_statuses:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid status '{new_status}'. Allowed: {', '.join(valid_statuses)}",
+                detail=f"Invalid status '{new_status}'. Allowed: {', '.join(sorted(valid_statuses))}",
             )
 
         old_status = hotspot.status
@@ -701,12 +715,18 @@ class HotspotService:
         action = "STATUS_CHANGED"
         if norm_status == "SAFE":
             action = "MARK_SAFE"
+        elif norm_status == "IN_REVIEW":
+            action = "IN_REVIEW"
+        elif norm_status == "CONFIRMED_RISK":
+            action = "CONFIRMED_RISK"
         elif norm_status == "ACKNOWLEDGED":
             action = "ACKNOWLEDGED"
         elif norm_status == "FALSE_POSITIVE":
             action = "FALSE_POSITIVE"
-        elif norm_status == "FIXED":
-            action = "FIXED"
+        elif norm_status in ("FIXED", "FIXED_VERIFIED"):
+            action = "VERIFIED_FIXED"
+        elif norm_status == "REMEDIATION":
+            action = "REMEDIATION_QUEUED"
 
         history_entry = HotspotHistory(
             id=uuid.uuid4(),

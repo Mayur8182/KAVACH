@@ -278,7 +278,7 @@ export default function FixVerifyPage() {
                 border: '1px solid #BFDBFE',
               }}
             >
-              <span>← Return to Finding Details</span>
+              <span>Return to Finding Details</span>
             </Link>
           </div>
         )}

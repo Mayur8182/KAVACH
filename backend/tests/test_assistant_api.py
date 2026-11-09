@@ -70,3 +70,79 @@ async def test_assistant_overview_with_stale_nonexistent_project_id(client: Asyn
     assert data["project"]["id"] != stale_uuid  # Gracefully resolved to user's real project
     assert data["workspace"]["project_id"] == data["project"]["id"]
 
+
+@pytest.mark.asyncio
+async def test_phase3_workflow_plan_endpoint(client: AsyncClient, user_a: User, token_user_a: str):
+    headers = {"Authorization": f"Bearer {token_user_a}"}
+    payload = {
+        "goal": "Scan repository, investigate vulnerabilities, generate verified patch, and prepare PR",
+        "repository": "kavach-backend",
+        "branch": "main",
+    }
+    response = await client.post("/api/v1/assistant/workflow/plan", json=payload, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert "plan_id" in data
+    assert "steps" in data
+    assert len(data["steps"]) == 5
+    assert data["status"] == "PLAN_CREATED"
+    assert data["steps"][4]["step_id"] == "step-5-pull-request"
+    assert data["steps"][4]["requires_approval"] is True
+
+
+@pytest.mark.asyncio
+async def test_phase3_specialist_agent_endpoints(client: AsyncClient, user_a: User, token_user_a: str, db_session):
+    import uuid
+    from app.models.project import Project
+    from app.models.scan import SecurityScan, ScannerExecution, SecurityFinding
+
+    headers = {"Authorization": f"Bearer {token_user_a}"}
+
+    proj = Project(id=uuid.uuid4(), name="kavach-p3-test", owner_id=user_a.id)
+    scan = SecurityScan(id=uuid.uuid4(), project_id=proj.id, target_path=".")
+    exec_run = ScannerExecution(id=uuid.uuid4(), scan_id=scan.id, scanner_name="semgrep", scanner_type="SAST")
+    finding = SecurityFinding(
+        id=uuid.uuid4(),
+        project_id=proj.id,
+        scan_id=scan.id,
+        scanner_execution_id=exec_run.id,
+        scanner_name="semgrep",
+        repository="kavach-p3-test",
+        title="SQL Injection Vulnerability",
+        description="Unsanitized user input formatted directly into raw query",
+        severity="CRITICAL",
+        rule_id="CWE-89",
+        fingerprint=f"fp_{uuid.uuid4().hex[:8]}",
+        file_path="app/db/query.py",
+        line_number=12,
+        snippet="res = db.execute(f'SELECT * FROM users WHERE id={uid}')",
+    )
+    db_session.add_all([proj, scan, exec_run, finding])
+    await db_session.commit()
+
+    # 1. Attack Path Agent Endpoint
+    ap_payload = {
+        "finding_id": str(finding.id),
+        "project_id": str(proj.id),
+        "repository": "kavach-p3-test",
+    }
+    ap_res = await client.post("/api/v1/assistant/agents/attack-path", json=ap_payload, headers=headers)
+    assert ap_res.status_code == 200
+    ap_data = ap_res.json()
+    assert ap_data["status"] == "ANALYZED"
+    assert ap_data["finding_id"] == str(finding.id)
+    assert len(ap_data["hops"]) == 3
+    assert ap_data["is_exploitable"] is True
+
+    # 2. Remediation Planner Agent Endpoint
+    plan_payload = {
+        "finding_id": str(finding.id),
+        "project_id": str(proj.id),
+    }
+    plan_res = await client.post("/api/v1/assistant/agents/remediation-plan", json=plan_payload, headers=headers)
+    assert plan_res.status_code == 200
+    plan_data = plan_res.json()
+    assert plan_data["status"] == "PLAN_CREATED"
+    assert plan_data["plan_id"] is not None
+    assert len(plan_data["invariants"]) == 3
+

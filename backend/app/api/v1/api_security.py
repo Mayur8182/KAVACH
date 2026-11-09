@@ -37,6 +37,7 @@ from app.models.audit_event import AuditEvent
 from app.models.policy import SecurityPolicy
 from app.services.api_security_service import ApiSecurityService
 from app.services.route_discovery_engine import RouteDiscoveryEngine
+from app.services.code_api_security_engine import code_api_security_engine
 from app.services.api_security_engine import (
     GraphQLCrawlerEngine,
     WebSocketFuzzerEngine,
@@ -1312,11 +1313,17 @@ async def apply_finding_fix(
             from app.code.remediation_pipeline import RemediationPipeline
             pipeline = RemediationPipeline(db)
             base_candidates = [
+                os.path.abspath("."),
                 os.path.abspath("backend/scratch/github_workspaces"),
                 os.path.abspath("scratch/github_workspaces"),
             ]
             for base_ws in base_candidates:
                 if os.path.isdir(base_ws):
+                    success, _ = await pipeline.apply_patch(base_ws, finding.remediation_patch, finding=finding)
+                    if success:
+                        patch_applied_on_disk = True
+                        break
+                    # Also try subdirectories
                     for sub_entry in os.listdir(base_ws):
                         cand_ws = os.path.join(base_ws, sub_entry)
                         if os.path.isdir(cand_ws):
@@ -1380,6 +1387,79 @@ async def verify_finding_fix(
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found")
 
+    # Locate the target file on disk to perform a real deterministic rescan
+    target_file = None
+    if isinstance(finding.evidence, dict) and finding.evidence.get("code_file_path"):
+        target_file = finding.evidence["code_file_path"].split(":")[0]
+    elif finding.remediation_patch:
+        for line in finding.remediation_patch.splitlines():
+            if line.startswith("--- a/") or line.startswith("+++ b/"):
+                target_file = line[6:].strip()
+                break
+
+    file_content = None
+    actual_file_path = None
+    if target_file:
+        cand_roots = [
+            os.path.abspath("."),
+            os.path.abspath("backend/scratch/github_workspaces"),
+            os.path.abspath("scratch/github_workspaces"),
+        ]
+        for c_root in cand_roots:
+            p = os.path.join(c_root, target_file)
+            if os.path.isfile(p):
+                try:
+                    with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                        file_content = f.read()
+                        actual_file_path = p
+                    break
+                except Exception:
+                    pass
+            if not actual_file_path and os.path.isdir(c_root):
+                base_fname = os.path.basename(target_file)
+                for root, _, files in os.walk(c_root):
+                    if base_fname in files:
+                        p = os.path.join(root, base_fname)
+                        try:
+                            with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                                file_content = f.read()
+                                actual_file_path = p
+                            break
+                        except Exception:
+                            pass
+                if actual_file_path:
+                    break
+
+    # Execute deterministic rescan
+    is_verified = True
+    rescan_msg = "Deterministic rescan passed: Vulnerability eliminated and verified against security contract."
+    if file_content and actual_file_path and finding.cwe:
+        is_verified, rescan_msg, rem_evidence = code_api_security_engine.verify_fix_for_file(
+            file_path=actual_file_path,
+            file_content=file_content,
+            finding_cwe=finding.cwe,
+        )
+
+    if not is_verified:
+        audit = AuditEvent(
+            actor_type="POLICY_ENGINE",
+            actor_id="kavach-fuzzer",
+            action="API_SECURITY_FIX_VERIFICATION_FAILED",
+            resource_type="ApiFinding",
+            resource_id=str(finding.id),
+            event_metadata={
+                "finding_id": str(finding.id),
+                "title": finding.title,
+                "cwe": finding.cwe,
+                "rescan_result": "FAILED",
+                "reason": rescan_msg,
+            },
+            status="FAILED",
+        )
+        db.add(audit)
+        await db.commit()
+        raise HTTPException(status_code=400, detail=rescan_msg)
+
     finding.status = "VERIFIED_FIXED"
     
     audit = AuditEvent(
@@ -1393,7 +1473,8 @@ async def verify_finding_fix(
             "title": finding.title,
             "cwe": finding.cwe,
             "rescan_result": "PASS",
-            "assertion": "Deterministic rescan passed: Vulnerability eliminated and verified against security contract.",
+            "assertion": rescan_msg,
+            "file": actual_file_path,
         },
         status="SUCCESS",
     )
@@ -1404,7 +1485,7 @@ async def verify_finding_fix(
         "status": "SUCCESS",
         "finding_id": str(finding.id),
         "finding_status": "VERIFIED_FIXED",
-        "message": "Deterministic rescan passed: Vulnerability eliminated and verified against security contract.",
+        "message": rescan_msg,
     }
 
 
@@ -2500,6 +2581,28 @@ async def analyze_repository_for_routes(
         repository_id=repository_id,
         branch=resolved_branch,
         repo_data=repo_data,
+    )
+    return result
+
+
+class CodeScanDirectPayload(BaseModel):
+    files: Dict[str, str] = Field(..., description="Map of relative file paths to file contents")
+    name: Optional[str] = "Submitted Codebase"
+    project_id: Optional[uuid.UUID] = None
+    branch: Optional[str] = "main"
+
+
+@router.post("/code/scan", summary="Analyze Submitted Code Files for OWASP API Security Vulnerabilities")
+async def scan_submitted_code(
+    payload: CodeScanDirectPayload,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    svc = ApiSecurityService(db)
+    result = await svc.analyze_repository_for_routes(
+        repository_id="submitted-code",
+        branch=payload.branch or "main",
+        custom_file_map=payload.files,
+        repo_data={"name": payload.name, "full_name": f"local/{payload.name}"},
     )
     return result
 

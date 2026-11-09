@@ -23,6 +23,14 @@
       {
         "command": "thing.fix",
         "title": "Thing Security: AI Fix"
+      },
+      {
+        "command": "thing.scanApi",
+        "title": "Kavach: Scan API Security (OWASP API Top 10)"
+      },
+      {
+        "command": "thing.fixFinding",
+        "title": "Kavach: Apply API Security Patch & Verify"
       }
     ],
     "viewsContainers": {

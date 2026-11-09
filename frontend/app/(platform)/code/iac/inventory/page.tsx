@@ -143,7 +143,7 @@ function IaCInventoryContent() {
               cursor: 'pointer',
             }}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'motion-safe:animate-spin motion-reduce:animate-none' : ''} />
             Refresh
           </button>
         </div>
@@ -180,7 +180,7 @@ function IaCInventoryContent() {
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '16px' }}>
             <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>Frameworks Active</div>
             <div style={{ fontSize: '13px', fontWeight: 600, color: '#2563EB', marginTop: '6px' }}>
-              TF ({stats.by_technology?.terraform || 0}) • K8s ({stats.by_technology?.kubernetes || 0}) • Helm ({stats.by_technology?.helm || 0})
+              TF ({stats.by_technology?.terraform || 0}), K8s ({stats.by_technology?.kubernetes || 0}), Helm ({stats.by_technology?.helm || 0})
             </div>
           </div>
         </div>
@@ -294,7 +294,7 @@ function IaCInventoryContent() {
               {loading ? (
                 <tr>
                   <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-                    <RefreshCw size={18} className="animate-spin" style={{ margin: '0 auto 8px auto', color: '#2563EB' }} />
+                    <RefreshCw size={18} className="motion-safe:animate-spin motion-reduce:animate-none" style={{ margin: '0 auto 8px auto', color: '#2563EB' }} />
                     Loading inventory...
                   </td>
                 </tr>
@@ -369,7 +369,7 @@ function IaCInventoryContent() {
                         {item.file_path}
                       </div>
                       <div style={{ fontSize: '11px', color: '#94A3B8' }}>
-                        Lines {item.line_start}–{item.line_end}
+                        Lines {item.line_start} to {item.line_end}
                       </div>
                     </td>
 

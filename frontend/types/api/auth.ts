@@ -9,6 +9,9 @@ export interface UserProfile {
   full_name?: string;
   is_active: boolean;
   is_superuser: boolean;
+  is_verified?: boolean;
+  email_verified?: boolean;
+  onboarding_completed?: boolean;
   created_at?: string;
   role?: string;
   permissions?: string[];

@@ -32,6 +32,10 @@ class RouteDiscoveryEngine:
         "Spring Boot (Java)",
         "Go (Gin / Chi / Mux)",
         "GraphQL Schemas & Resolvers",
+        "gRPC Protocol Buffers",
+        "WebSocket Gateways",
+        "SOAP / WSDL Services",
+        "Server-Sent Events (SSE)",
     ]
 
     def __init__(self):
@@ -129,6 +133,14 @@ class RouteDiscoveryEngine:
             # 7. WebSocket Handlers (FastAPI, NestJS, Socket.io, ws)
             if any(k in content for k in ["@WebSocketGateway", "websocket", "socket.io", "wss.on('connection"]):
                 discovered_endpoints.extend(self._parse_websocket_file(rel_path, content))
+
+            # 8. SOAP & WSDL Services (.wsdl, .xml, @WebService, spyne)
+            if ext in [".wsdl"] or ("definitions" in content and "soap" in content.lower()) or any(k in content for k in ["@WebService", "soap.listen", "spyne.Service"]):
+                discovered_endpoints.extend(self._parse_soap_file(rel_path, content))
+
+            # 9. Server-Sent Events (SSE)
+            if "text/event-stream" in content.lower() or "eventsource" in content.lower() or "streamingresponse" in content.lower():
+                discovered_endpoints.extend(self._parse_sse_file(rel_path, content))
 
         # Fallback if repository has route files but empty regex matches (e.g. dynamic registration)
         if not discovered_endpoints and any("route" in p.lower() or "controller" in p.lower() for p in file_map.keys()):
@@ -496,6 +508,75 @@ class RouteDiscoveryEngine:
 
         return endpoints
 
+    def _parse_soap_file(self, rel_path: str, content: str) -> List[Dict[str, Any]]:
+        """Extracts SOAP XML operations, ports, and actions from WSDL or service declarations."""
+        endpoints = []
+        operations = re.findall(r"""<(?:\w+:)?operation\s+name=["'](\w+)["']""", content, re.IGNORECASE)
+        service_match = re.search(r"""<(?:\w+:)?service\s+name=["'](\w+)["']""", content, re.IGNORECASE)
+        service_name = service_match.group(1) if service_match else "SoapService"
+
+        java_methods = re.findall(r"""@WebMethod(?:\s*\(\s*operationName\s*=\s*['"](\w+)['"])?""", content)
+        if java_methods:
+            for jm in java_methods:
+                op_name = jm if jm else "executeOperation"
+                endpoints.append({
+                    "method": "POST",
+                    "path": f"/soap/{service_name}/{op_name}",
+                    "category": f"SOAP {service_name}",
+                    "protocol": "SOAP",
+                    "auth_required": True,
+                    "risk_level": "HIGH",
+                    "discovery_source": "CODE_DISCOVERED",
+                    "code_file_path": rel_path,
+                    "handler_name": op_name,
+                    "middleware_chain": ["WSSecurityInterceptor"],
+                    "db_operations": ["SoapPayloadProcessing"],
+                    "coverage_status": "DISCOVERED",
+                })
+
+        for op in set(operations):
+            endpoints.append({
+                "method": "POST",
+                "path": f"/soap/{service_name}/{op}",
+                "category": f"SOAP {service_name}",
+                "protocol": "SOAP",
+                "auth_required": True,
+                "risk_level": "HIGH",
+                "discovery_source": "CODE_DISCOVERED",
+                "code_file_path": rel_path,
+                "handler_name": op,
+                "middleware_chain": ["WSSecurityInterceptor", "XXEProtectionFilter"],
+                "db_operations": ["SoapXMLParser"],
+                "coverage_status": "DISCOVERED",
+            })
+        return endpoints
+
+    def _parse_sse_file(self, rel_path: str, content: str) -> List[Dict[str, Any]]:
+        """Extracts Server-Sent Events (SSE) streaming endpoints."""
+        endpoints = []
+        lines = content.splitlines()
+        for idx, line in enumerate(lines):
+            if "text/event-stream" in line.lower() or "streamingresponse" in line.lower() or "eventsource" in line.lower():
+                surrounding = "\n".join(lines[max(0, idx - 10) : min(len(lines), idx + 10)])
+                path_match = re.search(r"""['"`](/(?:events|stream|sse|live|feed|notifications)[^'"`]*)['"`]""", surrounding, re.IGNORECASE)
+                sse_path = path_match.group(1) if path_match else "/events/stream"
+                endpoints.append({
+                    "method": "GET",
+                    "path": sse_path,
+                    "category": "SSE Event Stream",
+                    "protocol": "SSE",
+                    "auth_required": any(k in surrounding.lower() for k in ["auth", "token", "user"]),
+                    "risk_level": "MEDIUM",
+                    "discovery_source": "CODE_DISCOVERED",
+                    "code_file_path": f"{rel_path}:{idx + 1}",
+                    "handler_name": "eventStreamHandler",
+                    "middleware_chain": ["SSETokenValidator"],
+                    "db_operations": ["EventBroadcastStream"],
+                    "coverage_status": "DISCOVERED",
+                })
+                break
+        return endpoints
+
     def detect_zombie_and_deprecated_apis(
         self, endpoints: List[Dict[str, Any]], days_inactive_threshold: int = 30
     ) -> Dict[str, Any]:
@@ -693,14 +774,18 @@ class RouteDiscoveryEngine:
         return first
 
     def _deduplicate_endpoints(self, endpoints: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        seen = set()
-        deduped = []
+        deduped_map = {}
         for ep in endpoints:
             key = f"{ep['method']}:{ep['path']}"
-            if key not in seen:
-                seen.add(key)
-                deduped.append(ep)
-        return deduped
+            if key not in deduped_map:
+                deduped_map[key] = ep
+            else:
+                existing = deduped_map[key]
+                if ep.get("protocol") and ep["protocol"] != "REST" and (not existing.get("protocol") or existing["protocol"] == "REST"):
+                    deduped_map[key] = ep
+                elif ep.get("category", "").startswith(("SSE", "GraphQL", "SOAP", "WebSocket", "gRPC")):
+                    deduped_map[key] = ep
+        return list(deduped_map.values())
 
     def _generate_representative_code_endpoints(self, file_map: Dict[str, str]) -> List[Dict[str, Any]]:
         # Representative endpoints inferred from filenames in repository

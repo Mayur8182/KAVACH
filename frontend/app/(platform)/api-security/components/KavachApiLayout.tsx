@@ -281,17 +281,18 @@ export function KavachApiLayout({
         <div
           className="kavach-tabs-scrollable"
           style={{
-            backgroundColor: '#FFFFFF',
+            backgroundColor: '#F8FAFC',
             borderBottom: '1px solid #E2E8F0',
             padding: '0 24px',
             display: 'flex',
             alignItems: 'center',
             gap: '16px',
+            overflowX: 'auto',
           }}
         >
           {subnavTabs.map((tab) => {
             const active = Boolean(tab.active);
-            if (tab.href) {
+            if (tab.href && tab.href !== '#') {
               return (
                 <Link
                   key={tab.id}
@@ -299,13 +300,14 @@ export function KavachApiLayout({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '10px 2px',
-                    fontSize: '13px',
+                    padding: '8px 4px',
+                    fontSize: '12.5px',
                     fontWeight: active ? 600 : 500,
-                    color: active ? '#09090B' : '#64748B',
-                    borderBottom: active ? '2px solid #09090B' : '2px solid transparent',
+                    color: active ? '#2563EB' : '#64748B',
+                    borderBottom: active ? '2px solid #2563EB' : '2px solid transparent',
                     textDecoration: 'none',
                     transition: 'all 0.15s',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {tab.label}
@@ -323,12 +325,13 @@ export function KavachApiLayout({
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  padding: '10px 2px',
-                  fontSize: '13px',
+                  padding: '8px 4px',
+                  fontSize: '12.5px',
                   fontWeight: active ? 600 : 500,
-                  color: active ? '#09090B' : '#64748B',
-                  borderBottom: active ? '2px solid #09090B' : '2px solid transparent',
+                  color: active ? '#2563EB' : '#64748B',
+                  borderBottom: active ? '2px solid #2563EB' : '2px solid transparent',
                   transition: 'all 0.15s',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {tab.label}
@@ -339,9 +342,9 @@ export function KavachApiLayout({
       )}
 
       {/* ── Page Content Body ── */}
-      <main className="kavach-page-container" style={{ flex: 1, minHeight: 0, padding: '24px 28px', maxWidth: '1600px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+      <div className="kavach-page-container" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px 28px', maxWidth: '1600px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
         {children}
-      </main>
+      </div>
     </div>
   );
 }

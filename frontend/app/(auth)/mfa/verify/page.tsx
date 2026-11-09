@@ -126,6 +126,19 @@ function MfaVerifyContent() {
     }
   };
 
+  const handleSkipMfa = async () => {
+    try {
+      await api.onboarding.updateState({
+        mfa_skipped: true,
+        current_step: 'workspace',
+      } as any);
+    } catch {
+      // Continue anyway
+    }
+    const finalEmail = email || searchParams.get('email') || '';
+    router.push(`/onboarding/organization?email=${encodeURIComponent(finalEmail)}&skipped_mfa=true`);
+  };
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC', fontFamily: 'Inter, -apple-system, sans-serif' }}>
       {/* Top Header Navigation */}
@@ -415,6 +428,27 @@ function MfaVerifyContent() {
                 <KeyRound size={15} color="#64748B" />
                 <span>Use a recovery code instead</span>
               </Link>
+
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <button
+                  type="button"
+                  id="mfa-verify-skip-btn"
+                  onClick={handleSkipMfa}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 13,
+                    color: '#64748B',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#0F172A')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#64748B')}
+                >
+                  Skip MFA setup for now — Set up later in Settings →
+                </button>
+              </div>
             </form>
 
             {/* Security Note Callout */}

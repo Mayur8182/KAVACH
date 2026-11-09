@@ -157,3 +157,168 @@ class SimulateDecisionResponse(BaseModel):
 class ApprovalActionRequest(BaseModel):
     reason: Optional[str] = None
     approval_notes: Optional[str] = None
+
+
+# =========================================================================
+# Phase 5: AI Security Policy Engine & Governance Control Plane Schemas
+# =========================================================================
+
+class NLPolicyDraftRequest(BaseModel):
+    prompt: str = Field(..., min_length=5, description="Natural language policy requirement or directive")
+    scope: str = Field("PROJECT", description="GLOBAL, ORGANIZATION, PROJECT, ENVIRONMENT")
+    project_id: Optional[str] = None
+    organization_id: Optional[str] = None
+
+
+class NLPolicyDraftResponse(BaseModel):
+    policy_id: str
+    version_id: str
+    version: int
+    status: str
+    policy_content_hash: str
+    domain: Optional[str] = None
+    scope: str
+    explanation: str
+    test_cases_count: int
+    is_enforceable: bool
+
+
+class PolicyTestCaseResponse(BaseModel):
+    id: str
+    policy_version_id: str
+    name: str
+    description: Optional[str] = None
+    input_fixture: Dict[str, Any]
+    expected_decision: str
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PolicyTestRunResponse(BaseModel):
+    passed: bool
+    total: int
+    passed_count: int
+    failed_count: int
+    details: List[Dict[str, Any]]
+
+
+class PolicySimulationRequest(BaseModel):
+    lookback_days: int = Field(30, ge=1, le=365)
+
+
+class PolicySimulationResponse(BaseModel):
+    version_id: str
+    total_evaluated: int
+    passed_count: int
+    denied_count: int
+    blocked_actions_count: int
+    blocker_delta: int
+    new_violations: List[Dict[str, Any]]
+    false_positive_candidates: List[Dict[str, Any]]
+    remediation_burden: str
+
+
+class PolicyReviewSubmitRequest(BaseModel):
+    reviewer_id: Optional[str] = None
+
+
+class PolicyApprovalRequest(BaseModel):
+    approval_notes: Optional[str] = None
+
+
+class PolicyApprovalResultResponse(BaseModel):
+    approval_id: str
+    status: str
+    approval_token: str
+    message: str
+
+
+class PolicyActivationRequest(BaseModel):
+    approval_token: str = Field(..., description="Single-use cryptographic approval token")
+
+
+class PolicyRollbackRequest(BaseModel):
+    target_version: Optional[int] = None
+    reason: str = Field(..., min_length=3)
+
+
+class PolicyEvaluationRequest(BaseModel):
+    operation: OperationInput
+    actor: Optional[ActorInput] = None
+    project_id: Optional[str] = None
+    repository: Optional[str] = None
+    environment: str = Field("development", description="development, staging, production")
+
+
+class MatchedRuleResponse(BaseModel):
+    rule_key: str
+    severity: str
+    decision: str
+    reason: str
+
+
+class PolicyEvidenceResponse(BaseModel):
+    attribute: str
+    observed_value: Any
+    expected_condition: str
+    evidence_source: str
+    timestamp: datetime
+
+
+class PolicyEvaluationResponse(BaseModel):
+    decision_id: str
+    outcome: str
+    reason: str
+    enforcement_action: str
+    is_enforceable: bool
+    requires_approval: bool
+    matched_rules: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence: List[Dict[str, Any]] = Field(default_factory=list)
+    evaluated_at: datetime
+
+
+class PolicyExceptionCreateRequest(BaseModel):
+    policy_id: str
+    rule_key: Optional[str] = None
+    scope: str = Field("REPOSITORY", description="REPOSITORY, ENVIRONMENT, SERVICE, RESOURCE")
+    target: str = Field(..., min_length=1, description="Repository name, resource ARN, or environment name")
+    justification: str = Field(..., min_length=10, description="Audit-ready business or security justification")
+    risk_owner: str = Field(..., min_length=3, description="Named security or engineering owner accepting risk")
+    compensating_controls: Optional[str] = None
+    duration_days: int = Field(30, ge=1, le=90, description="Exception duration, maximum 90 days")
+
+
+class PolicyExceptionResponse(BaseModel):
+    id: str
+    policy_id: str
+    rule_key: Optional[str] = None
+    scope: str
+    target: str
+    justification: str
+    risk_owner: str
+    status: str
+    requested_by: str
+    approved_by: Optional[str] = None
+    compensating_controls: Optional[str] = None
+    expires_at: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PolicyEnforcementEventResponse(BaseModel):
+    id: str
+    decision_id: Optional[str] = None
+    enforcement_point: str
+    action_attempted: str
+    result: str
+    external_reference: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+

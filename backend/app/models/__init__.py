@@ -34,6 +34,10 @@ from app.models.policy import (
     SecurityDecision,
     DecisionEvidence,
     SecurityApproval,
+    PolicyRule,
+    PolicyTestCase,
+    PolicyException,
+    PolicyEnforcementEvent,
 )
 from app.models.investigation import (
     SecurityInvestigation,
@@ -268,6 +272,10 @@ __all__ = [
     "SecurityDecision",
     "DecisionEvidence",
     "SecurityApproval",
+    "PolicyRule",
+    "PolicyTestCase",
+    "PolicyException",
+    "PolicyEnforcementEvent",
     "SBOMJob",
     "SBOMDocument",
     "SBOMComponent",
