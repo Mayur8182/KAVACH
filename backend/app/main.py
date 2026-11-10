@@ -327,6 +327,9 @@ def create_application() -> FastAPI:
 
     # Centralized liveness & readiness probes (Mistake #94)
     @app.get("/health", tags=["Health & Readiness"], summary="Root liveness check")
+    @app.get("/healthz", tags=["Health & Readiness"], summary="Kubernetes/Render liveness check")
+    @app.get("/api/health", tags=["Health & Readiness"], summary="API liveness check")
+    @app.get("/api/healthz", tags=["Health & Readiness"], summary="API healthz check")
     def root_health():
         return {"status": "healthy", "service": "secure-control-plane-backend", "version": "1.0.0"}
 
