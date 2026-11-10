@@ -17,7 +17,7 @@ settings = get_settings()
 
 import os
 
-# Resolve database URL robustly (especially for SQLite file paths and MongoDB URLs)
+# Resolve database URL robustly (especially for SQLite file paths, PostgreSQL on Render, and MongoDB URLs)
 raw_db_url = settings.database_url
 if raw_db_url and raw_db_url.startswith(("mongodb://", "mongodb+srv://")):
     # SQLAlchemy requires an async SQL dialect, whereas MongoDB is managed by app.core.mongo
@@ -28,10 +28,24 @@ if raw_db_url and raw_db_url.startswith(("mongodb://", "mongodb+srv://")):
 if not raw_db_url:
     raw_db_url = getattr(settings, "sql_database_url", "sqlite+aiosqlite:///backend/dev.db")
 
+# Normalize PostgreSQL schemes for SQLAlchemy 2.0 AsyncPG (Render defaults to postgres://)
+if raw_db_url.startswith("postgres://"):
+    raw_db_url = "postgresql+asyncpg://" + raw_db_url[len("postgres://"):]
+elif raw_db_url.startswith("postgresql://"):
+    raw_db_url = "postgresql+asyncpg://" + raw_db_url[len("postgresql://"):]
+
+# asyncpg compatibility: normalize sslmode parameter to ssl if present
+if "postgresql+asyncpg://" in raw_db_url and "sslmode=" in raw_db_url:
+    raw_db_url = raw_db_url.replace("sslmode=require", "ssl=require")
+    raw_db_url = raw_db_url.replace("sslmode=prefer", "ssl=prefer")
+    raw_db_url = raw_db_url.replace("sslmode=disable", "ssl=disable")
+
 if raw_db_url and raw_db_url.startswith("sqlite+aiosqlite:///"):
     sqlite_path = raw_db_url.replace("sqlite+aiosqlite:///", "")
-    # If not absolute, search in expected locations
-    if not os.path.isabs(sqlite_path) and not os.path.exists(sqlite_path):
+    found = False
+    if os.path.isabs(sqlite_path) and os.path.exists(sqlite_path):
+        found = True
+    elif not os.path.isabs(sqlite_path):
         candidates = [
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dev.db")),
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend", "dev.db")),
@@ -42,7 +56,14 @@ if raw_db_url and raw_db_url.startswith("sqlite+aiosqlite:///"):
             if os.path.exists(c):
                 clean_path = c.replace("\\", "/")
                 raw_db_url = f"sqlite+aiosqlite:///{clean_path}"
+                found = True
                 break
+    if not found:
+        # Default fallback to an absolute path next to app/
+        default_db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dev.db"))
+        os.makedirs(os.path.dirname(default_db_path), exist_ok=True)
+        clean_path = default_db_path.replace("\\", "/")
+        raw_db_url = f"sqlite+aiosqlite:///{clean_path}"
 
 engine_kwargs: Dict[str, Any] = {
     "echo": False,

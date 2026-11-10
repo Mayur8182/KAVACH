@@ -29,10 +29,12 @@ services:
         fromDatabase:
           name: kavach-postgres
           property: connectionString
+      - key: MONGODB_URL
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        value: "https://kavachsecurity.me,https://www.kavachsecurity.me"
+        value: "https://kavachsecurity.me,https://www.kavachsecurity.me,https://*.onrender.com"
 
   # ---------------------------------------------------------------------------
   # 2. Kavach Frontend Web Service (Next.js)

@@ -32,6 +32,37 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 echo "--> FastAPI Backend launched (PID: $BACKEND_PID)."
 
+# Handle shutdown cleanly
+cleanup() {
+  echo "--> Shutting down services..."
+  kill -TERM "$BACKEND_PID" 2>/dev/null || true
+  exit 0
+}
+trap cleanup SIGTERM SIGINT
+
+# Wait for FastAPI Backend to become responsive before launching frontend
+echo "--> Waiting for FastAPI Backend to be healthy..."
+RETRIES=30
+READY=0
+while [ $RETRIES -gt 0 ]; do
+  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+    echo "ERROR: FastAPI Backend died unexpectedly during startup." >&2
+    exit 1
+  fi
+  if curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1; then
+    READY=1
+    break
+  fi
+  sleep 1
+  RETRIES=$((RETRIES - 1))
+done
+
+if [ $READY -eq 1 ]; then
+  echo "--> FastAPI Backend is healthy and accepting requests on internal port 8000."
+else
+  echo "WARNING: Backend health check timed out, proceeding to start frontend anyway..."
+fi
+
 # 2. Start Next.js Frontend directly on public 0.0.0.0:$PORT
 cd "$ROOT_DIR/frontend"
 if [ -x "./node_modules/.bin/next" ]; then

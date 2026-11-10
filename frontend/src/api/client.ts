@@ -24,10 +24,36 @@ import type {
   SecurityApproval,
 } from '../types/api';
 
-const API_BASE_URL =
-  ((import.meta as any)?.env?.VITE_API_BASE_URL as string) ||
-  (typeof (globalThis as any).process !== 'undefined' ? (globalThis as any).process.env?.NEXT_PUBLIC_API_URL : undefined) ||
-  (typeof window !== 'undefined' ? '/api/v1' : 'http://127.0.0.1:8000/api/v1');
+function resolveApiBaseUrl(): string {
+  // 1. Inlined Next.js client/build-time environment variable
+  let raw = process.env.NEXT_PUBLIC_API_URL || '';
+  if (!raw && typeof (import.meta as any) !== 'undefined') {
+    raw = (import.meta as any).env?.VITE_API_BASE_URL || '';
+  }
+
+  if (raw && typeof raw === 'string' && raw.trim().length > 0) {
+    let url = raw.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `https://${url}`;
+    }
+    url = url.replace(/\/+$/, '');
+    if (!url.endsWith('/api/v1') && !url.endsWith('/api')) {
+      url = `${url}/api/v1`;
+    }
+    return url;
+  }
+
+  // Fallback: browser calls relative /api/v1 (proxied via Next rewrites), SSR calls BACKEND_URL
+  if (typeof window !== 'undefined') {
+    return '/api/v1';
+  }
+  const backendPort = process.env.BACKEND_PORT || '8000';
+  const backendHost = process.env.BACKEND_URL || `http://127.0.0.1:${backendPort}`;
+  const base = backendHost.startsWith('http') ? backendHost : `https://${backendHost}`;
+  return `${base.replace(/\/+$/, '')}/api/v1`;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 class ApiClient {
   private baseUrl: string;

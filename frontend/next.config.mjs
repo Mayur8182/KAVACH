@@ -91,7 +91,12 @@ const nextConfig = {
   },
   async rewrites() {
     const backendPort = process.env.BACKEND_PORT || '8000';
-    const backendUrl = process.env.BACKEND_URL || `http://127.0.0.1:${backendPort}`;
+    let backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || `http://127.0.0.1:${backendPort}`;
+    if (backendUrl && !backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
+      backendUrl = `https://${backendUrl}`;
+    }
+    // Clean trailing slashes or duplicate api prefixes
+    backendUrl = backendUrl.replace(/\/+$/, '').replace(/\/api(\/v1)?$/, '');
     return [
       {
         source: '/api/:path*',

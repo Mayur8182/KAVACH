@@ -315,7 +315,7 @@ async def get_security_context(project_id: str, db: AsyncSession = Depends(get_d
         blueprint={"description": blueprint_obj.description} if blueprint_obj else None,
         policy={
             "name": policy_obj.name,
-            "default_action": policy_obj.default_action if hasattr(policy_obj, "default_action") else "ALLOW",
+            "default_action": getattr(policy_obj, "default_action", "BLOCK") or "BLOCK",
         } if policy_obj else None,
         contracts=[
             {

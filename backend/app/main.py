@@ -212,16 +212,30 @@ async def _run_startup_migrations() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             
-            # Cache table columns to avoid repetitive PRAGMA queries
+            # Cache table columns to avoid repetitive queries (dialect-aware for SQLite and PostgreSQL)
             table_columns_cache: dict = {}
+            is_sqlite = conn.dialect.name == "sqlite"
+            is_postgres = conn.dialect.name == "postgresql"
             for table, col, col_type in required_columns:
                 if table not in table_columns_cache:
-                    result = await conn.execute(text(f"PRAGMA table_info({table})"))
-                    table_columns_cache[table] = [row[1] for row in result.fetchall()]
+                    if is_sqlite:
+                        result = await conn.execute(text(f"PRAGMA table_info({table})"))
+                        table_columns_cache[table] = [row[1] for row in result.fetchall()]
+                    elif is_postgres:
+                        result = await conn.execute(
+                            text("SELECT column_name FROM information_schema.columns WHERE table_name = :t"),
+                            {"t": table},
+                        )
+                        table_columns_cache[table] = [row[0] for row in result.fetchall()]
+                    else:
+                        table_columns_cache[table] = []
                 if col not in table_columns_cache[table]:
-                    await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
-                    table_columns_cache[table].append(col)
-                    logger.info(f"[startup-migration] Added column {col} to {table}")
+                    try:
+                        await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                        table_columns_cache[table].append(col)
+                        logger.info(f"[startup-migration] Added column {col} to {table}")
+                    except Exception as col_err:
+                        logger.debug(f"[startup-migration] Column {col} on {table}: {col_err}")
     except Exception as exc:
         # Log but don't crash — table may not exist yet (first run before alembic)
         logger.warning(f"[startup-migration] Could not apply schema patch: {exc}")
@@ -298,11 +312,11 @@ def create_application() -> FastAPI:
     app.add_middleware(IdempotencyMiddleware)
     app.add_middleware(RateLimitingMiddleware)
 
-    # Configure CORS
+    # Configure CORS (permits localhost, Render preview/production subdomains, and custom domains)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
+        allow_origin_regex=r"^https?://([a-zA-Z0-9-]+\.)*(localhost|127\.0\.0\.1|onrender\.com|kavachsecurity\.me)(:[0-9]+)?$",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

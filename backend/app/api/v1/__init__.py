@@ -70,8 +70,10 @@ from app.api.v1.local_audit import router as local_audit_router
 from app.api.v1.runs import router as runs_router
 from app.api.v1.security_intelligence import router as security_intelligence_router
 from app.api.v1.remediation import router as remediation_router
+from app.api.v1.cli import router as cli_router
 
 v1_router = APIRouter()
+v1_router.include_router(cli_router)
 v1_router.include_router(remediation_router)
 v1_router.include_router(runs_router)
 v1_router.include_router(security_intelligence_router)
