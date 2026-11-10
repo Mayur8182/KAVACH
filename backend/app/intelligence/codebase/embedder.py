@@ -10,7 +10,11 @@ import math
 import hashlib
 import logging
 from typing import List, Dict, Any, Optional
-import numpy as np
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 from app.core.config import get_settings
 from app.intelligence.codebase.chunker import CodeChunk

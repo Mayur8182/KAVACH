@@ -5,7 +5,10 @@ Traces cross-file call paths, module imports, external package usage, and taint 
 """
 
 from typing import Dict, List, Optional, Set, Tuple, Any, Union
-import networkx as nx
+try:
+    import networkx as nx
+except ImportError:
+    nx = None
 
 from app.intelligence.codebase.ast_parser import CodeFileAST
 from app.intelligence.codebase.symbol_index import SymbolIndex, CodeSymbol
@@ -19,7 +22,7 @@ class DependencyGraphEngine:
     def __init__(self, symbol_index: Optional[SymbolIndex] = None):
         self.symbol_index = symbol_index or SymbolIndex()
         # DiGraph where nodes are either files, symbols, or external packages
-        self.graph = nx.DiGraph()
+        self.graph = nx.DiGraph() if nx is not None else None
         # Track external packages
         self.external_dependencies: Set[str] = set()
 

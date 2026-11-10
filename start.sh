@@ -42,7 +42,7 @@ trap cleanup SIGTERM SIGINT
 
 # Wait for FastAPI Backend to become responsive before launching frontend
 echo "--> Waiting for FastAPI Backend to be healthy..."
-RETRIES=30
+RETRIES=60
 READY=0
 while [ $RETRIES -gt 0 ]; do
   if ! kill -0 "$BACKEND_PID" 2>/dev/null; then

@@ -9,7 +9,10 @@ from __future__ import annotations
 import logging
 from typing import Dict, List, Optional, Set, Tuple
 
-import networkx as nx
+try:
+    import networkx as nx
+except ImportError:
+    nx = None
 
 from app.intelligence.codebase.ast_parser import CodeFileAST, ASTFunction
 from app.intelligence.codebase.dependency_graph import DependencyGraphEngine

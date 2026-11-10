@@ -8,7 +8,11 @@ NumPy vectorized cosine similarity fallback for SQLite/local environments.
 import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-import numpy as np
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 from app.intelligence.codebase.chunker import CodeChunk
 

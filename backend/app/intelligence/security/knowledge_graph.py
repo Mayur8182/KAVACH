@@ -10,7 +10,10 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional, Set
 
-import networkx as nx
+try:
+    import networkx as nx
+except ImportError:
+    nx = None
 
 from app.intelligence.security.schemas import (
     CanonicalFinding,
@@ -28,7 +31,7 @@ class SecurityKnowledgeGraph:
 
     def __init__(self, project_id: Optional[uuid.UUID] = None):
         self.project_id = project_id
-        self.graph = nx.DiGraph()
+        self.graph = nx.DiGraph() if nx is not None else None
 
     def add_finding_node(self, finding: CanonicalFinding) -> str:
         """Adds a finding node with rich metadata."""
