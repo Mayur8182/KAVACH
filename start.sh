@@ -43,39 +43,8 @@ cleanup() {
 }
 trap cleanup SIGTERM SIGINT
 
-# 1. Start FastAPI Backend in background on internal localhost:8000
-echo "--> Starting FastAPI Backend on 127.0.0.1:8000..."
-cd "$ROOT_DIR/backend"
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
-BACKEND_PID=$!
-echo "--> FastAPI Backend launched (PID: $BACKEND_PID)."
-
-# 2. Wait for FastAPI Backend to become responsive before launching frontend
-echo "--> Waiting for FastAPI Backend to be healthy on internal port 8000..."
-RETRIES=60
-READY=0
-while [ $RETRIES -gt 0 ]; do
-  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-    echo "FATAL: FastAPI Backend process ($BACKEND_PID) exited unexpectedly during startup!" >&2
-    exit 1
-  fi
-  if curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1; then
-    READY=1
-    break
-  fi
-  sleep 1
-  RETRIES=$((RETRIES - 1))
-done
-
-if [ $READY -ne 1 ]; then
-  echo "FATAL: FastAPI Backend failed to become healthy within 60s. Aborting startup." >&2
-  kill -TERM "$BACKEND_PID" 2>/dev/null || true
-  exit 1
-fi
-
-echo "--> FastAPI Backend is verified healthy and accepting internal traffic."
-
-# 3. Start Next.js Frontend directly on public 0.0.0.0:$PORT in background
+# 1. Start Next.js Frontend immediately on public 0.0.0.0:$PORT
+# Starting Next.js first ensures Render's port scanner detects an open port within seconds
 echo "--> Starting Next.js Frontend on 0.0.0.0:$PORT..."
 cd "$ROOT_DIR/frontend"
 if [ -x "./node_modules/.bin/next" ]; then
@@ -85,12 +54,18 @@ else
   npx next start -H 0.0.0.0 -p "$PORT" &
   FRONTEND_PID=$!
 fi
-
 echo "--> Next.js Frontend launched (PID: $FRONTEND_PID)."
 
-# 4. Wait for Next.js Frontend to bind and respond on port $PORT
+# 2. Start FastAPI Backend in parallel on internal localhost:8000
+echo "--> Starting FastAPI Backend on 127.0.0.1:8000..."
+cd "$ROOT_DIR/backend"
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+BACKEND_PID=$!
+echo "--> FastAPI Backend launched (PID: $BACKEND_PID)."
+
+# 3. Wait for Next.js to bind public port $PORT (Render port detection)
 echo "--> Verifying Next.js port binding on 0.0.0.0:$PORT..."
-FRONTEND_RETRIES=30
+FRONTEND_RETRIES=45
 FRONTEND_READY=0
 while [ $FRONTEND_RETRIES -gt 0 ]; do
   if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
@@ -98,7 +73,7 @@ while [ $FRONTEND_RETRIES -gt 0 ]; do
     kill -TERM "$BACKEND_PID" 2>/dev/null || true
     exit 1
   fi
-  if curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1; then
+  if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 || curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1; then
     FRONTEND_READY=1
     break
   fi
@@ -107,9 +82,42 @@ while [ $FRONTEND_RETRIES -gt 0 ]; do
 done
 
 if [ $FRONTEND_READY -ne 1 ]; then
-  echo "WARNING: Next.js health check timed out on internal probe, proceeding with supervisor..."
+  echo "WARNING: Next.js internal health probe timed out; checking if process is still alive..."
+  if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
+    echo "FATAL: Next.js process died." >&2
+    exit 1
+  fi
 else
   echo "--> Next.js Frontend is verified healthy on 0.0.0.0:$PORT."
+fi
+
+# 4. Wait for FastAPI Backend to be healthy on internal port 8000
+echo "--> Waiting for FastAPI Backend to be healthy on internal port 8000..."
+BACKEND_RETRIES=60
+BACKEND_READY=0
+while [ $BACKEND_RETRIES -gt 0 ]; do
+  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+    echo "FATAL: FastAPI Backend process ($BACKEND_PID) exited unexpectedly during startup!" >&2
+    kill -TERM "$FRONTEND_PID" 2>/dev/null || true
+    exit 1
+  fi
+  if curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1; then
+    BACKEND_READY=1
+    break
+  fi
+  sleep 1
+  BACKEND_RETRIES=$((BACKEND_RETRIES - 1))
+done
+
+if [ $BACKEND_READY -ne 1 ]; then
+  echo "WARNING: FastAPI Backend health probe timed out; checking if process is still alive..."
+  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+    echo "FATAL: FastAPI Backend process died." >&2
+    kill -TERM "$FRONTEND_PID" 2>/dev/null || true
+    exit 1
+  fi
+else
+  echo "--> FastAPI Backend is verified healthy and accepting internal traffic."
 fi
 
 echo "=================================================="

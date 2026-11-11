@@ -40,30 +40,36 @@ if "postgresql+asyncpg://" in raw_db_url and "sslmode=" in raw_db_url:
     raw_db_url = raw_db_url.replace("sslmode=prefer", "ssl=prefer")
     raw_db_url = raw_db_url.replace("sslmode=disable", "ssl=disable")
 
-if raw_db_url and raw_db_url.startswith("sqlite+aiosqlite:///"):
-    sqlite_path = raw_db_url.replace("sqlite+aiosqlite:///", "")
-    found = False
-    if os.path.isabs(sqlite_path) and os.path.exists(sqlite_path):
-        found = True
-    elif not os.path.isabs(sqlite_path):
-        candidates = [
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dev.db")),
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend", "dev.db")),
-            os.path.abspath("dev.db"),
-            os.path.abspath("backend/dev.db"),
-        ]
-        for c in candidates:
-            if os.path.exists(c):
-                clean_path = c.replace("\\", "/")
-                raw_db_url = f"sqlite+aiosqlite:///{clean_path}"
-                found = True
-                break
-    if not found:
-        # Default fallback to an absolute path next to app/
-        default_db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dev.db"))
-        os.makedirs(os.path.dirname(default_db_path), exist_ok=True)
-        clean_path = default_db_path.replace("\\", "/")
-        raw_db_url = f"sqlite+aiosqlite:///{clean_path}"
+if raw_db_url and "sqlite" in raw_db_url:
+    # Normalize SQLite URL to ensure safe, writable filesystem path across Linux, Docker, and Windows
+    backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    repo_root = os.path.abspath(os.path.join(backend_dir, ".."))
+    
+    candidates = [
+        os.path.join(backend_dir, "dev.db"),
+        os.path.join(repo_root, "backend", "dev.db"),
+        os.path.join(repo_root, "dev.db"),
+        os.path.abspath("dev.db"),
+        os.path.abspath("backend/dev.db"),
+    ]
+    
+    target_path = None
+    for cand in candidates:
+        if os.path.exists(cand):
+            target_path = os.path.abspath(cand)
+            break
+            
+    if not target_path:
+        if os.access(backend_dir, os.W_OK):
+            target_path = os.path.join(backend_dir, "dev.db")
+        else:
+            import tempfile
+            target_path = os.path.join(tempfile.gettempdir(), "kavach_dev.db")
+            
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    clean_target = target_path.replace("\\", "/")
+    raw_db_url = f"sqlite+aiosqlite:///{clean_target}"
+    logger.info(f"[database] Resolved SQLite database path: {clean_target}")
 
 engine_kwargs: Dict[str, Any] = {
     "echo": False,
