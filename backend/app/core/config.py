@@ -69,7 +69,7 @@ class Settings(BaseSettings):
             return ""
         import sys, os
         # If running on Linux/Render and received a Windows-style path (e.g., C:\tools\scanners\gitleaks.exe)
-        if sys.platform != "win32" and (":\\" in v or v.endswith(".exe") or "\\" in v):
+        if sys.platform != "win32" and (":\\" in v or ":/" in v or v.lower().endswith(".exe") or "\\" in v):
             basename = os.path.basename(v.replace("\\", "/"))
             if basename.lower().endswith(".exe"):
                 basename = basename[:-4]
@@ -88,6 +88,7 @@ class Settings(BaseSettings):
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "https://kavachsecurity.me",
+            "https://www.kavachsecurity.me",
             "https://app.kavachsecurity.me",
             "https://api.kavachsecurity.me",
             "https://kavach-2brv.onrender.com",
@@ -98,16 +99,30 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        origins: List[str] = []
         if isinstance(v, str):
             if v.startswith("[") and v.endswith("]"):
                 try:
-                    return json.loads(v)
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        origins = [str(i).strip() for i in parsed if str(i).strip()]
                 except Exception:
-                    pass
-            return [i.strip() for i in v.split(",") if i.strip()]
+                    origins = [i.strip() for i in v.split(",") if i.strip()]
+            else:
+                origins = [i.strip() for i in v.split(",") if i.strip()]
         elif isinstance(v, (list, set)):
-            return list(v)
-        return []
+            origins = [str(i).strip() for i in v if str(i).strip()]
+
+        essential = [
+            "https://kavachsecurity.me",
+            "https://www.kavachsecurity.me",
+            "https://app.kavachsecurity.me",
+            "https://api.kavachsecurity.me",
+        ]
+        for e in essential:
+            if e not in origins:
+                origins.append(e)
+        return origins
 
     # Redis Cache Settings
     redis_url: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")

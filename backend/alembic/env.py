@@ -25,7 +25,12 @@ target_metadata = Base.metadata
 
 # Override sqlalchemy.url with dynamic environment config
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+raw_url = settings.database_url
+if raw_url and raw_url.startswith(("mongodb://", "mongodb+srv://")):
+    raw_url = getattr(settings, "sql_database_url", "sqlite+aiosqlite:///backend/dev.db")
+if not raw_url:
+    raw_url = getattr(settings, "sql_database_url", "sqlite+aiosqlite:///backend/dev.db")
+config.set_main_option("sqlalchemy.url", raw_url)
 
 
 def run_migrations_offline() -> None:

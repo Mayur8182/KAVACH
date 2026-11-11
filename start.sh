@@ -16,8 +16,8 @@ export HOSTNAME="0.0.0.0"
 export PORT="${PORT:-10000}"
 
 echo "=================================================="
-echo "  KAVACH SECURITY — UNIFIED CONTROL PLANE"
-echo "  Deploying Frontend + Backend on single port $PORT"
+echo "  KAVACH SECURITY — CONTROL PLANE STARTUP"
+echo "  Target Port: $PORT"
 echo "=================================================="
 
 # Check uvicorn presence
@@ -48,9 +48,23 @@ cleanup() {
 }
 trap cleanup SIGTERM SIGINT
 
+# Detect if Next.js Frontend is built and runnable
+CAN_RUN_FRONTEND=0
+if [ -d "$ROOT_DIR/frontend/.next" ] && command -v node >/dev/null 2>&1; then
+  CAN_RUN_FRONTEND=1
+fi
+
+if [ $CAN_RUN_FRONTEND -eq 0 ]; then
+  echo "--> Notice: Frontend build (.next) or node not found in runtime."
+  echo "--> Running in STANDALONE BACKEND MODE: FastAPI on 0.0.0.0:$PORT"
+  cd "$ROOT_DIR/backend"
+  exec python -u -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --loop asyncio
+fi
+
+# UNIFIED MODE: Next.js on 0.0.0.0:$PORT, FastAPI on 127.0.0.1:8000
+echo "--> Running in UNIFIED MODE (Next.js on 0.0.0.0:$PORT, FastAPI on 127.0.0.1:8000)..."
+
 # 1. Start Next.js Frontend immediately on public 0.0.0.0:$PORT
-# Starting Next.js first ensures Render's port scanner detects an open port within seconds
-echo "--> Starting Next.js Frontend on 0.0.0.0:$PORT..."
 cd "$ROOT_DIR/frontend"
 if [ -x "./node_modules/.bin/next" ]; then
   ./node_modules/.bin/next start -H 0.0.0.0 -p "$PORT" &
@@ -71,15 +85,18 @@ python -u -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --loop asyncio > 
 BACKEND_PID=$!
 echo "--> FastAPI Backend launched (PID: $BACKEND_PID)."
 
-# 3. Wait for Next.js to bind public port $PORT (Render port detection)
+# 3. Wait for Next.js to bind public port $PORT
 echo "--> Verifying Next.js port binding on 0.0.0.0:$PORT..."
-FRONTEND_RETRIES=45
+FRONTEND_RETRIES=40
 FRONTEND_READY=0
 while [ $FRONTEND_RETRIES -gt 0 ]; do
   if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
-    echo "FATAL: Next.js Frontend process ($FRONTEND_PID) exited unexpectedly during startup!" >&2
+    echo "WARNING: Next.js process ($FRONTEND_PID) exited during startup." >&2
+    echo "--> Automatically falling back: Promoting FastAPI to public 0.0.0.0:$PORT to avoid 502..." >&2
     kill -TERM "$BACKEND_PID" 2>/dev/null || true
-    exit 1
+    wait "$BACKEND_PID" 2>/dev/null || true
+    cd "$ROOT_DIR/backend"
+    exec python -u -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --loop asyncio
   fi
   if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 || curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1; then
     FRONTEND_READY=1
@@ -90,10 +107,13 @@ while [ $FRONTEND_RETRIES -gt 0 ]; do
 done
 
 if [ $FRONTEND_READY -ne 1 ]; then
-  echo "WARNING: Next.js internal health probe timed out; checking if process is still alive..."
+  echo "WARNING: Next.js internal health probe timed out; verifying liveness..."
   if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
-    echo "FATAL: Next.js process died." >&2
-    exit 1
+    echo "--> Promoting FastAPI to 0.0.0.0:$PORT..." >&2
+    kill -TERM "$BACKEND_PID" 2>/dev/null || true
+    wait "$BACKEND_PID" 2>/dev/null || true
+    cd "$ROOT_DIR/backend"
+    exec python -u -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --loop asyncio
   fi
 else
   echo "--> Next.js Frontend is verified healthy on 0.0.0.0:$PORT."
@@ -106,9 +126,7 @@ BACKEND_READY=0
 while [ $BACKEND_RETRIES -gt 0 ]; do
   if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
     echo "WARNING: FastAPI Backend process ($BACKEND_PID) exited during startup! Restarting..." >&2
-    echo "=== RECENT BACKEND LOGS ===" >&2
     tail -n 60 /tmp/backend.log >&2 || true
-    echo "===========================" >&2
     cd "$ROOT_DIR/backend"
     python -u -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --loop asyncio >> /tmp/backend.log 2>&1 &
     BACKEND_PID=$!
@@ -135,19 +153,13 @@ echo "  - Frontend: 0.0.0.0:$PORT (ACTIVE)"
 echo "=================================================="
 
 # 5. Continuous Process Supervision Loop
-# Keep Next.js Frontend alive permanently so Render port 10000 never drops 502
-# Auto-restart FastAPI Backend if it terminates
 while true; do
   if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
-    echo "FATAL: Next.js Frontend process ($FRONTEND_PID) exited. Restarting frontend..." >&2
-    cd "$ROOT_DIR/frontend"
-    if [ -x "./node_modules/.bin/next" ]; then
-      ./node_modules/.bin/next start -H 0.0.0.0 -p "$PORT" &
-      FRONTEND_PID=$!
-    else
-      npx next start -H 0.0.0.0 -p "$PORT" &
-      FRONTEND_PID=$!
-    fi
+    echo "FATAL: Next.js Frontend exited. Promoting FastAPI to 0.0.0.0:$PORT..." >&2
+    kill -TERM "$BACKEND_PID" 2>/dev/null || true
+    wait "$BACKEND_PID" 2>/dev/null || true
+    cd "$ROOT_DIR/backend"
+    exec python -u -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --loop asyncio
   fi
   if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
     echo "WARNING: FastAPI Backend process ($BACKEND_PID) exited. Auto-restarting backend..." >&2
