@@ -93,7 +93,7 @@ fi
 
 # 4. Wait for FastAPI Backend to be healthy on internal port 8000
 echo "--> Waiting for FastAPI Backend to be healthy on internal port 8000..."
-BACKEND_RETRIES=60
+BACKEND_RETRIES=120
 BACKEND_READY=0
 while [ $BACKEND_RETRIES -gt 0 ]; do
   if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
@@ -110,12 +110,7 @@ while [ $BACKEND_RETRIES -gt 0 ]; do
 done
 
 if [ $BACKEND_READY -ne 1 ]; then
-  echo "WARNING: FastAPI Backend health probe timed out; checking if process is still alive..."
-  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-    echo "FATAL: FastAPI Backend process died." >&2
-    kill -TERM "$FRONTEND_PID" 2>/dev/null || true
-    exit 1
-  fi
+  echo "WARNING: FastAPI Backend taking longer than 120s to report healthy, continuing supervisor loop..."
 else
   echo "--> FastAPI Backend is verified healthy and accepting internal traffic."
 fi
