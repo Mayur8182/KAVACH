@@ -249,9 +249,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         f"Starting {settings.app_name} in {settings.app_env} mode",
         extra={"event": "startup", "version": "1.0.0"},
     )
-    await _run_startup_migrations()
-    await reconcile_interrupted_tasks()
-    start_task_worker()
+    try:
+        await asyncio.wait_for(_run_startup_migrations(), timeout=25.0)
+    except Exception as exc:
+        logger.warning(f"[startup] Startup migrations timed out or non-fatal error: {exc}")
+    try:
+        await asyncio.wait_for(reconcile_interrupted_tasks(), timeout=15.0)
+    except Exception as exc:
+        logger.warning(f"[startup] Task reconciliation timed out or non-fatal error: {exc}")
+    try:
+        start_task_worker()
+    except Exception as exc:
+        logger.warning(f"[startup] Could not start task worker: {exc}")
     yield
     logger.info("Initiating application shutdown", extra={"event": "shutdown"})
     await stop_task_worker()

@@ -101,16 +101,18 @@ fi
 
 # 4. Wait for FastAPI Backend to be healthy on internal port 8000
 echo "--> Waiting for FastAPI Backend to be healthy on internal port 8000..."
-BACKEND_RETRIES=120
+BACKEND_RETRIES=150
 BACKEND_READY=0
 while [ $BACKEND_RETRIES -gt 0 ]; do
   if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-    echo "FATAL: FastAPI Backend process ($BACKEND_PID) exited unexpectedly during startup!" >&2
+    echo "WARNING: FastAPI Backend process ($BACKEND_PID) exited during startup! Restarting..." >&2
     echo "=== RECENT BACKEND LOGS ===" >&2
     tail -n 60 /tmp/backend.log >&2 || true
     echo "===========================" >&2
-    kill -TERM "$FRONTEND_PID" 2>/dev/null || true
-    exit 1
+    cd "$ROOT_DIR/backend"
+    python -u -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --loop asyncio >> /tmp/backend.log 2>&1 &
+    BACKEND_PID=$!
+    echo "--> Backend restarted (New PID: $BACKEND_PID)."
   fi
   if curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1; then
     BACKEND_READY=1
@@ -121,29 +123,39 @@ while [ $BACKEND_RETRIES -gt 0 ]; do
 done
 
 if [ $BACKEND_READY -ne 1 ]; then
-  echo "WARNING: FastAPI Backend taking longer than 120s to report healthy, continuing supervisor loop..."
+  echo "WARNING: FastAPI Backend still initializing in background. Next.js remains active on port $PORT."
 else
   echo "--> FastAPI Backend is verified healthy and accepting internal traffic."
 fi
 
 echo "=================================================="
 echo "  KAVACH CONTROL PLANE FULLY OPERATIONAL"
-echo "  - Backend:  127.0.0.1:8000 (HEALTHY)"
-echo "  - Frontend: 0.0.0.0:$PORT (HEALTHY)"
+echo "  - Backend:  127.0.0.1:8000"
+echo "  - Frontend: 0.0.0.0:$PORT (ACTIVE)"
 echo "=================================================="
 
 # 5. Continuous Process Supervision Loop
-# If either service crashes, terminate both and exit with failure
+# Keep Next.js Frontend alive permanently so Render port 10000 never drops 502
+# Auto-restart FastAPI Backend if it terminates
 while true; do
-  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-    echo "FATAL: FastAPI Backend process ($BACKEND_PID) died!" >&2
-    kill -TERM "$FRONTEND_PID" 2>/dev/null || true
-    exit 1
-  fi
   if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
-    echo "FATAL: Next.js Frontend process ($FRONTEND_PID) died!" >&2
-    kill -TERM "$BACKEND_PID" 2>/dev/null || true
-    exit 1
+    echo "FATAL: Next.js Frontend process ($FRONTEND_PID) exited. Restarting frontend..." >&2
+    cd "$ROOT_DIR/frontend"
+    if [ -x "./node_modules/.bin/next" ]; then
+      ./node_modules/.bin/next start -H 0.0.0.0 -p "$PORT" &
+      FRONTEND_PID=$!
+    else
+      npx next start -H 0.0.0.0 -p "$PORT" &
+      FRONTEND_PID=$!
+    fi
   fi
-  sleep 3
+  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+    echo "WARNING: FastAPI Backend process ($BACKEND_PID) exited. Auto-restarting backend..." >&2
+    tail -n 40 /tmp/backend.log >&2 || true
+    cd "$ROOT_DIR/backend"
+    python -u -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --loop asyncio >> /tmp/backend.log 2>&1 &
+    BACKEND_PID=$!
+    echo "--> Backend restarted (PID: $BACKEND_PID)."
+  fi
+  sleep 5
 done

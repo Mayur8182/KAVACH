@@ -62,6 +62,20 @@ class Settings(BaseSettings):
     mail_starttls: bool = Field(default=True, description="Enable STARTTLS for SMTP")
     mail_ssl_tls: bool = Field(default=False, description="Enable SSL/TLS directly for SMTP")
 
+    @field_validator("semgrep_bin", "gitleaks_bin", "trivy_bin", "osv_bin", "checkov_bin", "syft_bin", mode="before")
+    @classmethod
+    def sanitize_scanner_bin(cls, v: Optional[str]) -> str:
+        if not v:
+            return ""
+        import sys, os
+        # If running on Linux/Render and received a Windows-style path (e.g., C:\tools\scanners\gitleaks.exe)
+        if sys.platform != "win32" and (":\\" in v or v.endswith(".exe") or "\\" in v):
+            basename = os.path.basename(v.replace("\\", "/"))
+            if basename.lower().endswith(".exe"):
+                basename = basename[:-4]
+            return basename
+        return v
+
     # CORS settings
     cors_origins: Union[List[str], str] = Field(
         default=[
