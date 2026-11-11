@@ -9,6 +9,7 @@ else
 fi
 
 export PYTHONPATH="$ROOT_DIR/backend"
+export PYTHONUNBUFFERED=1
 export BACKEND_PORT=8000
 export BACKEND_URL="http://127.0.0.1:8000"
 export HOSTNAME="0.0.0.0"
@@ -28,9 +29,13 @@ fi
 # Track child PIDs
 BACKEND_PID=""
 FRONTEND_PID=""
+TAIL_PID=""
 
 cleanup() {
   echo "--> Termination signal received. Gracefully shutting down services..."
+  if [ -n "$TAIL_PID" ]; then
+    kill "$TAIL_PID" 2>/dev/null || true
+  fi
   if [ -n "$FRONTEND_PID" ]; then
     kill -TERM "$FRONTEND_PID" 2>/dev/null || true
   fi
@@ -59,7 +64,10 @@ echo "--> Next.js Frontend launched (PID: $FRONTEND_PID)."
 # 2. Start FastAPI Backend in parallel on internal localhost:8000
 echo "--> Starting FastAPI Backend on 127.0.0.1:8000..."
 cd "$ROOT_DIR/backend"
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+touch /tmp/backend.log
+tail -n 0 -f /tmp/backend.log &
+TAIL_PID=$!
+python -u -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --loop asyncio > /tmp/backend.log 2>&1 &
 BACKEND_PID=$!
 echo "--> FastAPI Backend launched (PID: $BACKEND_PID)."
 
@@ -98,6 +106,9 @@ BACKEND_READY=0
 while [ $BACKEND_RETRIES -gt 0 ]; do
   if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
     echo "FATAL: FastAPI Backend process ($BACKEND_PID) exited unexpectedly during startup!" >&2
+    echo "=== RECENT BACKEND LOGS ===" >&2
+    tail -n 60 /tmp/backend.log >&2 || true
+    echo "===========================" >&2
     kill -TERM "$FRONTEND_PID" 2>/dev/null || true
     exit 1
   fi
