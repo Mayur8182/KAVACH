@@ -57,7 +57,8 @@ function ConnectGithubContent() {
     try {
       if (!installationId) {
         try {
-          const authData = await api.auth.getGithubAuthUrl();
+          const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback/github` : undefined;
+          const authData = await api.auth.getGithubAuthUrl(redirectUri);
           if (authData?.url) {
             window.location.href = authData.url;
             return;

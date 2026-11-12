@@ -301,6 +301,7 @@ class GitHubAuthUrlResponse(BaseModel):
 class GitHubCallbackRequest(BaseModel):
     code: str
     state: Optional[str] = None
+    redirect_uri: Optional[str] = None
 
 
 class GitHubAuthResponse(BaseModel):
@@ -318,24 +319,24 @@ class GitHubAuthResponse(BaseModel):
     summary="Get GitHub OAuth authorization URL",
     description="Generates the authorized GitHub consent URL for user login and repository access.",
 )
-async def get_github_auth_url() -> GitHubAuthUrlResponse:
+async def get_github_auth_url(redirect_uri: Optional[str] = None) -> GitHubAuthUrlResponse:
     settings = get_settings()
     client_id = settings.github_client_id or "Ov23likjqoMrdpB35SRt"
-    redirect_uri = settings.github_redirect_uri or "http://localhost:3002/auth/callback/github"
+    resolved_redirect_uri = redirect_uri or settings.github_redirect_uri or "http://localhost:3002/auth/callback/github"
 
     state = generate_oauth_state("github")
     scope = "read:user,user:email,repo"
     auth_url = (
         f"https://github.com/login/oauth/authorize"
         f"?client_id={client_id}"
-        f"&redirect_uri={redirect_uri}"
+        f"&redirect_uri={resolved_redirect_uri}"
         f"&scope={scope}"
         f"&state={state}"
     )
     return GitHubAuthUrlResponse(
         url=auth_url,
         client_id=client_id,
-        redirect_uri=redirect_uri,
+        redirect_uri=resolved_redirect_uri,
         state=state,
     )
 
@@ -360,7 +361,7 @@ async def github_oauth_callback(
     settings = get_settings()
     client_id = settings.github_client_id or "Ov23likjqoMrdpB35SRt"
     client_secret = settings.github_client_secret or "a676a37ce8268a0fd4deec132b1ca3e13bbd8901"
-    redirect_uri = settings.github_redirect_uri or "http://localhost:3002/auth/callback/github"
+    redirect_uri = payload.redirect_uri or settings.github_redirect_uri or "http://localhost:3002/auth/callback/github"
 
     # 1. Exchange code for access token with GitHub using pooled async client
     token_url = "https://github.com/login/oauth/access_token"

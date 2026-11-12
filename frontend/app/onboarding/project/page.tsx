@@ -336,7 +336,8 @@ function OnboardingProjectContent() {
                         type="button"
                         onClick={async () => {
                           try {
-                            const res = await api.auth.getGithubAuthUrl();
+                            const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback/github` : undefined;
+                            const res = await api.auth.getGithubAuthUrl(redirectUri);
                             if (res?.url) window.location.href = res.url;
                           } catch {
                             const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || 'Ov23likjqoMrdpB35SRt';

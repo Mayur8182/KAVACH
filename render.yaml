@@ -38,7 +38,7 @@ services:
         value: "10080"
       # CORS — allows the frontend domain + onrender preview URLs
       - key: CORS_ORIGINS
-        value: "https://kavachsecurity.me,https://www.kavachsecurity.me,https://kavach-frontend.onrender.com"
+        value: "https://kavachsecurity.me,https://www.kavachsecurity.me,https://kavach-frontend.onrender.com,https://kavach-frontend-1f5x.onrender.com"
       # GitHub OAuth
       - key: GITHUB_CLIENT_ID
         sync: false
@@ -114,14 +114,8 @@ services:
         value: "1"
       - key: NEXT_PUBLIC_APP_URL
         value: https://kavachsecurity.me
-      # Render automatically resolves kavach-backend's URL — no hardcoding needed!
+      # Kavach Backend Web Service public endpoint
       - key: BACKEND_URL
-        fromService:
-          type: web
-          name: kavach-backend
-          property: host
+        value: https://kavach-backend-3hdm.onrender.com
       - key: NEXT_PUBLIC_API_URL
-        fromService:
-          type: web
-          name: kavach-backend
-          property: host
+        value: https://kavach-backend-3hdm.onrender.com

@@ -60,7 +60,8 @@ function GitHubCallbackContent() {
 
     const exchangeCode = async () => {
       try {
-        const res = await api.auth.githubCallback({ code, state: state || undefined });
+        const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback/github` : undefined;
+        const res = await api.auth.githubCallback({ code, state: state || undefined, redirect_uri: redirectUri });
         if (res.access_token) {
           setAuthToken(res.access_token);
 
@@ -99,7 +100,9 @@ function GitHubCallbackContent() {
   const handleRetryGithub = async () => {
     setRetrying(true);
     try {
-      const data = await api.auth.getGithubAuthUrl();
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://kavachsecurity.me';
+      const redirectUri = `${currentOrigin}/auth/callback/github`;
+      const data = await api.auth.getGithubAuthUrl(redirectUri);
       if (data?.url) {
         window.location.href = data.url;
         return;

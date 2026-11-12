@@ -95,9 +95,27 @@ const nextConfig = {
   },
   async rewrites() {
     const backendPort = process.env.BACKEND_PORT || '8000';
-    let backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || `http://127.0.0.1:${backendPort}`;
-    if (backendUrl && !backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
+    const rawUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || `http://127.0.0.1:${backendPort}`;
+    let backendUrl = rawUrl.trim();
+    if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
       backendUrl = `https://${backendUrl}`;
+    }
+    try {
+      const parsed = new URL(backendUrl);
+      // If hostname is an internal Render service name (e.g. kavach-backend-3hdm) without domain dots
+      if (!parsed.hostname.includes('.') && parsed.hostname !== 'localhost') {
+        parsed.hostname = `${parsed.hostname}.onrender.com`;
+        parsed.port = '';
+        parsed.protocol = 'https:';
+      }
+      // Render public web services route externally via standard HTTPS (port 443). Strip internal port :10000
+      if (parsed.hostname.endsWith('.onrender.com')) {
+        parsed.port = '';
+        parsed.protocol = 'https:';
+      }
+      backendUrl = parsed.origin;
+    } catch {
+      backendUrl = backendUrl.replace(/:\d+$/, '').replace(/\/+$/, '');
     }
     // Clean trailing slashes or duplicate api prefixes
     backendUrl = backendUrl.replace(/\/+$/, '').replace(/\/api(\/v1)?$/, '');

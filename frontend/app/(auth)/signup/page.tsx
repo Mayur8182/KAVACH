@@ -51,19 +51,21 @@ export default function SignupPage() {
     setGithubLoading(true);
     setError(null);
     try {
-      const data = await api.auth.getGithubAuthUrl();
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://kavachsecurity.me';
+      const redirectUri = `${currentOrigin}/auth/callback/github`;
+      const data = await api.auth.getGithubAuthUrl(redirectUri);
       if (data?.url) {
         window.location.href = data.url;
         return;
       }
-    } catch (err) {
-      console.warn('Backend github auth url fetch failed, using fallback:', err);
+      throw new Error('No authorization URL returned from server.');
+    } catch (err: any) {
+      console.warn('Backend github auth url fetch failed:', err);
+      const msg = err?.message || 'Failed to connect to GitHub authorization server.';
+      setError(msg);
+      toast.error('GitHub Sign-up Failed', { description: msg });
+      setGithubLoading(false);
     }
-    const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || 'Ov23likjqoMrdpB35SRt';
-    const redirectUri = encodeURIComponent(
-      process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI || (typeof window !== 'undefined' ? `${window.location.origin}/auth/callback/github` : 'https://kavachsecurity.me/auth/callback/github')
-    );
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=read:user,user:email,repo`;
   };
 
   const handleGoogleSignup = async () => {

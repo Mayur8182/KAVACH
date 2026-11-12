@@ -904,13 +904,14 @@ class ThingApiClient {
       });
       return res.data;
     },
-    getGithubAuthUrl: async (): Promise<{ url: string; client_id: string; redirect_uri: string; state: string }> => {
-      const res = await this.request<any>('/api/v1/auth/github/url', {
+    getGithubAuthUrl: async (redirectUri?: string): Promise<{ url: string; client_id: string; redirect_uri: string; state: string }> => {
+      const q = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
+      const res = await this.request<any>(`/api/v1/auth/github/url${q}`, {
         skipAuth: true,
       });
       return res.data;
     },
-    githubCallback: async (payload: { code: string; state?: string }): Promise<{
+    githubCallback: async (payload: { code: string; state?: string; redirect_uri?: string }): Promise<{
       access_token: string;
       token_type: string;
       user: any;
