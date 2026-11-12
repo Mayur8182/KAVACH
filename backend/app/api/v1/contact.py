@@ -103,7 +103,7 @@ async def submit_contact_inquiry(
 
     return ContactInquiryResponse(
         status="success",
-        message="Thank you for contacting SecuLayer. A security specialist will review your request shortly.",
+        message="Thank you for contacting Kavach Security. A security specialist will review your request shortly.",
         inquiry_id=inquiry_id,
         received_at=now,
         estimated_response_sla=sla,

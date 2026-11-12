@@ -1,0 +1,9 @@
+Contact: mailto:security@kavachsecurity.me
+Contact: tel:+91-8780378086
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: en, hi
+Canonical: https://kavachsecurity.me/.well-known/security.txt
+Policy: https://kavachsecurity.me/legal/vulnerability-disclosure
+Acknowledgments: https://kavachsecurity.me/security/hall-of-fame
+Hiring: https://kavachsecurity.me/careers
+Encryption: https://kavachsecurity.me/pgp-key.txt

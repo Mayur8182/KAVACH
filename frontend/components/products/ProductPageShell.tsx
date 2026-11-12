@@ -53,7 +53,7 @@ export interface ProductPageShellProps {
 
 export const ProductPageShell: React.FC<ProductPageShellProps> = (props) => {
   const {
-    productTitle = props.title || 'SecuLayer Product',
+    productTitle = props.title || 'Kavach Security Product',
     categoryBadge = props.category || 'DEFENSIVE SECURITY CONTROL',
     heroTitle = 'Deterministic Security Control Plane',
     heroDescription = 'Continuously discover, evaluate and protect your assets with policy enforcement and runtime evidence.',
@@ -86,7 +86,7 @@ export const ProductPageShell: React.FC<ProductPageShellProps> = (props) => {
     if (onSecondaryAction) {
       onSecondaryAction();
     } else {
-      window.open('https://docs.seculayer.com', '_blank', 'noopener,noreferrer');
+      window.open('https://docs.kavachsecurity.me', '_blank', 'noopener,noreferrer');
     }
   };
 

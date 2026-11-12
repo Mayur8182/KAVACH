@@ -386,7 +386,7 @@ export default function KavachHomePage() {
         onOpenExpert={() => setExpertOpen(true)}
       />
 
-      <main style={{ flex: 1, width: '100%' }}>
+      <main id="main-content" style={{ flex: 1, width: '100%', overflowX: 'hidden' }}>
         {/* ========================================================= */}
         {/* SECTION 1: HERO (Screenshot Page 1)                       */}
         {/* ========================================================= */}
@@ -442,8 +442,8 @@ export default function KavachHomePage() {
                   margin: '0 0 16px 0',
                 }}
               >
-                Every fix, verified.<br />
-                Every verdict, signed.
+                Autonomous Security Engineering.<br />
+                Every fix verified &amp; signed.
               </h1>
 
               {/* Subtitle / Description */}
@@ -723,82 +723,91 @@ export default function KavachHomePage() {
               </span>
             </div>
 
-            {/* Findings Rows */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {SAST_FINDINGS.map((finding) => (
-                <div
-                  key={finding.num}
-                  onClick={() => handleRowClick(finding)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '14px 4px',
-                    borderBottom: '1px solid #F8FAFC',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: '260px' }}>
-                    <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#64748B' }}>
-                      {finding.num}
-                    </span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
-                          {finding.title}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            fontFamily: 'monospace',
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            backgroundColor: '#F1F5F9',
-                            border: '1px solid #E2E8F0',
-                            color: '#334155',
-                          }}
-                        >
-                          {finding.scanner}
+            {/* Findings Rows (Wrapped with responsive horizontal scroll isolation) */}
+            <div
+              className="kavach-table-responsive"
+              style={{
+                width: '100%',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
+              <div style={{ minWidth: '540px', display: 'flex', flexDirection: 'column' }}>
+                {SAST_FINDINGS.map((finding) => (
+                  <div
+                    key={finding.num}
+                    onClick={() => handleRowClick(finding)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '14px 4px',
+                      borderBottom: '1px solid #F8FAFC',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: '260px' }}>
+                      <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#64748B' }}>
+                        {finding.num}
+                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
+                            {finding.title}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              fontFamily: 'monospace',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              backgroundColor: '#F1F5F9',
+                              border: '1px solid #E2E8F0',
+                              color: '#334155',
+                            }}
+                          >
+                            {finding.scanner}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#475569', fontFamily: 'monospace' }}>
+                          {finding.cve}
                         </span>
                       </div>
-                      <span style={{ fontSize: '12px', color: '#475569', fontFamily: 'monospace' }}>
-                        {finding.cve}
-                      </span>
                     </div>
-                  </div>
 
-                  <span
-                    style={{
-                      fontSize: '13px',
-                      fontFamily: 'monospace',
-                      color: '#64748B',
-                      flex: 1,
-                      textAlign: 'center',
-                    }}
-                  >
-                    {finding.file}:{finding.lineNumber}
-                  </span>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span
                       style={{
                         fontSize: '13px',
-                        fontWeight: 600,
-                        color: finding.severityColor,
-                        minWidth: '70px',
-                        textAlign: 'right',
+                        fontFamily: 'monospace',
+                        color: '#64748B',
+                        flex: 1,
+                        textAlign: 'center',
                       }}
                     >
-                      {finding.severity}
+                      {finding.file}:{finding.lineNumber}
                     </span>
-                    <ChevronRight size={15} color="#94A3B8" />
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          color: finding.severityColor,
+                          minWidth: '70px',
+                          textAlign: 'right',
+                        }}
+                      >
+                        {finding.severity}
+                      </span>
+                      <ChevronRight size={15} color="#94A3B8" />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
             {/* Card Footer */}
@@ -1745,7 +1754,8 @@ export default function KavachHomePage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '24px',
+            padding: 'clamp(12px, 3vw, 24px)',
+            boxSizing: 'border-box',
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget) setWalkthroughModalOpen(false);
@@ -1754,7 +1764,7 @@ export default function KavachHomePage() {
           <div
             style={{
               width: '100%',
-              maxWidth: '1080px',
+              maxWidth: 'min(96vw, 1080px)',
               backgroundColor: '#090D16',
               borderRadius: '16px',
               border: '1px solid rgba(255, 255, 255, 0.12)',

@@ -110,7 +110,7 @@ export const LiveScanningHUD: React.FC<LiveScanningHUDProps> = ({
     const runLiveScan = async () => {
       try {
         setLogs([
-          `[00:00] Initializing SecuLayer Unified Verification Engine...`,
+          `[00:00] Initializing Kavach Security Unified Verification Engine...`,
           `[00:00] Target: ${repositoryName} (Branch: ${branch})`,
         ]);
 

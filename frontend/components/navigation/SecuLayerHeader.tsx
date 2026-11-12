@@ -53,7 +53,7 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
 }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const isMinimal = variant === 'minimal' || pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
+  const isMinimal = variant === 'minimal' || pathname === '/login' || pathname === '/register' || pathname === '/signup' || pathname === '/forgot-password';
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
@@ -445,7 +445,7 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                               border: '1px solid #BFDBFE',
                             }}
                           >
-                            SecuLayer Platform
+                            Kavach Platform
                           </span>
                           <span style={{ fontSize: '13px', color: '#64748B' }}>
                             Unified security for development, cloud and autonomous runtimes
@@ -674,7 +674,7 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
           <button
             onClick={handleSearchClick}
             type="button"
-            aria-label="Search SecuLayer"
+            aria-label="Search Kavach Security"
             style={{
               display: 'flex',
               alignItems: 'center',

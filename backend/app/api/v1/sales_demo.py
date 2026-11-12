@@ -695,7 +695,7 @@ async def contact_sales(
         "status": "success",
         "inquiry_id": req_id,
         "lead_id": req_id,
-        "message": "Thank you for contacting SecuLayer Enterprise Sales. An enterprise director has been assigned to your account.",
+        "message": "Thank you for contacting Kavach Security Enterprise Sales. An enterprise director has been assigned to your account.",
         "assigned_executive": "Marcus Vance, VP Enterprise Accounts",
         "estimated_response_sla": "2 business hours",
     }

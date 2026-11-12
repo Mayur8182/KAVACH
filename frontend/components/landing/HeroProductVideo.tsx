@@ -352,7 +352,9 @@ export const HeroProductVideo: React.FC<HeroProductVideoProps> = ({
             objectFit: 'cover',
             display: hasError ? 'none' : 'block',
           }}
-        />
+        >
+          <track kind="captions" src="/captions-en.vtt" srcLang="en" label="English" default />
+        </video>
 
         {/* Fallback Animated Simulator if Video Is Buffering / Missing on CDN */}
         {hasError && (

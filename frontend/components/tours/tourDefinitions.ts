@@ -43,13 +43,13 @@ export const TOUR_CONFIGS: Record<string, TourConfig> = {
   // ── 1. GLOBAL CONTROL PLANE TOUR (5 ESSENTIAL STEPS) ──
   dashboard_overview: {
     id: 'dashboard_overview',
-    name: 'SECULAYER',
+    name: 'KAVACH SECURITY',
     subtitle: 'CONTROL PLANE · PRODUCT TOUR',
     module: 'global',
     steps: [
       {
         id: 'welcome',
-        title: 'Welcome to SecuLayer Control Plane',
+        title: 'Welcome to Kavach Security Control Plane',
         description:
           'Your unified application security command center. Monitor code repositories, cloud infrastructure, AI agents, and security policies in real-time.',
         focusArea: 'Workspace Command Center',

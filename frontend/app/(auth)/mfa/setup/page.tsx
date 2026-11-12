@@ -87,12 +87,12 @@ function MfaSetupContent() {
         const res = await api.auth.mfa.setup(activeEmail);
         if (isMounted && res?.secret) {
           setSecretKey(res.secret);
-          setTotpUri(res.totp_uri || `otpauth://totp/SecuLayer:${activeEmail}?secret=${res.secret}&issuer=SecuLayer`);
+          setTotpUri(res.totp_uri || `otpauth://totp/Kavach:${activeEmail}?secret=${res.secret}&issuer=Kavach`);
         }
       } catch {
         if (isMounted) {
           setSecretKey('JBSWY3DPEHPK3PXP');
-          setTotpUri(`otpauth://totp/SecuLayer:${email || 'you@company.com'}?secret=JBSWY3DPEHPK3PXP&issuer=SecuLayer`);
+          setTotpUri(`otpauth://totp/Kavach:${email || 'you@company.com'}?secret=JBSWY3DPEHPK3PXP&issuer=Kavach`);
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -193,7 +193,7 @@ function MfaSetupContent() {
                 </div>
               ) : (
                 <>
-                  <QrCodeSvg value={totpUri || `otpauth://totp/SecuLayer:${email}?secret=JBSWY3DPEHPK3PXP&issuer=SecuLayer`} size={170} />
+                  <QrCodeSvg value={totpUri || `otpauth://totp/Kavach:${email}?secret=JBSWY3DPEHPK3PXP&issuer=Kavach`} size={170} />
                   <span style={{ fontSize: '12px', color: '#64748B', marginTop: '12px', fontWeight: 500 }}>
                     Point your camera or authenticator scanner at this code
                   </span>

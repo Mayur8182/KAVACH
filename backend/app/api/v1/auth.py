@@ -770,7 +770,7 @@ async def check_email_verification(
 
     return AuthStatusResponse(
         status="success",
-        message="Your email address has been verified successfully. Welcome to SecuLayer.",
+        message="Your email address has been verified successfully. Welcome to Kavach Security.",
         verified=True,
         expired=False,
         email=user.email,
@@ -852,7 +852,7 @@ async def verify_email_token(
 
     return AuthStatusResponse(
         status="success",
-        message="Your email address has been verified successfully. Welcome to SecuLayer.",
+        message="Your email address has been verified successfully. Welcome to Kavach Security.",
         verified=True,
         expired=False,
         email=email_str,
@@ -1049,7 +1049,7 @@ async def setup_mfa(
         for _ in range(6)
     ]
 
-    totp_uri = f"otpauth://totp/SecuLayer:{target_email}?secret={secret_key}&issuer=SecuLayer&algorithm=SHA1&digits=6&period=30"
+    totp_uri = f"otpauth://totp/Kavach:{target_email}?secret={secret_key}&issuer=Kavach&algorithm=SHA1&digits=6&period=30"
 
     # Persist in user record if user exists
     if user:

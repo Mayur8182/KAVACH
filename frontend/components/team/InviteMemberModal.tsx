@@ -165,7 +165,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
                 Invite Team Member
               </h2>
               <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>
-                Grant role-based access and permissions to your SecuLayer workspace.
+                Grant role-based access and permissions to your Kavach Security workspace.
               </p>
             </div>
           </div>

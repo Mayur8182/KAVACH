@@ -1,5 +1,5 @@
 """
-Email Service for SecuLayer / SecureAI Control Plane.
+Email Service for Kavach Security / SecureAI Control Plane.
 
 Handles real SMTP email delivery (invitations, alerts, security events)
 using configured Gmail credentials.
@@ -478,7 +478,7 @@ Kavach Security Team
     <h1>Reset Your Account Password</h1>
     <p>Hello <strong>{display_name}</strong>,</p>
     <p>
-      We received a request to reset the password for your SecuLayer Security account.
+      We received a request to reset the password for your Kavach Security account.
       Click the button below to choose a new password:
     </p>
 
@@ -585,10 +585,10 @@ Kavach Security Team
   <div class="container">
     <h2 style="margin: 0 0 16px; color: #0F172A;">Emergency MFA Recovery Code</h2>
     <p>Hello <strong>{display_name}</strong>,</p>
-    <p>You requested emergency access to your SecuLayer account:</p>
+    <p>You requested emergency access to your Kavach Security account:</p>
     <div class="code-box">{recovery_code}</div>
     <p style="font-size: 13px; color: #64748B;">Enter this one-time code on the MFA Recovery screen to restore access.</p>
-    <p style="font-size: 12px; color: #94A3B8; margin-top: 24px;">&copy; 2026 SecuLayer Inc.</p>
+    <p style="font-size: 12px; color: #94A3B8; margin-top: 24px;">&copy; 2026 Kavach Security Inc. All rights reserved.</p>
   </div>
 </body>
 </html>
@@ -614,23 +614,23 @@ Kavach Security Team
         Sends an email address verification link to new user via SMTP.
         """
         display_name = user_name or recipient_email.split('@')[0]
-        sender_display = f"SecuLayer Accounts <{self.default_sender}>"
+        sender_display = f"Kavach Security <{self.default_sender}>"
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Verify Your Email Address — SecuLayer"
+        msg["Subject"] = "Verify Your Email Address — Kavach Security"
         msg["From"] = sender_display
         msg["To"] = recipient_email
 
         text_body = f"""
 Hello {display_name},
 
-Thank you for signing up for SecuLayer. Please click the link below to verify your email address:
+Thank you for signing up for Kavach Security. Please click the link below to verify your email address:
 {verification_url}
 
 This link is valid for 24 hours.
-If you did not register for SecuLayer, you can safely ignore this message.
+If you did not register for Kavach Security, you can safely ignore this message.
 
-SecuLayer Security Team
+Kavach Security Team
 """
 
         html_body = f"""
@@ -673,12 +673,12 @@ SecuLayer Security Team
   <div class="container">
     <h2 style="margin: 0 0 16px; color: #0F172A;">Verify Your Email Address</h2>
     <p>Hello <strong>{display_name}</strong>,</p>
-    <p>Click the button below to verify your email address and activate your SecuLayer workspace:</p>
+    <p>Click the button below to verify your email address and activate your Kavach Security workspace:</p>
     <div style="text-align: center;">
       <a href="{verification_url}" class="btn" target="_blank">Verify Email Address &rarr;</a>
     </div>
     <p style="font-size: 12px; color: #64748B;">Or paste this URL in your browser:<br><a href="{verification_url}" style="color: #2563EB; word-break: break-all;">{verification_url}</a></p>
-    <p style="font-size: 12px; color: #94A3B8; margin-top: 24px;">This link expires in 24 hours. &copy; 2026 SecuLayer Inc.</p>
+    <p style="font-size: 12px; color: #94A3B8; margin-top: 24px;">This link expires in 24 hours. &copy; 2026 Kavach Security Inc. All rights reserved.</p>
   </div>
 </body>
 </html>

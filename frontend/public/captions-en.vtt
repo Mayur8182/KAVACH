@@ -1,0 +1,10 @@
+WEBVTT - Kavach Security Platform Walkthrough
+
+00:00:00.000 --> 00:00:05.000
+Connect code repository and run AST static analysis
+
+00:00:05.000 --> 00:00:10.000
+Evaluate deterministic OPA security policies and sign proof
+
+00:00:10.000 --> 00:00:15.000
+Verified remediation generated with audit trail
