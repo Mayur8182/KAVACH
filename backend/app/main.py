@@ -334,6 +334,12 @@ def create_application() -> FastAPI:
     # Register centralized exception handlers
     register_exception_handlers(app)
 
+    # Root entrypoint redirect to API documentation
+    @app.get("/", include_in_schema=False)
+    def root_entry():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/docs")
+
     # Centralized liveness & readiness probes (Mistake #94)
     @app.get("/health", tags=["Health & Readiness"], summary="Root liveness check")
     @app.get("/healthz", tags=["Health & Readiness"], summary="Kubernetes/Render liveness check")
