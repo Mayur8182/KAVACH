@@ -117,9 +117,9 @@ services:
         fromService:
           type: web
           name: kavach-backend
-          property: hostport
+          property: host
       - key: NEXT_PUBLIC_API_URL
         fromService:
           type: web
           name: kavach-backend
-          property: hostport
+          property: host
