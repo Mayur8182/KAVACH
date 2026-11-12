@@ -23,6 +23,22 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     setIsMobileOpen(false);
   }, [pathname]);
 
+  // Prevent background scrolling while mobile navigation drawer is open (Phase 3)
+  React.useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (isMobileOpen) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    }
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = '';
+      }
+    };
+  }, [isMobileOpen]);
+
   const {
     currentProject,
     currentOrg,
@@ -68,6 +84,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
       {/* Main Column */}
       <div
+        className="kavach-main-column"
         style={{
           display: 'flex',
           flexDirection: 'column',

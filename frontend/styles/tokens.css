@@ -147,6 +147,15 @@
   --z-toast:                  500;
   --z-command:                600;
 
+  /* --- Responsive Breakpoint System Tokens --- */
+  --bp-mobile-sm:             320px;
+  --bp-mobile:                375px;
+  --bp-mobile-lg:             480px;
+  --bp-tablet:                768px;
+  --bp-laptop:                1024px;
+  --bp-desktop:               1280px;
+  --bp-desktop-lg:            1536px;
+
   /* --- Layout & Accessibility Constants --- */
   --sidebar-width:            240px;
   --sidebar-collapsed-width:  64px;

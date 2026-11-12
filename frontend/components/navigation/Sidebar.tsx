@@ -148,6 +148,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const pathname = usePathname() || '/code';
   const [workspacesExpanded, setWorkspacesExpanded] = useState(false);
 
+  // Close mobile drawer on Escape key press (Phase 3 Accessibility)
+  useEffect(() => {
+    if (!isMobileOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCloseMobile?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobileOpen, onCloseMobile]);
+
   // Workspace Context Detection
   const isKavachCoreRoute =
     pathname === '/home' ||

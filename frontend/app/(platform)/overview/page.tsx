@@ -561,8 +561,8 @@ export default function SecurityHQPage() {
                     No execution runs recorded yet. Start a scan to generate pipeline telemetry.
                   </div>
                 ) : (
-                  <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', overflow: 'hidden' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <div className="kavach-table-responsive" style={{ border: '1px solid #E2E8F0', borderRadius: '10px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                    <table style={{ width: '100%', minWidth: '580px', borderCollapse: 'collapse', fontSize: '13px' }}>
                       <thead>
                         <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', textAlign: 'left' }}>
                           <th style={{ padding: '10px 16px', fontWeight: 600 }}>Run / Execution</th>

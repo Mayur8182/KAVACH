@@ -165,10 +165,11 @@ export default function SignupPage() {
             borderRadius: '14px',
             border: '1px solid #E2E8F0',
             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02)',
-            padding: '30px 28px',
+            padding: '28px clamp(16px, 5vw, 28px)',
             width: '100%',
             maxWidth: '430px',
             margin: 'auto',
+            boxSizing: 'border-box',
           }}
         >
           {/* Form Header */}

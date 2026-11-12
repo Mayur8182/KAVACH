@@ -682,8 +682,9 @@ export function AssistantDrawer() {
 
         {/* ── Copilot Input Bar ──────────────────────────────────────── */}
         <div
+          className="kavach-safe-bottom"
           style={{
-            padding: '14px 20px',
+            padding: '12px 16px max(14px, env(safe-area-inset-bottom))',
             borderTop: '1px solid #E2E8F0',
             backgroundColor: '#FFFFFF',
           }}

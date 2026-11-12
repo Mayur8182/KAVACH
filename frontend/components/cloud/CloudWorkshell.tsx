@@ -136,6 +136,7 @@ export const CloudWorkshell: React.FC<CloudWorkshellProps> = ({ children, action
             display: 'flex',
             gap: '0',
             overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
             padding: '0 20px',
             scrollbarWidth: 'none',
           }}

@@ -80,6 +80,7 @@ function CodeDiffViewer({ diff }: { diff: string }) {
   const lines = diff.split('\n');
   return (
     <div
+      className="kavach-code-scroll"
       style={{
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
         fontSize: '12px',

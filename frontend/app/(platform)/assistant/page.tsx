@@ -2660,13 +2660,16 @@ export default function AssistantPage() {
 
             {/* ─── DOCKED BOTTOM CHAT INPUT BAR (NO EMPTY SPACE UNDERNEATH) ─── */}
             <div
+              className="kavach-safe-bottom"
               style={{
                 borderTop: '1px solid #E2E8F0',
                 backgroundColor: '#FFFFFF',
-                padding: '12px 32px 18px',
+                padding: '10px 16px max(14px, env(safe-area-inset-bottom))',
                 boxShadow: '0 -2px 10px rgba(0,0,0,0.03)',
                 zIndex: 20,
                 flexShrink: 0,
+                position: 'sticky',
+                bottom: 0,
               }}
             >
               <div
