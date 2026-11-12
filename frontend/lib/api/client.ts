@@ -442,6 +442,14 @@ export interface RequestOptions extends RequestInit {
   bypassCache?: boolean;
 }
 
+export function buildScopeHeaders(scope?: ScopeHeaders): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (scope?.organizationId) headers['X-Organization-ID'] = scope.organizationId;
+  if (scope?.projectId) headers['X-Project-ID'] = scope.projectId;
+  if (scope?.environmentId) headers['X-Environment-ID'] = scope.environmentId;
+  return headers;
+}
+
 class ThingApiClient {
   private baseUrl: string;
 
@@ -2014,7 +2022,7 @@ class ThingApiClient {
       return res.data;
     },
     create: async (payload: any): Promise<any> => {
-      return this.environments.configure(payload);
+      return (this as any).environments.configure(payload);
     },
   };
 
@@ -2419,12 +2427,8 @@ class ThingApiClient {
   // =========================================================================
   // HOME / SECURITY HQ APIS (Scoped & Aggregated)
   // =========================================================================
-  private buildScopeHeaders(scope?: ScopeHeaders): Record<string, string> {
-    const headers: Record<string, string> = {};
-    if (scope?.organizationId) headers['X-Organization-ID'] = scope.organizationId;
-    if (scope?.projectId) headers['X-Project-ID'] = scope.projectId;
-    if (scope?.environmentId) headers['X-Environment-ID'] = scope.environmentId;
-    return headers;
+  public buildScopeHeaders(scope?: ScopeHeaders): Record<string, string> {
+    return buildScopeHeaders(scope);
   }
 
   public home = {
