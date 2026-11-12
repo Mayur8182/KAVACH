@@ -10847,6 +10847,22 @@ class ThingApiClient {
       return res.data;
     },
 
+    revokeException: async (exceptionId: string, projectId?: string): Promise<any> => {
+      const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/sast/exceptions/${encodeURIComponent(exceptionId)}${qs}`, {
+        method: 'DELETE',
+      });
+      return res.data;
+    },
+
+    deleteException: async (exceptionId: string, projectId?: string): Promise<any> => {
+      const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/sast/exceptions/${encodeURIComponent(exceptionId)}${qs}`, {
+        method: 'DELETE',
+      });
+      return res.data;
+    },
+
     coverage: async (params?: { project_id?: string }): Promise<any> => {
       const q = new URLSearchParams();
       if (params?.project_id) q.append('project_id', params.project_id);

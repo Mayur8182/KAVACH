@@ -344,7 +344,7 @@ function OnboardingProductsContent() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
                     {item.capabilities.map((cap, cIdx) => (
                       <div key={cIdx} style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '12px', color: '#334155' }}>
-                        <CheckCircle2 size={13} color={isChecked ? '#10B981' : '#94A3B8'} strokeWidth={2.5} style={{ shrink: 0 }} />
+                        <CheckCircle2 size={13} color={isChecked ? '#10B981' : '#94A3B8'} strokeWidth={2.5} style={{ flexShrink: 0 }} />
                         <span>{cap}</span>
                       </div>
                     ))}

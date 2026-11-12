@@ -28,6 +28,7 @@ import {
   FileCode2,
   GitBranch,
   GitPullRequest,
+  RefreshCw,
   ExternalLink,
   ChevronRight,
   ArrowRight,
@@ -234,7 +235,7 @@ export function SastCriticalFindingsCard({
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', divideY: '1px solid #F1F5F9' }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         {findings.slice(0, 4).map((f, idx) => (
           <div
             key={f.id || idx}

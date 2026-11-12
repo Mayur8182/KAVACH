@@ -26,6 +26,7 @@ import {
   Layers,
   Search,
   RefreshCw,
+  Terminal,
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
 

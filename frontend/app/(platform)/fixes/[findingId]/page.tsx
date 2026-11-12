@@ -232,7 +232,6 @@ export default function RemediationPage() {
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              divideX: '1px solid #E2E8F0',
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: '12px',
               lineHeight: 1.8,

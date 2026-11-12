@@ -20,6 +20,7 @@ interface GitHubImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImportComplete?: () => void;
+  onImportSuccess?: () => void;
 }
 
 const AVAILABLE_MODULES = [

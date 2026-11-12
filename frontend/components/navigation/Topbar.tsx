@@ -48,6 +48,7 @@ import {
   Layers,
   Container,
   FileCheck2,
+  FolderGit2,
   Link2,
 } from 'lucide-react';
 import { KavachMark, KavachLogo } from '@/components/common/KavachLogo';

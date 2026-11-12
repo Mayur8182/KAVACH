@@ -41,6 +41,7 @@ export interface FindingOverlay {
   severity: string;
   agent: string;
   line: number;
+  snippet?: string;
 }
 
 export interface WorkspaceFileItem {

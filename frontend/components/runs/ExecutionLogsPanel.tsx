@@ -29,8 +29,8 @@ export interface LogItem {
 
 export interface InspectedFileItem {
   path: string;
-  status: 'analyzed' | 'scanning' | 'pending';
-  findingsCount: number;
+  status?: 'analyzed' | 'scanning' | 'pending';
+  findingsCount?: number;
 }
 
 export interface ToolExecutionItem {

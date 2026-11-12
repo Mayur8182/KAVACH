@@ -212,7 +212,7 @@ export default function AgentDetailRunPage() {
           fileFindings: Record<string, FindingMeta[]>;
         }>(`/api/v1/runs/${encodeURIComponent(resolvedId)}/inspected-files`);
 
-        const filesData = filesRes?.data || filesRes;
+        const filesData: any = (filesRes as any)?.data || filesRes;
 
         if (filesData && active) {
           const files = filesData.files && filesData.files.length > 0
@@ -326,7 +326,7 @@ export default function AgentDetailRunPage() {
         const res = await api.request<{ file: string; content: string }>(
           `/api/v1/runs/${encodeURIComponent(effectiveId)}/files/content?file_path=${encodeURIComponent(currentFile)}`
         );
-        const dataObj = res?.data || res;
+        const dataObj: any = (res as any)?.data || res;
         if (active && dataObj && dataObj.content) {
           setFileContent(dataObj.content);
         } else if (active) {

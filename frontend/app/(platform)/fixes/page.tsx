@@ -46,7 +46,7 @@ export default function FixesHubPage() {
           return;
         }
 
-        const fRes: any = await api.findings.list({ status: 'open', limit: 20 }).catch(() => null);
+        const fRes: any = await api.findings.list({ status: 'open', page_size: 20 }).catch(() => null);
         if (active && fRes?.items && fRes.items.length > 0) {
           const mapped = fRes.items.map((f: any) => ({
             id: f.id,

@@ -250,7 +250,7 @@ export default function CodeOverviewPage() {
           number: res.pr_number || res.number || 1,
           message: res.message || 'Pull request created successfully on GitHub!'
         });
-        setToastMessage('Pull Request created on GitHub!');
+        setToastMessage({ text: 'Pull Request created on GitHub!', type: 'success' });
       } else {
         setFindingFixError(res?.message || 'Could not create GitHub PR');
       }
@@ -268,7 +268,7 @@ export default function CodeOverviewPage() {
           number: res2.number || res2.pr_number || 1,
           message: 'Pull request created successfully on GitHub!'
         });
-        setToastMessage('Pull Request created on GitHub!');
+        setToastMessage({ text: 'Pull Request created on GitHub!', type: 'success' });
       } catch (err2: any) {
         setFindingFixError(err2?.detail || err2?.message || 'Failed to dispatch GitHub PR. Check repository token in Integrations.');
       }
