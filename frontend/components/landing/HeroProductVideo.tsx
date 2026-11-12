@@ -41,6 +41,7 @@ export const HeroProductVideo: React.FC<HeroProductVideoProps> = ({
   const [bufferedEnd, setBufferedEnd] = useState<number>(0);
   const [showControls, setShowControls] = useState<boolean>(true);
   const [activeChapter, setActiveChapter] = useState<number>(0);
+  const [hasError, setHasError] = useState<boolean>(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const chapters = [
@@ -344,13 +345,97 @@ export const HeroProductVideo: React.FC<HeroProductVideoProps> = ({
           onLoadedMetadata={handleLoadedMetadata}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
+          onError={() => setHasError(true)}
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            display: 'block',
+            display: hasError ? 'none' : 'block',
           }}
         />
+
+        {/* Fallback Animated Simulator if Video Is Buffering / Missing on CDN */}
+        {hasError && (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#0F172A',
+              padding: compact ? '16px' : '28px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              fontFamily: "'JetBrains Mono', monospace",
+              boxSizing: 'border-box',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Top Terminal Status */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981', boxShadow: '0 0 8px #10B981' }} />
+                <span style={{ fontSize: '11px', color: '#E2E8F0', fontWeight: 600 }}>KAVACH RUNTIME ENGINE · LIVE DEMO</span>
+              </div>
+              <span style={{ fontSize: '10px', color: '#64748B', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+                OPA-STRICT-REGO
+              </span>
+            </div>
+
+            {/* Code / Scanner Telemetry Flow */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? '6px' : '10px', margin: 'auto 0' }}>
+              <div style={{ fontSize: compact ? '11px' : '13px', color: '#38BDF8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#94A3B8' }}>01</span>
+                <span>▶ repository.connect(&quot;Mayur8182/KAVACH&quot;)</span>
+                <span style={{ fontSize: '10px', color: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '1px 6px', borderRadius: '3px' }}>CONNECTED</span>
+              </div>
+              <div style={{ fontSize: compact ? '11px' : '13px', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#94A3B8' }}>02</span>
+                <span>▶ AST scanners: Semgrep + Trivy + Gitleaks</span>
+                <span style={{ fontSize: '10px', color: '#3B82F6', backgroundColor: 'rgba(59, 130, 246, 0.15)', padding: '1px 6px', borderRadius: '3px' }}>INVARIANTS VERIFIED</span>
+              </div>
+              <div style={{ fontSize: compact ? '11px' : '13px', color: '#A7F3D0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#94A3B8' }}>03</span>
+                <span>▶ Deterministic OPA verdict: 0 unhandled vulnerabilities</span>
+                <span style={{ fontSize: '10px', color: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '1px 6px', borderRadius: '3px' }}>SAFE TO DEPLOY</span>
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '10px' }}>
+              <span style={{ fontSize: '11px', color: '#94A3B8' }}>
+                Deterministic Security Pipeline Active
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onExpand) onExpand();
+                  else {
+                    setHasError(false);
+                    videoRef.current?.load();
+                  }
+                }}
+                style={{
+                  backgroundColor: '#2563EB',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <Play size={12} />
+                <span>Interactive Walkthrough</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Center Big Play Button (shown when paused) */}
         {!isPlaying && (

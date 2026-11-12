@@ -394,8 +394,9 @@ export default function KavachHomePage() {
           style={{
             maxWidth: '1380px',
             margin: '0 auto',
-            padding: '36px 24px 28px',
+            padding: 'clamp(20px, 4vw, 36px) clamp(16px, 3vw, 24px) 28px',
             width: '100%',
+            boxSizing: 'border-box',
           }}
         >
           {/* ── Compact Balanced Split Hero (Desktop: Left Copy, Right Video Preview) ── */}
@@ -871,8 +872,9 @@ export default function KavachHomePage() {
           style={{
             maxWidth: '1380px',
             margin: '0 auto',
-            padding: '64px 24px 80px',
+            padding: 'clamp(32px, 5vw, 64px) clamp(16px, 3vw, 24px) clamp(40px, 6vw, 80px)',
             width: '100%',
+            boxSizing: 'border-box',
           }}
         >
           <div
@@ -921,7 +923,7 @@ export default function KavachHomePage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
               gap: '20px',
               marginBottom: '48px',
             }}
@@ -1043,8 +1045,9 @@ export default function KavachHomePage() {
           style={{
             maxWidth: '1380px',
             margin: '0 auto',
-            padding: '32px 24px 80px',
+            padding: 'clamp(24px, 4vw, 32px) clamp(16px, 3vw, 24px) clamp(40px, 6vw, 80px)',
             width: '100%',
+            boxSizing: 'border-box',
           }}
         >
           {/* Header Row */}
@@ -1103,7 +1106,7 @@ export default function KavachHomePage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
               gap: '16px',
             }}
           >
@@ -1196,8 +1199,9 @@ export default function KavachHomePage() {
           style={{
             maxWidth: '1380px',
             margin: '0 auto',
-            padding: '64px 24px 80px',
+            padding: 'clamp(32px, 5vw, 64px) clamp(16px, 3vw, 24px) clamp(40px, 6vw, 80px)',
             width: '100%',
+            boxSizing: 'border-box',
           }}
         >
           {/* Eyebrow */}
@@ -1433,16 +1437,17 @@ export default function KavachHomePage() {
           style={{
             maxWidth: '1380px',
             margin: '0 auto 64px',
-            padding: '0 24px',
+            padding: '0 clamp(16px, 3vw, 24px)',
             width: '100%',
+            boxSizing: 'border-box',
           }}
         >
           <div
             style={{
               backgroundColor: '#000000',
               color: '#FFFFFF',
-              borderRadius: '8px',
-              padding: '56px 48px',
+              borderRadius: '12px',
+              padding: 'clamp(32px, 5vw, 56px) clamp(20px, 5vw, 48px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -1529,8 +1534,9 @@ export default function KavachHomePage() {
         style={{
           borderTop: '1px solid #E2E8F0',
           backgroundColor: '#FFFFFF',
-          padding: '64px 24px 32px',
+          padding: 'clamp(40px, 6vw, 64px) clamp(16px, 3vw, 24px) 32px',
           width: '100%',
+          boxSizing: 'border-box',
         }}
       >
         <div
@@ -1573,7 +1579,13 @@ export default function KavachHomePage() {
                 >
                   security@kavachsecurity.me
                 </a>
-                <span>+1 (888) 732-8529</span>
+                <a
+                  href="tel:+918780378086"
+                  style={{ color: '#64748B', textDecoration: 'none' }}
+                  className="hover:text-slate-900"
+                >
+                  +91 8780378086
+                </a>
               </div>
             </div>
 

@@ -120,12 +120,12 @@ export const EnterpriseFooter: React.FC = () => {
                 security@kavachsecurity.me
               </a>
               <a
-                href="tel:+18887328529"
+                href="tel:+918780378086"
                 style={{ color: '#71717A', textDecoration: 'none', transition: 'color 150ms' }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = '#09090B')}
                 onMouseLeave={(e) => (e.currentTarget.style.color = '#71717A')}
               >
-                +1 (888) 732-8529
+                +91 8780378086
               </a>
             </div>
 

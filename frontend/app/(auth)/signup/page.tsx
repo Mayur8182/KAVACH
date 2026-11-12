@@ -158,17 +158,17 @@ export default function SignupPage() {
       <KavachHeader variant="minimal" />
 
       {/* Main Content: Clean Centered Authentication Card */}
-      <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', minHeight: 'calc(100vh - 64px)' }}>
+      <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(20px, 4vh, 48px) 16px', minHeight: 'calc(100vh - 68px)' }}>
         <div
           style={{
             backgroundColor: '#FFFFFF',
-            borderRadius: '14px',
+            borderRadius: '16px',
             border: '1px solid #E2E8F0',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02)',
-            padding: '28px clamp(16px, 5vw, 28px)',
+            boxShadow: '0 20px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.02)',
+            padding: '32px clamp(20px, 5vw, 36px)',
             width: '100%',
-            maxWidth: '430px',
-            margin: 'auto',
+            maxWidth: '460px',
+            margin: '0 auto',
             boxSizing: 'border-box',
           }}
         >

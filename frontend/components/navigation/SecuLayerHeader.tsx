@@ -861,6 +861,37 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
         </div>
         </>
       )}
+
+      {isMinimal && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span
+              style={{ fontSize: '13px', color: '#64748B' }}
+              className="auth-header-subtext"
+            >
+              {pathname === '/signup' || pathname === '/register'
+                ? 'Already have an account?'
+                : "Don't have an account?"}
+            </span>
+            <Link
+              href={pathname === '/signup' || pathname === '/register' ? '/login' : '/signup'}
+              style={{
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#0F172A',
+                backgroundColor: '#F8FAFC',
+                border: '1px solid #CBD5E1',
+                borderRadius: '7px',
+                padding: '6px 14px',
+                textDecoration: 'none',
+                transition: 'all 0.15s ease',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}
+            >
+              <span>{pathname === '/signup' || pathname === '/register' ? 'Sign in' : 'Create account'}</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Mobile Drawer */}
@@ -1122,6 +1153,11 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
           }
           .header-desktop-btn {
             display: inline-flex !important;
+          }
+        }
+        @media (max-width: 580px) {
+          .auth-header-subtext {
+            display: none !important;
           }
         }
         @media (max-width: 979px) {
