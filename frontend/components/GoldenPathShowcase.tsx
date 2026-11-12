@@ -2,972 +2,487 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import {
-  Terminal,
-  ShieldCheck,
-  CheckCircle2,
-  GitPullRequest,
-  Lock,
-  Activity,
-  Sparkles,
-  ArrowRight,
-  Search,
-  Code2,
-  Check,
-  ExternalLink,
-  ShieldAlert,
-  Layers,
-  Cpu,
-  GitCommit,
-  CheckCheck,
-} from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   TYPEWRITER HOOK (Loops command text only while component is visible)
+   REDUCED MOTION HELPER HOOK
 ───────────────────────────────────────────────────────────────────────────── */
-function useTypewriter(
-  words: string[],
-  isVisible: boolean,
-  reducedMotion: boolean,
-  typingSpeed = 40,
-  pauseTime = 2500
-) {
-  const [displayText, setDisplayText] = useState(words[0]);
-  const [wordIndex, setWordIndex] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
-
+function useReducedMotion() {
+  const [reducedMotion, setReducedMotion] = useState(false);
   useEffect(() => {
-    if (reducedMotion) {
-      setDisplayText(words[0]);
-      return;
-    }
-    if (!isVisible) return;
-
-    let timer: NodeJS.Timeout;
-    const currentWord = words[wordIndex % words.length];
-
-    if (!isDeleting && displayText === currentWord) {
-      timer = setTimeout(() => setIsDeleting(true), pauseTime);
-    } else if (isDeleting && displayText === '') {
-      setIsDeleting(false);
-      setWordIndex((prev) => (prev + 1) % words.length);
-    } else {
-      timer = setTimeout(() => {
-        setDisplayText((prev) =>
-          isDeleting
-            ? currentWord.substring(0, prev.length - 1)
-            : currentWord.substring(0, prev.length + 1)
-        );
-      }, isDeleting ? typingSpeed / 2 : typingSpeed);
-    }
-
-    return () => clearTimeout(timer);
-  }, [displayText, isDeleting, wordIndex, words, typingSpeed, pauseTime, isVisible, reducedMotion]);
-
-  return displayText;
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return reducedMotion;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   ANIMATED NUMBER COUNTER (Triggers when in view, respects reduced motion)
+   ANIMATED STAT COUNTER
 ───────────────────────────────────────────────────────────────────────────── */
-function AnimatedCounter({
-  value,
-  suffix = '',
-  prefix = '',
-  isVisible = false,
-  reducedMotion = false,
-}: {
-  value: number;
-  suffix?: string;
-  prefix?: string;
-  isVisible?: boolean;
-  reducedMotion?: boolean;
-}) {
-  const [count, setCount] = useState(reducedMotion ? value : 0);
+function StatCounter({ target, suffix = '', isVisible, reducedMotion }: { target: number; suffix?: string; isVisible: boolean; reducedMotion: boolean }) {
+  const [val, setVal] = useState(reducedMotion ? target : 0);
 
   useEffect(() => {
     if (reducedMotion) {
-      setCount(value);
+      setVal(target);
       return;
     }
     if (!isVisible) return;
 
     let start = 0;
-    const duration = 1400;
+    const duration = 1200;
     const stepTime = 25;
     const steps = duration / stepTime;
-    const increment = value / steps;
+    const inc = target / steps;
 
     const timer = setInterval(() => {
-      start += increment;
-      if (start >= value) {
-        setCount(value);
+      start += inc;
+      if (start >= target) {
+        setVal(target);
         clearInterval(timer);
       } else {
-        setCount(Math.floor(start));
+        setVal(Math.floor(start));
       }
     }, stepTime);
 
     return () => clearInterval(timer);
-  }, [isVisible, value, reducedMotion]);
+  }, [isVisible, target, reducedMotion]);
 
   return (
-    <span style={{ fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)' }}>
-      {prefix}
-      {count}
+    <span>
+      {val}
       {suffix}
     </span>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   MACOS WINDOW CHROME
+   1. SCAN HUD SUB-COMPONENT (Step 1)
 ───────────────────────────────────────────────────────────────────────────── */
-interface MacWindowProps {
-  title: string;
-  badge?: string;
-  badgeColor?: string;
-  children: React.ReactNode;
-  headerAction?: React.ReactNode;
-}
+const ENGINES = [
+  { name: 'Git clone', type: 'checkout' },
+  { name: 'Gitleaks', type: 'secrets' },
+  { name: 'Semgrep', type: 'SAST' },
+  { name: 'Trivy', type: 'SCA, containers' },
+  { name: 'OPA', type: 'policy gate' },
+];
 
-function MacWindow({ title, badge, badgeColor = '#38BDF8', children, headerAction }: MacWindowProps) {
+export function ScanHud({ isVisible, reducedMotion }: { isVisible: boolean; reducedMotion: boolean }) {
+  const [engineStates, setEngineStates] = useState<('queued' | 'running' | 'done')[]>(
+    reducedMotion ? ['done', 'done', 'done', 'done', 'done'] : ['queued', 'queued', 'queued', 'queued', 'queued']
+  );
+  const [summary, setSummary] = useState(
+    reducedMotion ? '5 findings: 1 critical, 2 high, 2 medium' : 'Waiting for scan'
+  );
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setEngineStates(['done', 'done', 'done', 'done', 'done']);
+      setSummary('5 findings: 1 critical, 2 high, 2 medium');
+      return;
+    }
+    if (!isVisible) return;
+
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
+    async function runLoop() {
+      while (isMounted) {
+        // Reset to queued
+        setEngineStates(['queued', 'queued', 'queued', 'queued', 'queued']);
+        setSummary('Scanning the main branch');
+        await new Promise((r) => { timeoutId = setTimeout(r, 600); });
+        if (!isMounted) break;
+
+        // Run engines one by one
+        for (let i = 0; i < ENGINES.length; i++) {
+          if (!isMounted) break;
+          setEngineStates((prev) => {
+            const next = [...prev];
+            next[i] = 'running';
+            return next;
+          });
+          await new Promise((r) => { timeoutId = setTimeout(r, 800); });
+          if (!isMounted) break;
+
+          setEngineStates((prev) => {
+            const next = [...prev];
+            next[i] = 'done';
+            return next;
+          });
+        }
+
+        if (!isMounted) break;
+        setSummary('5 findings: 1 critical, 2 high, 2 medium');
+        await new Promise((r) => { timeoutId = setTimeout(r, 3400); });
+      }
+    }
+
+    runLoop();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [isVisible, reducedMotion]);
+
   return (
-    <div
-      style={{
-        backgroundColor: '#090D16',
-        borderRadius: '12px',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        boxShadow: '0 20px 45px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        boxSizing: 'border-box',
-      }}
-    >
-      {/* Window Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 14px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
-          backgroundColor: '#0F172A',
-          gap: '12px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#EF4444', display: 'inline-block' }} />
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#F59E0B', display: 'inline-block' }} />
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }} />
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-          <span
-            style={{
-              fontSize: '11px',
-              fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
-              color: '#94A3B8',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {title}
-          </span>
-          {badge && (
-            <span
-              style={{
-                fontSize: '9.5px',
-                fontFamily: 'var(--font-mono, monospace)',
-                fontWeight: 700,
-                color: badgeColor,
-                backgroundColor: 'rgba(56, 189, 248, 0.12)',
-                border: '1px solid rgba(56, 189, 248, 0.25)',
-                padding: '1px 6px',
-                borderRadius: '4px',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {badge}
-            </span>
-          )}
-        </div>
-
-        <div>{headerAction || <div style={{ width: '36px' }} />}</div>
+    <div className="gps-feat">
+      <div className="gps-txt">
+        <span className="gps-step">Step 1</span>
+        <h2>Six engines scan in parallel</h2>
+        <p>
+          Connect a GitHub repo and run one scan. Semgrep, Gitleaks, Trivy and OPA run on the real
+          code, so every finding comes from a scanner and not from a guess.
+        </p>
       </div>
 
-      {/* Window Body */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>{children}</div>
-    </div>
-  );
-}
+      <div className="gps-stage">
+        <div className="gps-win">
+          <div className="gps-bar">
+            <i style={{ backgroundColor: '#F87171' }} />
+            <i style={{ backgroundColor: '#FBBF24' }} />
+            <i style={{ backgroundColor: '#4ADE9A' }} />
+            <span>Scan: api-service, main</span>
+          </div>
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   1. SCAN HUD (Terminal-style vulnerability detection)
-───────────────────────────────────────────────────────────────────────────── */
-interface ScanHudProps {
-  isVisible: boolean;
-  reducedMotion: boolean;
-}
-
-export function ScanHud({ isVisible, reducedMotion }: ScanHudProps) {
-  const [activeTab, setActiveTab] = useState<'all' | 'sast' | 'secrets'>('all');
-  const terminalCommand = useTypewriter(
-    [
-      'kavach scan --repo=kavach/core --branch=main --engine=ast,secrets',
-      'kavach audit --policy=strict-invariants.rego --prove',
-      'kavach gate evaluate --branch=main --deterministic',
-    ],
-    isVisible,
-    reducedMotion
-  );
-
-  const findings = [
-    {
-      id: 'FIND-001',
-      type: 'sast',
-      title: 'SQL injection (CWE-89 / OWASP A03)',
-      file: 'auth/route.py',
-      line: 42,
-      sev: 'CRITICAL',
-      sevColor: '#EF4444',
-      sevBg: 'rgba(239, 68, 68, 0.15)',
-      engine: 'Semgrep AST',
-    },
-    {
-      id: 'FIND-002',
-      type: 'secrets',
-      title: 'High-entropy plaintext AWS key (CWE-798)',
-      file: 'src/config.py',
-      line: 18,
-      sev: 'HIGH',
-      sevColor: '#F97316',
-      sevBg: 'rgba(249, 115, 22, 0.15)',
-      engine: 'Gitleaks Entropy',
-    },
-    {
-      id: 'FIND-003',
-      type: 'sast',
-      title: 'Path traversal file write (CWE-434)',
-      file: 'src/upload.py',
-      line: 64,
-      sev: 'HIGH',
-      sevColor: '#F97316',
-      sevBg: 'rgba(249, 115, 22, 0.15)',
-      engine: 'Semgrep SAST',
-    },
-  ];
-
-  const filtered = activeTab === 'all' ? findings : findings.filter((f) => f.type === activeTab);
-
-  return (
-    <MacWindow
-      title="kavach-ast-scanner --telemetry"
-      badge="LIVE"
-      badgeColor="#10B981"
-      headerAction={
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span
-            style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              backgroundColor: '#10B981',
-              boxShadow: '0 0 8px #10B981',
-            }}
-          />
-          <span style={{ fontSize: '10px', color: '#10B981', fontFamily: 'monospace', fontWeight: 600 }}>
-            AST SYNC
-          </span>
-        </div>
-      }
-    >
-      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
-        {/* Terminal Input Bar */}
-        <div
-          style={{
-            backgroundColor: '#030712',
-            borderRadius: '6px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            padding: '8px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: '12px',
-            color: '#38BDF8',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <Terminal size={14} color="#38BDF8" style={{ flexShrink: 0 }} />
-          <span style={{ color: '#64748B' }}>$</span>
-          <span style={{ color: '#F1F5F9', whiteSpace: 'nowrap', overflow: 'hidden' }}>{terminalCommand}</span>
-          {!reducedMotion && (
-            <span
-              style={{
-                width: '6px',
-                height: '13px',
-                backgroundColor: '#38BDF8',
-                display: 'inline-block',
-                animation: 'pulse 1s infinite',
-                marginLeft: '2px',
-              }}
-            />
-          )}
-
-          {/* Animated Scanning Sweep Beam */}
-          {!reducedMotion && isVisible && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                width: '60px',
-                background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.25), transparent)',
-                animation: 'scanningSweep 2.8s linear infinite',
-                pointerEvents: 'none',
-              }}
-            />
-          )}
-        </div>
-
-        {/* Filter Tabs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {(['all', 'sast', 'secrets'] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              style={{
-                fontSize: '11px',
-                fontFamily: 'var(--font-mono, monospace)',
-                fontWeight: 600,
-                padding: '4px 10px',
-                borderRadius: '4px',
-                border: activeTab === tab ? '1px solid #2563EB' : '1px solid rgba(255, 255, 255, 0.08)',
-                backgroundColor: activeTab === tab ? '#1E293B' : 'transparent',
-                color: activeTab === tab ? '#38BDF8' : '#94A3B8',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {tab === 'all' ? 'All (3)' : tab.toUpperCase()}
-            </button>
-          ))}
-          <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#64748B', fontFamily: 'monospace' }}>
-            Multi-Engine AST
-          </span>
-        </div>
-
-        {/* Live Findings List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-          {filtered.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                backgroundColor: '#0F172A',
-                border: '1px solid rgba(255, 255, 255, 0.07)',
-                borderRadius: '8px',
-                padding: '10px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                transition: 'border-color 0.15s ease',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                <span
-                  style={{
-                    fontSize: '10px',
-                    fontFamily: 'monospace',
-                    fontWeight: 700,
-                    color: item.sevColor,
-                    backgroundColor: item.sevBg,
-                    border: `1px solid ${item.sevColor}33`,
-                    padding: '2px 7px',
-                    borderRadius: '4px',
-                    flexShrink: 0,
-                  }}
-                >
-                  {item.sev}
-                </span>
-
-                <div style={{ minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: '12.5px',
-                      fontWeight: 600,
-                      color: '#F8FAFC',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {item.title}
+          <div className="gps-body">
+            {ENGINES.map((engine, idx) => {
+              const state = engineStates[idx];
+              return (
+                <div key={engine.name} className={`gps-row ${state}`}>
+                  <b>{engine.name}</b>
+                  <em>{engine.type}</em>
+                  <div className="gps-pb">
+                    <u style={{ width: state === 'done' ? '100%' : state === 'running' ? '65%' : '0%' }} />
                   </div>
-                  <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#94A3B8', marginTop: '2px' }}>
-                    <code style={{ color: '#38BDF8' }}>{item.file}</code>:{item.line} · {item.engine}
-                  </div>
+                  <span className="gps-st">{state}</span>
                 </div>
-              </div>
+              );
+            })}
 
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontFamily: 'monospace',
-                  color: '#10B981',
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
-                ISOLATED
-              </span>
+            <div className="gps-sum">
+              <b>{summary}</b>
             </div>
-          ))}
-        </div>
-
-        {/* Status Line */}
-        <div
-          style={{
-            paddingTop: '10px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '11px',
-            color: '#64748B',
-            fontFamily: 'var(--font-mono, monospace)',
-          }}
-        >
-          <span>3 findings isolated in 1.84s</span>
-          <span style={{ color: '#10B981' }}>Semgrep + Gitleaks</span>
-        </div>
-      </div>
-    </MacWindow>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   2. AUTO-FIX CARD (Split-pane code editor with OPA policy verification)
-───────────────────────────────────────────────────────────────────────────── */
-export function AutoFixCard() {
-  const [selectedPolicy, setSelectedPolicy] = useState('no-unparameterized-sql');
-
-  return (
-    <MacWindow
-      title="kavach/agent/synthesize-fix · OPA Policy Gate"
-      badge="OPA VERIFIED"
-      badgeColor="#10B981"
-      headerAction={
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Sparkles size={13} color="#38BDF8" />
-          <span style={{ fontSize: '10px', color: '#38BDF8', fontFamily: 'monospace', fontWeight: 600 }}>
-            GEMINI 2.5 PRO
-          </span>
-        </div>
-      }
-    >
-      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
-        {/* Policy Gate Header Pill */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            backgroundColor: '#0F172A',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            fontSize: '11px',
-            fontFamily: 'var(--font-mono, monospace)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#94A3B8' }}>TARGET FILE:</span>
-            <code style={{ color: '#38BDF8', fontWeight: 600 }}>auth/route.py:42</code>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981' }} />
-            <span style={{ color: '#10B981', fontWeight: 700 }}>POLICY: ALLOW (SIGNED)</span>
-          </div>
-        </div>
-
-        {/* Split Code Diff Window */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
-            gap: '10px',
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: '11px',
-            lineHeight: 1.55,
-          }}
-        >
-          {/* Left: Original Red */}
-          <div
-            style={{
-              backgroundColor: '#050811',
-              borderRadius: '6px',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                padding: '6px 10px',
-                backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                borderBottom: '1px solid rgba(239, 68, 68, 0.15)',
-                color: '#EF4444',
-                fontWeight: 700,
-                fontSize: '10.5px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span>ORIGINAL (VULNERABLE)</span>
-              <span style={{ fontSize: '10px' }}>LINE 41-43</span>
-            </div>
-            <div style={{ padding: '10px', color: '#94A3B8' }}>
-              <div style={{ color: '#64748B' }}># Raw SQL concatenation</div>
-              <div
-                style={{
-                  color: '#F87171',
-                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                  padding: '2px 4px',
-                  borderRadius: '3px',
-                  marginTop: '4px',
-                }}
-              >
-                - cursor.execute(f&quot;SELECT * FROM users WHERE id = &apos;&#123;user_id&#125;&apos;&quot;)
-              </div>
-              <div style={{ color: '#64748B', marginTop: '4px' }}>&nbsp;&nbsp;return cursor.fetchone()</div>
-            </div>
-          </div>
-
-          {/* Right: Fixed Green */}
-          <div
-            style={{
-              backgroundColor: '#050811',
-              borderRadius: '6px',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                padding: '6px 10px',
-                backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                borderBottom: '1px solid rgba(16, 185, 129, 0.15)',
-                color: '#10B981',
-                fontWeight: 700,
-                fontSize: '10.5px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span>AUTONOMOUS REMEDIATION</span>
-              <span style={{ fontSize: '10px' }}>PARAMETERIZED</span>
-            </div>
-            <div style={{ padding: '10px', color: '#94A3B8' }}>
-              <div style={{ color: '#64748B' }}># Parameterized SQL tuple</div>
-              <div
-                style={{
-                  color: '#34D399',
-                  backgroundColor: 'rgba(16, 185, 129, 0.14)',
-                  padding: '2px 4px',
-                  borderRadius: '3px',
-                  marginTop: '4px',
-                }}
-              >
-                + cursor.execute(&quot;SELECT * FROM users WHERE id = %s&quot;, (user_id,))
-              </div>
-              <div style={{ color: '#64748B', marginTop: '4px' }}>&nbsp;&nbsp;return cursor.fetchone()</div>
-            </div>
-          </div>
-        </div>
-
-        {/* AI Explanation & Invariant Badges */}
-        <div
-          style={{
-            backgroundColor: '#030712',
-            borderRadius: '6px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            padding: '10px 12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94A3B8' }}>
-            <CheckCircle2 size={13} color="#10B981" />
-            <span style={{ color: '#F1F5F9', fontWeight: 600 }}>Deterministic Invariant Proof:</span>
-            <span>Eliminates CWE-89 injection while preserving downstream dict cursor mapping.</span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
-            <span
-              style={{
-                fontSize: '10px',
-                fontFamily: 'monospace',
-                color: '#38BDF8',
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                border: '1px solid rgba(56, 189, 248, 0.2)',
-              }}
-            >
-              OPA: no-raw-fstrings [PASS]
-            </span>
-            <span
-              style={{
-                fontSize: '10px',
-                fontFamily: 'monospace',
-                color: '#10B981',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
-              }}
-            >
-              Semgrep Rescan: 0 Findings [PASS]
-            </span>
           </div>
         </div>
       </div>
-    </MacWindow>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   3. VERIFY CARD (GitHub PR Preview with passing checks & signed badge)
-───────────────────────────────────────────────────────────────────────────── */
-export function VerifyCard() {
-  const [merged, setMerged] = useState(false);
-
-  return (
-    <MacWindow
-      title="github.com/kavach-security/api · PR #418"
-      badge="READY TO MERGE"
-      badgeColor="#10B981"
-      headerAction={
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <GitPullRequest size={13} color="#10B981" />
-          <span style={{ fontSize: '10px', color: '#10B981', fontFamily: 'monospace', fontWeight: 600 }}>
-            CHECKS PASSING (4/4)
-          </span>
-        </div>
-      }
-    >
-      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
-        {/* PR Title & Branch Header */}
-        <div
-          style={{
-            backgroundColor: '#0F172A',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '8px',
-            padding: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span
-              style={{
-                fontSize: '10px',
-                fontFamily: 'monospace',
-                fontWeight: 700,
-                color: '#10B981',
-                backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-              }}
-            >
-              OPEN
-            </span>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#F8FAFC' }}>
-              PR #418: [Kavach Autofix] Parameterize SQL query in auth/route.py
-            </span>
-          </div>
-
-          <div
-            style={{
-              fontSize: '11px',
-              fontFamily: 'var(--font-mono, monospace)',
-              color: '#94A3B8',
-              marginTop: '6px',
-            }}
-          >
-            Branch: <code style={{ color: '#38BDF8' }}>kavach/autofix-sqli-42</code> into{' '}
-            <code style={{ color: '#F1F5F9' }}>main</code>
-          </div>
-        </div>
-
-        {/* CI/CD Passing Checks Checklist */}
-        <div
-          style={{
-            backgroundColor: '#030712',
-            borderRadius: '6px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            padding: '10px 12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-          }}
-        >
-          <div style={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: 700, color: '#64748B' }}>
-            VERIFIED CI/CD ATTESTATIONS
-          </div>
-
-          {[
-            { label: 'Semgrep SAST Regression Scan', desc: '0 Critical or High Findings', status: 'PASS' },
-            { label: 'Deterministic OPA Rego Gate', desc: 'Cryptographically signed ALLOW', status: 'PASS' },
-            { label: 'Ephemeral Sandbox Test', desc: '200 OK · 0 API regressions', status: 'PASS' },
-            { label: 'SLSA Level 3 Provenance Ledger', desc: 'Signed hash in PostgreSQL audit log', status: 'SIGNED' },
-          ].map((check, idx) => (
-            <div
-              key={idx}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontSize: '11.5px',
-                color: '#CBD5E1',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Check size={13} color="#10B981" />
-                <span>{check.label}</span>
-                <span style={{ fontSize: '10px', color: '#64748B' }}>({check.desc})</span>
-              </div>
-              <span
-                style={{
-                  fontSize: '9.5px',
-                  fontFamily: 'monospace',
-                  fontWeight: 700,
-                  color: '#10B981',
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                  padding: '1px 5px',
-                  borderRadius: '3px',
-                }}
-              >
-                {check.status}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Merge Button Action */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          <div style={{ fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
-            {merged ? 'Merged into main (commit f81a0e)' : 'Ready for 1-click merge'}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setMerged(!merged)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 16px',
-              backgroundColor: merged ? '#1E293B' : '#10B981',
-              color: merged ? '#94A3B8' : '#030712',
-              fontWeight: 700,
-              fontSize: '12px',
-              borderRadius: '6px',
-              border: merged ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              boxShadow: merged ? 'none' : '0 0 15px rgba(16, 185, 129, 0.3)',
-            }}
-          >
-            <GitPullRequest size={14} />
-            <span>{merged ? 'Merged (Click to Re-test)' : 'Merge Pull Request (Clean)'}</span>
-          </button>
-        </div>
-      </div>
-    </MacWindow>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   4. FLOW STRIP (The 6-Step Connected Pipeline)
-───────────────────────────────────────────────────────────────────────────── */
-interface FlowStripProps {
-  activeStep: number;
-  setActiveStep: (step: number) => void;
-}
-
-export function FlowStrip({ activeStep, setActiveStep }: FlowStripProps) {
-  const steps = [
-    { num: '01', title: 'AST Scan', desc: 'Semgrep + Gitleaks', icon: Terminal },
-    { num: '02', title: 'AI Patch', desc: 'Gemini AST synthesis', icon: Sparkles },
-    { num: '03', title: 'OPA Eval', desc: 'Deterministic Rego gate', icon: ShieldCheck },
-    { num: '04', title: 'Sandbox Test', desc: 'Ephemeral isolation', icon: Activity },
-    { num: '05', title: 'SLSA Sign', desc: 'Cryptographic ledger', icon: Lock },
-    { num: '06', title: 'Verified PR', desc: 'Zero hallucination', icon: GitPullRequest },
-  ];
-
-  return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-        gap: '10px',
-        width: '100%',
-      }}
-    >
-      {steps.map((step, idx) => {
-        const Icon = step.icon;
-        const isActive = activeStep === idx;
-        return (
-          <button
-            key={idx}
-            type="button"
-            onClick={() => setActiveStep(idx)}
-            style={{
-              backgroundColor: isActive ? '#0F172A' : '#090D16',
-              border: isActive ? '1px solid #2563EB' : '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '8px',
-              padding: '12px 14px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              textAlign: 'left',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              position: 'relative',
-              overflow: 'hidden',
-              boxShadow: isActive ? '0 0 16px rgba(37, 99, 235, 0.25)' : 'none',
-            }}
-          >
-            {isActive && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '2px',
-                  backgroundColor: '#38BDF8',
-                }}
-              />
-            )}
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span
-                style={{
-                  fontSize: '10px',
-                  fontFamily: 'var(--font-mono, monospace)',
-                  fontWeight: 700,
-                  color: isActive ? '#38BDF8' : '#64748B',
-                }}
-              >
-                {step.num}
-              </span>
-              <Icon size={14} color={isActive ? '#38BDF8' : '#64748B'} />
-            </div>
-
-            <div style={{ fontSize: '13px', fontWeight: 700, color: isActive ? '#FFFFFF' : '#CBD5E1' }}>
-              {step.title}
-            </div>
-
-            <div style={{ fontSize: '11px', color: '#64748B', lineHeight: 1.3 }}>{step.desc}</div>
-          </button>
-        );
-      })}
     </div>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   5. STATS ROW (The 4 Animated Metrics)
+   2. AUTO-FIX CARD SUB-COMPONENT (Step 2)
 ───────────────────────────────────────────────────────────────────────────── */
-interface StatsRowProps {
-  isVisible: boolean;
-  reducedMotion: boolean;
-}
+export function AutoFixCard({ isVisible, reducedMotion }: { isVisible: boolean; reducedMotion: boolean }) {
+  const [badHit, setBadHit] = useState(reducedMotion);
+  const [genPressed, setGenPressed] = useState(false);
+  const [fixText, setFixText] = useState(
+    reducedMotion ? 'db.query("SELECT * FROM users WHERE id = $1", [id])' : ''
+  );
+  const [opaActive, setOpaActive] = useState(reducedMotion);
 
-export function StatsRow({ isVisible, reducedMotion }: StatsRowProps) {
-  const stats = [
-    {
-      value: 100,
-      suffix: '%',
-      label: 'Deterministic Decision Accuracy',
-      desc: 'Zero probabilistic LLM hallucination in approvals',
-      color: '#38BDF8',
-    },
-    {
-      value: 18,
-      prefix: '< ',
-      suffix: 'ms',
-      label: 'Median OPA Policy Evaluation',
-      desc: 'Local Rego compiled execution latency',
-      color: '#10B981',
-    },
-    {
-      value: 0,
-      label: 'Unverified Merges Permitted',
-      desc: 'Strict SLSA Level 3 provenance signing',
-      color: '#F59E0B',
-    },
-    {
-      value: 1,
-      prefix: '< ',
-      suffix: ' Click',
-      label: 'Vulnerability to Verified PR',
-      desc: 'Fully automated continuous remediation',
-      color: '#A855F7',
-    },
-  ];
+  useEffect(() => {
+    if (reducedMotion) {
+      setBadHit(true);
+      setFixText('db.query("SELECT * FROM users WHERE id = $1", [id])');
+      setOpaActive(true);
+      return;
+    }
+    if (!isVisible) return;
+
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+    const targetFix = 'db.query("SELECT * FROM users WHERE id = $1", [id])';
+
+    async function runLoop() {
+      while (isMounted) {
+        // Reset
+        setBadHit(false);
+        setFixText('');
+        setOpaActive(false);
+        setGenPressed(false);
+        await new Promise((r) => { timeoutId = setTimeout(r, 800); });
+        if (!isMounted) break;
+
+        // Highlight vulnerable line
+        setBadHit(true);
+        await new Promise((r) => { timeoutId = setTimeout(r, 900); });
+        if (!isMounted) break;
+
+        // Button press effect
+        setGenPressed(true);
+        await new Promise((r) => { timeoutId = setTimeout(r, 350); });
+        setGenPressed(false);
+        if (!isMounted) break;
+
+        // Type fix character by character
+        for (let i = 1; i <= targetFix.length; i++) {
+          if (!isMounted) break;
+          setFixText(targetFix.substring(0, i));
+          await new Promise((r) => { timeoutId = setTimeout(r, 22); });
+        }
+
+        if (!isMounted) break;
+        await new Promise((r) => { timeoutId = setTimeout(r, 400); });
+        if (!isMounted) break;
+
+        // OPA verified badge lights up
+        setOpaActive(true);
+        await new Promise((r) => { timeoutId = setTimeout(r, 3400); });
+      }
+    }
+
+    runLoop();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [isVisible, reducedMotion]);
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
-        gap: '16px',
-        padding: '24px clamp(16px, 3vw, 28px)',
-        backgroundColor: '#090D16',
-        borderRadius: '12px',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-      }}
-    >
-      {stats.map((stat, idx) => (
-        <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div
-            style={{
-              fontSize: 'clamp(26px, 3.5vw, 36px)',
-              fontWeight: 800,
-              color: stat.color,
-              lineHeight: 1.1,
-            }}
-          >
-            <AnimatedCounter
-              value={stat.value}
-              prefix={stat.prefix}
-              suffix={stat.suffix}
-              isVisible={isVisible}
-              reducedMotion={reducedMotion}
-            />
+    <div className="gps-feat gps-rev">
+      <div className="gps-txt">
+        <span className="gps-step">Step 2</span>
+        <h2>Open a finding. Get the smallest fix.</h2>
+        <p>
+          Each finding shows the exact line and the taint path. Generate Auto-Fix and Kavach
+          writes a one-line patch instead of a vague suggestion.
+        </p>
+      </div>
+
+      <div className="gps-stage">
+        <div className="gps-win">
+          <div className="gps-bar">
+            <i style={{ backgroundColor: '#F87171' }} />
+            <i style={{ backgroundColor: '#FBBF24' }} />
+            <i style={{ backgroundColor: '#4ADE9A' }} />
+            <span>Finding: CWE-89 in auth/route.py:42</span>
           </div>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#F1F5F9', marginTop: '4px' }}>
-            {stat.label}
+
+          <div className="gps-body">
+            <div className="gps-top">
+              <strong>SQL injection (Semgrep SAST)</strong>
+              <span className="gps-tag">Critical</span>
+            </div>
+
+            <pre>
+              <span className={`gps-ln gps-d ${badHit ? 'gps-hit' : ''}`}>
+                db.query(&quot;SELECT * FROM users WHERE id = &quot; + id)
+              </span>
+              <span className="gps-ln gps-a">
+                <span>{fixText || (reducedMotion ? 'db.query("SELECT * FROM users WHERE id = $1", [id])' : '')}</span>
+              </span>
+            </pre>
+
+            <div className="gps-act">
+              <span className={`gps-gen ${genPressed ? 'gps-press' : ''}`}>
+                Generate Auto-Fix
+              </span>
+              <span className={`gps-badge ${opaActive ? 'gps-on' : ''}`}>
+                ✓ Verified by OPA policy
+              </span>
+            </div>
           </div>
-          <div style={{ fontSize: '11.5px', color: '#64748B', lineHeight: 1.4 }}>{stat.desc}</div>
         </div>
-      ))}
+      </div>
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   3. VERIFY CARD SUB-COMPONENT (Step 3)
+───────────────────────────────────────────────────────────────────────────── */
+const CHECKS = [
+  'No policy regressions',
+  'Regression tests pass',
+  'Diff is minimal (1 line changed)',
+  'Attestation signed',
+];
+
+export function VerifyCard({ isVisible, reducedMotion }: { isVisible: boolean; reducedMotion: boolean }) {
+  const [checkStates, setCheckStates] = useState<boolean[]>(
+    reducedMotion ? [true, true, true, true] : [false, false, false, false]
+  );
+  const [prActive, setPrActive] = useState(reducedMotion);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setCheckStates([true, true, true, true]);
+      setPrActive(true);
+      return;
+    }
+    if (!isVisible) return;
+
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
+    async function runLoop() {
+      while (isMounted) {
+        // Reset
+        setCheckStates([false, false, false, false]);
+        setPrActive(false);
+        await new Promise((r) => { timeoutId = setTimeout(r, 700); });
+        if (!isMounted) break;
+
+        // Tick checklist items one by one
+        for (let i = 0; i < CHECKS.length; i++) {
+          if (!isMounted) break;
+          setCheckStates((prev) => {
+            const next = [...prev];
+            next[i] = true;
+            return next;
+          });
+          await new Promise((r) => { timeoutId = setTimeout(r, 650); });
+        }
+
+        if (!isMounted) break;
+        // PR opened badge
+        setPrActive(true);
+        await new Promise((r) => { timeoutId = setTimeout(r, 3400); });
+      }
+    }
+
+    runLoop();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [isVisible, reducedMotion]);
+
+  return (
+    <div className="gps-feat">
+      <div className="gps-txt">
+        <span className="gps-step">Step 3</span>
+        <h2>Verified before it reaches GitHub</h2>
+        <p>
+          The patch has to pass your OPA policies and regression tests first. Only then does Kavach
+          publish a signed pull request for your team to review.
+        </p>
+      </div>
+
+      <div className="gps-stage">
+        <div className="gps-win">
+          <div className="gps-bar">
+            <i style={{ backgroundColor: '#F87171' }} />
+            <i style={{ backgroundColor: '#FBBF24' }} />
+            <i style={{ backgroundColor: '#4ADE9A' }} />
+            <span>Verification</span>
+          </div>
+
+          <div className="gps-body">
+            {CHECKS.map((text, idx) => {
+              const isOk = checkStates[idx];
+              return (
+                <div key={text} className={`gps-chk ${isOk ? 'gps-ok' : ''}`}>
+                  <s>{isOk ? '✓' : ''}</s>
+                  <span>{text}</span>
+                </div>
+              );
+            })}
+
+            <div className={`gps-pr ${prActive ? 'gps-on' : ''}`}>
+              <div>
+                <strong style={{ display: 'block', fontSize: '14px', color: '#E8EDF7' }}>
+                  Fix CWE-89 in auth/route.py
+                </strong>
+                <small style={{ color: '#93A0BC', fontSize: '12px' }}>
+                  Opened by Kavach, ready to review
+                </small>
+              </div>
+              <span className="gps-pill">Pull request opened</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   4. FLOW STRIP (6-step connected pipeline)
+───────────────────────────────────────────────────────────────────────────── */
+const FLOW_STEPS = [
+  { num: '1. Connect', label: 'GitHub repo' },
+  { num: '2. Scan', label: 'Real engines' },
+  { num: '3. Triage', label: 'Finding detail' },
+  { num: '4. Fix', label: 'Minimal diff' },
+  { num: '5. Verify', label: 'OPA decides' },
+  { num: '6. Pull request', label: 'Signed, on GitHub' },
+];
+
+export function FlowStrip({ isVisible, reducedMotion }: { isVisible: boolean; reducedMotion: boolean }) {
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    if (reducedMotion || !isVisible) return;
+
+    const timer = setInterval(() => {
+      setActiveIdx((prev) => (prev + 1) % FLOW_STEPS.length);
+    }, 1200);
+
+    return () => clearInterval(timer);
+  }, [isVisible, reducedMotion]);
+
+  return (
+    <section className="gps-flow">
+      <h2>One path from repo to merged fix</h2>
+      <div className="gps-fl">
+        {FLOW_STEPS.map((step, idx) => (
+          <div
+            key={step.num}
+            className={`gps-fn ${activeIdx === idx ? 'gps-on' : ''}`}
+            onClick={() => setActiveIdx(idx)}
+            style={{ cursor: 'pointer' }}
+          >
+            <b>{step.num}</b>
+            <span>{step.label}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   5. STATS ROW (4 animated metrics)
+───────────────────────────────────────────────────────────────────────────── */
+export function StatsRow({ isVisible, reducedMotion }: { isVisible: boolean; reducedMotion: boolean }) {
+  return (
+    <section className="gps-stats">
+      <div>
+        <div className="gps-n">
+          <StatCounter target={6} isVisible={isVisible} reducedMotion={reducedMotion} />
+        </div>
+        <p>deterministic scan engines</p>
+      </div>
+
+      <div>
+        <div className="gps-n">
+          <StatCounter target={4} isVisible={isVisible} reducedMotion={reducedMotion} />
+        </div>
+        <p>modules: Code, Cloud, Attack, Agent</p>
+      </div>
+
+      <div>
+        <div className="gps-n">
+          <StatCounter target={1} isVisible={isVisible} reducedMotion={reducedMotion} />
+        </div>
+        <p>click from finding to pull request</p>
+      </div>
+
+      <div>
+        <div className="gps-n">
+          <StatCounter target={100} suffix="%" isVisible={isVisible} reducedMotion={reducedMotion} />
+        </div>
+        <p>of fixes checked by policy first</p>
+      </div>
+    </section>
   );
 }
 
@@ -977,148 +492,459 @@ export function StatsRow({ isVisible, reducedMotion }: StatsRowProps) {
 export function GoldenPathShowcase() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
-  const [activeStep, setActiveStep] = useState(0);
+  const reducedMotion = useReducedMotion();
 
-  // Viewport IntersectionObserver & prefers-reduced-motion
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setReducedMotion(mq.matches);
-    const handleMotionChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
-    mq.addEventListener('change', handleMotionChange);
-
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
+        if (entry.isIntersecting) setIsVisible(true);
       },
       { threshold: 0.15 }
     );
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
+    if (containerRef.current) observer.observe(containerRef.current);
 
-    return () => {
-      mq.removeEventListener('change', handleMotionChange);
-      observer.disconnect();
-    };
+    return () => observer.disconnect();
   }, []);
 
   return (
-    <section
-      ref={containerRef}
-      style={{
-        backgroundColor: '#070A12',
-        color: '#FFFFFF',
-        padding: 'clamp(48px, 6vw, 84px) clamp(16px, 3vw, 24px)',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-        width: '100%',
-        boxSizing: 'border-box',
-        overflowX: 'hidden',
-        position: 'relative',
-      }}
-    >
-      <div style={{ maxWidth: '1380px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '36px' }}>
-        {/* Section Header */}
-        <div style={{ textAlign: 'center', maxWidth: '820px', margin: '0 auto' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '4px 12px',
-              borderRadius: '20px',
-              backgroundColor: 'rgba(56, 189, 248, 0.1)',
-              border: '1px solid rgba(56, 189, 248, 0.25)',
-              color: '#38BDF8',
-              fontSize: '11.5px',
-              fontWeight: 600,
-              fontFamily: 'var(--font-mono, monospace)',
-              marginBottom: '14px',
-            }}
-          >
-            <Sparkles size={13} />
-            <span>KAVACH GOLDEN PATH · AUTOMATED END-TO-END DEMO</span>
-          </div>
+    <div ref={containerRef} className="gps-container">
+      <div className="gps-wrapper">
+        {/* Step 1: Scan HUD */}
+        <ScanHud isVisible={isVisible} reducedMotion={reducedMotion} />
 
-          <h2
-            style={{
-              fontSize: 'clamp(28px, 4.5vw, 44px)',
-              fontWeight: 800,
-              letterSpacing: '-0.03em',
-              lineHeight: 1.15,
-              margin: '0 0 14px 0',
-              color: '#FFFFFF',
-            }}
-          >
-            Experience Autonomous Security with Deterministic Verification
-          </h2>
+        {/* Step 2: Auto-Fix Card */}
+        <AutoFixCard isVisible={isVisible} reducedMotion={reducedMotion} />
 
-          <p
-            style={{
-              fontSize: 'clamp(14px, 2vw, 16px)',
-              color: '#94A3B8',
-              lineHeight: 1.6,
-              margin: 0,
-            }}
-          >
-            Multi-engine AST discovery feeds an autonomous patch synthesizer, verified against strict OPA invariants
-            and sealed with cryptographic SLSA Level 3 attestations before creating an authenticated pull request.
-          </p>
-        </div>
+        {/* Step 3: Verify Card */}
+        <VerifyCard isVisible={isVisible} reducedMotion={reducedMotion} />
 
-        {/* 6-Step Connected Flow Strip */}
-        <FlowStrip activeStep={activeStep} setActiveStep={setActiveStep} />
+        {/* 6-Step Flow Strip */}
+        <FlowStrip isVisible={isVisible} reducedMotion={reducedMotion} />
 
-        {/* 3 Main Feature Cards (Scan HUD, Auto-Fix, Verify) */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))',
-            gap: '24px',
-            alignItems: 'stretch',
-          }}
-        >
-          {/* Card 1: Scan HUD */}
-          <ScanHud isVisible={isVisible} reducedMotion={reducedMotion} />
-
-          {/* Card 2: Auto-Fix Split Diff */}
-          <AutoFixCard />
-
-          {/* Card 3: Verify & Pull Request */}
-          <VerifyCard />
-        </div>
-
-        {/* 4 Animated Stats Row */}
+        {/* Stats Row */}
         <StatsRow isVisible={isVisible} reducedMotion={reducedMotion} />
       </div>
 
-      {/* Embedded CSS Animations */}
-      <style jsx>{`
-        @keyframes scanningSweep {
-          0% {
-            left: -60px;
+      {/* Scoped CSS matching the exact design tokens and animations */}
+      <style jsx global>{`
+        .gps-container {
+          background: #090D16;
+          color: #E8EDF7;
+          border-top: 1px solid #223052;
+          border-bottom: 1px solid #223052;
+          padding: 32px 0 64px;
+          font-family: var(--font-sans, "Plus Jakarta Sans", "Inter", -apple-system, sans-serif);
+          -webkit-font-smoothing: antialiased;
+        }
+        .gps-wrapper {
+          max-width: 1120px;
+          margin: 0 auto;
+          padding: 0 24px;
+        }
+        .gps-feat {
+          display: grid;
+          grid-template-columns: 1fr 1.2fr;
+          gap: 56px;
+          align-items: center;
+          padding: 64px 0;
+          border-top: 1px solid #223052;
+        }
+        .gps-feat:first-of-type {
+          border-top: none;
+        }
+        .gps-feat.gps-rev .gps-txt {
+          order: 2;
+        }
+        .gps-txt h2 {
+          font-size: clamp(28px, 4vw, 40px);
+          line-height: 1.15;
+          font-weight: 700;
+          color: #FFFFFF;
+          margin: 0 0 14px 0;
+          letter-spacing: -0.02em;
+        }
+        .gps-txt p {
+          color: #93A0BC;
+          margin: 0;
+          max-width: 32em;
+          font-size: 16px;
+          line-height: 1.6;
+        }
+        .gps-step {
+          display: inline-block;
+          color: #7DD3C8;
+          font-size: 14px;
+          font-weight: 700;
+          margin-bottom: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .gps-stage {
+          position: relative;
+          border-radius: 16px;
+          padding: 36px 28px;
+          background: linear-gradient(135deg, #143B44, #0F2036 60%, #121A33);
+          border: 1px solid #223052;
+          overflow: hidden;
+        }
+        .gps-stage::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(circle, rgba(125, 211, 200, 0.45) 1px, transparent 1.6px) 0 0/14px 14px;
+          opacity: 0.28;
+          -webkit-mask-image: linear-gradient(120deg, #000, transparent 70%);
+          mask-image: linear-gradient(120deg, #000, transparent 70%);
+          pointer-events: none;
+        }
+        .gps-win {
+          position: relative;
+          background: #0F1626;
+          border: 1px solid #223052;
+          border-radius: 12px;
+          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+          overflow: hidden;
+          color: #E8EDF7;
+        }
+        .gps-bar {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 11px 14px;
+          background: #141D31;
+          border-bottom: 1px solid #223052;
+          font-size: 13px;
+          color: #93A0BC;
+        }
+        .gps-bar i {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          display: inline-block;
+        }
+        .gps-bar span {
+          margin-left: 8px;
+          font-family: var(--font-mono, monospace);
+          font-size: 12px;
+        }
+        .gps-body {
+          padding: 20px;
+        }
+        .gps-row {
+          display: grid;
+          grid-template-columns: 92px 1fr 66px;
+          grid-template-areas: "n pb st" "t pb st";
+          column-gap: 14px;
+          align-items: center;
+          padding: 10px 0;
+          border-bottom: 1px solid #223052;
+          font-size: 14px;
+        }
+        .gps-row:last-of-type {
+          border-bottom: 0;
+        }
+        .gps-row b {
+          grid-area: n;
+          font-weight: 600;
+          line-height: 1.2;
+          color: #E8EDF7;
+        }
+        .gps-row em {
+          grid-area: t;
+          font-style: normal;
+          color: #93A0BC;
+          font-size: 12px;
+        }
+        .gps-pb {
+          grid-area: pb;
+          height: 6px;
+          border-radius: 4px;
+          background: #141D31;
+          overflow: hidden;
+        }
+        .gps-pb u {
+          display: block;
+          height: 100%;
+          background: #7DD3C8;
+          transition: width 0.4s ease;
+        }
+        .gps-st {
+          grid-area: st;
+          text-align: right;
+          font-size: 12.5px;
+          color: #93A0BC;
+          font-family: var(--font-mono, monospace);
+        }
+        .gps-row.running .gps-st {
+          color: #FBBF24;
+          font-weight: 600;
+        }
+        .gps-row.running .gps-pb u {
+          background: #FBBF24;
+        }
+        .gps-row.done .gps-st {
+          color: #4ADE9A;
+          font-weight: 600;
+        }
+        .gps-row.done .gps-pb u {
+          background: #4ADE9A;
+        }
+        .gps-sum {
+          margin-top: 14px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          background: #141D31;
+          border: 1px solid #223052;
+          font-size: 13.5px;
+          color: #93A0BC;
+        }
+        .gps-sum b {
+          color: #E8EDF7;
+        }
+        .gps-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .gps-top strong {
+          font-size: 15px;
+          color: #FFFFFF;
+        }
+        .gps-tag {
+          font-size: 11.5px;
+          font-weight: 700;
+          padding: 3px 9px;
+          border-radius: 99px;
+          background: rgba(248, 113, 113, 0.15);
+          color: #F87171;
+          border: 1px solid rgba(248, 113, 113, 0.3);
+        }
+        .gps-body pre {
+          margin: 14px 0 0;
+          font: 13px/1.65 var(--font-mono, "JetBrains Mono", Consolas, monospace);
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+        .gps-ln {
+          display: block;
+          padding: 5px 10px;
+          border-radius: 5px;
+          min-height: 28px;
+          box-sizing: border-box;
+        }
+        .gps-ln.gps-d {
+          background: rgba(248, 113, 113, 0.12);
+          color: #F87171;
+          opacity: 0.6;
+          transition: all 0.3s ease;
+        }
+        .gps-ln.gps-d.gps-hit {
+          opacity: 1;
+          box-shadow: inset 3px 0 #F87171;
+        }
+        .gps-ln.gps-a {
+          background: rgba(74, 222, 154, 0.12);
+          color: #4ADE9A;
+          box-shadow: inset 3px 0 #4ADE9A;
+          margin-top: 4px;
+        }
+        .gps-act {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          margin-top: 16px;
+          flex-wrap: wrap;
+        }
+        .gps-gen {
+          padding: 8px 14px;
+          border-radius: 8px;
+          border: 1px solid #7DD3C8;
+          color: #7DD3C8;
+          font-size: 13.5px;
+          font-weight: 600;
+          transition: all 0.15s ease;
+          display: inline-block;
+          user-select: none;
+        }
+        .gps-gen.gps-press {
+          background: #7DD3C8;
+          color: #06121A;
+          transform: scale(0.96);
+        }
+        .gps-badge {
+          font-size: 13px;
+          color: #93A0BC;
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          opacity: 0.35;
+          transition: opacity 0.3s ease, color 0.3s ease;
+          font-family: var(--font-mono, monospace);
+        }
+        .gps-badge.gps-on {
+          opacity: 1;
+          color: #4ADE9A;
+        }
+        .gps-chk {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 0;
+          font-size: 14px;
+          color: #93A0BC;
+          transition: color 0.25s ease;
+        }
+        .gps-chk s {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          border: 1.5px solid #223052;
+          display: grid;
+          place-items: center;
+          flex: none;
+          text-decoration: none;
+          font-size: 11px;
+          line-height: 1;
+          color: transparent;
+          transition: all 0.25s ease;
+        }
+        .gps-chk.gps-ok {
+          color: #E8EDF7;
+        }
+        .gps-chk.gps-ok s {
+          background: #4ADE9A;
+          border-color: #4ADE9A;
+          color: #06121A;
+          font-weight: 700;
+        }
+        .gps-pr {
+          margin-top: 14px;
+          padding: 12px 14px;
+          border-radius: 8px;
+          background: #141D31;
+          border: 1px solid #223052;
+          font-size: 14px;
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          align-items: center;
+          flex-wrap: wrap;
+          opacity: 0.35;
+          transition: all 0.3s ease;
+        }
+        .gps-pr.gps-on {
+          opacity: 1;
+          border-color: #4ADE9A;
+          box-shadow: 0 0 16px rgba(74, 222, 154, 0.15);
+        }
+        .gps-pill {
+          font-size: 12px;
+          font-weight: 700;
+          padding: 3px 10px;
+          border-radius: 99px;
+          background: rgba(74, 222, 154, 0.15);
+          color: #4ADE9A;
+          border: 1px solid rgba(74, 222, 154, 0.3);
+        }
+        .gps-flow {
+          padding: 64px 0 48px;
+          border-top: 1px solid #223052;
+        }
+        .gps-flow h2 {
+          font-size: clamp(28px, 4vw, 40px);
+          max-width: 18em;
+          color: #FFFFFF;
+          margin: 0 0 28px 0;
+          font-weight: 700;
+          letter-spacing: -0.02em;
+        }
+        .gps-fl {
+          display: flex;
+          gap: 0;
+          flex-wrap: wrap;
+        }
+        .gps-fn {
+          flex: 1 1 150px;
+          position: relative;
+          padding: 16px 14px;
+          border: 1px solid #223052;
+          background: #0F1626;
+          margin: 0 -1px -1px 0;
+          font-size: 14px;
+          transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        .gps-fn b {
+          display: block;
+          font-size: 15px;
+          color: #E8EDF7;
+          margin-bottom: 2px;
+        }
+        .gps-fn span {
+          color: #93A0BC;
+          font-size: 13px;
+        }
+        .gps-fn.gps-on {
+          background: #141D31;
+          border-color: #7DD3C8;
+          z-index: 2;
+        }
+        .gps-fn.gps-on::after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: 3px;
+          background: #7DD3C8;
+        }
+        .gps-stats {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 28px;
+          padding: 56px 0 16px;
+          border-top: 1px solid #223052;
+        }
+        .gps-stats .gps-n {
+          font-size: clamp(40px, 5vw, 56px);
+          font-weight: 700;
+          line-height: 1;
+          color: #7DD3C8;
+          font-family: var(--font-mono, monospace);
+        }
+        .gps-stats p {
+          margin: 8px 0 0;
+          color: #93A0BC;
+          font-size: 15px;
+          line-height: 1.4;
+        }
+        @media (max-width: 860px) {
+          .gps-feat {
+            grid-template-columns: 1fr;
+            gap: 28px;
+            padding: 44px 0;
           }
-          100% {
-            left: 100%;
+          .gps-feat.gps-rev .gps-txt {
+            order: 1;
+          }
+          .gps-stage {
+            padding: 22px 16px;
+          }
+          .gps-row {
+            grid-template-columns: 78px 1fr 58px;
           }
         }
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.2;
+        @media (prefers-reduced-motion: reduce) {
+          * {
+            animation: none !important;
+            transition: none !important;
           }
         }
       `}</style>
-    </section>
+    </div>
   );
 }
 
 export default GoldenPathShowcase;
-
