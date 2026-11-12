@@ -23,7 +23,7 @@ import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
 import { SearchModal } from '@/components/common/SearchModal';
 import { TalkToExpertModal } from '@/components/common/TalkToExpertModal';
 
-export default function SecuLayerProductsPage() {
+export default function KavachProductsPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [expertOpen, setExpertOpen] = useState(false);
   const [filterLayer, setFilterLayer] = useState<'all' | 'code' | 'cloud' | 'runtime' | 'ai' | 'ops'>('all');

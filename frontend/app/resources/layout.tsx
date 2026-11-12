@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     canonical: '/resources',
   },
   openGraph: {
-    title: 'SecuLayer Security Engineering Resources',
+    title: 'Kavach Security Engineering Resources',
     description:
       'Research papers, compliance checklists, and technical blueprints for modern security engineering teams.',
     url: 'https://kavachsecurity.me/resources',

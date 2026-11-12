@@ -4,12 +4,12 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Architecture & Technical Documentation',
   description:
-    'Comprehensive technical guides for SecuLayer control plane: SAST/SCA scanners, eBPF kernel telemetry, OPA Rego policies, and MCP agent gateway.',
+    'Comprehensive technical guides for Kavach control plane: SAST/SCA scanners, eBPF kernel telemetry, OPA Rego policies, and MCP agent gateway.',
   alternates: {
     canonical: '/docs',
   },
   openGraph: {
-    title: 'SecuLayer Technical Documentation',
+    title: 'Kavach Technical Documentation',
     description:
       'Architecture, API references, CLI integration, and deterministic security guides.',
     url: 'https://kavachsecurity.me/docs',

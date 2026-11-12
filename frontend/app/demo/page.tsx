@@ -390,7 +390,7 @@ int trace_execve(struct trace_event_raw_sys_enter* ctx) {
       subtitle: 'Immutable Rego policies evaluate all operations. LLMs never decide permissions.',
       icon: Lock,
       color: '#F59E0B',
-      codeSnippet: `package seculayer.agent.policy
+      codeSnippet: `package kavach.agent.policy
 
 default allow = false
 
@@ -439,7 +439,7 @@ allow {
             deterministic_decision: 'DENY',
             reason: 'Tool action exceeded agent privilege boundaries; access to production air-gapped secret blocked.',
             sha256_evidence_chain: '4a9f88e12c09b36d71fa9021secu202689f13e7163884c718274092bba4019484b90',
-            signer: 'SecuLayer Control Plane Policy Enforcer',
+            signer: 'Kavach Control Plane Policy Enforcer',
             signature_algorithm: 'Ed25519-SHA256'
           },
           verified_controls: [
@@ -485,7 +485,7 @@ allow {
               <span>Interactive Security Demo & Briefing Suite</span>
             </div>
             <h1 style={{ fontSize: '32px', fontWeight: 800, margin: '0 0 8px', letterSpacing: '-0.02em', color: '#0F172A' }}>
-              SecuLayer Interactive Demo Environment
+              Kavach Interactive Demo Environment
             </h1>
             <p style={{ fontSize: '15px', color: '#64748B', maxWidth: '780px', margin: 0, lineHeight: 1.5 }}>
               Test deterministic policy enforcement in real-time, execute live scanner checks, or schedule a technical briefing with our security engineers.
@@ -578,7 +578,7 @@ allow {
               <div style={{ marginBottom: '24px' }}>
                 <h2 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 6px', color: '#0F172A' }}>Schedule Your 30-Minute Architecture Deep Dive</h2>
                 <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
-                  Meet directly with a SecuLayer Principal Security Architect for a live technical evaluation tailored to your codebase and infrastructure.
+                  Meet directly with a Kavach Principal Security Architect for a live technical evaluation tailored to your codebase and infrastructure.
                 </p>
               </div>
 
@@ -814,7 +814,7 @@ allow {
         {activeTab === 'request' && (
           <div style={{ maxWidth: '800px', margin: '0 auto', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '36px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
             <div style={{ marginBottom: '28px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px', color: '#0F172A' }}>Request a Personalized SecuLayer Demonstration</h2>
+              <h2 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px', color: '#0F172A' }}>Request a Personalized Kavach Demonstration</h2>
               <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
                 Tell us about your organization and architecture. Our technical solutions team will assemble a tailored demonstration environment.
               </p>
@@ -931,7 +931,7 @@ allow {
                     >
                       <option value="Dedicated VPC / GovCloud">Dedicated Customer VPC / GovCloud</option>
                       <option value="Air-gapped Sovereign Enclave">Air-gapped Sovereign Enclave (No outbound internet)</option>
-                      <option value="Cloud SaaS">SecuLayer Cloud SaaS</option>
+                      <option value="Cloud SaaS">Kavach Cloud SaaS</option>
                       <option value="Hybrid">Hybrid Multi-Region</option>
                     </select>
                   </div>
@@ -993,7 +993,7 @@ allow {
         {activeTab === 'contact' && (
           <div style={{ maxWidth: '780px', margin: '0 auto', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '36px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
             <div style={{ marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px', color: '#0F172A' }}>Contact SecuLayer Enterprise Sales</h2>
+              <h2 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px', color: '#0F172A' }}>Contact Kavach Enterprise Sales</h2>
               <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
                 Speak directly with an enterprise account director regarding custom volume licensing, multi-year MSA agreements, or sovereign cloud deployment pricing.
               </p>
@@ -1641,7 +1641,7 @@ allow {
                 <div>
                   <h2 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 4px', color: '#0F172A' }}>Guided Architecture Walkthrough</h2>
                   <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-                    Step through the 5 core deterministic pillars of SecuLayer&apos;s enterprise security platform.
+                    Step through the 5 core deterministic pillars of Kavach&apos;s enterprise security platform.
                   </p>
                 </div>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#2563EB', backgroundColor: '#EFF6FF', padding: '6px 12px', borderRadius: '8px' }}>

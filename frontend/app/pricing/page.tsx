@@ -446,7 +446,7 @@ export default function PricingPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {[
               {
-                q: 'What makes Kavach / SecuLayer deterministic instead of an AI wrapper?',
+                q: 'What makes Kavach deterministic instead of an AI wrapper?',
                 a: 'LLMs propose remediations, but deterministic security engines (Semgrep AST, Gitleaks regex/entropy, Trivy CVE databases, and OPA Rego rules) make all authoritative security decisions. No scan findings or policy passes are ever fabricated by an LLM.',
               },
               {

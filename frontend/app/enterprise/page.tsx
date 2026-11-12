@@ -71,7 +71,7 @@ export default function EnterprisePage() {
         <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '20px', backgroundColor: 'rgba(37,99,235,0.2)', border: '1px solid rgba(59,130,246,0.3)', color: '#60A5FA', fontSize: '13px', fontWeight: 600, marginBottom: '20px' }}>
             <Sparkles size={14} />
-            <span>SecuLayer Enterprise Architecture</span>
+            <span>Kavach Enterprise Architecture</span>
           </div>
           <h1 style={{ fontSize: '46px', fontWeight: 800, margin: '0 0 20px', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
             Mission-Critical Security Control Plane <br />

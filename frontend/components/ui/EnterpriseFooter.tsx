@@ -56,9 +56,9 @@ export const EnterpriseFooter: React.FC = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
             {[
-              'SOC 2 Type II Certified',
-              'ISO 27001 Compliant',
-              'SLSA Level 3 Provenance',
+              'SOC 2 Type II (In Progress)',
+              'ISO 27001 (In Progress)',
+              'SLSA Level 3 (Aligned)',
               'OPA Rego Policy Enforced',
             ].map((item) => (
               <div

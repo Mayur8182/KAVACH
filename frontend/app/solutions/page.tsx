@@ -21,7 +21,7 @@ const SOLUTIONS = [
     icon: Bot,
     title: 'Autonomous AI Agent Governance',
     subtitle: 'Safeguard agentic coding assistants without hindering development velocity.',
-    desc: 'Autonomous coding agents make multi-file modifications and invoke command-line tools. SecuLayer wraps every agent with deterministic OPA contracts, sandboxed syscall execution, and human-in-the-loop approvals for privileged operations.',
+    desc: 'Autonomous coding agents make multi-file modifications and invoke command-line tools. Kavach wraps every agent with deterministic OPA contracts, sandboxed syscall execution, and human-in-the-loop approvals for privileged operations.',
     features: [
       'MCP tool-level authorization gateway',
       'Immutable cryptographic audit events for every patch',
@@ -91,7 +91,7 @@ export default function SolutionsPage() {
             Engineered Solutions for Modern Engineering Teams
           </h1>
           <p style={{ fontSize: '16px', color: '#64748B', maxWidth: '680px', margin: '0 auto 32px', lineHeight: 1.6 }}>
-            From AI coding agent boundaries to multi-cloud runtime defense, SecuLayer provides verifiable, evidence-backed security controls.
+            From AI coding agent boundaries to multi-cloud runtime defense, Kavach provides verifiable, evidence-backed security controls.
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', flexWrap: 'wrap' }}>
             <Link
@@ -220,7 +220,7 @@ export default function SolutionsPage() {
             Ready to secure your engineering workflows?
           </h2>
           <p style={{ fontSize: '15px', color: '#94A3B8', margin: '0 0 28px' }}>
-            Complete the 6-step onboarding wizard in less than 2 minutes. Real database persistence, real scans.
+            Complete the 5-step onboarding wizard in less than 2 minutes. Real database persistence, real scans.
           </p>
           <Link
             href="/onboarding"
@@ -240,7 +240,7 @@ export default function SolutionsPage() {
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F1F5F9')}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
           >
-            <span>Launch SecuLayer Onboarding</span>
+            <span>Launch Kavach Onboarding</span>
             <ArrowRight size={15} />
           </Link>
         </div>

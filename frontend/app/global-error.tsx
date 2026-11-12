@@ -58,7 +58,7 @@ export default function GlobalError({
   return (
     <html lang="en" data-theme="light">
       <head>
-        <title>500 — Application Runtime Error | SecuLayer</title>
+        <title>500 — Application Runtime Error | Kavach</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body

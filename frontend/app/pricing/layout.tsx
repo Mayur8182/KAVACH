@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     canonical: '/pricing',
   },
   openGraph: {
-    title: 'SecuLayer Pricing & Enterprise Plans',
+    title: 'Kavach Pricing & Enterprise Plans',
     description:
       'Transparent security control plane pricing for developer teams and multi-cloud enterprises. Real deterministic OPA gates, eBPF probes, and MCP agent defense.',
     url: 'https://kavachsecurity.me/pricing',

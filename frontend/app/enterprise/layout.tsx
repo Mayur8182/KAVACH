@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     canonical: '/enterprise',
   },
   openGraph: {
-    title: 'SecuLayer Enterprise Security Blueprint',
+    title: 'Kavach Enterprise Security Blueprint',
     description:
       'SOC 2 Type II, SLSA Level 3 provenance, and dedicated multi-cloud security architecture for high-compliance engineering orgs.',
     url: 'https://kavachsecurity.me/enterprise',

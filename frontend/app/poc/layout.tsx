@@ -9,9 +9,9 @@ export const metadata: Metadata = {
     canonical: '/poc',
   },
   openGraph: {
-    title: 'SecuLayer Proof-of-Concept Deployment',
+    title: 'Kavach Proof-of-Concept Deployment',
     description:
-      'Evaluate SecuLayer inside your VPC or cloud account with measurable security benchmarks.',
+      'Evaluate Kavach inside your VPC or cloud account with measurable security benchmarks.',
     url: 'https://kavachsecurity.me/poc',
   },
 };

@@ -27,7 +27,7 @@ import {
   Activity,
   GitBranch,
 } from 'lucide-react';
-import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
+import { KavachHeader } from '@/components/navigation/SecuLayerHeader';
 
 interface DocSectionContent {
   category: string;
@@ -48,7 +48,7 @@ const DOC_SECTIONS = [
     id: 'getting-started',
     title: 'Getting Started',
     items: [
-      { id: 'quickstart', title: 'SecuLayer Quickstart' },
+      { id: 'quickstart', title: 'Kavach Quickstart' },
       { id: 'architecture', title: 'Architecture & Determinism' },
       { id: 'cli', title: 'Antigravity CLI (agy)' },
       { id: 'auth', title: 'Authentication & Tokens' },
@@ -89,8 +89,8 @@ const DOC_SECTIONS = [
 const DOC_DETAILS: Record<string, DocSectionContent> = {
   quickstart: {
     category: 'Getting Started',
-    title: 'SecuLayer Quickstart',
-    subtitle: 'Get up and running with SecuLayer deterministic security control plane in under 5 minutes.',
+    title: 'Kavach Quickstart',
+    subtitle: 'Get up and running with Kavach deterministic security control plane in under 5 minutes.',
     principle: 'LLM proposes. Deterministic security systems decide. Runtime evidence proves.',
     items: [
       {
@@ -101,12 +101,12 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
       {
         heading: '2. Install the Antigravity CLI (agy)',
         text: 'The Antigravity CLI allows you to execute SAST scans, secret detection, SBOM verification, and OPA policy evaluation directly from your workstation or CI/CD pipelines.',
-        code: 'curl -sSL https://get.seculayer.io | bash\nagy auth login --token <YOUR_SECULAYER_API_TOKEN>\nagy scan . --all',
+        code: 'curl -sSL https://get.Kavach.io | bash\nagy auth login --token <YOUR_Kavach_API_TOKEN>\nagy scan . --all',
         lang: 'bash',
       },
       {
         heading: '3. Architectural Golden Rule',
-        text: 'LLMs are never the authoritative security boundary in SecuLayer. Autonomous AI agents investigate anomalies and propose code diffs, while deterministic engines (Semgrep, Trivy, Gitleaks, OPA) approve or reject executions with verifiable proofs.',
+        text: 'LLMs are never the authoritative security boundary in Kavach. Autonomous AI agents investigate anomalies and propose code diffs, while deterministic engines (Semgrep, Trivy, Gitleaks, OPA) approve or reject executions with verifiable proofs.',
       },
     ],
   },
@@ -122,7 +122,7 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
       },
       {
         heading: 'No Hardcoded Fallbacks & Real Persistence',
-        text: 'In production, SecuLayer persists all organizations, workspaces, projects, scan findings, and audit trails in PostgreSQL. No frontend localStorage or mock endpoints are ever used to simulate security posture.',
+        text: 'In production, Kavach persists all organizations, workspaces, projects, scan findings, and audit trails in PostgreSQL. No frontend localStorage or mock endpoints are ever used to simulate security posture.',
         code: '# PostgreSQL schema relationships\nOrganization (1) ──< Workspace (N) ──< Project (N) ──< ScanRun (N) ──< Finding (N)',
         lang: 'text',
       },
@@ -140,7 +140,7 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
       {
         heading: 'CLI Installation & Version Check',
         text: 'Install the latest agy binary for macOS, Linux, or Windows (via PowerShell):',
-        code: '# macOS / Linux\ncurl -fsSL https://cli.seculayer.io/install.sh | sh\n\n# Windows PowerShell\niwr -useb https://cli.seculayer.io/install.ps1 | iex\n\nagy --version',
+        code: '# macOS / Linux\ncurl -fsSL https://cli.Kavach.io/install.sh | sh\n\n# Windows PowerShell\niwr -useb https://cli.Kavach.io/install.ps1 | iex\n\nagy --version',
         lang: 'bash',
       },
       {
@@ -164,13 +164,13 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
     items: [
       {
         heading: 'Multi-Factor Authentication (MFA/TOTP)',
-        text: 'SecuLayer enforces RFC 6238 TOTP authenticators for all administrative accounts. Setup produces a base32 secret and cryptographically generated backup recovery codes stored in hashed vaults.',
+        text: 'Kavach enforces RFC 6238 TOTP authenticators for all administrative accounts. Setup produces a base32 secret and cryptographically generated backup recovery codes stored in hashed vaults.',
         link: { label: 'Configure MFA Now →', href: '/mfa/setup' },
       },
       {
         heading: 'API Bearer Token Authorization',
         text: 'All backend endpoints require a valid JWT Bearer header. Use short-lived user tokens or organization service account tokens:',
-        code: 'GET /api/v1/auth/me HTTP/1.1\nHost: api.seculayer.io\nAuthorization: Bearer <ACCESS_TOKEN>\nContent-Type: application/json',
+        code: 'GET /api/v1/auth/me HTTP/1.1\nHost: api.Kavach.io\nAuthorization: Bearer <ACCESS_TOKEN>\nContent-Type: application/json',
         lang: 'http',
       },
       {
@@ -200,7 +200,7 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
       },
       {
         heading: 'Deterministic Remediation Workflow',
-        text: 'When a security finding is detected, SecuLayer generates an exact unified diff. The code must undergo automated re-scanning and pass cleanly before status updates to FIXED.',
+        text: 'When a security finding is detected, Kavach generates an exact unified diff. The code must undergo automated re-scanning and pass cleanly before status updates to FIXED.',
       },
     ],
   },
@@ -223,7 +223,7 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
       },
       {
         heading: 'SLSA Level 3 Supply Chain Attestation',
-        text: 'SecuLayer signs SBOMs and container build manifests with Sigstore Cosign keys, providing immutable provenance across the entire CI/CD build chain.',
+        text: 'Kavach signs SBOMs and container build manifests with Sigstore Cosign keys, providing immutable provenance across the entire CI/CD build chain.',
       },
     ],
   },
@@ -255,7 +255,7 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
     items: [
       {
         heading: 'Kernel Syscall Interception',
-        text: 'SecuLayer eBPF probes attach to kernel tracepoints (`sys_enter_execve`, `sys_enter_connect`, `sys_enter_openat`) to detect anomalous outbound connections or unauthorized binary execution within container workloads.',
+        text: 'Kavach eBPF probes attach to kernel tracepoints (`sys_enter_execve`, `sys_enter_connect`, `sys_enter_openat`) to detect anomalous outbound connections or unauthorized binary execution within container workloads.',
         code: '// eBPF tracepoint hook\nSEC("tracepoint/syscalls/sys_enter_execve")\nint trace_execve(struct trace_event_raw_sys_enter* ctx) {\n    // Inspect binary path and block unauthorized processes\n    return 0;\n}',
         lang: 'c',
       },
@@ -276,7 +276,7 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
     items: [
       {
         heading: 'The MCP Security Gateway Architecture',
-        text: 'All AI agent tool calls pass through the SecuLayer gateway before hitting underlying tools: Agent -> Tool Request -> Identity -> Authorization -> Policy -> Risk Check -> Approval -> Execution -> Audit.',
+        text: 'All AI agent tool calls pass through the Kavach gateway before hitting underlying tools: Agent -> Tool Request -> Identity -> Authorization -> Policy -> Risk Check -> Approval -> Execution -> Audit.',
       },
       {
         heading: 'Risk Rating & Tool Schema Verification',
@@ -302,7 +302,7 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
       {
         heading: 'Example Security Gate Contract',
         text: 'This policy rejects any PR where critical vulnerabilities or leaked secrets remain unresolved:',
-        code: 'package seculayer.delivery\n\ndefault allow = false\n\n# Allow only if no critical findings and all scans passed\nallow {\n    input.scans.sast.critical_count == 0\n    input.scans.secrets.findings_count == 0\n    input.scans.container.cvss_max < 7.0\n}\n\nreason["Critical SAST vulnerabilities detected"] {\n    input.scans.sast.critical_count > 0\n}\n\nreason["Plaintext secrets detected in commit"] {\n    input.scans.secrets.findings_count > 0\n}',
+        code: 'package Kavach.delivery\n\ndefault allow = false\n\n# Allow only if no critical findings and all scans passed\nallow {\n    input.scans.sast.critical_count == 0\n    input.scans.secrets.findings_count == 0\n    input.scans.container.cvss_max < 7.0\n}\n\nreason["Critical SAST vulnerabilities detected"] {\n    input.scans.sast.critical_count > 0\n}\n\nreason["Plaintext secrets detected in commit"] {\n    input.scans.secrets.findings_count > 0\n}',
         lang: 'rego',
       },
       {
@@ -359,7 +359,7 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
       {
         heading: 'Base URL & Versioning',
         text: 'All requests must target the v1 REST API endpoint over HTTPS:',
-        code: 'https://api.seculayer.io/api/v1',
+        code: 'https://api.Kavach.io/api/v1',
         lang: 'text',
       },
       {
@@ -473,7 +473,7 @@ export default function DocsPage() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#FFFFFF', color: '#0F172A', fontFamily: 'var(--font-sans, -apple-system, sans-serif)' }}>
-      <SecuLayerHeader />
+      <KavachHeader />
 
       {/* Docs Header Banner */}
       <div style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', padding: '36px 24px' }}>
@@ -481,10 +481,10 @@ export default function DocsPage() {
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', backgroundColor: '#EFF6FF', borderRadius: '16px', color: '#2563EB', fontSize: '12px', fontWeight: 600, marginBottom: '10px' }}>
               <Sparkles size={13} />
-              <span>SecuLayer 2026 Developer Documentation</span>
+              <span>Kavach 2026 Developer Documentation</span>
             </div>
             <h1 style={{ fontSize: '28px', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0F172A' }}>
-              SecuLayer Documentation
+              Kavach Documentation
             </h1>
             <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#64748B', maxWidth: '640px' }}>
               Comprehensive engineering guides, real API specifications, deterministic policy blueprints, and runtime protection architectures.

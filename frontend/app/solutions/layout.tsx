@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     canonical: '/solutions',
   },
   openGraph: {
-    title: 'SecuLayer Security Solutions',
+    title: 'Kavach Security Solutions',
     description:
       'Security architectures for high-growth startups, regulated finance, and multi-cloud enterprises.',
     url: 'https://kavachsecurity.me/solutions',

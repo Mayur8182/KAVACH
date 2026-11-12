@@ -52,7 +52,7 @@ const FindingDetailDrawer = dynamic(
 import { RepositoryScanProgressBar, ScanJobProgress } from '@/components/code/RepositoryScanProgressBar';
 import { ScrollProductWorkflow } from '@/components/landing/ScrollProductWorkflow';
 import { HeroProductVideo } from '@/components/landing/HeroProductVideo';
-import { FuseProductShowcase } from '@/components/landing/FuseProductShowcase';
+import { GoldenPathShowcase } from '@/components/GoldenPathShowcase';
 
 // Verified Deterministic Findings matching Live Scanners
 const SAST_FINDINGS = [
@@ -60,15 +60,15 @@ const SAST_FINDINGS = [
     num: '01',
     id: 'FIND-001',
     title: 'SQL injection',
-    file: 'src/api/user.js',
+    file: 'auth/route.py',
     lineNumber: 42,
     severity: 'Critical',
     severityColor: '#EF4444',
     scanner: 'Semgrep SAST',
     cve: 'CWE-89 / OWASP A03',
-    codeSnippet: `const query = "SELECT * FROM users WHERE id = '" + req.params.id + "'";\ndb.query(query, callback);`,
-    explanation: 'Unsanitized user parameter passed directly into raw SQL query concatenation without parameterized statement.',
-    suggestedFix: `const query = "SELECT * FROM users WHERE id = $1";\ndb.query(query, [req.params.id], callback);`,
+    codeSnippet: `cursor.execute(f"SELECT * FROM users WHERE id = '{user_id}'")`,
+    explanation: 'Unsanitized user parameter formatted directly into SQL string without parameterized query statement.',
+    suggestedFix: `cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))`,
   },
   {
     num: '02',
@@ -211,7 +211,7 @@ const SOLUTIONS = [
     title: 'Autonomous AI Agent Governance',
     subtitle: 'Safeguard agentic coding assistants without hindering development velocity.',
     description:
-      'Autonomous coding agents make multi-file modifications and invoke command-line tools. SecuLayer wraps every agent with deterministic OPA contracts, sandboxed syscall execution, and human-in-the-loop approvals for privileged operations.',
+      'Autonomous coding agents make multi-file modifications and invoke command-line tools. Kavach wraps every agent with deterministic OPA contracts, sandboxed syscall execution, and human-in-the-loop approvals for privileged operations.',
     linkText: 'Explore Agent Governance',
     linkHref: '/agent',
     capabilities: [
@@ -861,18 +861,13 @@ export default function KavachHomePage() {
               borderBottom: '1px solid #E2E8F0',
             }}
           >
-            <span>SOC 2 TYPE II</span>
-            <span>ISO 27001</span>
-            <span>SLSA LEVEL 3</span>
+            <span>SOC 2 TYPE II (IN PROGRESS)</span>
+            <span>ISO 27001 (IN PROGRESS)</span>
+            <span>SLSA LEVEL 3 (ARCHITECTURE ALIGNED)</span>
             <span>OPA REGO ENFORCED</span>
             <span>EBPF KERNEL DEFENSE</span>
           </div>
         </section>
-
-        {/* ========================================================= */}
-        {/* FUSE.AI-STYLE ANIMATED PRODUCT STORYTELLING SHOWCASE      */}
-        {/* ========================================================= */}
-        <FuseProductShowcase />
 
         {/* ========================================================= */}
         {/* SECTION 2: ARCHITECTURE (Screenshot Page 1 Bottom)        */}
@@ -1043,9 +1038,14 @@ export default function KavachHomePage() {
               borderTop: '1px solid #F1F5F9',
             }}
           >
-            SECULAYER DEFENSE SUITE
+            KAVACH DEFENSE SUITE
           </div>
         </section>
+
+        {/* ========================================================= */}
+        {/* KAVACH GOLDEN PATH ANIMATED PRODUCT SHOWCASE              */}
+        {/* ========================================================= */}
+        <GoldenPathShowcase />
 
         {/* ========================================================= */}
         {/* SECTION 3: NINE WORKSPACES GRID (Screenshot Page 2)       */}
@@ -1252,7 +1252,7 @@ export default function KavachHomePage() {
               margin: '0 0 20px 0',
             }}
           >
-            From AI coding agent boundaries to multi-cloud runtime defense, SecuLayer provides
+            From AI coding agent boundaries to multi-cloud runtime defense, Kavach provides
             verifiable, evidence-backed security controls.
           </p>
 
@@ -1486,7 +1486,7 @@ export default function KavachHomePage() {
                   lineHeight: 1.5,
                 }}
               >
-                Complete the 6-step onboarding wizard in less than 2 minutes. Real database persistence, real scans.
+                Complete the 5-step onboarding wizard in less than 2 minutes. Real database persistence, real scans.
               </p>
             </div>
 

@@ -194,7 +194,7 @@ export const ScrollProductWorkflow: React.FC = () => {
               border: '1px solid #DBEAFE',
             }}
           >
-            SecuLayer Control Plane · Workflow Preview
+            Kavach Control Plane · Workflow Preview
           </span>
           <span
             style={{
@@ -228,7 +228,7 @@ export const ScrollProductWorkflow: React.FC = () => {
             margin: 0,
           }}
         >
-          Experience how SecuLayer continuously audits source code, isolates vulnerabilities with
+          Experience how Kavach continuously audits source code, isolates vulnerabilities with
           deterministic AST taint analysis, and validates remediations with verifiable evidence.
         </p>
       </div>
@@ -501,7 +501,7 @@ export const ScrollProductWorkflow: React.FC = () => {
             </div>
           </div>
 
-          {/* ── RIGHT COLUMN: AUTHENTIC SECULAYER DASHBOARD PANEL ── */}
+          {/* ── RIGHT COLUMN: AUTHENTIC KAVACH DASHBOARD PANEL ── */}
           <div
             style={{
               backgroundColor: '#FFFFFF',
@@ -543,7 +543,7 @@ export const ScrollProductWorkflow: React.FC = () => {
                     border: '1px solid #E2E8F0',
                   }}
                 >
-                  seculayer.control/code/workspaces/api-service
+                  kavach.control/code/workspaces/api-service
                 </div>
               </div>
 
@@ -647,7 +647,7 @@ export const ScrollProductWorkflow: React.FC = () => {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155' }}>
                         <Check size={14} color="#10B981" />
-                        <span>SecuLayer OPA Gatekeeper enabled for CI/CD checks</span>
+                        <span>Kavach OPA Gatekeeper enabled for CI/CD checks</span>
                       </div>
                     </div>
                   </div>
@@ -1183,11 +1183,11 @@ result = await db.execute(query)`}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <GitPullRequest size={16} color="#2563EB" />
                       <span style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
-                        PR #418: [SecuLayer Autofix] Parameterize raw SQL queries in auth/route.py
+                        PR #418: [Kavach Autofix] Parameterize raw SQL queries in auth/route.py
                       </span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
-                      Branch: <code style={{ backgroundColor: '#FFFFFF', padding: '1px 6px', borderRadius: '4px', border: '1px solid #E2E8F0' }}>seculayer/autofix-sqli-42</code> into <code style={{ backgroundColor: '#FFFFFF', padding: '1px 6px', borderRadius: '4px', border: '1px solid #E2E8F0' }}>main</code>
+                      Branch: <code style={{ backgroundColor: '#FFFFFF', padding: '1px 6px', borderRadius: '4px', border: '1px solid #E2E8F0' }}>kavach/autofix-sqli-42</code> into <code style={{ backgroundColor: '#FFFFFF', padding: '1px 6px', borderRadius: '4px', border: '1px solid #E2E8F0' }}>main</code>
                     </div>
                   </div>
 

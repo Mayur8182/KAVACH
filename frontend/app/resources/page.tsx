@@ -45,7 +45,7 @@ const RESOURCES_DATA: ResourceItem[] = [
     id: 'adv-mcp-vuln',
     category: 'advisories',
     title: 'Threat Advisory: Arbitrary Tool Invocation in Unauthenticated MCP Servers',
-    description: 'Detailed breakdown of attack paths exploiting exposed Model Context Protocol endpoints and remediation using the SecuLayer MCP Security Gateway.',
+    description: 'Detailed breakdown of attack paths exploiting exposed Model Context Protocol endpoints and remediation using the Kavach MCP Security Gateway.',
     date: 'Sep 2026',
     readTime: '8 min read',
     badge: 'Security Advisory',
@@ -119,13 +119,13 @@ export default function ResourcesPage() {
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', backgroundColor: '#EFF6FF', borderRadius: '16px', color: '#2563EB', fontSize: '12px', fontWeight: 600, marginBottom: '14px' }}>
             <Sparkles size={14} />
-            <span>SecuLayer Knowledge & Research Center</span>
+            <span>Kavach Knowledge & Research Center</span>
           </div>
           <h1 style={{ fontSize: '38px', fontWeight: 800, margin: '0 0 14px', letterSpacing: '-0.02em', color: '#0F172A' }}>
             Security Research & Technical Resources
           </h1>
           <p style={{ fontSize: '15px', color: '#64748B', lineHeight: 1.6, margin: '0 0 28px' }}>
-            Explore peer-reviewed whitepapers, threat advisories, policy benchmarks, and step-by-step developer guides from the SecuLayer Security Research Team.
+            Explore peer-reviewed whitepapers, threat advisories, policy benchmarks, and step-by-step developer guides from the Kavach Security Research Team.
           </p>
 
           {/* Search bar */}
