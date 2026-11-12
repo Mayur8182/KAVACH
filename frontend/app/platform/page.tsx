@@ -252,25 +252,7 @@ export default function KavachPlatformPage() {
       {/* Skip to Main Content Link */}
       <a
         href="#architecture-matrix"
-        style={{
-          position: 'absolute',
-          left: '-9999px',
-          top: '12px',
-          zIndex: 9999,
-          padding: '8px 16px',
-          backgroundColor: '#0F172A',
-          color: '#FFFFFF',
-          borderRadius: '6px',
-          fontWeight: 600,
-          fontSize: '13px',
-          textDecoration: 'none',
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.left = '16px';
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.left = '-9999px';
-        }}
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-slate-900 focus:text-white focus:rounded-md focus:text-sm focus:font-semibold focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         Skip to main content
       </a>

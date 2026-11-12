@@ -1121,3 +1121,4 @@ export function GoldenPathShowcase() {
 }
 
 export default GoldenPathShowcase;
+
