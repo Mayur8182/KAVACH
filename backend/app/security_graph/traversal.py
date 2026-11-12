@@ -38,7 +38,7 @@ class GraphTraversalEngine:
         """
         Evaluates temporal validity (Rule 52).
         """
-        if not query_time:
+        if not isinstance(query_time, datetime):
             query_time = datetime.now(timezone.utc)
         elif query_time.tzinfo is None:
             query_time = query_time.replace(tzinfo=timezone.utc)

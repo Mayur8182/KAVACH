@@ -193,6 +193,7 @@ export const GitHubImportModal: React.FC<GitHubImportModalProps> = ({
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
+          repository_url: customRepoUrl.trim(),
           repo_url: customRepoUrl.trim(),
           default_branch: customBranch.trim() || 'main',
           selected_modules: Array.from(selectedModules),

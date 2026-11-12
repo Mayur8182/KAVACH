@@ -399,7 +399,7 @@ async def import_repositories(
                 existing_a.project_path = item.project_path
 
     await db.commit()
-    return await list_repositories_management(project_id=None, current_user=current_user, db=db)
+    return await list_repositories_management(project_id=None, tenant=tenant, db=db)
 
 
 @router.post(
@@ -418,7 +418,7 @@ async def add_custom_repository(
     Parses git URL, creates GitHubRepository, and binds requested security modules.
     Strictly scoped to user's authorized TenantContext.
     """
-    raw_url = payload.repository_url.strip()
+    raw_url = payload.effective_url if hasattr(payload, "effective_url") else (payload.repository_url or getattr(payload, "repo_url", "") or "").strip()
     if not raw_url:
         raise HTTPException(status_code=400, detail="Repository URL or name cannot be empty.")
 
@@ -546,7 +546,7 @@ async def add_custom_repository(
     await db.commit()
 
     # Load and return created item
-    res_list = await list_repositories_management(project_id=None, current_user=current_user, db=db)
+    res_list = await list_repositories_management(project_id=None, tenant=tenant, db=db)
     for it in res_list:
         if it.id == str(repo.id):
             return it

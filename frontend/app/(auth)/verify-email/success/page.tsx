@@ -230,7 +230,7 @@ function VerifySuccessContent() {
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#1D4ED8')}
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#2563EB')}
                 >
-                  <span>Proceed to MFA Setup (Screen 26)</span>
+                  <span>Proceed to MFA Setup</span>
                   <ArrowRight size={16} />
                 </Link>
 
@@ -257,7 +257,7 @@ function VerifySuccessContent() {
                     onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
                   >
                     <Layers size={14} />
-                    <span>Connect GitHub (Screen 29)</span>
+                    <span>Connect GitHub</span>
                   </Link>
 
                   <Link

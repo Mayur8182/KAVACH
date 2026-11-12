@@ -274,48 +274,7 @@ export function AssistantDrawer() {
   };
 
   if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        aria-label="Open Kavach Copilot"
-        title="Open Kavach Copilot (⌘K)"
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 900,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '10px 16px',
-          backgroundColor: '#0F172A',
-          color: '#FFFFFF',
-          borderRadius: '9999px',
-          border: '1px solid #334155',
-          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.3)',
-          cursor: 'pointer',
-          fontFamily: 'Inter, system-ui, sans-serif',
-          fontSize: '13px',
-          fontWeight: 600,
-          transition: 'all 0.2s ease',
-        }}
-      >
-        <Sparkles size={16} color="#818CF8" />
-        <span>Copilot</span>
-        <kbd
-          style={{
-            fontSize: '11px',
-            backgroundColor: 'rgba(255, 255, 255, 0.15)',
-            padding: '2px 6px',
-            borderRadius: '4px',
-            color: '#E2E8F0',
-            fontFamily: 'monospace',
-          }}
-        >
-          ⌘K
-        </kbd>
-      </button>
-    );
+    return null;
   }
 
   return (

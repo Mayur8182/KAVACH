@@ -76,11 +76,16 @@ class ImportRepositoriesRequest(BaseModel):
 
 
 class AddCustomRepositoryRequest(BaseModel):
-    repository_url: str = Field(..., description="Git / GitHub repository URL or owner/name")
+    repository_url: Optional[str] = Field(default=None, description="Git / GitHub repository URL or owner/name")
+    repo_url: Optional[str] = Field(default=None, description="Alternative key for repository URL")
     default_branch: Optional[str] = Field(default="main", description="Target branch name")
     name: Optional[str] = Field(default=None, description="Optional custom name")
     project_id: Optional[str] = None
     selected_modules: List[str] = Field(default_factory=lambda: ["SAST", "SECRETS", "SCA", "CONTAINER"])
+
+    @property
+    def effective_url(self) -> str:
+        return (self.repository_url or self.repo_url or "").strip()
 
 
 class BatchDeleteRepositoriesRequest(BaseModel):

@@ -316,20 +316,6 @@ export const ALL_WORKSPACES: WorkspaceProduct[] = [
     defaultScope: 'All Frameworks',
     scopes: ['All Frameworks'],
   },
-  {
-    id: 'sales',
-    name: 'Sales & Enterprise',
-    category: 'Knowledge & Posture',
-    desc: 'Demo, Qualification, POC Engine, Quotes & Onboarding',
-    route: '/sales',
-    icon: ShieldCheck,
-    color: '#0F172A',
-    bg: '#F8FAFC',
-    border: '#E2E8F0',
-    scopeLabel: 'Deal Pipeline',
-    defaultScope: 'All Deals',
-    scopes: ['All Deals', 'Active POCs', 'Signed Agreements'],
-  },
 ];
 
 const GithubIcon = ({ size = 16, color = '#0f172a' }: { size?: number; color?: string }) => (

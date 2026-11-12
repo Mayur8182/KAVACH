@@ -526,13 +526,13 @@ export function GoldenPathShowcase() {
         <StatsRow isVisible={isVisible} reducedMotion={reducedMotion} />
       </div>
 
-      {/* Scoped CSS matching the exact design tokens and animations */}
+      {/* Scoped CSS matching the light enterprise theme */}
       <style jsx global>{`
         .gps-container {
-          background: #090D16;
-          color: #E8EDF7;
-          border-top: 1px solid #223052;
-          border-bottom: 1px solid #223052;
+          background: #FFFFFF;
+          color: #0F172A;
+          border-top: 1px solid #E2E8F0;
+          border-bottom: 1px solid #E2E8F0;
           padding: 32px 0 64px;
           font-family: var(--font-sans, "Plus Jakarta Sans", "Inter", -apple-system, sans-serif);
           -webkit-font-smoothing: antialiased;
@@ -548,7 +548,7 @@ export function GoldenPathShowcase() {
           gap: 56px;
           align-items: center;
           padding: 64px 0;
-          border-top: 1px solid #223052;
+          border-top: 1px solid #E2E8F0;
         }
         .gps-feat:first-of-type {
           border-top: none;
@@ -560,12 +560,12 @@ export function GoldenPathShowcase() {
           font-size: clamp(28px, 4vw, 40px);
           line-height: 1.15;
           font-weight: 700;
-          color: #FFFFFF;
+          color: #0F172A;
           margin: 0 0 14px 0;
           letter-spacing: -0.02em;
         }
         .gps-txt p {
-          color: #93A0BC;
+          color: #475569;
           margin: 0;
           max-width: 32em;
           font-size: 16px;
@@ -573,7 +573,7 @@ export function GoldenPathShowcase() {
         }
         .gps-step {
           display: inline-block;
-          color: #7DD3C8;
+          color: #0D9488;
           font-size: 14px;
           font-weight: 700;
           margin-bottom: 10px;
@@ -584,38 +584,38 @@ export function GoldenPathShowcase() {
           position: relative;
           border-radius: 16px;
           padding: 36px 28px;
-          background: linear-gradient(135deg, #143B44, #0F2036 60%, #121A33);
-          border: 1px solid #223052;
+          background: linear-gradient(135deg, #F0FDFA 0%, #F8FAFC 60%, #F1F5F9 100%);
+          border: 1px solid #E2E8F0;
           overflow: hidden;
         }
         .gps-stage::before {
           content: "";
           position: absolute;
           inset: 0;
-          background: radial-gradient(circle, rgba(125, 211, 200, 0.45) 1px, transparent 1.6px) 0 0/14px 14px;
-          opacity: 0.28;
+          background: radial-gradient(circle, rgba(13, 148, 136, 0.25) 1px, transparent 1.6px) 0 0/14px 14px;
+          opacity: 0.35;
           -webkit-mask-image: linear-gradient(120deg, #000, transparent 70%);
           mask-image: linear-gradient(120deg, #000, transparent 70%);
           pointer-events: none;
         }
         .gps-win {
           position: relative;
-          background: #0F1626;
-          border: 1px solid #223052;
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
           border-radius: 12px;
-          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
           overflow: hidden;
-          color: #E8EDF7;
+          color: #0F172A;
         }
         .gps-bar {
           display: flex;
           align-items: center;
           gap: 7px;
           padding: 11px 14px;
-          background: #141D31;
-          border-bottom: 1px solid #223052;
+          background: #F8FAFC;
+          border-bottom: 1px solid #E2E8F0;
           font-size: 13px;
-          color: #93A0BC;
+          color: #64748B;
         }
         .gps-bar i {
           width: 10px;
@@ -638,7 +638,7 @@ export function GoldenPathShowcase() {
           column-gap: 14px;
           align-items: center;
           padding: 10px 0;
-          border-bottom: 1px solid #223052;
+          border-bottom: 1px solid #E2E8F0;
           font-size: 14px;
         }
         .gps-row:last-of-type {
@@ -648,59 +648,59 @@ export function GoldenPathShowcase() {
           grid-area: n;
           font-weight: 600;
           line-height: 1.2;
-          color: #E8EDF7;
+          color: #0F172A;
         }
         .gps-row em {
           grid-area: t;
           font-style: normal;
-          color: #93A0BC;
+          color: #64748B;
           font-size: 12px;
         }
         .gps-pb {
           grid-area: pb;
           height: 6px;
           border-radius: 4px;
-          background: #141D31;
+          background: #E2E8F0;
           overflow: hidden;
         }
         .gps-pb u {
           display: block;
           height: 100%;
-          background: #7DD3C8;
+          background: #0D9488;
           transition: width 0.4s ease;
         }
         .gps-st {
           grid-area: st;
           text-align: right;
           font-size: 12.5px;
-          color: #93A0BC;
+          color: #64748B;
           font-family: var(--font-mono, monospace);
         }
         .gps-row.running .gps-st {
-          color: #FBBF24;
+          color: #D97706;
           font-weight: 600;
         }
         .gps-row.running .gps-pb u {
-          background: #FBBF24;
+          background: #D97706;
         }
         .gps-row.done .gps-st {
-          color: #4ADE9A;
+          color: #059669;
           font-weight: 600;
         }
         .gps-row.done .gps-pb u {
-          background: #4ADE9A;
+          background: #059669;
         }
         .gps-sum {
           margin-top: 14px;
           padding: 10px 12px;
           border-radius: 8px;
-          background: #141D31;
-          border: 1px solid #223052;
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
           font-size: 13.5px;
-          color: #93A0BC;
+          color: #475569;
         }
         .gps-sum b {
-          color: #E8EDF7;
+          color: #0F172A;
         }
         .gps-top {
           display: flex;
@@ -711,22 +711,26 @@ export function GoldenPathShowcase() {
         }
         .gps-top strong {
           font-size: 15px;
-          color: #FFFFFF;
+          color: #0F172A;
         }
         .gps-tag {
           font-size: 11.5px;
           font-weight: 700;
           padding: 3px 9px;
           border-radius: 99px;
-          background: rgba(248, 113, 113, 0.15);
-          color: #F87171;
-          border: 1px solid rgba(248, 113, 113, 0.3);
+          background: #FEF2F2;
+          color: #DC2626;
+          border: 1px solid #FECACA;
         }
         .gps-body pre {
           margin: 14px 0 0;
           font: 13px/1.65 var(--font-mono, "JetBrains Mono", Consolas, monospace);
           white-space: pre-wrap;
           word-break: break-word;
+          background: #0F172A;
+          border: 1px solid #1E293B;
+          border-radius: 8px;
+          padding: 10px;
         }
         .gps-ln {
           display: block;
@@ -736,19 +740,19 @@ export function GoldenPathShowcase() {
           box-sizing: border-box;
         }
         .gps-ln.gps-d {
-          background: rgba(248, 113, 113, 0.12);
+          background: rgba(239, 68, 68, 0.2);
           color: #F87171;
-          opacity: 0.6;
+          opacity: 0.7;
           transition: all 0.3s ease;
         }
         .gps-ln.gps-d.gps-hit {
           opacity: 1;
-          box-shadow: inset 3px 0 #F87171;
+          box-shadow: inset 3px 0 #EF4444;
         }
         .gps-ln.gps-a {
-          background: rgba(74, 222, 154, 0.12);
-          color: #4ADE9A;
-          box-shadow: inset 3px 0 #4ADE9A;
+          background: rgba(16, 185, 129, 0.2);
+          color: #34D399;
+          box-shadow: inset 3px 0 #10B981;
           margin-top: 4px;
         }
         .gps-act {
@@ -761,8 +765,9 @@ export function GoldenPathShowcase() {
         .gps-gen {
           padding: 8px 14px;
           border-radius: 8px;
-          border: 1px solid #7DD3C8;
-          color: #7DD3C8;
+          border: 1px solid #0D9488;
+          color: #0D9488;
+          background: #F0FDFA;
           font-size: 13.5px;
           font-weight: 600;
           transition: all 0.15s ease;
@@ -770,23 +775,24 @@ export function GoldenPathShowcase() {
           user-select: none;
         }
         .gps-gen.gps-press {
-          background: #7DD3C8;
-          color: #06121A;
+          background: #0D9488;
+          color: #FFFFFF;
           transform: scale(0.96);
         }
         .gps-badge {
           font-size: 13px;
-          color: #93A0BC;
+          color: #64748B;
           display: flex;
           align-items: center;
           gap: 7px;
-          opacity: 0.35;
+          opacity: 0.45;
           transition: opacity 0.3s ease, color 0.3s ease;
           font-family: var(--font-mono, monospace);
         }
         .gps-badge.gps-on {
           opacity: 1;
-          color: #4ADE9A;
+          color: #059669;
+          font-weight: 600;
         }
         .gps-chk {
           display: flex;
@@ -794,14 +800,14 @@ export function GoldenPathShowcase() {
           gap: 10px;
           padding: 8px 0;
           font-size: 14px;
-          color: #93A0BC;
+          color: #64748B;
           transition: color 0.25s ease;
         }
         .gps-chk s {
           width: 18px;
           height: 18px;
           border-radius: 50%;
-          border: 1.5px solid #223052;
+          border: 1.5px solid #CBD5E1;
           display: grid;
           place-items: center;
           flex: none;
@@ -812,51 +818,53 @@ export function GoldenPathShowcase() {
           transition: all 0.25s ease;
         }
         .gps-chk.gps-ok {
-          color: #E8EDF7;
+          color: #0F172A;
+          font-weight: 500;
         }
         .gps-chk.gps-ok s {
-          background: #4ADE9A;
-          border-color: #4ADE9A;
-          color: #06121A;
+          background: #059669;
+          border-color: #059669;
+          color: #FFFFFF;
           font-weight: 700;
         }
         .gps-pr {
           margin-top: 14px;
           padding: 12px 14px;
           border-radius: 8px;
-          background: #141D31;
-          border: 1px solid #223052;
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
           font-size: 14px;
           display: flex;
           justify-content: space-between;
           gap: 10px;
           align-items: center;
           flex-wrap: wrap;
-          opacity: 0.35;
+          opacity: 0.45;
           transition: all 0.3s ease;
         }
         .gps-pr.gps-on {
           opacity: 1;
-          border-color: #4ADE9A;
-          box-shadow: 0 0 16px rgba(74, 222, 154, 0.15);
+          border-color: #059669;
+          background: #F0FDF4;
+          box-shadow: 0 0 16px rgba(5, 150, 105, 0.12);
         }
         .gps-pill {
           font-size: 12px;
           font-weight: 700;
           padding: 3px 10px;
           border-radius: 99px;
-          background: rgba(74, 222, 154, 0.15);
-          color: #4ADE9A;
-          border: 1px solid rgba(74, 222, 154, 0.3);
+          background: #ECFDF5;
+          color: #059669;
+          border: 1px solid #A7F3D0;
         }
         .gps-flow {
           padding: 64px 0 48px;
-          border-top: 1px solid #223052;
+          border-top: 1px solid #E2E8F0;
         }
         .gps-flow h2 {
           font-size: clamp(28px, 4vw, 40px);
           max-width: 18em;
-          color: #FFFFFF;
+          color: #0F172A;
           margin: 0 0 28px 0;
           font-weight: 700;
           letter-spacing: -0.02em;
@@ -870,8 +878,8 @@ export function GoldenPathShowcase() {
           flex: 1 1 150px;
           position: relative;
           padding: 16px 14px;
-          border: 1px solid #223052;
-          background: #0F1626;
+          border: 1px solid #E2E8F0;
+          background: #FFFFFF;
           margin: 0 -1px -1px 0;
           font-size: 14px;
           transition: background 0.3s ease, border-color 0.3s ease;
@@ -879,16 +887,16 @@ export function GoldenPathShowcase() {
         .gps-fn b {
           display: block;
           font-size: 15px;
-          color: #E8EDF7;
+          color: #0F172A;
           margin-bottom: 2px;
         }
         .gps-fn span {
-          color: #93A0BC;
+          color: #64748B;
           font-size: 13px;
         }
         .gps-fn.gps-on {
-          background: #141D31;
-          border-color: #7DD3C8;
+          background: #F0FDFA;
+          border-color: #0D9488;
           z-index: 2;
         }
         .gps-fn.gps-on::after {
@@ -898,25 +906,25 @@ export function GoldenPathShowcase() {
           right: 0;
           bottom: 0;
           height: 3px;
-          background: #7DD3C8;
+          background: #0D9488;
         }
         .gps-stats {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
           gap: 28px;
           padding: 56px 0 16px;
-          border-top: 1px solid #223052;
+          border-top: 1px solid #E2E8F0;
         }
         .gps-stats .gps-n {
           font-size: clamp(40px, 5vw, 56px);
           font-weight: 700;
           line-height: 1;
-          color: #7DD3C8;
+          color: #0D9488;
           font-family: var(--font-mono, monospace);
         }
         .gps-stats p {
           margin: 8px 0 0;
-          color: #93A0BC;
+          color: #64748B;
           font-size: 15px;
           line-height: 1.4;
         }

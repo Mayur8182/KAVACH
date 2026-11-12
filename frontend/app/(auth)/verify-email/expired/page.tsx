@@ -258,7 +258,7 @@ function VerifyEmailExpiredContent() {
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#1E293B')}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#0F172A')}
           >
-            <span>Next Step: Set up MFA (Screen 26)</span>
+            <span>Next Step: Set up MFA</span>
             <ArrowRight size={15} />
           </Link>
 

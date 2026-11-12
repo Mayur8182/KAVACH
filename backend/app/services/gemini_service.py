@@ -357,6 +357,7 @@ Only return raw JSON. No markdown code fences outside JSON."""
             "explanation": explanation,
             "files_changed": [file_path],
             "patch": patch,
+            "diff": patch,
             "tests": tests,
             "security_validation_required": True,
             "risk": "low" if "SEC" in rule else "medium",

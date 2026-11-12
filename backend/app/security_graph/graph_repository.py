@@ -86,8 +86,10 @@ class GraphRepository:
         Loads the in-memory graph representation (node_lookup, adjacency_outbound, adjacency_inbound)
         for a specific project, filtered by temporal validity.
         """
-        if not query_time:
+        if not isinstance(query_time, datetime):
             query_time = datetime.now(timezone.utc)
+        elif query_time.tzinfo is None:
+            query_time = query_time.replace(tzinfo=timezone.utc)
 
         # 1. Fetch nodes active at query_time
         node_stmt = select(SecurityGraphNode).where(

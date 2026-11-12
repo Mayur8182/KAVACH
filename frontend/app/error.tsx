@@ -323,47 +323,68 @@ export default function GlobalError({
 
             <div
               style={{
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                fontSize: '12.5px',
-                color: '#991B1B',
-                backgroundColor: '#FEF2F2',
-                border: '1px solid #FEE2E2',
+                fontSize: '13px',
+                color: '#334155',
+                backgroundColor: '#F8FAFC',
+                border: '1px solid #E2E8F0',
                 borderRadius: '8px',
-                padding: '10px 12px',
-                wordBreak: 'break-all',
+                padding: '12px 14px',
                 lineHeight: 1.5,
               }}
             >
-              <span style={{ fontWeight: 700, color: '#DC2626' }}>Exception: </span>
-              {error?.message || 'An unexpected runtime error occurred during component execution.'}
+              An operational disturbance was intercepted by Kavach Resilience Gateway. All session boundaries, encrypted tokens, and tenant states remain protected.
             </div>
 
-            {error?.digest && (
-              <div
+            <details
+              style={{
+                marginTop: '12px',
+                textAlign: 'left',
+                border: '1px solid #E2E8F0',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                backgroundColor: '#FFFFFF',
+              }}
+            >
+              <summary
                 style={{
-                  marginTop: '10px',
                   fontSize: '11.5px',
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                  fontWeight: 600,
                   color: '#64748B',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
+                  cursor: 'pointer',
+                  userSelect: 'none',
                 }}
               >
-                <span style={{ fontWeight: 600, color: '#475569' }}>Digest ID:</span>
-                <code
+                Inspect Technical Diagnostics (Developers)
+              </summary>
+              <div
+                style={{
+                  marginTop: '8px',
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                  fontSize: '12px',
+                  color: '#991B1B',
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FEE2E2',
+                  borderRadius: '6px',
+                  padding: '8px 10px',
+                  wordBreak: 'break-all',
+                }}
+              >
+                <span style={{ fontWeight: 700, color: '#DC2626' }}>Exception: </span>
+                {error?.message || 'An unexpected runtime error occurred during component execution.'}
+              </div>
+              {error?.digest && (
+                <div
                   style={{
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    color: '#0F172A',
+                    marginTop: '6px',
+                    fontSize: '11px',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                    color: '#64748B',
                   }}
                 >
-                  {error.digest}
-                </code>
-              </div>
-            )}
+                  Digest ID: <code>{error.digest}</code>
+                </div>
+              )}
+            </details>
           </div>
 
           {/* Action Controls */}
