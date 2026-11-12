@@ -1,9 +1,3 @@
-databases:
-  - name: kavach-postgres
-    plan: free
-    databaseName: kavach
-    user: kavach_user
-
 services:
   # ---------------------------------------------------------------------------
   # 1. Kavach Backend Web Service (FastAPI)
@@ -14,27 +8,91 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /api/v1/health/live
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --loop asyncio --log-level info
+    healthCheckPath: /health
     envVars:
       - key: APP_ENV
         value: production
+      - key: APP_HOST
+        value: "0.0.0.0"
       - key: LOG_LEVEL
         value: INFO
+      - key: API_V1_PREFIX
+        value: /api/v1
+      # Database — SQLite in /tmp (writable on Render free tier)
       - key: DATABASE_URL
-        fromDatabase:
-          name: kavach-postgres
-          property: connectionString
+        value: sqlite+aiosqlite:////tmp/kavach.db
       - key: SQL_DATABASE_URL
-        fromDatabase:
-          name: kavach-postgres
-          property: connectionString
+        value: sqlite+aiosqlite:////tmp/kavach.db
+      # MongoDB Atlas (set manually in Render dashboard - keep secret)
       - key: MONGODB_URL
         sync: false
+      - key: MONGODB_DB_NAME
+        value: secure_control_plane
+      # JWT
       - key: JWT_SECRET
         generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "10080"
+      # CORS — allows the frontend domain + onrender preview URLs
       - key: CORS_ORIGINS
-        value: "https://kavachsecurity.me,https://www.kavachsecurity.me,https://*.onrender.com"
+        value: "https://kavachsecurity.me,https://www.kavachsecurity.me,https://kavach-frontend.onrender.com"
+      # GitHub OAuth
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_REDIRECT_URI
+        value: https://kavachsecurity.me/auth/callback/github
+      - key: GITHUB_TOKEN
+        sync: false
+      # Google OAuth
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://kavachsecurity.me/auth/callback/google
+      # Gemini AI
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash-lite
+      # Mail / SMTP
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_DEFAULT_SENDER
+        value: noreply@kavachsecurity.me
+      - key: MAIL_SERVER
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_STARTTLS
+        value: "True"
+      - key: MAIL_SSL_TLS
+        value: "False"
+      # Scanners (Linux binaries — no .exe paths)
+      - key: SEMGREP_BIN
+        value: semgrep
+      - key: GITLEAKS_BIN
+        value: gitleaks
+      - key: TRIVY_BIN
+        value: trivy
+      - key: OSV_BIN
+        value: osv-scanner
+      - key: CHECKOV_BIN
+        value: checkov
+      - key: SYFT_BIN
+        value: syft
+      # OPA / Redis (not available on free tier — backend handles gracefully)
+      - key: OPA_URL
+        value: http://localhost:8181
+      - key: REDIS_URL
+        value: redis://localhost:6379/0
 
   # ---------------------------------------------------------------------------
   # 2. Kavach Frontend Web Service (Next.js)
@@ -44,7 +102,7 @@ services:
     runtime: node
     plan: free
     rootDir: frontend
-    buildCommand: npm install && npm run build:clean
+    buildCommand: npm install && npm run build
     startCommand: npm run start -- -p $PORT
     healthCheckPath: /healthz
     envVars:
@@ -54,13 +112,14 @@ services:
         value: "1"
       - key: NEXT_PUBLIC_APP_URL
         value: https://kavachsecurity.me
+      # Render automatically resolves kavach-backend's URL — no hardcoding needed!
       - key: BACKEND_URL
         fromService:
           type: web
           name: kavach-backend
-          property: host
+          property: hostport
       - key: NEXT_PUBLIC_API_URL
         fromService:
           type: web
           name: kavach-backend
-          property: host
+          property: hostport
