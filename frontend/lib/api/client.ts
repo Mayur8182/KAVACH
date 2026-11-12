@@ -5160,6 +5160,36 @@ class ThingApiClient {
   };
 
   // =========================================================================
+  // KAVACH MCP GATEWAY — Public Discovery, Manifest & Deterministic Sandbox Invocation
+  // =========================================================================
+  public mcp = {
+    getStatus: async (): Promise<any> => {
+      const res = await this.request<any>('/api/v1/mcp/status');
+      return res.data;
+    },
+    getManifest: async (): Promise<any> => {
+      const res = await this.request<any>('/api/v1/mcp/manifest');
+      return res.data;
+    },
+    getTools: async (): Promise<any[]> => {
+      const res = await this.request<any[]>('/api/v1/mcp/tools');
+      return res.data;
+    },
+    sandboxCall: async (payload: {
+      tool_name: string;
+      arguments?: Record<string, any>;
+      client_name?: string;
+      agent_type?: string;
+    }): Promise<any> => {
+      const res = await this.request<any>('/api/v1/mcp/sandbox-call', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+  };
+
+  // =========================================================================
   // THING PROTECT — Runtime Defense, Policy Enforcement & MCP Security APIs
   // =========================================================================
   public protect = {

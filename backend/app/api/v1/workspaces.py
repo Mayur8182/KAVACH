@@ -558,9 +558,10 @@ async def create_workspace(
         environments_count=1,
     )
     db.add(new_ws)
-    await db.flush()
+    # Commit workspace + org first so FK references are real when audit event inserts
+    await db.commit()
 
-    # Immutable audit logging
+    # Immutable audit logging — after commit so FK constraints always pass
     await audit.log_event(
         action="WORKSPACE_CREATED",
         resource_type="workspace",

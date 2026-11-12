@@ -53,6 +53,7 @@ import { RepositoryScanProgressBar, ScanJobProgress } from '@/components/code/Re
 import { ScrollProductWorkflow } from '@/components/landing/ScrollProductWorkflow';
 import { HeroProductVideo } from '@/components/landing/HeroProductVideo';
 import { GoldenPathShowcase } from '@/components/GoldenPathShowcase';
+import { MCPConnectorShowcase } from '@/components/MCPConnectorShowcase';
 
 // Verified Deterministic Findings matching Live Scanners
 const SAST_FINDINGS = [
@@ -1046,6 +1047,11 @@ export default function KavachHomePage() {
         {/* KAVACH GOLDEN PATH ANIMATED PRODUCT SHOWCASE              */}
         {/* ========================================================= */}
         <GoldenPathShowcase />
+
+        {/* ========================================================= */}
+        {/* KAVACH AUTONOMOUS MCP GATEWAY CONNECTOR                   */}
+        {/* ========================================================= */}
+        <MCPConnectorShowcase />
 
         {/* ========================================================= */}
         {/* SECTION 3: NINE WORKSPACES GRID (Screenshot Page 2)       */}

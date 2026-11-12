@@ -186,7 +186,7 @@ function MfaVerifyContent() {
                     width: 28,
                     height: 28,
                     borderRadius: '50%',
-                    backgroundColor: '#2563EB',
+                    backgroundColor: '#09090B',
                     color: '#FFFFFF',
                     display: 'flex',
                     alignItems: 'center',
@@ -194,7 +194,7 @@ function MfaVerifyContent() {
                     fontSize: 13,
                     fontWeight: 700,
                     flexShrink: 0,
-                    boxShadow: '0 0 12px rgba(37, 99, 235, 0.45)',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                   }}
                 >
                   2
@@ -340,7 +340,7 @@ function MfaVerifyContent() {
                       fontSize: 22,
                       fontWeight: 700,
                       color: '#FFFFFF',
-                      border: digit ? '2px solid #3B82F6' : '1px solid rgba(255, 255, 255, 0.15)',
+                      border: digit ? '2px solid #09090B' : '1px solid #CBD5E1',
                       borderRadius: 8,
                       backgroundColor: 'rgba(255, 255, 255, 0.05)',
                       outline: 'none',
@@ -359,7 +359,7 @@ function MfaVerifyContent() {
                   id="trust-device-checkbox"
                   checked={trustDevice}
                   onChange={e => setTrustDevice(e.target.checked)}
-                  style={{ width: 16, height: 16, marginTop: 2, accentColor: '#2563EB', cursor: 'pointer' }}
+                  style={{ width: 16, height: 16, marginTop: 2, accentColor: '#09090B', cursor: 'pointer' }}
                 />
                 <label htmlFor="trust-device-checkbox" style={{ cursor: 'pointer' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#CBD5E1' }}>Trust this device for 30 days</div>
@@ -379,19 +379,19 @@ function MfaVerifyContent() {
                   gap: 8,
                   width: '100%',
                   padding: '12px 20px',
-                  backgroundColor: verifying ? '#1E40AF' : '#2563EB',
+                  backgroundColor: verifying ? '#27272A' : '#09090B',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: 8,
                   fontSize: 14,
                   fontWeight: 600,
                   cursor: verifying ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
                   marginBottom: 20,
                   transition: 'background-color 0.15s ease',
                 }}
-                onMouseEnter={e => { if (!verifying) e.currentTarget.style.backgroundColor = '#1D4ED8'; }}
-                onMouseLeave={e => { if (!verifying) e.currentTarget.style.backgroundColor = '#2563EB'; }}
+                onMouseEnter={e => { if (!verifying) e.currentTarget.style.backgroundColor = '#27272A'; }}
+                onMouseLeave={e => { if (!verifying) e.currentTarget.style.backgroundColor = '#09090B'; }}
               >
                 {verifying && <RefreshCw size={15} style={{ animation: 'spin 1s linear infinite' }} />}
                 <span>{verifying ? 'Verifying...' : 'Verify and Continue'}</span>
@@ -467,7 +467,7 @@ function MfaVerifyContent() {
                 alignItems: 'flex-start',
               }}
             >
-              <Shield size={18} color="#3B82F6" style={{ flexShrink: 0, marginTop: 2 }} />
+              <Shield size={18} color="#0D9488" style={{ flexShrink: 0, marginTop: 2 }} />
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#F8FAFC', marginBottom: 2 }}>
                   Keep your account secure

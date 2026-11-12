@@ -310,18 +310,18 @@ function MfaSetupContent() {
                   alignItems: 'center',
                   gap: '8px',
                   padding: '10px 22px',
-                  backgroundColor: '#2563EB',
+                  backgroundColor: '#09090B',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '13px',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                   transition: 'background-color 0.15s ease',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1D4ED8')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2563EB')}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#27272A')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#09090B')}
               >
                 <span>Continue</span>
                 <ArrowRight size={14} />

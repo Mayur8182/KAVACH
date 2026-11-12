@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * /verify-email/success — SecuLayer Email Verified Success Page
+ * /verify-email/success — Kavach Email Verified Success Page
  * Calls POST /api/v1/auth/verify-email to confirm verification token.
  * Provides clear account status, security posture checklist, and navigation to dashboard.
  */
@@ -115,7 +115,7 @@ function VerifySuccessContent() {
                   margin: '0 auto 20px',
                 }}
               >
-                <RefreshCw size={28} color="#2563EB" style={{ animation: 'spin 1s linear infinite' }} />
+                <RefreshCw size={28} color="#0D9488" style={{ animation: 'spin 1s linear infinite' }} />
               </div>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0F172A', margin: '0 0 8px' }}>
                 Verifying your credentials...
@@ -217,18 +217,18 @@ function VerifySuccessContent() {
                     gap: 8,
                     width: '100%',
                     padding: '12px 20px',
-                    backgroundColor: '#2563EB',
+                    backgroundColor: '#0D9488',
                     color: '#FFFFFF',
                     borderRadius: 6,
                     fontSize: 14,
                     fontWeight: 600,
                     textDecoration: 'none',
-                    boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                    boxShadow: '0 2px 4px rgba(13, 148, 136, 0.2)',
                     boxSizing: 'border-box',
                     transition: 'background-color 0.15s ease',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#1D4ED8')}
-                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#2563EB')}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#0F766E')}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#0D9488')}
                 >
                   <span>Proceed to MFA Setup</span>
                   <ArrowRight size={16} />
@@ -298,7 +298,7 @@ function VerifySuccessContent() {
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#2563EB',
+                    color: '#0D9488',
                     fontSize: 12,
                     cursor: 'pointer',
                     textDecoration: 'underline',
@@ -344,7 +344,7 @@ function VerifySuccessContent() {
                     justifyContent: 'center',
                     gap: 8,
                     padding: '11px 20px',
-                    backgroundColor: '#2563EB',
+                    backgroundColor: '#0D9488',
                     color: '#FFFFFF',
                     borderRadius: 6,
                     fontSize: 14,
