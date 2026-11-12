@@ -184,27 +184,13 @@ export const GitHubImportModal: React.FC<GitHubImportModalProps> = ({
     setImporting(true);
     setError(null);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '' : 'http://127.0.0.1:8000');
-      const token = getAuthToken() || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
-      const res = await fetch(`${baseUrl}/api/v1/repositories/add-custom`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          repository_url: customRepoUrl.trim(),
-          repo_url: customRepoUrl.trim(),
-          default_branch: customBranch.trim() || 'main',
-          selected_modules: Array.from(selectedModules),
-          trigger_scan: true,
-        }),
+      await api.post('/api/v1/repositories/add-custom', {
+        repository_url: customRepoUrl.trim(),
+        repo_url: customRepoUrl.trim(),
+        default_branch: customBranch.trim() || 'main',
+        selected_modules: Array.from(selectedModules),
+        trigger_scan: true,
       });
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(errJson?.detail || 'Failed to connect custom repository.');
-      }
 
       onImportComplete?.();
       onClose();

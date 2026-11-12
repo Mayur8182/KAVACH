@@ -359,7 +359,9 @@ export const GeminiAIAssistant: React.FC<GeminiAIAssistantProps> = ({
                 <div>
                   <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>AI Assessment:</div>
                   <div style={{ fontSize: '13px', color: '#475569', marginTop: '4px', lineHeight: '1.5' }}>
-                    {result.explanation}
+                    {typeof result.explanation === 'object' && result.explanation !== null
+                      ? (result.explanation.summary || result.explanation.vulnerability_analysis || String(result.explanation))
+                      : result.explanation}
                   </div>
                 </div>
               )}

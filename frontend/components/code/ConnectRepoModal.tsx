@@ -168,7 +168,7 @@ export const ConnectRepoModal: React.FC<ConnectRepoModalProps> = ({ isOpen, onCl
                 Connect GitHub Repository
               </h3>
               <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0' }}>
-                Connect directly in SecuLayer and trigger automated security scan
+                Connect directly in Kavach and trigger automated security scan
               </p>
             </div>
           </div>

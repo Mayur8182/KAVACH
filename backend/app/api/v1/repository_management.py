@@ -452,7 +452,9 @@ async def add_custom_repository(
             )
         p_uuid = uuid.UUID(str(payload.project_id))
     else:
-        p_uuid = tenant.project_id
+        p_uuid = tenant.project_id or (next(iter(tenant.accessible_project_ids)) if tenant.accessible_project_ids else None)
+
+    ws_uuid: Optional[uuid.UUID] = tenant.workspace_id or (next(iter(tenant.accessible_workspace_ids)) if tenant.accessible_workspace_ids else None)
 
     # Check if repo already exists in GitHubRepository for this tenant
     stmt = select(GitHubRepository).where(
@@ -471,6 +473,7 @@ async def add_custom_repository(
         repo = GitHubRepository(
             id=uuid.uuid4(),
             project_id=p_uuid,
+            workspace_id=ws_uuid,
             github_repository_id=abs(hash(full_name)) % 100000000,
             owner=owner,
             name=repo_name,
@@ -492,6 +495,8 @@ async def add_custom_repository(
         repo.last_synced_at = now_ts
         if p_uuid and not repo.project_id:
             repo.project_id = p_uuid
+        if ws_uuid and not repo.workspace_id:
+            repo.workspace_id = ws_uuid
 
     # Ensure RealIntegrationRepository also tracks it for CIMS
     try:

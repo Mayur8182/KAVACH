@@ -128,7 +128,7 @@ export const CookieConsentBanner: React.FC = () => {
 
       {/* Description text */}
       <p style={{ fontSize: '12px', lineHeight: 1.55, color: '#475569', margin: 0 }}>
-        SecuLayer uses essential session cookies for authentication, CSRF mitigation, and access control. We do not use advertising or tracking cookies.{' '}
+        Kavach uses essential session cookies for authentication, CSRF mitigation, and access control. We do not use advertising or tracking cookies.{' '}
         <Link
           href="/privacy"
           style={{

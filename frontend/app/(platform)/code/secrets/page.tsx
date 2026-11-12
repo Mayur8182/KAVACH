@@ -3268,7 +3268,7 @@ export default function SecretsOverviewPage() {
               </div>
 
               <div style={{ padding: '10px 12px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '11px', color: '#64748B' }}>
-                SecuLayer will register webhooks and immediately run a complete Gitleaks secret scan.
+                Kavach will register webhooks and immediately run a complete Gitleaks secret scan.
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>

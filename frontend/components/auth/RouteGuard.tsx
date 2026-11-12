@@ -162,7 +162,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({ children }) => {
         name: currentRoute.navigationLabel || 'Enterprise Capability',
         tagline: currentRoute.ownershipSummary || 'Advanced enterprise security module',
         description: currentRoute.ownershipSummary || 'This capability is governed by workspace entitlement policies.',
-        domain: currentRoute.ownershipDomain || 'SecuLayer Security Suite',
+        domain: currentRoute.ownershipDomain || 'Kavach Security Suite',
       };
       const Icon = PRODUCT_ICONS[productKey] || ShieldCheck;
 

@@ -457,7 +457,9 @@ export function FindingDetailView() {
             </div>
 
             <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 14px 0' }}>
-              {findingData.autofix.explanation}
+              {typeof findingData.autofix.explanation === 'object' && findingData.autofix.explanation !== null
+                ? (findingData.autofix.explanation.summary || findingData.autofix.explanation.vulnerability_analysis || findingData.autofix.explanation.remediation_changes || 'Automated security patch replaces insecure construct with safe, verified implementation.')
+                : (findingData.autofix.explanation || 'Automated security patch replaces insecure construct with safe, verified implementation.')}
             </p>
 
             <div

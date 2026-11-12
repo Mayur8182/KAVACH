@@ -5856,14 +5856,14 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#64748B' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontFamily: 'monospace' }}>
-                    <FileCode size={13} color="#2563EB" />
+                    <FileCode size={13} color="#0D9488" />
                     {modalFinding.file_path || 'src/config.js'}
                     {modalFinding.start_line ? ` : L${modalFinding.start_line}` : ''}
                   </span>
                   <span>•</span>
                   <span>Detected {formatRelativeTime(modalFinding.first_seen)}</span>
                   <span>•</span>
-                  <span>Source: {(modalFinding.scanner_name || 'Semgrep AST Engine').replace(/seculayer/gi, 'kavach')}</span>
+                  <span>Source: {(modalFinding.scanner_name || 'Kavach AST Engine').replace(/seculayer-builtin/gi, 'Kavach Builtin').replace(/seculayer/gi, 'Kavach')}</span>
                 </div>
 
                 {/* Sub-tabs Header */}
@@ -5882,9 +5882,9 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
                         style={{
                           padding: '6px 14px',
                           border: 'none',
-                          borderBottom: isActive ? '2px solid #2563EB' : '2px solid transparent',
+                          borderBottom: isActive ? '2px solid #09090B' : '2px solid transparent',
                           backgroundColor: 'transparent',
-                          color: isActive ? '#2563EB' : '#64748B',
+                          color: isActive ? '#09090B' : '#64748B',
                           fontWeight: isActive ? 700 : 500,
                           fontSize: '13px',
                           cursor: 'pointer',
@@ -5893,7 +5893,7 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
                           gap: '6px',
                         }}
                       >
-                        {t === 'Remediation' && <Sparkles size={13} color={isActive ? '#2563EB' : '#94A3B8'} />}
+                        {t === 'Remediation' && <Sparkles size={13} color={isActive ? '#09090B' : '#94A3B8'} />}
                         {t === 'Remediation' ? '✨ Remediation & Diff' : t}
                       </button>
                     );
@@ -5951,16 +5951,16 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
                     {/* Recommendation */}
                     <div
                       style={{
-                        backgroundColor: '#EFF6FF',
-                        border: '1px solid #BFDBFE',
+                        backgroundColor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
                         borderRadius: '10px',
                         padding: '14px',
                       }}
                     >
-                      <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#1E40AF', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <ShieldCheck size={16} color="#2563EB" /> Recommended Remediation
+                      <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#09090B', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <ShieldCheck size={16} color="#0D9488" /> Recommended Remediation
                       </h4>
-                      <p style={{ fontSize: '12.5px', color: '#1E3A8A', lineHeight: '1.5', margin: 0 }}>
+                      <p style={{ fontSize: '12.5px', color: '#334155', lineHeight: '1.5', margin: 0 }}>
                         {(() => {
                           const exp = remediationMap[modalFinding.id]?.explanation;
                           if (typeof exp === 'object' && exp !== null) {
@@ -6182,8 +6182,8 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
                     style={{
                       padding: '8px 18px',
                       borderRadius: '8px',
-                      border: 'none',
-                      backgroundColor: '#2563EB',
+                      border: '1px solid #27272A',
+                      backgroundColor: '#09090B',
                       color: '#FFFFFF',
                       fontSize: '12.5px',
                       fontWeight: 600,
@@ -6191,7 +6191,7 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      boxShadow: '0 2px 4px rgba(37, 99, 235, 0.25)',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
                     }}
                   >
                     {isApplyingRemediation ? (

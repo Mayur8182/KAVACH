@@ -45,13 +45,13 @@ class ScanPlanner:
 
         decisions: List[ScannerPlanDecision] = []
 
-        # 1. Evaluate SecuLayer Builtin (Native zero-dependency guardrail)
+        # 1. Evaluate Kavach Builtin (Native zero-dependency guardrail)
         if "seculayer-builtin" not in exclude_set:
             decisions.append(
                 ScannerPlanDecision(
                     scanner_name="seculayer-builtin",
                     scanner_type="SAST",
-                    tool_name="SecuLayer Builtin AST Engine",
+                    tool_name="Kavach Builtin AST Engine",
                     action=PlanAction.RUN,
                     priority=1,
                     reason="Native zero-dependency AST & deterministic rule engine covers core injection, secret, and auth flaws.",
@@ -77,7 +77,7 @@ class ScanPlanner:
                 gitleaks_reason = "Excluded by user request selection."
             elif not gitleaks_avail:
                 gitleaks_action = PlanAction.SKIP
-                gitleaks_reason = f"Gitleaks CLI not installed on host ({gitleaks_msg}). Falling back to SecuLayer Builtin secret detection."
+                gitleaks_reason = f"Gitleaks CLI not installed on host ({gitleaks_msg}). Falling back to Kavach Builtin secret detection."
             elif asset_profile.total_files_inspected == 0 and not asset_profile.is_git_repository:
                 gitleaks_action = PlanAction.SKIP
                 gitleaks_reason = "No target files or git commits available for secret entropy analysis."
@@ -124,7 +124,7 @@ class ScanPlanner:
                 semgrep_reason = "Excluded by user request selection."
             elif not semgrep_avail:
                 semgrep_action = PlanAction.SKIP
-                semgrep_reason = f"Semgrep CLI not installed on host ({semgrep_msg}). Falling back to SecuLayer Builtin SAST analysis."
+                semgrep_reason = f"Semgrep CLI not installed on host ({semgrep_msg}). Falling back to Kavach Builtin SAST analysis."
             elif total_source_files == 0:
                 semgrep_action = PlanAction.SKIP
                 semgrep_reason = "No source code files matching supported programming languages detected in target."

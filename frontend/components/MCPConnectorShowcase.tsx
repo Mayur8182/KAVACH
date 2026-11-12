@@ -9,15 +9,8 @@ import {
   Copy,
   Check,
   Play,
-  Layers,
   ArrowRight,
   Lock,
-  FileCode2,
-  Activity,
-  AlertTriangle,
-  Sparkles,
-  Server,
-  Zap,
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
 
@@ -663,3 +656,4 @@ export const MCPConnectorShowcase: React.FC = () => {
     </section>
   );
 };
+

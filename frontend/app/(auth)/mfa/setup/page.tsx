@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * /mfa/setup — SecuLayer MFA Setup (Step 2 of Onboarding: Optional 2FA)
+ * /mfa/setup — Kavach MFA Setup (Step 2 of Onboarding: Optional 2FA)
  * Fully optional, can be skipped with 1 click to proceed directly to workspace setup.
  * Generates real TOTP secret via POST /api/v1/auth/mfa/setup.
  */

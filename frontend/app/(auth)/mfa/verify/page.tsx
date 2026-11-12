@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * /mfa/verify — SecuLayer MFA Verify (Step 2 of 4)
+ * /mfa/verify — Kavach MFA Verify (Step 2 of 4)
  * Matches screen 27 in the specification exactly.
  * Real verification via POST /api/v1/auth/mfa/verify with RFC 6238 TOTP.
  */

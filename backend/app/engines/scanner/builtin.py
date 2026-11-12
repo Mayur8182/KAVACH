@@ -292,7 +292,7 @@ class BuiltinSecurityScanner(SecurityScanner):
     """
     scanner_name = "seculayer-builtin"
     scanner_type = "SAST"
-    tool_name = "SecuLayer Static Engine"
+    tool_name = "Kavach Static Engine"
     executable_name = "builtin"
 
     # Multi-engine execution cache: when 5 scanners run concurrently during one scan,
@@ -300,7 +300,7 @@ class BuiltinSecurityScanner(SecurityScanner):
     _scan_cache: Dict[str, Tuple[float, ScannerExecutionResult]] = {}
 
     async def validate_environment(self) -> Tuple[bool, str, str]:
-        return True, "SecuLayer Native Static Analysis Engine is operational", "2.4.0-native"
+        return True, "Kavach Native Static Analysis Engine is operational", "2.4.0-native"
 
     def build_command(self, target: ScanTarget) -> List[str]:
         return ["seculayer-builtin", "scan", target.path]

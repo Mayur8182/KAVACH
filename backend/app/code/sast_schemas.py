@@ -269,7 +269,7 @@ class SASTRuleItem(BaseModel):
     cwe: Optional[str] = None
     owasp: Optional[str] = None
     pattern: Optional[str] = None
-    scanner: str = "Semgrep / SecuLayer Builtin"
+    scanner: str = "Semgrep / Kavach Builtin"
     enabled: bool = True
     is_custom: bool = False
     created_at: Optional[str] = None

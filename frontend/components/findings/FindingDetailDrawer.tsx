@@ -1046,9 +1046,9 @@ export function FindingDetailDrawer({
               padding: '8px 12px',
               fontSize: '12px',
               fontWeight: 600,
-              color: '#4F46E5',
-              background: '#EEF2FF',
-              border: '1px solid #C7D2FE',
+              color: '#09090B',
+              background: '#F4F4F5',
+              border: '1px solid #E4E4E7',
               borderRadius: '6px',
               cursor: 'pointer',
             }}
@@ -1089,7 +1089,7 @@ export function FindingDetailDrawer({
                 gap: '6px',
               }}
             >
-              <Sparkles size={13} color="#818CF8" />
+              <Sparkles size={13} color="#FFFFFF" />
               <span>Remediate</span>
             </button>
           </div>

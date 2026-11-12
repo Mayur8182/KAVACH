@@ -229,7 +229,7 @@ function ConnectGithubContent() {
             </h1>
 
             <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 28px', lineHeight: 1.5 }}>
-              Link your GitHub account to automatically discover your organizations and repositories. SecuLayer will scan your code and infrastructure for security insights.
+              Link your GitHub account to automatically discover your organizations and repositories. Kavach will scan your code and infrastructure for security insights.
             </p>
 
             {error && (
