@@ -130,29 +130,29 @@ function MfaSetupContent() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#FAFAFA', fontFamily: 'Inter, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0B0F19', fontFamily: 'Inter, -apple-system, sans-serif', color: '#F8FAFC' }}>
       {/* Top Header Navigation */}
-      <SecuLayerHeader />
+      <SecuLayerHeader variant="minimal" />
 
       {/* Main Container */}
-      <main style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px 20px' }}>
+      <main style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 'clamp(24px, 4vh, 48px) 16px' }}>
         <div style={{ width: '100%', maxWidth: '640px' }}>
           <div
             style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E2E8F0',
+              backgroundColor: '#0F172A',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
               borderRadius: '16px',
-              padding: '36px',
-              boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)',
+              padding: 'clamp(24px, 4vw, 36px)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
             }}
           >
             {/* Header with Step Indicator */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#09090B', backgroundColor: '#F4F4F5', padding: '4px 10px', borderRadius: '6px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#38BDF8', backgroundColor: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '4px 10px', borderRadius: '6px' }}>
                   Step 2 of 5
                 </span>
-                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>
+                <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 500 }}>
                   Optional Security Guardrail
                 </span>
               </div>
@@ -162,39 +162,40 @@ function MfaSetupContent() {
                 style={{
                   fontSize: '13px',
                   fontWeight: 600,
-                  color: '#64748B',
+                  color: '#94A3B8',
                   backgroundColor: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
+                  transition: 'color 0.15s ease',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#09090B')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#64748B')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#FFFFFF')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
               >
                 <span>Skip for now</span>
                 <ArrowRight size={13} />
               </button>
             </div>
 
-            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', margin: '0 0 8px 0' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#F8FAFC', letterSpacing: '-0.02em', margin: '0 0 8px 0' }}>
               Multi-Factor Authentication (2FA)
             </h1>
-            <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 28px 0', lineHeight: 1.5 }}>
+            <p style={{ fontSize: '14px', color: '#94A3B8', margin: '0 0 28px 0', lineHeight: 1.5 }}>
               Scan this QR code with Google Authenticator, 1Password, or Authy to enable hardware/TOTP verification for your account. You can also configure this later in Settings.
             </p>
 
             {/* QR Code Container */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px solid #F1F5F9', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px', backgroundColor: '#090D16', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)', marginBottom: '24px' }}>
               {loading ? (
-                <div style={{ padding: 40, color: '#64748B', fontSize: 13, fontWeight: 500 }}>
+                <div style={{ padding: 40, color: '#94A3B8', fontSize: 13, fontWeight: 500 }}>
                   Generating security keys...
                 </div>
               ) : (
                 <>
                   <QrCodeSvg value={totpUri || `otpauth://totp/Kavach:${email}?secret=JBSWY3DPEHPK3PXP&issuer=Kavach`} size={170} />
-                  <span style={{ fontSize: '12px', color: '#64748B', marginTop: '12px', fontWeight: 500 }}>
+                  <span style={{ fontSize: '12px', color: '#94A3B8', marginTop: '12px', fontWeight: 500 }}>
                     Point your camera or authenticator scanner at this code
                   </span>
                 </>
@@ -212,7 +213,7 @@ function MfaSetupContent() {
                   gap: '6px',
                   backgroundColor: 'transparent',
                   border: 'none',
-                  color: '#09090B',
+                  color: '#38BDF8',
                   fontSize: '13px',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -224,7 +225,7 @@ function MfaSetupContent() {
               </button>
 
               {showManual && (
-                <div style={{ marginTop: '12px', padding: '14px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <div style={{ marginTop: '12px', padding: '14px', backgroundColor: '#090D16', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input
                       type="text"
@@ -233,13 +234,13 @@ function MfaSetupContent() {
                       style={{
                         flex: 1,
                         padding: '8px 12px',
-                        border: '1px solid #CBD5E1',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
                         borderRadius: '6px',
                         fontFamily: 'monospace',
                         fontSize: '13px',
                         fontWeight: 600,
-                        backgroundColor: '#FFFFFF',
-                        color: '#0F172A',
+                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                        color: '#38BDF8',
                         outline: 'none',
                       }}
                     />
@@ -251,16 +252,16 @@ function MfaSetupContent() {
                         alignItems: 'center',
                         gap: '6px',
                         padding: '8px 14px',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #CBD5E1',
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
                         borderRadius: '6px',
                         fontSize: '13px',
                         fontWeight: 600,
-                        color: copied ? '#059669' : '#334155',
+                        color: copied ? '#34D399' : '#F1F5F9',
                         cursor: 'pointer',
                       }}
                     >
-                      {copied ? <Check size={14} color="#059669" /> : <Copy size={14} />}
+                      {copied ? <Check size={14} color="#34D399" /> : <Copy size={14} />}
                       <span>{copied ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
@@ -269,7 +270,7 @@ function MfaSetupContent() {
             </div>
 
             {/* Bottom Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '18px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
               <button
                 type="button"
                 id="mfa-skip-btn"
@@ -279,9 +280,9 @@ function MfaSetupContent() {
                   alignItems: 'center',
                   gap: '6px',
                   padding: '10px 18px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#64748B',
-                  border: '1px solid #E2E8F0',
+                  backgroundColor: 'transparent',
+                  color: '#94A3B8',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
                   borderRadius: '8px',
                   fontSize: '13px',
                   fontWeight: 600,
@@ -289,12 +290,12 @@ function MfaSetupContent() {
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F8FAFC';
-                  e.currentTarget.style.color = '#0F172A';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                  e.currentTarget.style.color = '#FFFFFF';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
-                  e.currentTarget.style.color = '#64748B';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#94A3B8';
                 }}
               >
                 <span>Skip for now</span>
@@ -302,28 +303,28 @@ function MfaSetupContent() {
 
               <button
                 type="button"
-                id="mfa-setup-continue-btn"
+                id="mfa-continue-btn"
                 onClick={handleContinue}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: '11px 24px',
-                  backgroundColor: '#09090B',
+                  padding: '10px 22px',
+                  backgroundColor: '#2563EB',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '8px',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
                   transition: 'background-color 0.15s ease',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#27272A')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#09090B')}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1D4ED8')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2563EB')}
               >
                 <span>Continue</span>
-                <ArrowRight size={15} />
+                <ArrowRight size={14} />
               </button>
             </div>
           </div>

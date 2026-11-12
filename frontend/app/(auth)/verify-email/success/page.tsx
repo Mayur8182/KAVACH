@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
+import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
 
 const Logo = () => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
@@ -84,32 +85,7 @@ function VerifySuccessContent() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC', fontFamily: 'Inter, -apple-system, sans-serif' }}>
       {/* Top Navigation */}
-      <nav style={{ padding: '16px 32px', backgroundColor: '#fff', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link href="/" style={{ textDecoration: 'none' }}>
-          <Logo />
-        </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <Link href="/contact" style={{ fontSize: 14, color: '#475569', textDecoration: 'none' }}>Contact Security Team</Link>
-          <Link
-            href="/home"
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#0F172A',
-              color: '#fff',
-              borderRadius: 6,
-              fontSize: 13,
-              fontWeight: 600,
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <span>Console</span>
-            <ArrowRight size={14} />
-          </Link>
-        </div>
-      </nav>
+      <SecuLayerHeader variant="minimal" />
 
       {/* Main Container */}
       <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 24px' }}>

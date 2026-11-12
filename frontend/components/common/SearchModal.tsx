@@ -49,8 +49,8 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSel
     { id: 'prod-graph', type: 'page', category: 'pages', title: 'Security Graph', description: 'Interactive attack path discovery & blast radius topology', href: '/products/graph' },
     { id: 'prod-intel', type: 'page', category: 'pages', title: 'Threat Intelligence', description: 'Real-time threat feeds, CVE intelligence & actor mapping', href: '/products/intelligence' },
     { id: 'prod-soc', type: 'page', category: 'pages', title: 'Security Operations (SOC)', description: 'Modern security incident response, alerts & playbooks', href: '/products/soc' },
-    { id: 'p-demo', type: 'page', category: 'pages', title: 'SecuLayer Interactive Demo Suite', description: 'Schedule architecture review or live interactive evaluation', href: '/demo' },
-    { id: 'p-platform', type: 'page', category: 'pages', title: 'SecuLayer Platform Architecture', description: 'Deterministic security control plane and lifecycle gates', href: '/platform' },
+    { id: 'p-demo', type: 'page', category: 'pages', title: 'Kavach Interactive Demo Suite', description: 'Schedule architecture review or live interactive evaluation', href: '/demo' },
+    { id: 'p-platform', type: 'page', category: 'pages', title: 'Kavach Platform Architecture', description: 'Deterministic security control plane and lifecycle gates', href: '/platform' },
     { id: 'p-pricing', type: 'page', category: 'pages', title: 'Transparent Enterprise Pricing', description: 'Developer, Team, Business, and Enterprise plans', href: '/pricing' },
     { id: 'p-contact', type: 'page', category: 'pages', title: 'Contact Solutions & Sales', description: 'Connect with security architects and CIRT hotline', href: '/contact' },
   ];
@@ -510,7 +510,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSel
           }}
         >
           <span>Use &uarr; &darr; to navigate, Enter to view, ESC to dismiss</span>
-          <span style={{ fontWeight: 600, color: '#0F172A' }}>SecuLayer Search</span>
+          <span style={{ fontWeight: 600, color: '#0F172A' }}>Kavach Search</span>
         </div>
       </div>
     </div>

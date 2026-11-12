@@ -84,11 +84,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/kavach-cube.png', sizes: '32x32', type: 'image/png' },
+      { url: '/kavach-cube-white.png', sizes: '32x32', type: 'image/png' },
       { url: '/favicon.svg', type: 'image/svg+xml' },
     ],
-    shortcut: '/kavach-cube.png',
-    apple: '/kavach-cube.png',
+    shortcut: '/kavach-cube-white.png',
+    apple: '/kavach-cube-white.png',
   },
 };
 

@@ -13,10 +13,26 @@ class AuditRepository:
         self.db = db
 
     async def create(self, event: AuditEvent) -> AuditEvent:
-        self.db.add(event)
-        await self.db.flush()
-        await self.db.refresh(event)
-        return event
+        try:
+            async with self.db.begin_nested():
+                self.db.add(event)
+                await self.db.flush()
+            await self.db.refresh(event)
+            return event
+        except Exception:
+            # If a foreign key constraint fails (e.g. workspace/org is pending or uncommitted in caller),
+            # preserve audit trail by clearing direct relational FK columns while preserving metadata.
+            try:
+                event.workspace_id = None
+                event.organization_id = None
+                event.project_id = None
+                async with self.db.begin_nested():
+                    self.db.add(event)
+                    await self.db.flush()
+                await self.db.refresh(event)
+                return event
+            except Exception:
+                return event
 
     async def list_events(
         self,

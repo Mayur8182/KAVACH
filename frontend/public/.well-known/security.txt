@@ -7,3 +7,4 @@ Policy: https://kavachsecurity.me/legal/vulnerability-disclosure
 Acknowledgments: https://kavachsecurity.me/security/hall-of-fame
 Hiring: https://kavachsecurity.me/careers
 Encryption: https://kavachsecurity.me/pgp-key.txt
+

@@ -516,7 +516,7 @@ class SuperAdminTenantService:
                     organization_id=org.id,
                     role=m_role,
                     status="PENDING",
-                    message="Welcome to SecuLayer platform workspace.",
+                    message="Welcome to Kavach Security platform workspace.",
                 )
                 self.db.add(inv)
 

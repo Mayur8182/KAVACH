@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <!-- Kavach 3D Isometric Cube Emblem -->
-  <path d="M16 3L28 10V22L16 29L4 22V10L16 3Z" stroke="#0F172A" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M16 3V16M16 16V29M16 16L28 10M16 16L4 10" stroke="#0F172A" stroke-width="1.8" stroke-linejoin="round"/>
-  <!-- Inner geometric core -->
-  <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" stroke="#2563EB" stroke-width="1.5" stroke-linejoin="round" fill="#DBEAFE" fill-opacity="0.75"/>
-  <path d="M16 8V15M16 15V22M16 15L22 11.5M16 15L10 11.5" stroke="#2563EB" stroke-width="1.2" stroke-linejoin="round"/>
+  <!-- Kavach Clean Isometric Cube Emblem in Pure White -->
+  <path d="M16 2L29 9.5V22.5L16 30L3 22.5V9.5L16 2Z" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M16 2V16M16 16V30M16 16L29 9.5M16 16L3 9.5" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/>
+  <!-- Inner geometric core in crisp white -->
+  <path d="M16 8L23 12V20L16 24L9 20V12L16 8Z" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round" fill="#FFFFFF" fill-opacity="0.15"/>
+  <path d="M16 8V16M16 16V24M16 16L23 12M16 16L9 12" stroke="#FFFFFF" stroke-width="1.4" stroke-linejoin="round"/>
 </svg>

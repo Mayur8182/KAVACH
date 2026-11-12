@@ -140,16 +140,16 @@ function MfaVerifyContent() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC', fontFamily: 'Inter, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0B0F19', fontFamily: 'Inter, -apple-system, sans-serif', color: '#F8FAFC' }}>
       {/* Top Header Navigation */}
-      <SecuLayerHeader />
+      <SecuLayerHeader variant="minimal" />
 
       {/* Main Container */}
-      <main style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '48px 24px' }}>
+      <main style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: 'clamp(24px, 4vh, 48px) 16px' }}>
         <div style={{ width: '100%', maxWidth: 1040, display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: 36, alignItems: 'start' }} className="mfa-layout">
           {/* Left Stepper Sidebar */}
           <div>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', margin: '0 0 24px', letterSpacing: '-0.01em' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#F8FAFC', margin: '0 0 24px', letterSpacing: '-0.01em' }}>
               Set up Multi-Factor Authentication
             </h2>
 
@@ -161,20 +161,21 @@ function MfaVerifyContent() {
                     width: 28,
                     height: 28,
                     borderRadius: '50%',
-                    backgroundColor: '#2563EB',
+                    backgroundColor: '#10B981',
                     color: '#FFFFFF',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: 13,
                     flexShrink: 0,
+                    boxShadow: '0 0 10px rgba(16, 185, 129, 0.35)',
                   }}
                 >
                   <Check size={16} strokeWidth={2.5} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>Authenticator App</div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>Scan QR code</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#F1F5F9' }}>Authenticator App</div>
+                  <div style={{ fontSize: 12, color: '#94A3B8' }}>Scan QR code</div>
                 </div>
               </div>
 
@@ -193,25 +194,26 @@ function MfaVerifyContent() {
                     fontSize: 13,
                     fontWeight: 700,
                     flexShrink: 0,
+                    boxShadow: '0 0 12px rgba(37, 99, 235, 0.45)',
                   }}
                 >
                   2
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#2563EB' }}>Verify Code</div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>Confirm setup</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#60A5FA' }}>Verify Code</div>
+                  <div style={{ fontSize: 12, color: '#94A3B8' }}>Confirm setup</div>
                 </div>
               </div>
 
               {/* Step 3 - Inactive */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, opacity: 0.6 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, opacity: 0.5 }}>
                 <div
                   style={{
                     width: 28,
                     height: 28,
                     borderRadius: '50%',
-                    border: '1.5px solid #CBD5E1',
-                    color: '#64748B',
+                    border: '1.5px solid rgba(255, 255, 255, 0.2)',
+                    color: '#94A3B8',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -223,20 +225,20 @@ function MfaVerifyContent() {
                   3
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>Recovery Codes</div>
-                  <div style={{ fontSize: 12, color: '#94A3B8' }}>Save for account recovery</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#CBD5E1' }}>Recovery Codes</div>
+                  <div style={{ fontSize: 12, color: '#64748B' }}>Save for account recovery</div>
                 </div>
               </div>
 
               {/* Step 4 - Inactive */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, opacity: 0.6 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, opacity: 0.5 }}>
                 <div
                   style={{
                     width: 28,
                     height: 28,
                     borderRadius: '50%',
-                    border: '1.5px solid #CBD5E1',
-                    color: '#64748B',
+                    border: '1.5px solid rgba(255, 255, 255, 0.2)',
+                    color: '#94A3B8',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -248,8 +250,8 @@ function MfaVerifyContent() {
                   4
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>Complete</div>
-                  <div style={{ fontSize: 12, color: '#94A3B8' }}>Enable MFA</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#CBD5E1' }}>Complete</div>
+                  <div style={{ fontSize: 12, color: '#64748B' }}>Enable MFA</div>
                 </div>
               </div>
             </div>
@@ -258,23 +260,23 @@ function MfaVerifyContent() {
           {/* Right Main Content Card */}
           <div
             style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: 12,
-              boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)',
-              padding: '36px 36px',
+              backgroundColor: '#0F172A',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: 16,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+              padding: 'clamp(24px, 4vw, 36px)',
             }}
           >
             {/* Step Tag */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#2563EB', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#38BDF8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
               STEP 2 OF 4
             </div>
 
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#F8FAFC', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
               Verify your authenticator app
             </h1>
 
-            <p style={{ fontSize: 14, color: '#64748B', margin: '0 0 28px', lineHeight: 1.5 }}>
+            <p style={{ fontSize: 14, color: '#94A3B8', margin: '0 0 28px', lineHeight: 1.5 }}>
               Enter the 6-digit code from your authenticator app to confirm that it is set up correctly.
             </p>
 
@@ -286,9 +288,9 @@ function MfaVerifyContent() {
                   gap: 8,
                   padding: '10px 14px',
                   borderRadius: 6,
-                  backgroundColor: '#FEF2F2',
-                  border: '1px solid #FECACA',
-                  color: '#B91C1C',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#F87171',
                   fontSize: 13,
                   marginBottom: 20,
                 }}
@@ -306,9 +308,9 @@ function MfaVerifyContent() {
                   gap: 8,
                   padding: '10px 14px',
                   borderRadius: 6,
-                  backgroundColor: '#F0FDF4',
-                  border: '1px solid #BBF7D0',
-                  color: '#15803D',
+                  backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  color: '#34D399',
                   fontSize: 13,
                   marginBottom: 20,
                 }}
@@ -320,7 +322,7 @@ function MfaVerifyContent() {
 
             <form onSubmit={handleVerify}>
               {/* 6 Digit Input Boxes */}
-              <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+              <div style={{ display: 'flex', gap: 'clamp(6px, 1.8vw, 12px)', marginBottom: 24, justifyContent: 'flex-start', maxWidth: '100%' }}>
                 {digits.map((digit, i) => (
                   <input
                     key={i}
@@ -332,18 +334,19 @@ function MfaVerifyContent() {
                     onChange={e => handleDigitChange(i, e.target.value)}
                     onKeyDown={e => handleKeyDown(i, e)}
                     style={{
-                      width: 48,
-                      height: 52,
+                      width: 'clamp(38px, 11vw, 48px)',
+                      height: 'clamp(46px, 13vw, 54px)',
                       textAlign: 'center',
                       fontSize: 22,
                       fontWeight: 700,
-                      color: '#0F172A',
-                      border: digit ? '2px solid #2563EB' : '1px solid #CBD5E1',
+                      color: '#FFFFFF',
+                      border: digit ? '2px solid #3B82F6' : '1px solid rgba(255, 255, 255, 0.15)',
                       borderRadius: 8,
-                      backgroundColor: '#FFFFFF',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
                       outline: 'none',
-                      boxShadow: digit ? '0 0 0 3px rgba(37, 99, 235, 0.1)' : 'none',
+                      boxShadow: digit ? '0 0 12px rgba(59, 130, 246, 0.35)' : 'none',
                       transition: 'all 0.15s ease',
+                      boxSizing: 'border-box',
                     }}
                   />
                 ))}
@@ -359,8 +362,8 @@ function MfaVerifyContent() {
                   style={{ width: 16, height: 16, marginTop: 2, accentColor: '#2563EB', cursor: 'pointer' }}
                 />
                 <label htmlFor="trust-device-checkbox" style={{ cursor: 'pointer' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Trust this device for 30 days</div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>You won&apos;t be prompted for a code on this device for 30 days.</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#CBD5E1' }}>Trust this device for 30 days</div>
+                  <div style={{ fontSize: 12, color: '#94A3B8' }}>You won&apos;t be prompted for a code on this device for 30 days.</div>
                 </label>
               </div>
 
@@ -376,14 +379,14 @@ function MfaVerifyContent() {
                   gap: 8,
                   width: '100%',
                   padding: '12px 20px',
-                  backgroundColor: verifying ? '#93C5FD' : '#2563EB',
+                  backgroundColor: verifying ? '#1E40AF' : '#2563EB',
                   color: '#FFFFFF',
                   border: 'none',
-                  borderRadius: 6,
+                  borderRadius: 8,
                   fontSize: 14,
                   fontWeight: 600,
                   cursor: verifying ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
                   marginBottom: 20,
                   transition: 'background-color 0.15s ease',
                 }}
@@ -396,9 +399,9 @@ function MfaVerifyContent() {
 
               {/* Divider: OR */}
               <div style={{ display: 'flex', alignItems: 'center', margin: '0 0 20px' }}>
-                <div style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
-                <span style={{ padding: '0 14px', fontSize: 12, fontWeight: 600, color: '#94A3B8' }}>OR</span>
-                <div style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
+                <div style={{ flex: 1, height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)' }} />
+                <span style={{ padding: '0 14px', fontSize: 12, fontWeight: 600, color: '#64748B' }}>OR</span>
+                <div style={{ flex: 1, height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)' }} />
               </div>
 
               {/* Secondary CTA: Use Recovery Code */}
@@ -410,22 +413,22 @@ function MfaVerifyContent() {
                   justifyContent: 'center',
                   gap: 8,
                   width: '100%',
-                  padding: '10px 20px',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: 6,
+                  padding: '11px 20px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: 8,
                   fontSize: 14,
                   fontWeight: 600,
-                  color: '#334155',
+                  color: '#F1F5F9',
                   textDecoration: 'none',
                   boxSizing: 'border-box',
-                  marginBottom: 28,
+                  marginBottom: 24,
                   transition: 'background-color 0.15s ease',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)')}
               >
-                <KeyRound size={15} color="#64748B" />
+                <KeyRound size={15} color="#94A3B8" />
                 <span>Use a recovery code instead</span>
               </Link>
 
@@ -438,13 +441,14 @@ function MfaVerifyContent() {
                     background: 'none',
                     border: 'none',
                     fontSize: 13,
-                    color: '#64748B',
+                    color: '#94A3B8',
                     textDecoration: 'underline',
                     cursor: 'pointer',
                     padding: '4px 8px',
+                    transition: 'color 0.15s ease',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#0F172A')}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#64748B')}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#FFFFFF')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}
                 >
                   Skip MFA setup for now — Set up later in Settings →
                 </button>
@@ -454,8 +458,8 @@ function MfaVerifyContent() {
             {/* Security Note Callout */}
             <div
               style={{
-                backgroundColor: '#F8FAFC',
-                border: '1px solid #E2E8F0',
+                backgroundColor: '#090D16',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
                 borderRadius: 8,
                 padding: '14px 16px',
                 display: 'flex',
@@ -463,12 +467,12 @@ function MfaVerifyContent() {
                 alignItems: 'flex-start',
               }}
             >
-              <Shield size={18} color="#2563EB" style={{ flexShrink: 0, marginTop: 2 }} />
+              <Shield size={18} color="#3B82F6" style={{ flexShrink: 0, marginTop: 2 }} />
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', marginBottom: 2 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#F8FAFC', marginBottom: 2 }}>
                   Keep your account secure
                 </div>
-                <div style={{ fontSize: 12, color: '#64748B', lineHeight: 1.4 }}>
+                <div style={{ fontSize: 12, color: '#94A3B8', lineHeight: 1.4 }}>
                   Never share your MFA code with anyone. Kavach Security will never ask for your code outside of this login flow.
                 </div>
               </div>
@@ -482,9 +486,10 @@ function MfaVerifyContent() {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
-        @media (max-width: 768px) {
+        @media (max-width: 820px) {
           .mfa-layout {
             grid-template-columns: 1fr !important;
+            gap: 24px !important;
           }
         }
       `}</style>

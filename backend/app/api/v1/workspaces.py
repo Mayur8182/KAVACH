@@ -558,6 +558,7 @@ async def create_workspace(
         environments_count=1,
     )
     db.add(new_ws)
+    await db.flush()
 
     # Immutable audit logging
     await audit.log_event(
