@@ -52,6 +52,7 @@ const FindingDetailDrawer = dynamic(
 import { RepositoryScanProgressBar, ScanJobProgress } from '@/components/code/RepositoryScanProgressBar';
 import { ScrollProductWorkflow } from '@/components/landing/ScrollProductWorkflow';
 import { HeroProductVideo } from '@/components/landing/HeroProductVideo';
+import { FuseProductShowcase } from '@/components/landing/FuseProductShowcase';
 
 // Verified Deterministic Findings matching Live Scanners
 const SAST_FINDINGS = [
@@ -869,9 +870,9 @@ export default function KavachHomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* SCROLL-DRIVEN PRODUCT WALKTHROUGH (SCROLLYTELLING DEMO)   */}
+        {/* FUSE.AI-STYLE ANIMATED PRODUCT STORYTELLING SHOWCASE      */}
         {/* ========================================================= */}
-        <ScrollProductWorkflow />
+        <FuseProductShowcase />
 
         {/* ========================================================= */}
         {/* SECTION 2: ARCHITECTURE (Screenshot Page 1 Bottom)        */}
