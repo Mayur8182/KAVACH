@@ -494,17 +494,6 @@ class SBOMService:
             except Exception as e:
                 logger.warning(f"Failed to resolve repo: {e}")
 
-        if not repo:
-            try:
-                repo_res = await self.db.execute(select(GitHubRepository).limit(1))
-                first_repo = repo_res.scalars().first()
-                if first_repo:
-                    repo = first_repo
-                    if not pid and first_repo.project_id:
-                        pid = first_repo.project_id
-            except Exception as e:
-                logger.warning(f"Failed to resolve fallback repo: {e}")
-
         if not pid and project_id:
             try:
                 pid = uuid.UUID(str(project_id))
@@ -512,24 +501,7 @@ class SBOMService:
                 pass
 
         if not pid:
-            try:
-                proj_res = await self.db.execute(select(Project).limit(1))
-                first_proj = proj_res.scalars().first()
-                if first_proj:
-                    pid = first_proj.id
-                else:
-                    new_proj = Project(
-                        id=uuid.uuid4(),
-                        name="Default Project",
-                        slug="default-project",
-                        description="Default workspace security project",
-                    )
-                    self.db.add(new_proj)
-                    await self.db.commit()
-                    pid = new_proj.id
-            except Exception as e:
-                logger.warning(f"Failed to resolve fallback project: {e}")
-                pid = uuid.uuid4()
+            pid = uuid.uuid4()
 
         return pid, repo
 

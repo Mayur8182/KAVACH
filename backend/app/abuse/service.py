@@ -303,31 +303,13 @@ class AbuseProtectionService:
 
         now = datetime.now(timezone.utc)
         proj_id = signal.project_id
-        if not proj_id:
-            proj_stmt = select(Project).limit(1)
-            res = await self.db.execute(proj_stmt)
-            proj = res.scalar_one_or_none()
-            if proj:
-                proj_id = proj.id
-            else:
-                user_stmt = select(User).limit(1)
-                user_res = await self.db.execute(user_stmt)
-                user = user_res.scalar_one_or_none()
-                if not user:
-                    user = User(
-                        email="system_abuse@thing.security",
-                        name="Abuse Protection Admin",
-                        password_hash="system_hash_placeholder",
-                        is_active=True,
-                    )
-                    self.db.add(user)
-                    await self.db.flush()
-
-                proj = Project(
-                    name="Abuse Protection Default",
-                    description="Default project for abuse alerts",
-                    owner_id=user.id,
-                )
+        if not proj_id and getattr(event, "tenant_id", None):
+            try:
+                t_uuid = uuid.UUID(str(event.tenant_id))
+                p_res = await self.db.execute(select(Project.id).where(or_(Project.owner_id == t_uuid, Project.organization_id == t_uuid)).limit(1))
+                proj_id = p_res.scalar_one_or_none()
+            except Exception:
+                proj_id = None
                 self.db.add(proj)
                 await self.db.flush()
                 proj_id = proj.id

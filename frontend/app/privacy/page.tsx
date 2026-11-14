@@ -25,7 +25,7 @@ export default function PrivacyPage() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#FFFFFF', color: '#0F172A', fontFamily: 'var(--font-sans, -apple-system, sans-serif)' }}>
       <SecuLayerHeader />
 
-      <main style={{ flex: 1, maxWidth: '960px', width: '100%', margin: '0 auto', padding: '48px 24px 80px' }}>
+      <main style={{ flex: 1, maxWidth: '1120px', width: '100%', margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(16px, 4vw, 40px) 80px', boxSizing: 'border-box', overflowWrap: 'anywhere' }}>
         <div style={{ marginBottom: '32px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', backgroundColor: '#F4F4F5', borderRadius: '16px', color: '#09090B', fontSize: '12px', fontWeight: 600, marginBottom: '12px' }}>
             <Shield size={13} aria-hidden="true" />
@@ -203,7 +203,7 @@ export default function PrivacyPage() {
               <strong>Kavach Security &amp; Privacy Office</strong><br />
               Attn: Data Protection Officer<br />
               Email: <a href="mailto:privacy@kavachsecurity.me" style={{ color: '#09090B', fontWeight: 600 }}>privacy@kavachsecurity.me</a><br />
-              Legal Address: 100 Montgomery St, Suite 2400, San Francisco, CA 94104
+              Legal Address: Anand, Gujarat, India, 388120
             </p>
           </section>
         </div>

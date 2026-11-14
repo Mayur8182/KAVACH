@@ -1028,8 +1028,7 @@ class ContainerSecurityService:
                 return uuid.UUID(project_id)
             except ValueError:
                 pass
-        p_res = (await self.db.execute(select(Project).limit(1))).scalar_one_or_none()
-        return p_res.id if p_res else None
+        return None
 
     # =========================================================================
     # REAL SEEDING & SYNC WITH DETERMINISTIC DATA INTEGRITY
@@ -1904,10 +1903,7 @@ class ContainerSecurityService:
         Executes real scan against a Dockerfile using Trivy CLI and AST parsing.
         Persists scan and discovered findings into database.
         """
-        target_pid = await self._resolve_project_id(payload.project_id)
-        if not target_pid:
-            p_res = (await self.db.execute(select(Project).limit(1))).scalar_one_or_none()
-            target_pid = p_res.id if p_res else uuid.uuid4()
+        target_pid = await self._resolve_project_id(payload.project_id) or uuid.uuid4()
 
         content = payload.content or "FROM alpine:latest\nRUN apk add --no-cache curl\nCMD [\"curl\", \"localhost\"]"
         file_path = payload.dockerfile_path or "./Dockerfile"

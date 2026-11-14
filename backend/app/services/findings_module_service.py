@@ -147,10 +147,6 @@ class FindingsModuleService:
             pass
 
         if not p_ids:
-            all_proj_q = select(Project.id).limit(50)
-            all_projs = list((await self.db.execute(all_proj_q)).scalars().all())
-            if all_projs:
-                return False, all_projs
             return True, []
 
         return False, list(p_ids)

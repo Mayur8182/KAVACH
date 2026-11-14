@@ -799,10 +799,21 @@ async def create_onboarding_project(
 )
 async def get_onboarding_project(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Optional[OnboardingProjectResponse]:
-    stmt = select(Project).order_by(Project.created_at.desc()).limit(1)
+    from app.models.invitation import OrganizationMember
+    stmt = select(Project).where(Project.owner_id == current_user.id).order_by(Project.created_at.desc()).limit(1)
     res = await db.execute(stmt)
     project = res.scalar_one_or_none()
+    if not project:
+        mem_stmt = (
+            select(Project)
+            .join(OrganizationMember, OrganizationMember.organization_id == Project.organization_id)
+            .where(OrganizationMember.user_id == current_user.id, OrganizationMember.is_active == True)
+            .order_by(Project.created_at.desc())
+            .limit(1)
+        )
+        project = (await db.execute(mem_stmt)).scalar_one_or_none()
     if not project:
         return None
 

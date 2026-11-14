@@ -3,7 +3,7 @@
  * Mirrors backend Pydantic schemas in backend/app/cloud/schemas.py
  */
 
-export type CloudProvider = 'AWS' | 'AZURE' | 'GCP';
+export type CloudProvider = 'AWS' | 'AZURE' | 'GCP' | 'KUBERNETES';
 
 export type CloudConnectionStatus =
   | 'NOT_CONFIGURED'
@@ -97,6 +97,29 @@ export interface ConnectProviderRequest {
   gcp_project_identifier?: string;
   default_region?: string;
   credentials_payload?: Record<string, any>;
+}
+
+export interface SetupInstructionsResponse {
+  provider: CloudProvider;
+  instructions_title: string;
+  instructions_markdown: string;
+  external_id?: string;
+  kavach_account_id?: string;
+  trust_policy?: Record<string, any>;
+  required_permissions: string[];
+  cli_snippet?: string;
+  cloudformation_template_json?: string;
+  cloudformation_quick_create_url?: string;
+}
+
+export interface ConnectionValidationResponse {
+  success: boolean;
+  status: string;
+  message: string;
+  account_identifier?: string;
+  discovered_resources_count: number;
+  observations_count: number;
+  details: Record<string, any>;
 }
 
 export interface CloudAssetItem {

@@ -201,6 +201,38 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
           badge: 'Workspace',
         },
         {
+          title: 'Codebase Scanning',
+          href: '/products/codebase-scanning',
+          desc: 'Follow code findings from source to reviewed fix',
+          icon: FileCode2,
+          color: '#09090B',
+          bg: '#F4F4F5',
+        },
+        {
+          title: 'Vulnerability Management',
+          href: '/products/vulnerability-management',
+          desc: 'Prioritize vulnerabilities with reachability evidence',
+          icon: ShieldAlert,
+          color: '#09090B',
+          bg: '#F4F4F5',
+        },
+        {
+          title: 'Supply Chain Security',
+          href: '/products/supply-chain',
+          desc: 'Understand package relationships and upgrade risk',
+          icon: Database,
+          color: '#09090B',
+          bg: '#F4F4F5',
+        },
+        {
+          title: 'Secret Scanning',
+          href: '/products/secret-scanning',
+          desc: 'Trace exposed credentials and guide containment',
+          icon: ShieldCheck,
+          color: '#09090B',
+          bg: '#F4F4F5',
+        },
+        {
           title: 'Container Security',
           href: '/code/container-security',
           desc: 'Image vulnerability scanning & SBOM tracking',
@@ -232,7 +264,7 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
       items: [
         {
           title: 'Cloud Security',
-          href: '/onboarding?product=cloud&workspace=cloud',
+          href: '/cloud',
           desc: 'Multi-cloud CSPM, IAM & CIS benchmarks workspace',
           icon: Cloud,
           color: '#09090B',

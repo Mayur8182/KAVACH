@@ -1,15 +1,20 @@
 /* ===================================================================
-   THING DESIGN SYSTEM — DESIGN TOKENS
-   Single source of truth for the entire Thing platform.
-   Strict semantic tokens. No arbitrary magic values allowed.
+   KAVACH SECURITY DESIGN SYSTEM — DESIGN TOKENS
+   Single source of truth for all Kavach interfaces.
+   Calm, authoritative, enterprise light-mode default with dark support.
    =================================================================== */
 
 :root {
-  /* --- Surfaces & Backgrounds (SecuLayer Light Theme Default) --- */
+  /* --- Brand & Identification --- */
+  --brand-name:               'Kavach';
+  --brand-version:            '2.0.0';
+
+  /* --- Surfaces & Backgrounds (Enterprise Light Mode Default) --- */
   --color-bg:                 #f8fafc;
   --color-surface:            #ffffff;
+  --color-surface-subtle:     #f8fafc;
   --color-surface-elevated:   #ffffff;
-  --color-surface-overlay:    #f8fafc;
+  --color-surface-overlay:    rgba(15, 23, 42, 0.4);
   --color-surface-hover:      #f1f5f9;
   --color-surface-active:     #e2e8f0;
 
@@ -17,37 +22,44 @@
   --color-border:             #e2e8f0;
   --color-border-subtle:      #f1f5f9;
   --color-border-strong:      #cbd5e1;
-  --color-border-focus:       rgba(9, 9, 11, 0.3);
+  --color-border-focus:       #09090b;
 
-  /* --- Text & Content --- */
-  --color-text-primary:       #0f172a;
-  --color-text-secondary:     #475569;
-  --color-text-muted:         #64748b;
-  --color-text-disabled:      #94a3b8;
+  /* --- Text & Content (Strict WCAG AAA / AA 4.5:1+) --- */
+  --color-text-primary:       #0f172a; /* Slate 900 */
+  --color-text-secondary:     #334155; /* Slate 700 */
+  --color-text-muted:         #64748b; /* Slate 500 */
+  --color-text-disabled:      #94a3b8; /* Slate 400 */
   --color-text-inverse:       #ffffff;
 
-  /* --- Semantic: Primary Action (Enterprise Clean Monochrome) --- */
-  --color-primary:            #09090b;
-  --color-primary-hover:      #27272a;
-  --color-primary-subtle:     #f4f4f5;
-  --color-primary-border:     #e4e4e7;
-  --color-primary-text:       #09090b;
+  /* --- Primary Action (Enterprise Restraint: Crisp Monochrome) --- */
+  --color-primary:            #09090b; /* Zinc 950 */
+  --color-primary-hover:      #27272a; /* Zinc 800 */
+  --color-primary-subtle:     #f4f4f5; /* Zinc 100 */
+  --color-primary-border:     #e4e4e7; /* Zinc 200 */
+  --color-primary-text:       #ffffff;
+
+  /* --- Accent (Developer & Link Action: Cobalt Blue) --- */
+  --color-accent:             #2563eb; /* Blue 600 */
+  --color-accent-hover:       #1d4ed8; /* Blue 700 */
+  --color-accent-subtle:      #eff6ff; /* Blue 50 */
+  --color-accent-border:      #bfdbfe; /* Blue 200 */
+  --color-accent-text:        #1d4ed8;
 
   /* --- Semantic: Status & Health --- */
   --color-success:            #10b981;
   --color-success-subtle:     #ecfdf5;
   --color-success-border:     #a7f3d0;
-  --color-success-text:       #059669;
+  --color-success-text:       #047857;
 
   --color-warning:            #f59e0b;
   --color-warning-subtle:     #fffbeb;
   --color-warning-border:     #fde68a;
-  --color-warning-text:       #d97706;
+  --color-warning-text:       #b45309;
 
   --color-danger:             #ef4444;
   --color-danger-subtle:      #fef2f2;
   --color-danger-border:      #fecaca;
-  --color-danger-text:        #dc2626;
+  --color-danger-text:        #b91c1c;
 
   --color-info:               #0284c7;
   --color-info-subtle:        #f0f9ff;
@@ -59,64 +71,75 @@
   --color-neutral-border:     #e2e8f0;
   --color-neutral-text:       #475569;
 
-  /* --- Security Severity System (Light Mode) --- */
+  /* --- Security Severity System (Authoritative Enterprise Standards) --- */
   --severity-critical:        #ef4444;
   --severity-critical-bg:     #fef2f2;
   --severity-critical-border: #fecaca;
-  --severity-critical-text:   #dc2626;
+  --severity-critical-text:   #b91c1c;
+  --severity-critical-dot:    #dc2626;
 
   --severity-high:            #ea580c;
   --severity-high-bg:         #fff7ed;
-  --severity-high-border:     #ffedd5;
+  --severity-high-border:     #fed7aa;
   --severity-high-text:       #c2410c;
+  --severity-high-dot:        #ea580c;
 
   --severity-medium:          #d97706;
   --severity-medium-bg:       #fffbeb;
   --severity-medium-border:   #fef3c7;
   --severity-medium-text:     #b45309;
+  --severity-medium-dot:      #f59e0b;
 
-  --severity-low:             #64748b;
-  --severity-low-bg:          #f8fafc;
-  --severity-low-border:      #e2e8f0;
-  --severity-low-text:        #475569;
+  --severity-low:             #2563eb;
+  --severity-low-bg:          #eff6ff;
+  --severity-low-border:      #dbeafe;
+  --severity-low-text:        #1d4ed8;
+  --severity-low-dot:         #3b82f6;
 
   --severity-info:            #0284c7;
   --severity-info-bg:         #f0f9ff;
   --severity-info-border:     #e0f2fe;
   --severity-info-text:       #0369a1;
+  --severity-info-dot:        #0ea5e9;
 
-  --severity-unknown:         #94a3b8;
-  --severity-unknown-bg:      #f8fafc;
-  --severity-unknown-border:  #e2e8f0;
-  --severity-unknown-text:    #64748b;
+  --severity-safe:            #10b981;
+  --severity-safe-bg:         #ecfdf5;
+  --severity-safe-border:     #a7f3d0;
+  --severity-safe-text:       #047857;
+  --severity-safe-dot:        #10b981;
 
-  /* --- Typography (Fixed Scale: 12 / 14 / 16 / 20 / 24 / 32 / 48) --- */
-  --font-sans:                'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono:                'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  /* --- Typography Scale (Strict DevSecOps Ergonomic Hierarchy) --- */
+  --font-sans:                'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:                'JetBrains Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
 
-  --text-xs:                  12px;
-  --text-sm:                  14px;
-  --text-base:                16px;
-  --text-md:                  16px;
-  --text-lg:                  20px;
-  --text-xl:                  24px;
-  --text-2xl:                 32px;
-  --text-3xl:                 40px;
-  --text-display:             48px;
+  --text-2xs:                 10px;
+  --text-xs:                  11px;
+  --text-sm:                  13px;
+  --text-base:                14px;
+  --text-md:                  15px;
+  --text-lg:                  18px;
+  --text-xl:                  20px;
+  --text-2xl:                 24px;
+  --text-3xl:                 30px;
+  --text-display:             36px;
 
   --weight-normal:            400;
   --weight-medium:            500;
   --weight-semibold:          600;
   --weight-bold:              700;
 
-  /* --- Spacing Scale (Strict 8-Point Scale: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64) --- */
+  /* --- Spacing Scale (Disciplined 8-Point Baseline Grid) --- */
   --space-0-5:                2px;
   --space-1:                  4px;
+  --space-1-5:                6px;
   --space-2:                  8px;
+  --space-2-5:                10px;
   --space-3:                  12px;
+  --space-3-5:                14px;
   --space-4:                  16px;
   --space-5:                  20px;
   --space-6:                  24px;
+  --space-7:                  28px;
   --space-8:                  32px;
   --space-10:                 40px;
   --space-12:                 48px;
@@ -130,13 +153,16 @@
   --radius-xl:                12px;
   --radius-pill:              9999px;
 
-  /* --- Shadows --- */
-  --shadow-sm:                0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md:                0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg:                0 12px 32px rgba(0, 0, 0, 0.12);
-  --shadow-drawer:            -8px 0 32px rgba(0, 0, 0, 0.15);
+  /* --- Elevation & Shadows --- */
+  --shadow-none:              none;
+  --shadow-xs:                0 1px 2px 0 rgba(15, 23, 42, 0.04);
+  --shadow-sm:                0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --shadow-md:                0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-lg:                0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --shadow-drawer:            -8px 0 28px rgba(15, 23, 42, 0.12);
+  --shadow-modal:             0 20px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
 
-  /* --- Z-Index Scale --- */
+  /* --- Z-Index Layering --- */
   --z-base:                   0;
   --z-raised:                 10;
   --z-sticky:                 50;
@@ -147,53 +173,75 @@
   --z-toast:                  500;
   --z-command:                600;
 
-  /* --- Responsive Breakpoint System Tokens --- */
-  --bp-mobile-sm:             320px;
-  --bp-mobile:                375px;
-  --bp-mobile-lg:             480px;
-  --bp-tablet:                768px;
-  --bp-laptop:                1024px;
-  --bp-desktop:               1280px;
-  --bp-desktop-lg:            1536px;
-
-  /* --- Layout & Accessibility Constants --- */
+  /* --- Structural Layout Constants --- */
   --sidebar-width:            240px;
   --sidebar-collapsed-width:  64px;
   --topbar-height:            52px;
-  --product-nav-height:       42px;
-  --touch-target-min:         44px;
-  --max-content-width:        1200px;
-  --prose-max-width:          65ch;
+  --touch-target-min:         40px;
+  --max-content-width:        1280px;
   --focus-ring:               0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-primary);
 
-  /* --- Motion (Explain, not decorate. 150ms-300ms) --- */
-  --transition-fast:          150ms ease-out;
-  --transition-normal:        250ms ease-out;
-  --transition-slow:          300ms cubic-bezier(0.16, 1, 0.3, 1);
+  /* --- Motion & Transitions (Purposeful, snappy 150ms-250ms) --- */
+  --transition-fast:          120ms ease-out;
+  --transition-normal:        200ms ease-out;
+  --transition-smooth:        250ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Light Theme Variables (Maintains token contracts) */
-[data-theme="light"] {
-  --color-bg:                 #f8fafc;
-  --color-surface:            #ffffff;
-  --color-surface-elevated:   #f1f5f9;
-  --color-surface-overlay:    #e2e8f0;
-  --color-surface-hover:      #f1f5f9;
-  --color-surface-active:     #e2e8f0;
+/* Dark Mode Tokens (Full High-Contrast Dark Canvas) */
+[data-theme="dark"] {
+  --color-bg:                 #09090b;
+  --color-surface:            #121215;
+  --color-surface-subtle:     #18181b;
+  --color-surface-elevated:   #1c1c21;
+  --color-surface-overlay:    rgba(0, 0, 0, 0.7);
+  --color-surface-hover:      #27272a;
+  --color-surface-active:     #3f3f46;
 
-  --color-border:             rgba(0, 0, 0, 0.08);
-  --color-border-subtle:      rgba(0, 0, 0, 0.04);
-  --color-border-strong:      rgba(0, 0, 0, 0.15);
-  --color-border-focus:       rgba(99, 102, 241, 0.8);
+  --color-border:             #27272a;
+  --color-border-subtle:      #1f1f23;
+  --color-border-strong:      #3f3f46;
+  --color-border-focus:       #ffffff;
 
-  --color-text-primary:       #0f172a;
-  --color-text-secondary:     #475569;
-  --color-text-muted:         #64748b;
-  --color-text-disabled:      #94a3b8;
-  --color-text-inverse:       #ffffff;
+  --color-text-primary:       #f8fafc;
+  --color-text-secondary:     #cbd5e1;
+  --color-text-muted:         #94a3b8;
+  --color-text-disabled:      #64748b;
+  --color-text-inverse:       #09090b;
 
-  --shadow-sm:                0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md:                0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg:                0 12px 32px rgba(0, 0, 0, 0.12);
-  --shadow-drawer:            -8px 0 32px rgba(0, 0, 0, 0.15);
+  --color-primary:            #ffffff;
+  --color-primary-hover:      #e4e4e7;
+  --color-primary-subtle:     #27272a;
+  --color-primary-border:     #3f3f46;
+  --color-primary-text:       #09090b;
+
+  --color-accent:             #3b82f6;
+  --color-accent-hover:       #60a5fa;
+  --color-accent-subtle:      rgba(59, 130, 246, 0.15);
+  --color-accent-border:      rgba(59, 130, 246, 0.3);
+  --color-accent-text:        #93c5fd;
+
+  --severity-critical-bg:     rgba(239, 68, 68, 0.15);
+  --severity-critical-border: rgba(239, 68, 68, 0.3);
+  --severity-critical-text:   #f87171;
+
+  --severity-high-bg:         rgba(234, 88, 12, 0.15);
+  --severity-high-border:     rgba(234, 88, 12, 0.3);
+  --severity-high-text:       #fb923c;
+
+  --severity-medium-bg:       rgba(217, 119, 6, 0.15);
+  --severity-medium-border:   rgba(217, 119, 6, 0.3);
+  --severity-medium-text:     #fbbf24;
+
+  --severity-low-bg:          rgba(37, 99, 235, 0.15);
+  --severity-low-border:      rgba(37, 99, 235, 0.3);
+  --severity-low-text:        #60a5fa;
+
+  --severity-info-bg:         rgba(2, 132, 199, 0.15);
+  --severity-info-border:     rgba(2, 132, 199, 0.3);
+  --severity-info-text:       #38bdf8;
+
+  --shadow-xs:                0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-sm:                0 1px 3px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md:                0 4px 6px -1px rgba(0, 0, 0, 0.6);
+  --shadow-lg:                0 10px 15px -3px rgba(0, 0, 0, 0.7);
 }

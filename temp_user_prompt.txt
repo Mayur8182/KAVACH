@@ -1,0 +1,112 @@
+<USER_REQUEST>
+# KAVACH API SECURITY — COMPLETE UI/UX REDESIGN & IMPLEMENTATION
+
+## PROJECT OBJECTIVE
+
+Redesign the entire existing Kavach API Security module using the supplied visual references as the primary design direction.
+
+The goal is to transform the existing generic cybersecurity dashboard into a premium, modern, YC-backed startup-style enterprise security product.
+
+This is NOT a simple theme update.
+
+Redesign the complete information architecture, navigation experience, page compositions, visual hierarchy, components, spacing, typography, interaction patterns, and responsive layouts.
+
+Every page must look like part of the same product, but each page must have its own purpose-built layout.
+
+**Core design principle: SAME DESIGN SYSTEM, DIFFERENT PAGE COMPOSITIONS.**
+
+---
+
+# 1. DESIGN DIRECTION
+
+Use the supplied reference images as the visual source of truth.
+
+### Visual language
+
+- Premium YC startup aesthetic.
+- Minimalist, editorial, developer-focused design.
+- Swiss-inspired typography and spacing.
+- Clean enterprise security interface.
+- Warm white / off-white backgrounds.
+- Charcoal and near-black typography.
+- Subtle neutral borders.
+- Minimal shadows.
+- Precise alignment and spacing.
+- Clear information hierarchy.
+- Compact but readable technical data.
+- Functional, sophisticated interactions.
+
+### Color system
+
+Do NOT use blue as the primary interface color.
+
+Use this color system:
+
+- Primary background: warm off-white (#F8F7F4).
+- Surface: white (#FFFFFF).
+- Primary text: charcoal (#171717).
+- Secondary text: muted gray (#737373).
+- Borders: light neutral gray (#E7E5E0).
+- Primary actions: near-black (#171717).
+- Success: muted green.
+- Critical: restrained red.
+- High: muted orange.
+- Medium: muted amber.
+- Low: neutral gray.
+
+Use severity colors only when communicating actual security severity.
+
+Avoid colorful decoration.
+
+### Strictly prohibited
+
+- Generic AI SaaS dashboard templates.
+- Blue gradient dashboards.
+- Purple or blue glowing backgrounds.
+- Excessive rounded cards.
+- Four identica
+<truncated 19532 bytes>
+ommand/search navigation works.
+- All nine pages are redesigned.
+- Each page has its own distinct layout.
+- All pages share one consistent design system.
+- No blue primary theme remains.
+- No repetitive generic KPI-card dashboards remain.
+- No forced horizontal workflow strip is used.
+- No accidental horizontal page scrolling exists.
+- Existing backend functionality remains intact.
+- All security data is real and persisted.
+- All primary actions work.
+- Desktop, tablet and mobile layouts are verified.
+
+## FINAL INSTRUCTION
+
+Think like a senior product designer and frontend architect building a serious YC-backed cybersecurity startup.
+
+Do not simply beautify the existing dashboard.
+
+Reimagine how developers and security engineers interact with API security data.
+
+Make the product feel premium, focused, fast, technical, trustworthy and production-ready.
+
+The reference images define the visual language.
+
+The existing Kavach architecture defines the functionality.
+
+Preserve the functionality. Redesign the experience.
+
+**One unified Kavach design system. Nine purpose-built page layouts. Zero generic dashboard templates.**  Look this only apply in my API security platoform okan in api seucirty dashabrod only 
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-11-14T14:50:55+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\USER\Desktop\YC THING\backend\app\services\api_security_testing_engine.py (LANGUAGE_UNSPECIFIED)
+Cursor is on line: 1
+Other open documents:
+- c:\Users\USER\Desktop\YC THING\frontend\app\(platform)\api-security\page.tsx (LANGUAGE_UNSPECIFIED)
+- c:\Users\USER\Desktop\YC THING\frontend\components\security\ProductSecurityLifecycle.tsx (LANGUAGE_UNSPECIFIED)
+- c:\Users\USER\Desktop\YC THING\frontend\components\navigation\Topbar.tsx (LANGUAGE_UNSPECIFIED)
+- c:\Users\USER\Desktop\YC THING\frontend\app\(platform)\secrets\page.tsx (LANGUAGE_UNSPECIFIED)
+- c:\Users\USER\Desktop\YC THING\frontend\app\(platform)\iac\page.tsx (LANGUAGE_UNSPECIFIED)
+</ADDITIONAL_METADATA>

@@ -113,6 +113,7 @@ class GitHubService:
             message=msg,
             installations_count=len(installations),
             connected_repos_count=len(repos),
+            installation_ids=[item.github_installation_id for item in installations if item.status == "ACTIVE"],
         )
 
     async def verify_and_sync_installation(

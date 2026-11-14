@@ -44,6 +44,7 @@ import {
   FileCode,
 } from 'lucide-react';
 import { KavachApiLayout } from '../../components/KavachApiLayout';
+import { AnalysisProgressCard } from '../../components/AnalysisProgressCard';
 import { api } from '@/lib/api/client';
 import { useScope } from '@/context/ScopeContext';
 import { toast } from '@/lib/toast';
@@ -421,156 +422,57 @@ function ScanDetailsContent() {
         )
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1280px', margin: '0 auto', width: '100%' }}>
-        {/* ── 1. Canonical Interactive Top Navigation & Breadcrumb ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-          <Link
-            href="/api-security/analysis"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #CBD5E1',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#334155',
-              textDecoration: 'none',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <ArrowLeft size={13} />
-            <span>Back to Security Analysis</span>
-          </Link>
-
-          <nav
-            aria-label="Breadcrumb"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '12px',
-              color: '#64748B',
-              flexWrap: 'wrap',
-              backgroundColor: '#F8FAFC',
-              border: '1px solid #E2E8F0',
-              padding: '6px 12px',
-              borderRadius: '6px',
-            }}
-          >
-            <Link
-              href="/api-security/analysis"
-              style={{ color: '#475569', textDecoration: 'none', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-            >
-              <span>Security Analysis</span>
-            </Link>
-          <ChevronRight size={13} color="#94A3B8" />
-          <Link
-            href="/api-security/analysis"
-            style={{ color: '#475569', textDecoration: 'none', fontWeight: 500 }}
-          >
-            <span>Scan Results</span>
-          </Link>
-          <ChevronRight size={13} color="#94A3B8" />
-          <Link
-            href={scan?.api_id ? `/api-security/apis/${scan.api_id}` : '/api-security/apis'}
-            style={{ color: '#0F172A', textDecoration: 'none', fontWeight: 600 }}
-            title="Navigate to target API inventory"
-          >
-            <span>{scan?.api_name || 'API Target'}</span>
-          </Link>
-          <ChevronRight size={13} color="#94A3B8" />
-          <span
-            style={{
-              color: '#2563EB',
-              fontWeight: 700,
-              backgroundColor: '#EFF6FF',
-              padding: '2px 8px',
-              borderRadius: '4px',
-              border: '1px solid #DBEAFE',
-            }}
-          >
-            {currentTabObj.label.split(' ')[0]}
-          </span>
-        </nav>
-      </div>
-
-        {/* ── First-Time Visitor Explainer Hero Banner (Addresses Jargon: BOLA & OWASP Top 10) ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
+        {/* ── 1. Compact Unified Executive Scan HUD ── */}
         <div
           style={{
             backgroundColor: '#FFFFFF',
             border: '1px solid #E2E8F0',
-            borderLeft: '4px solid #2563EB',
             borderRadius: '10px',
-            padding: '14px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px',
-            fontSize: '12px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: '#EFF6FF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#2563EB',
-                flexShrink: 0,
-              }}
-            >
-              <Shield size={17} />
-            </div>
-            <div style={{ color: '#334155', lineHeight: 1.5 }}>
-              <strong style={{ color: '#0F172A' }}>Kavach Autonomous API Security:</strong>{' '}
-              Continuously finds and verifies vulnerabilities across endpoints. Automated test suites examine critical risks including{' '}
-              <span
-                title="Broken Object Level Authorization (OWASP API1:2023) - flawed authorization allowing unauthorized access across data objects and user IDs"
-                style={{ textDecoration: 'underline dotted', cursor: 'help', fontWeight: 600, color: '#2563EB' }}
-              >
-                Broken Object Level Authorization (BOLA/IDOR)
-              </span>{' '}
-              and enforce adherence to{' '}
-              <span
-                title="Open Worldwide Application Security Project (OWASP) - standard framework outlining the top 10 most critical API security risks"
-                style={{ textDecoration: 'underline dotted', cursor: 'help', fontWeight: 600, color: '#2563EB' }}
-              >
-                OWASP API Security Top 10
-              </span>{' '}
-              standards with deterministic proof.
-            </div>
-          </div>
-        </div>
-
-        {/* ── 2. Header & Execution Identity Banner ── */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '12px',
-            padding: '20px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '16px',
+            padding: '16px 20px',
             boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.01em' }}>
-                {scan?.api_name || 'API Security Scan Execution'}
-              </h1>
+          {/* Top Line: Breadcrumb Navigation + Mode Identity + Quick Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '12px' }}>
+              <Link
+                href="/api-security/analysis"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 10px',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '6px',
+                  fontWeight: 600,
+                  color: '#334155',
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <ArrowLeft size={12} />
+                <span>Security Analysis</span>
+              </Link>
+              <ChevronRight size={12} color="#94A3B8" />
+              <Link
+                href={scan?.api_id ? `/api-security/apis/${scan.api_id}` : '/api-security/apis'}
+                style={{ color: '#0F172A', textDecoration: 'none', fontWeight: 600 }}
+              >
+                {scan?.api_name || 'API Target'}
+              </Link>
+              <ChevronRight size={12} color="#94A3B8" />
+              <span style={{ color: '#64748B', fontFamily: 'monospace' }}>
+                Scan: {scanId?.slice(0, 8)}...
+              </span>
+            </div>
+
+            {/* Top Right: Status Pill & Action Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span
                 style={{
                   padding: '3px 10px',
@@ -580,7 +482,6 @@ function ScanDetailsContent() {
                   backgroundColor: scan?.status === 'COMPLETED' ? '#ECFDF5' : scan?.status === 'FAILED' ? '#FEF2F2' : '#EFF6FF',
                   color: scan?.status === 'COMPLETED' ? '#059669' : scan?.status === 'FAILED' ? '#DC2626' : '#2563EB',
                   border: `1px solid ${scan?.status === 'COMPLETED' ? '#A7F3D0' : scan?.status === 'FAILED' ? '#FECACA' : '#BFDBFE'}`,
-                  letterSpacing: '0.04em',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
@@ -589,6 +490,53 @@ function ScanDetailsContent() {
                 {!isFinished && <Loader2 size={11} className="animate-spin" />}
                 <span>{scan?.status || 'RUNNING'}</span>
               </span>
+
+              <span
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  backgroundColor: '#F1F5F9',
+                  color: '#475569',
+                  border: '1px solid #E2E8F0',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Clock size={11} />
+                <span>{formatTime(elapsedSeconds)}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Middle Line: Scan Identity & Metric Counters */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', borderTop: '1px solid #F1F5F9', paddingTop: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.01em' }}>
+                {scan?.api_name || 'API Security Scan'}
+              </h1>
+
+              {/* Mode Badge: Source Code SAST vs Live Endpoint DAST */}
+              <span
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  backgroundColor: scan?.scan_config?.mode === 'CODE_SCAN' || !scan?.api_name?.includes('http') ? '#F1F5F9' : '#EFF6FF',
+                  color: scan?.scan_config?.mode === 'CODE_SCAN' || !scan?.api_name?.includes('http') ? '#0F172A' : '#1D4ED8',
+                  border: `1px solid ${scan?.scan_config?.mode === 'CODE_SCAN' || !scan?.api_name?.includes('http') ? '#CBD5E1' : '#BFDBFE'}`,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Code2 size={12} />
+                <span>{scan?.scan_config?.mode === 'CODE_SCAN' || !scan?.api_name?.includes('http') ? 'Source Code Audit (AST)' : 'Live Endpoint Fuzzing (DAST)'}</span>
+              </span>
+
               <span
                 style={{
                   padding: '3px 8px',
@@ -600,165 +548,222 @@ function ScanDetailsContent() {
                   border: '1px solid #FDE68A',
                 }}
               >
-                {scan?.environment || 'PRODUCTION'}
+                {scan?.environment || 'STAGING'}
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#64748B', flexWrap: 'wrap' }}>
-              <span>
-                Scan ID: <strong style={{ fontFamily: 'monospace', color: '#334155' }}>{scanId?.slice(0, 16)}</strong>
-              </span>
-              <span>
-                Endpoints Tested: <strong style={{ color: '#0F172A' }}>{endpointsCount} routes</strong>
-              </span>
-              <span>
-                Elapsed: <strong style={{ color: '#0F172A' }}>{formatTime(elapsedSeconds)}</strong>
-              </span>
-              {scan?.started_at && (
-                <>
-                  <span>Started: {new Date(scan.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── 3. Scan Execution vs Security Outcome Banner (Plain Language & Consolidated) ── */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '12px',
-            padding: '18px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '24px',
-            flexWrap: 'wrap',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-          }}
-        >
-          {/* Left: Scan Execution Status */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flex: 1, minWidth: 'min(100%, 280px)' }}>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '10px',
-                backgroundColor: scan?.status === 'COMPLETED' ? '#ECFDF5' : '#EFF6FF',
-                color: scan?.status === 'COMPLETED' ? '#059669' : '#2563EB',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              {scan?.status === 'COMPLETED' ? <CheckCircle2 size={22} /> : <Loader2 size={22} className="animate-spin" />}
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
-                  {scan?.status === 'COMPLETED' ? 'Scan Execution: Completed' : 'Scan Execution: Running'}
-                </span>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    padding: '2px 8px',
-                    borderRadius: '9999px',
-                    backgroundColor: '#F1F5F9',
-                    color: '#334155',
-                  }}
-                >
-                  100% Routes Tested ({endpointsCount} endpoints)
-                </span>
+            {/* Quick KPI Summary Chips */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>Endpoints:</span>
+                <strong style={{ color: '#0F172A' }}>{endpointsCount}</strong>
               </div>
-              <p style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0 0', lineHeight: 1.4 }}>
-                Comprehensive automated OWASP Top 10 assertion suites executed.
-                <span style={{ display: 'block', color: '#94A3B8', fontSize: '11px', marginTop: '2px' }}>
-                  *Note: 100% coverage indicates all discovered routes were tested, not that the application is secure.
-                </span>
-              </p>
-            </div>
-          </div>
 
-          {/* Right: Security Outcome Status (Consolidated & Plain Language) */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '20px',
-              borderLeft: '1px solid #F1F5F9',
-              paddingLeft: '24px',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Security Outcome
+              <div style={{ width: '1px', height: '14px', backgroundColor: '#E2E8F0' }} />
+
+              <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>Tests:</span>
+                <span style={{ color: '#10B981', fontWeight: 700 }}>{testsPassed} passed</span>
+                {testsFailed > 0 && <span style={{ color: '#DC2626', fontWeight: 700 }}>/ {testsFailed} failed</span>}
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
-                <span style={{ fontSize: '18px', fontWeight: 800, color: testsFailed > 0 ? '#DC2626' : '#059669' }}>
-                  {testsFailed > 0 ? `${testsFailed} Vulnerabilities Identified` : 'All Security Assertions Passed'}
-                </span>
-                {testsFailed > 0 && (
-                  <span style={{ fontSize: '12px', color: '#64748B' }}>
-                    • <strong style={{ color: '#DC2626' }}>{criticalCount} Critical</strong>, <strong style={{ color: '#D97706' }}>{highCount} High</strong>
+
+              <div style={{ width: '1px', height: '14px', backgroundColor: '#E2E8F0' }} />
+
+              {/* Findings Counters */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {criticalCount > 0 && (
+                  <span
+                    onClick={() => {
+                      setSeverityFilter('CRITICAL');
+                      handleTabChange('findings');
+                    }}
+                    style={{
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      backgroundColor: '#FEE2E2',
+                      color: '#DC2626',
+                      border: '1px solid #FECACA',
+                      cursor: 'pointer',
+                    }}
+                    title="Click to view Critical findings"
+                  >
+                    {criticalCount} Critical
+                  </span>
+                )}
+                {highCount > 0 && (
+                  <span
+                    onClick={() => {
+                      setSeverityFilter('HIGH');
+                      handleTabChange('findings');
+                    }}
+                    style={{
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      backgroundColor: '#FEF3C7',
+                      color: '#B45309',
+                      border: '1px solid #FDE68A',
+                      cursor: 'pointer',
+                    }}
+                    title="Click to view High findings"
+                  >
+                    {highCount} High
+                  </span>
+                )}
+                {criticalCount === 0 && highCount === 0 && isFinished && (
+                  <span
+                    style={{
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      backgroundColor: '#ECFDF5',
+                      color: '#059669',
+                      border: '1px solid #A7F3D0',
+                    }}
+                  >
+                    0 Critical Risks
                   </span>
                 )}
               </div>
-            </div>
 
-            {criticalCount + highCount > 0 ? (
-              <button
-                type="button"
-                onClick={handleReviewFindingsClick}
-                disabled={isNavigatingFindings}
-                className="btn-tactile review-findings-button"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backgroundColor: '#DC2626',
-                  color: '#FFFFFF',
-                  padding: '9px 16px',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  border: 'none',
-                  cursor: isNavigatingFindings ? 'wait' : 'pointer',
-                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.25)',
-                  transition: 'all 0.15s ease',
-                  opacity: isNavigatingFindings ? 0.75 : 1,
-                }}
-              >
-                {isNavigatingFindings ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <ShieldAlert size={14} />
-                )}
-                <span>Review Critical Findings ({criticalCount + highCount})</span>
-              </button>
-            ) : (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backgroundColor: '#ECFDF5',
-                  color: '#059669',
-                  padding: '8px 14px',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  border: '1px solid #A7F3D0',
-                }}
-              >
-                <CheckCircle2 size={14} />
-                <span>All Assertions Passed</span>
-              </div>
-            )}
+              {/* Action Button: Review Findings */}
+              {criticalCount + highCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleReviewFindingsClick}
+                  disabled={isNavigatingFindings}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor: '#DC2626',
+                    color: '#FFFFFF',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: isNavigatingFindings ? 'wait' : 'pointer',
+                    boxShadow: '0 1px 3px rgba(220, 38, 38, 0.2)',
+                  }}
+                >
+                  <ShieldAlert size={13} />
+                  <span>Review Findings ({criticalCount + highCount})</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Compact 5-Stage Stepper Bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid #F1F5F9', paddingTop: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%' }}>
+              {steps.map((st, idx) => {
+                const status = getStepStatus(st.id);
+                const stepDuration = getStepDuration(st.id, idx);
+                return (
+                  <React.Fragment key={st.id}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        backgroundColor: status === 'active' ? '#EFF6FF' : status === 'completed' ? '#F8FAFC' : 'transparent',
+                        border: `1px solid ${status === 'active' ? '#BFDBFE' : status === 'completed' ? '#E2E8F0' : 'transparent'}`,
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          backgroundColor: status === 'completed' ? '#10B981' : status === 'active' ? '#2563EB' : '#E2E8F0',
+                          color: '#FFFFFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {status === 'completed' ? <Check size={11} /> : status === 'active' ? <Loader2 size={11} className="animate-spin" /> : idx + 1}
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '11.5px',
+                          fontWeight: status === 'active' ? 700 : 500,
+                          color: status === 'active' ? '#2563EB' : status === 'completed' ? '#0F172A' : '#94A3B8',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {st.label}
+                      </span>
+                      {status === 'completed' && (
+                        <span style={{ fontSize: '10px', color: '#94A3B8', fontFamily: 'monospace', marginLeft: 'auto' }}>
+                          {stepDuration}
+                        </span>
+                      )}
+                    </div>
+                    {idx < steps.length - 1 && (
+                      <div style={{ width: '10px', height: '1px', backgroundColor: '#E2E8F0', flexShrink: 0 }} />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
           </div>
         </div>
+
+        {/* ── Unreachable Host Diagnostic Callout (If DAST Fuzzer encountered timeouts) ── */}
+        {scan?.status === 'COMPLETED' && testsFailed === 0 && testsPassed === 0 && testsTotal > 0 && (
+          <div
+            style={{
+              backgroundColor: '#FFFBEB',
+              border: '1px solid #FDE68A',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '14px',
+              fontSize: '12.5px',
+              color: '#92400E',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <AlertTriangle size={18} color="#D97706" style={{ flexShrink: 0 }} />
+              <div>
+                <strong>Notice: Live target server was offline or unreachable during dynamic probes.</strong>{' '}
+                <span>If you are analyzing a repository without a live running server, run a <strong>Source Code Security Audit</strong> to discover AST routes and check logic without network dependencies.</span>
+              </div>
+            </div>
+            <Link
+              href="/api-security"
+              style={{
+                backgroundColor: '#B45309',
+                color: '#FFFFFF',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontWeight: 600,
+                fontSize: '12px',
+                textDecoration: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Launch Code Audit
+            </Link>
+          </div>
+        )}
 
         {/* ── 4. Unified Persistent Tab Strip (P2 & P4) ── */}
         <div
@@ -805,172 +810,54 @@ function ScanDetailsContent() {
 
         {/* ── TAB 1: OVERVIEW ── */}
         {activeTab === 'overview' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Stepper Card */}
-            <div
-              style={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '10px',
-                padding: '24px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-              }}
-            >
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 10px',
-                  borderRadius: '12px',
-                  backgroundColor: scan?.status === 'COMPLETED' ? '#ECFDF5' : '#EFF6FF',
-                  color: scan?.status === 'COMPLETED' ? '#059669' : '#2563EB',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  marginBottom: '8px',
-                }}
-              >
-                {!isFinished ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
-                <span>{scan?.status === 'COMPLETED' ? 'Completed' : 'Running Automated Security Tests'}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Real-time Analysis Progress Card (Matching Screenshot 3) */}
+            <AnalysisProgressCard
+              status={scan?.status || 'RUNNING'}
+              progress={
+                scan?.status === 'COMPLETED'
+                  ? 100
+                  : scan?.status === 'FAILED'
+                  ? 72
+                  : testsTotal > 0
+                  ? Math.min(95, Math.max(30, Math.round(50 + ((testsPassed + testsFailed) / testsTotal) * 45)))
+                  : 72
+              }
+              stepName={
+                scan?.status === 'COMPLETED'
+                  ? 'Complete'
+                  : scan?.status === 'DISCOVERING'
+                  ? 'Endpoint discovery'
+                  : scan?.status === 'ANALYZING'
+                  ? 'Attack path mapping'
+                  : 'Vulnerability analysis'
+              }
+            />
+
+            {/* Quick Metrics 4-Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
+              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>Total Assertions</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', marginTop: '4px' }}>{testsTotal}</div>
+                <div style={{ fontSize: '11px', color: '#2563EB', marginTop: '2px' }}>Automated test vectors</div>
               </div>
 
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '4px 0 6px 0' }}>
-                {scan?.status === 'COMPLETED' ? 'Security Analysis Completed' : 'Security Analysis in Progress'}
-              </h2>
-              <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 24px 0' }}>
-                {scan?.status === 'COMPLETED'
-                  ? 'All automated security test suites, Broken Object Level Authorization (BOLA) verifications, and AI assessments finished.'
-                  : `Testing target "${scan?.api_name || 'API Inventory'}" against OWASP API Top 10 vulnerabilities.`}
-              </p>
-
-              {/* Stepper with Metaphorical Domain Icons & Granular Per-Step Durations */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'center',
-                  width: '100%',
-                  maxWidth: '860px',
-                  marginBottom: '24px',
-                  position: 'relative',
-                }}
-              >
-                {steps.map((st, idx) => {
-                  const status = getStepStatus(st.id);
-                  const StepIcon = st.icon;
-                  const stepDuration = getStepDuration(st.id, idx);
-                  return (
-                    <React.Fragment key={st.id}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 2, minWidth: '96px' }}>
-                        <div
-                          style={{
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '50%',
-                            backgroundColor: status === 'completed' ? '#2563EB' : status === 'active' ? '#EFF6FF' : '#FFFFFF',
-                            border: `2px solid ${status === 'completed' ? '#2563EB' : status === 'active' ? '#2563EB' : '#CBD5E1'}`,
-                            color: status === 'completed' ? '#FFFFFF' : status === 'active' ? '#2563EB' : '#64748B',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            boxShadow: status === 'active' ? '0 0 0 4px rgba(37,99,235,0.12)' : 'none',
-                            transition: 'all 0.2s ease',
-                          }}
-                          title={`${st.label} - ${status === 'completed' ? `Completed (${stepDuration})` : status === 'active' ? 'Active' : 'Pending'}`}
-                        >
-                          {status === 'completed' ? (
-                            <CheckCircle2 size={18} />
-                          ) : status === 'active' ? (
-                            <Loader2 size={17} className="animate-spin" />
-                          ) : (
-                            <StepIcon size={16} />
-                          )}
-                        </div>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: status === 'active' ? 700 : 600,
-                            color: status === 'active' ? '#2563EB' : '#475569',
-                            whiteSpace: 'nowrap',
-                            textAlign: 'center',
-                          }}
-                        >
-                          {st.label}
-                        </span>
-                        {status === 'completed' ? (
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              color: '#64748B',
-                              fontFamily: 'monospace',
-                              backgroundColor: '#F1F5F9',
-                              padding: '1px 5px',
-                              borderRadius: '3px',
-                            }}
-                          >
-                            ({stepDuration})
-                          </span>
-                        ) : status === 'active' ? (
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              color: '#2563EB',
-                              fontWeight: 600,
-                              backgroundColor: '#EFF6FF',
-                              padding: '1px 5px',
-                              borderRadius: '3px',
-                            }}
-                          >
-                            active
-                          </span>
-                        ) : null}
-                      </div>
-
-                      {idx < steps.length - 1 && (
-                        <div
-                          style={{
-                            flex: 1,
-                            height: '2px',
-                            backgroundColor: status === 'completed' ? '#2563EB' : '#E2E8F0',
-                            marginTop: '18px',
-                            zIndex: 1,
-                          }}
-                        />
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>Passed Tests</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: '#10B981', marginTop: '4px' }}>{testsPassed}</div>
+                <div style={{ fontSize: '11px', color: '#10B981', marginTop: '2px' }}>Verified secure controls</div>
               </div>
 
-              {/* Progress Bar & Detailed Elapsed Breakdown */}
-              <div style={{ width: '100%', maxWidth: '860px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B' }}>
-                  <span style={{ fontWeight: 600, color: '#334155', textAlign: 'left' }} title={scan?.current_test || 'Analyzing security posture...'}>
-                    Current Phase: <span style={{ fontWeight: 500, color: '#64748B' }}>{scan?.current_test || (isFinished ? 'Security Analysis Complete' : 'Executing active test vectors')}</span>
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap' }}>
-                    <Clock size={13} />
-                    <span>Total Elapsed: <strong style={{ color: '#0F172A' }}>{formatTime(elapsedSeconds)}</strong></span>
-                  </div>
-                </div>
+              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>Failed Assertions</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: testsFailed > 0 ? '#EF4444' : '#64748B', marginTop: '4px' }}>{testsFailed}</div>
+                <div style={{ fontSize: '11px', color: testsFailed > 0 ? '#EF4444' : '#64748B', marginTop: '2px' }}>Security assertions breached</div>
+              </div>
 
-                <div style={{ width: '100%', height: '8px', backgroundColor: '#F1F5F9', borderRadius: '9999px', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${scan?.progress_pct ?? (isFinished ? 100 : 25)}%`,
-                      backgroundColor: scan?.status === 'COMPLETED' ? '#10B981' : '#2563EB',
-                      borderRadius: '9999px',
-                      transition: 'width 0.4s ease',
-                    }}
-                  />
-                </div>
+              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>Confirmed Vulns</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: (criticalCount + highCount) > 0 ? '#DC2626' : '#10B981', marginTop: '4px' }}>{criticalCount + highCount}</div>
+                <div style={{ fontSize: '11px', color: (criticalCount + highCount) > 0 ? '#DC2626' : '#10B981', marginTop: '2px' }}>Critical & High severity</div>
               </div>
             </div>
 
@@ -1212,33 +1099,6 @@ function ScanDetailsContent() {
                     <ArrowRight size={13} />
                   </button>
                 </div>
-              </div>
-            </div>
-
-            {/* Quick Metrics 4-Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
-              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>Test Cases</div>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', marginTop: '4px' }}>{testsTotal}</div>
-                <div style={{ fontSize: '11px', color: '#2563EB', marginTop: '2px' }}>Total assertions executed</div>
-              </div>
-
-              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>Passed Tests</div>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: '#10B981', marginTop: '4px' }}>{testsPassed}</div>
-                <div style={{ fontSize: '11px', color: '#10B981', marginTop: '2px' }}>Verified secure controls</div>
-              </div>
-
-              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>Failed Assertions</div>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: '#EF4444', marginTop: '4px' }}>{testsFailed}</div>
-                <div style={{ fontSize: '11px', color: '#EF4444', marginTop: '2px' }}>Security assertions breached</div>
-              </div>
-
-              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>Confirmed Vulns</div>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: '#DC2626', marginTop: '4px' }}>{criticalCount + highCount}</div>
-                <div style={{ fontSize: '11px', color: '#DC2626', marginTop: '2px' }}>Critical / High severity</div>
               </div>
             </div>
           </div>

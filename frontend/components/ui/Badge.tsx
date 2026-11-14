@@ -9,91 +9,105 @@ import {
   Shield,
 } from 'lucide-react';
 
-export type BadgeVariant = 'neutral' | 'success' | 'warning' | 'error' | 'info';
+export type BadgeVariant = 'neutral' | 'success' | 'warning' | 'error' | 'info' | 'brand';
+export type BadgeSize = 'xs' | 'sm' | 'md';
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
+  size?: BadgeSize;
   icon?: React.ReactNode;
   showDefaultIcon?: boolean;
+  dot?: boolean;
 }
 
 /**
- * Enterprise Status Badge
+ * Kavach Enterprise Status Badge
  * Strictly conforms to:
- * - Rule 4: Never color alone (always paired with icon or text tag).
- * - Rule 6: WCAG 4.5:1 contrast compliance.
- * - Rule 3: Limited to short tags under 20 characters.
+ * - WCAG AA contrast (4.5:1+) on enterprise light backgrounds
+ * - Compact typographic footprint (10px - 12px)
+ * - Accessible status semantics
  */
 export const Badge: React.FC<BadgeProps> = ({
   children,
   variant = 'neutral',
+  size = 'sm',
   icon,
-  showDefaultIcon = true,
+  showDefaultIcon = false,
+  dot = false,
+  className = '',
   style = {},
   ...props
 }) => {
-  const configs: Record<
+  const variantStyles: Record<
     BadgeVariant,
-    { bg: string; border: string; text: string; defaultIcon: React.ReactNode }
+    { bg: string; border: string; text: string; dotColor: string; defaultIcon: React.ReactNode }
   > = {
     neutral: {
-      bg: 'rgba(255, 255, 255, 0.05)',
-      border: 'rgba(255, 255, 255, 0.12)',
-      text: '#94A3B8',
-      defaultIcon: <Shield size={12} />,
+      bg: 'bg-[#F1F5F9]',
+      border: 'border-[#E2E8F0]',
+      text: 'text-[#475569]',
+      dotColor: 'bg-[#64748B]',
+      defaultIcon: <Shield size={11} />,
     },
     success: {
-      bg: 'rgba(16, 185, 129, 0.12)',
-      border: 'rgba(16, 185, 129, 0.3)',
-      text: '#10B981',
-      defaultIcon: <CheckCircle2 size={12} />,
+      bg: 'bg-[#ECFDF5]',
+      border: 'border-[#A7F3D0]',
+      text: 'text-[#047857]',
+      dotColor: 'bg-[#10B981]',
+      defaultIcon: <CheckCircle2 size={11} />,
     },
     warning: {
-      bg: 'rgba(245, 158, 11, 0.12)',
-      border: 'rgba(245, 158, 11, 0.3)',
-      text: '#F59E0B',
-      defaultIcon: <AlertTriangle size={12} />,
+      bg: 'bg-[#FFFBEB]',
+      border: 'border-[#FDE68A]',
+      text: 'text-[#B45309]',
+      dotColor: 'bg-[#F59E0B]',
+      defaultIcon: <AlertTriangle size={11} />,
     },
     error: {
-      bg: 'rgba(239, 68, 68, 0.12)',
-      border: 'rgba(239, 68, 68, 0.3)',
-      text: '#EF4444',
-      defaultIcon: <AlertCircle size={12} />,
+      bg: 'bg-[#FEF2F2]',
+      border: 'border-[#FECACA]',
+      text: 'text-[#B91C1C]',
+      dotColor: 'bg-[#EF4444]',
+      defaultIcon: <AlertCircle size={11} />,
     },
     info: {
-      bg: 'rgba(56, 189, 248, 0.12)',
-      border: 'rgba(56, 189, 248, 0.3)',
-      text: '#38BDF8',
-      defaultIcon: <Info size={12} />,
+      bg: 'bg-[#F0F9FF]',
+      border: 'border-[#BAE6FD]',
+      text: 'text-[#0369A1]',
+      dotColor: 'bg-[#0284C7]',
+      defaultIcon: <Info size={11} />,
+    },
+    brand: {
+      bg: 'bg-[#F4F4F5]',
+      border: 'border-[#E4E4E7]',
+      text: 'text-[#09090B]',
+      dotColor: 'bg-[#09090B]',
+      defaultIcon: <Shield size={11} />,
     },
   };
 
-  const current = configs[variant];
+  const sizeClasses: Record<BadgeSize, string> = {
+    xs: 'text-[10px] px-1.5 py-0.5 gap-1 rounded',
+    sm: 'text-[11px] px-2 py-0.5 gap-1.5 rounded-md',
+    md: 'text-[12px] px-2.5 py-1 gap-1.5 rounded-md',
+  };
+
+  const current = variantStyles[variant];
   const renderedIcon = icon || (showDefaultIcon ? current.defaultIcon : null);
 
   return (
     <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '5px',
-        padding: '3px 8px',
-        borderRadius: '4px',
-        backgroundColor: current.bg,
-        border: `1px solid ${current.border}`,
-        color: current.text,
-        fontSize: '11px',
-        fontWeight: 600,
-        fontFamily: 'var(--font-mono, monospace)',
-        letterSpacing: '0.04em',
-        textTransform: 'uppercase',
-        lineHeight: 1.2,
-        whiteSpace: 'nowrap',
-        ...style,
-      }}
+      className={`inline-flex items-center font-medium font-sans border whitespace-nowrap leading-none transition-colors ${current.bg} ${current.border} ${current.text} ${sizeClasses[size]} ${className}`}
+      style={style}
       {...props}
     >
-      {renderedIcon && <span aria-hidden="true" style={{ display: 'inline-flex' }}>{renderedIcon}</span>}
+      {dot && (
+        <span
+          className={`w-1.5 h-1.5 rounded-full shrink-0 ${current.dotColor}`}
+          aria-hidden="true"
+        />
+      )}
+      {renderedIcon && <span className="inline-flex shrink-0" aria-hidden="true">{renderedIcon}</span>}
       <span>{children}</span>
     </span>
   );

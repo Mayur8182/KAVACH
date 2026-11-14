@@ -127,9 +127,9 @@ export default function SignupPage() {
       if (loginRes?.access_token) {
         setAuthToken(loginRes.access_token);
         toast.success('Account created successfully', {
-          description: 'Welcome to Kavach. Redirecting to verification...',
+          description: 'Welcome to Kavach. Opening project workspace setup...',
         });
-        router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+        router.push('/onboarding');
       } else {
         throw new Error('Account created but auto-login failed. Please log in manually.');
       }

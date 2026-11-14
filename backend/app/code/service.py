@@ -230,7 +230,6 @@ class CodeService:
             if target_proj:
                 if (
                     user_is_super
-                    or not target_proj.owner_id
                     or target_proj.owner_id == self.current_user.id
                 ):
                     return False, [target_uuid]
@@ -248,12 +247,10 @@ class CodeService:
                         )
                         if mem_check.scalars().first():
                             return False, [target_uuid]
-                    else:
-                        return False, [target_uuid]
                 except Exception:
                     pass
 
-                return False, [target_uuid]
+                return True, []
 
             return True, []
 
@@ -283,10 +280,6 @@ class CodeService:
             pass
 
         if not allowed_ids:
-            all_proj_q = select(Project.id).limit(50)
-            all_projs = list((await self.db.execute(all_proj_q)).scalars().all())
-            if all_projs:
-                return False, all_projs
             return True, []
 
         return False, allowed_ids
@@ -322,52 +315,6 @@ class CodeService:
         if proj_uuids:
             repo_q = repo_q.where(GitHubRepository.project_id.in_(proj_uuids))
         repos_total = (await self.db.execute(repo_q)).scalar() or 0
-
-        # Auto-link: If no repositories exist for active project, check for unassigned or user's auto-created project repos
-        if repos_total == 0 and proj_uuids:
-            first_proj_id = proj_uuids[0]
-            p_obj = (await self.db.execute(select(Project).where(Project.id == first_proj_id))).scalar_one_or_none()
-            target_ws_id = getattr(p_obj, 'workspace_id', None) if p_obj else None
-
-            # 1. Attach orphan repositories (no project_id)
-            orphans = (await self.db.execute(select(GitHubRepository).where(GitHubRepository.project_id.is_(None)))).scalars().all()
-            if orphans:
-                for orp in orphans:
-                    orp.project_id = first_proj_id
-                    if target_ws_id:
-                        orp.workspace_id = target_ws_id
-                await self.db.commit()
-                repos_total = (await self.db.execute(repo_q)).scalar() or 0
-
-            # 2. Check if any repository was created under user's other auto-generated projects or workspace
-            if repos_total == 0:
-                alt_conds = []
-                if self.current_user:
-                    alt_conds.append(Project.owner_id == self.current_user.id)
-                if target_ws_id:
-                    alt_conds.append(Project.workspace_id == target_ws_id)
-                if alt_conds:
-                    alt_proj_stmt = select(Project.id).where(and_(Project.id != first_proj_id, or_(*alt_conds)))
-                    alt_pids = (await self.db.execute(alt_proj_stmt)).scalars().all()
-                    if alt_pids:
-                        alt_repos = (await self.db.execute(select(GitHubRepository).where(GitHubRepository.project_id.in_(alt_pids)))).scalars().all()
-                        if alt_repos:
-                            for ar in alt_repos:
-                                ar.project_id = first_proj_id
-                                if target_ws_id:
-                                    ar.workspace_id = target_ws_id
-                            await self.db.execute(
-                                update(GitHubSecurityJob)
-                                .where(GitHubSecurityJob.project_id.in_(alt_pids))
-                                .values(project_id=first_proj_id)
-                            )
-                            await self.db.execute(
-                                update(SecurityScan)
-                                .where(SecurityScan.project_id.in_(alt_pids))
-                                .values(project_id=first_proj_id)
-                            )
-                            await self.db.commit()
-                            repos_total = (await self.db.execute(repo_q)).scalar() or 0
 
         # Repositories that have at least one completed scan (via GitHubSecurityJob → SecurityScan)
         scanned_repo_q = (
@@ -664,46 +611,6 @@ class CodeService:
             repo_q = repo_q.where(GitHubRepository.project_id.in_(proj_uuids))
         result = await self.db.execute(repo_q)
         repositories = result.scalars().all()
-
-        # Auto-link: If no repositories exist for active project, check for unassigned or user's auto-created project repos
-        if not repositories and proj_uuids:
-            first_proj_id = proj_uuids[0]
-            # 1. Attach orphan repositories (no project_id)
-            orphans = (await self.db.execute(select(GitHubRepository).where(GitHubRepository.project_id == None))).scalars().all()
-            if orphans:
-                for orp in orphans:
-                    orp.project_id = first_proj_id
-                await self.db.commit()
-                result = await self.db.execute(repo_q)
-                repositories = result.scalars().all()
-
-            # 2. Check if any repository was created under user's other auto-generated projects (e.g. Recordly)
-            if not repositories and self.current_user:
-                alt_proj_stmt = select(Project.id).where(
-                    and_(
-                        Project.id != first_proj_id,
-                        Project.owner_id == self.current_user.id,
-                    )
-                )
-                alt_proj_ids = (await self.db.execute(alt_proj_stmt)).scalars().all()
-                if alt_proj_ids:
-                    alt_repos = (await self.db.execute(select(GitHubRepository).where(GitHubRepository.project_id.in_(alt_proj_ids)))).scalars().all()
-                    if alt_repos:
-                        for ar in alt_repos:
-                            ar.project_id = first_proj_id
-                        await self.db.execute(
-                            update(GitHubSecurityJob)
-                            .where(GitHubSecurityJob.project_id.in_(alt_proj_ids))
-                            .values(project_id=first_proj_id)
-                        )
-                        await self.db.execute(
-                            update(SecurityScan)
-                            .where(SecurityScan.project_id.in_(alt_proj_ids))
-                            .values(project_id=first_proj_id)
-                        )
-                        await self.db.commit()
-                        result = await self.db.execute(repo_q)
-                        repositories = result.scalars().all()
 
         # CIMS Auto-Propagation: If no repositories exist in GitHubRepository, check RealIntegrationRepository
         # strictly scoped to current user's authorized integrations (Zero cross-tenant leakage!)

@@ -39,30 +39,42 @@ class ProtectService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_default_project_id(self) -> uuid.UUID:
-        stmt = select(Project).limit(1)
-        res = await self.db.execute(stmt)
-        proj = res.scalars().first()
-        if proj:
-            return proj.id
+    async def get_default_project_id(self, user_id: Optional[uuid.UUID] = None) -> uuid.UUID:
+        if user_id:
+            stmt = select(Project).where(Project.owner_id == user_id).limit(1)
+            res = await self.db.execute(stmt)
+            proj = res.scalars().first()
+            if proj:
+                return proj.id
+        any_stmt = select(Project).limit(1)
+        any_res = await self.db.execute(any_stmt)
+        existing_proj = any_res.scalars().first()
+        if existing_proj:
+            return existing_proj.id
+        if not user_id:
+            from app.models.user import User
+            u_stmt = select(User.id).limit(1)
+            u_res = await self.db.execute(u_stmt)
+            user_id = u_res.scalars().first()
         fallback_id = uuid.uuid4()
         new_proj = Project(
             id=fallback_id,
             name="Production Engineering",
             description="Primary security and cloud infrastructure project",
             environment="production",
+            owner_id=user_id,
         )
         self.db.add(new_proj)
         await self.db.flush()
         return fallback_id
 
-    async def resolve_project_id(self, project_id_str: Optional[str] = None) -> uuid.UUID:
+    async def resolve_project_id(self, project_id_str: Optional[str] = None, user_id: Optional[uuid.UUID] = None) -> uuid.UUID:
         if project_id_str:
             try:
                 return uuid.UUID(project_id_str)
             except ValueError:
                 pass
-        return await self.get_default_project_id()
+        return await self.get_default_project_id(user_id=user_id)
 
     async def seed_initial_protect_data_if_empty(self, project_id: uuid.UUID):
         """

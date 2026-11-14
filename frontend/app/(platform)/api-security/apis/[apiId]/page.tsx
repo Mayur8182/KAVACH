@@ -251,59 +251,39 @@ export default function ApiDetailPage() {
         </div>
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Breadcrumb Navigation */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748B' }}>
-          <Link href="/api-security/apis" style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 500 }}>
-            API Inventory
+        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-400">
+          <Link href="/api-security/apis" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+            API Catalog
           </Link>
           <span>/</span>
-          <span style={{ color: '#0F172A', fontWeight: 600 }}>{targetApi?.name || 'API Target'}</span>
-          <span
-            style={{
-              marginLeft: '6px',
-              fontSize: '11px',
-              fontWeight: 600,
-              padding: '1px 7px',
-              borderRadius: '10px',
-              backgroundColor: '#F1F5F9',
-              color: '#475569',
-            }}
-          >
+          <span className="text-slate-900 dark:text-slate-100 font-semibold">{targetApi?.name || 'API Target'}</span>
+          <span className="ml-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
             {endpoints.length} Endpoints
           </span>
         </div>
 
         {/* API Target Title Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: '16px' }}>
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-4 flex-wrap gap-4">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-                {targetApi?.name || 'API Inventory'}
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                {targetApi?.name || 'API Inventory Target'}
               </h1>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  backgroundColor: '#ECFDF5',
-                  color: '#059669',
-                  border: '1px solid #A7F3D0',
-                }}
-              >
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                 {targetApi?.environment || 'STAGING'}
               </span>
             </div>
-            <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0', fontFamily: 'monospace' }}>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 font-mono">
               Base URL: {targetApi?.base_url || 'Not configured'}
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: '#64748B' }}>Total Attack Surface</div>
-              <div style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-xs text-slate-500 dark:text-zinc-400">Total Attack Surface</div>
+              <div className="text-base font-bold text-slate-900 dark:text-slate-100">
                 {endpoints.length} Endpoints
               </div>
             </div>

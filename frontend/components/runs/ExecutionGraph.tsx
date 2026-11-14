@@ -312,7 +312,7 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
               return (
                 <path
                   key={idx}
-                  d={`M 0 50% C 8 50%, 8 ${targetY}%, 16 ${targetY}%`}
+                  d={`M 0 50 C 8 50, 8 ${targetY}, 16 ${targetY}`}
                   fill="none"
                   stroke="#CBD5E1"
                   strokeWidth="1.2"
@@ -332,229 +332,229 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
             minWidth: 0,
           }}
         >
-        {filteredAgents.length === 0 ? (
-          <div style={{ padding: '24px 12px', textAlign: 'center', color: '#94A3B8', fontSize: '12px' }}>
-            No security agents match the current filter.
-          </div>
-        ) : (
-          filteredAgents.map((agent) => {
-            const isSelected = selectedAgentId === agent.id;
-            const isExpanded = expandedAgents[agent.id] ?? false;
-            const isCompleted = agent.status === 'completed';
-            const isRunning = agent.status === 'running' || agent.status === 'initializing';
-            const isFailed = agent.status === 'failed';
+          {filteredAgents.length === 0 ? (
+            <div style={{ padding: '24px 12px', textAlign: 'center', color: '#94A3B8', fontSize: '12px' }}>
+              No security agents match the current filter.
+            </div>
+          ) : (
+            filteredAgents.map((agent) => {
+              const isSelected = selectedAgentId === agent.id;
+              const isExpanded = expandedAgents[agent.id] ?? false;
+              const isCompleted = agent.status === 'completed';
+              const isRunning = agent.status === 'running' || agent.status === 'initializing';
+              const isFailed = agent.status === 'failed';
 
-            return (
-              <div
-                key={agent.id}
-                onClick={() => onSelectAgent?.(agent.id)}
-                style={{
-                  border: isSelected ? '1.5px solid #16A34A' : '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  backgroundColor: isSelected ? '#F0FDF4' : '#FFFFFF',
-                  padding: '10px 12px',
-                  cursor: 'pointer',
-                  transition: 'all 120ms ease',
-                  boxShadow: isSelected
-                    ? '0 0 0 1px #16A34A, 0 1px 3px rgba(22, 163, 74, 0.08)'
-                    : '0 1px 2px rgba(0,0,0,0.02)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                }}
-              >
-                {/* Agent Header Line */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
-                    <div
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '6px',
-                        backgroundColor: '#F8FAFC',
-                        border: '1px solid #E2E8F0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {getAgentIcon(agent.id || agent.type)}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
+              return (
+                <div
+                  key={agent.id}
+                  onClick={() => onSelectAgent?.(agent.id)}
+                  style={{
+                    border: isSelected ? '1.5px solid #16A34A' : '1px solid #E2E8F0',
+                    borderRadius: '8px',
+                    backgroundColor: isSelected ? '#F0FDF4' : '#FFFFFF',
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    transition: 'all 120ms ease',
+                    boxShadow: isSelected
+                      ? '0 0 0 1px #16A34A, 0 1px 3px rgba(22, 163, 74, 0.08)'
+                      : '0 1px 2px rgba(0,0,0,0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
+                  {/* Agent Header Line */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: '13px',
-                          fontWeight: 700,
-                          color: '#0F172A',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          backgroundColor: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
                         }}
                       >
-                        {agent.name}
+                        {getAgentIcon(agent.id || agent.type)}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '1px' }}>
-                        <span
+                      <div style={{ minWidth: 0 }}>
+                        <div
                           style={{
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            color: isCompleted
-                              ? '#16A34A'
-                              : (isRunning ? '#D97706' : (isFailed ? '#DC2626' : '#64748B')),
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            color: '#0F172A',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
                           }}
                         >
+                          {agent.name}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '1px' }}>
                           <span
                             style={{
-                              width: '5px',
-                              height: '5px',
-                              borderRadius: '50%',
-                              backgroundColor: isCompleted
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: isCompleted
                                 ? '#16A34A'
-                                : (isRunning ? '#D97706' : (isFailed ? '#DC2626' : '#94A3B8')),
-                            }}
-                          />
-                          {isCompleted
-                            ? 'Completed'
-                            : (isRunning ? 'Running' : (isFailed ? 'Failed' : 'Pending'))}
-                        </span>
-                        {agent.engine && (
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              color: '#64748B',
-                              backgroundColor: '#F1F5F9',
-                              padding: '1px 5px',
-                              borderRadius: '4px',
+                                : (isRunning ? '#D97706' : (isFailed ? '#DC2626' : '#64748B')),
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
                             }}
                           >
-                            {agent.engine}
+                            <span
+                              style={{
+                                width: '5px',
+                                height: '5px',
+                                borderRadius: '50%',
+                                backgroundColor: isCompleted
+                                  ? '#16A34A'
+                                  : (isRunning ? '#D97706' : (isFailed ? '#DC2626' : '#94A3B8')),
+                              }}
+                            />
+                            {isCompleted
+                              ? 'Completed'
+                              : (isRunning ? 'Running' : (isFailed ? 'Failed' : 'Pending'))}
                           </span>
-                        )}
+                          {agent.engine && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                color: '#64748B',
+                                backgroundColor: '#F1F5F9',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                              }}
+                            >
+                              {agent.engine}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Expand / Collapse toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => toggleExpand(agent.id, e)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#64748B',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                        title={isExpanded ? 'Collapse task details' : 'Expand task details'}
+                      >
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
                     </div>
                   </div>
 
-                  {/* Expand / Collapse toggle */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      onClick={(e) => toggleExpand(agent.id, e)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#64748B',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        borderRadius: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                      }}
-                      title={isExpanded ? 'Collapse task details' : 'Expand task details'}
-                    >
-                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Progress bar if running & measurable */}
-                {isRunning && (
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '3px',
-                      backgroundColor: '#E2E8F0',
-                      borderRadius: '2px',
-                      overflow: 'hidden',
-                      marginTop: '2px',
-                    }}
-                  >
+                  {/* Progress bar if running & measurable */}
+                  {isRunning && (
                     <div
                       style={{
-                        width: `${Math.max(10, Math.min(100, agent.progressPercentage || 40))}%`,
-                        height: '100%',
-                        backgroundColor: '#16A34A',
+                        width: '100%',
+                        height: '3px',
+                        backgroundColor: '#E2E8F0',
                         borderRadius: '2px',
-                        transition: 'width 200ms ease',
+                        overflow: 'hidden',
+                        marginTop: '2px',
                       }}
-                    />
-                  </div>
-                )}
+                    >
+                      <div
+                        style={{
+                          width: `${Math.max(10, Math.min(100, agent.progressPercentage || 40))}%`,
+                          height: '100%',
+                          backgroundColor: '#16A34A',
+                          borderRadius: '2px',
+                          transition: 'width 200ms ease',
+                        }}
+                      />
+                    </div>
+                  )}
 
-                {/* Current activity badge */}
-                {agent.currentActivity && (
-                  <div
-                    style={{
-                      fontSize: '11px',
-                      color: isRunning ? '#065F46' : (isCompleted ? '#166534' : '#475569'),
-                      backgroundColor: isRunning ? '#ECFDF5' : (isCompleted ? '#F0FDF4' : '#F8FAFC'),
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      border: `1px solid ${isRunning ? '#A7F3D0' : '#E2E8F0'}`,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                    }}
-                    title={agent.currentActivity}
-                  >
-                    {isRunning && <Loader2 size={10} className="animate-spin" color="#16A34A" />}
-                    <span>{agent.currentActivity}</span>
-                  </div>
-                )}
+                  {/* Current activity badge */}
+                  {agent.currentActivity && (
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        color: isRunning ? '#065F46' : (isCompleted ? '#166534' : '#475569'),
+                        backgroundColor: isRunning ? '#ECFDF5' : (isCompleted ? '#F0FDF4' : '#F8FAFC'),
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        border: `1px solid ${isRunning ? '#A7F3D0' : '#E2E8F0'}`,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                      }}
+                      title={agent.currentActivity}
+                    >
+                      {isRunning && <Loader2 size={10} className="animate-spin" color="#16A34A" />}
+                      <span>{agent.currentActivity}</span>
+                    </div>
+                  )}
 
-                {/* Sub-steps Checklist (Shown when expanded) */}
-                {isExpanded && agent.steps && agent.steps.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: '4px',
-                      paddingTop: '6px',
-                      borderTop: '1px solid #F1F5F9',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                    }}
-                  >
-                    {agent.steps.map((st, sIdx) => {
-                      const isStepDone = st.status === 'completed';
-                      const isStepRunning = st.status === 'running';
-                      return (
-                        <div
-                          key={sIdx}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontSize: '11px',
-                            color: isStepDone ? '#0F172A' : (isStepRunning ? '#16A34A' : '#94A3B8'),
-                            fontWeight: isStepRunning ? 600 : 400,
-                          }}
-                        >
-                          {isStepDone ? (
-                            <CheckCircle2 size={12} color="#16A34A" style={{ flexShrink: 0 }} />
-                          ) : isStepRunning ? (
-                            <Loader2 size={12} color="#16A34A" className="animate-spin" style={{ flexShrink: 0 }} />
-                          ) : (
-                            <Circle size={10} color="#CBD5E1" style={{ flexShrink: 0 }} />
-                          )}
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {st.name}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
+                  {/* Sub-steps Checklist (Shown when expanded) */}
+                  {isExpanded && agent.steps && agent.steps.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: '4px',
+                        paddingTop: '6px',
+                        borderTop: '1px solid #F1F5F9',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                      }}
+                    >
+                      {agent.steps.map((st, sIdx) => {
+                        const isStepDone = st.status === 'completed';
+                        const isStepRunning = st.status === 'running';
+                        return (
+                          <div
+                            key={sIdx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '11px',
+                              color: isStepDone ? '#0F172A' : (isStepRunning ? '#16A34A' : '#94A3B8'),
+                              fontWeight: isStepRunning ? 600 : 400,
+                            }}
+                          >
+                            {isStepDone ? (
+                              <CheckCircle2 size={12} color="#16A34A" style={{ flexShrink: 0 }} />
+                            ) : isStepRunning ? (
+                              <Loader2 size={12} color="#16A34A" className="animate-spin" style={{ flexShrink: 0 }} />
+                            ) : (
+                              <Circle size={10} color="#CBD5E1" style={{ flexShrink: 0 }} />
+                            )}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {st.name}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

@@ -37,22 +37,32 @@ class DataService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def ensure_baseline_data_seeded(self, project_id: Optional[uuid.UUID] = None) -> uuid.UUID:
+    async def ensure_baseline_data_seeded(self, project_id: Optional[uuid.UUID] = None, user_id: Optional[uuid.UUID] = None) -> uuid.UUID:
         if not project_id:
             from app.models.project import Project
-            proj = (await self.db.execute(select(Project).limit(1))).scalars().first()
-            if proj:
-                project_id = proj.id
-            else:
-                project_id = uuid.uuid4()
-                new_proj = Project(
-                    id=project_id,
-                    name="Production Engineering",
-                    description="Primary security and cloud infrastructure project",
-                    environment="production",
-                )
-                self.db.add(new_proj)
-                await self.db.flush()
+            if user_id:
+                proj = (await self.db.execute(select(Project).where(Project.owner_id == user_id).limit(1))).scalars().first()
+                if proj:
+                    project_id = proj.id
+            if not project_id:
+                any_proj = (await self.db.execute(select(Project).limit(1))).scalars().first()
+                if any_proj:
+                    project_id = any_proj.id
+                else:
+                    if not user_id:
+                        from app.models.user import User
+                        u_res = await self.db.execute(select(User.id).limit(1))
+                        user_id = u_res.scalars().first()
+                    project_id = uuid.uuid4()
+                    new_proj = Project(
+                        id=project_id,
+                        name="Production Engineering",
+                        description="Primary security and cloud infrastructure project",
+                        environment="production",
+                        owner_id=user_id,
+                    )
+                    self.db.add(new_proj)
+                    await self.db.flush()
 
         check = await self.db.execute(
             select(func.count(DataStore.id)).where(DataStore.project_id == project_id)

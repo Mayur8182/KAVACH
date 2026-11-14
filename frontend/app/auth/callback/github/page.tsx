@@ -68,12 +68,12 @@ function GitHubCallbackContent() {
           try {
             const ent = await api.entitlements.getMe();
             if (!ent?.onboarding_completed) {
-              router.push('/onboarding/products');
+              router.push('/onboarding?github=connected');
             } else {
-              router.push('/assistant');
+              router.push('/overview');
             }
           } catch {
-            router.push('/assistant');
+            router.push('/onboarding?github=connected');
           }
         } else {
           throw new Error('Authentication succeeded but no access token was returned.');

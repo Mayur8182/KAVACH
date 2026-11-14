@@ -26,6 +26,7 @@ import {
 import { useEntitlements } from '@/lib/hooks/useEntitlements';
 import { useAccessControl } from '@/lib/hooks/useAccessControl';
 import { getRouteByPath, RouteContract } from '@/types/navigation/routeRegistry';
+import { KavachBrandLoader } from '@/components/feedback/KavachBrandLoader';
 
 const PRODUCT_ICONS: Record<string, React.ComponentType<{ size?: number; color?: string; style?: React.CSSProperties }>> = {
   thing_code: Code2,
@@ -63,31 +64,17 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({ children }) => {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: '60vh',
-          gap: '14px',
-          color: '#64748B',
-          fontSize: '13px',
-          fontFamily: 'Inter, -apple-system, sans-serif',
+          minHeight: '65vh',
+          width: '100%',
         }}
       >
-        <div
-          style={{
-            width: '32px',
-            height: '32px',
-            border: '2.5px solid #E2E8F0',
-            borderTopColor: '#2563EB',
-            borderRadius: '50%',
-            animation: 'spin 0.7s linear infinite',
-          }}
+        <KavachBrandLoader
+          size="md"
+          theme="light"
+          message="Evaluating Security Entitlements"
+          submessage="Authorizing cryptographic identity & role permissions…"
+          badgeText="Zero-Trust Policy Enforced"
         />
-        <span>Evaluating security entitlements & role authorization...</span>
-        <style jsx>{`
-          @keyframes spin {
-            to {
-              transform: rotate(360deg);
-            }
-          }
-        `}</style>
       </div>
     );
   }

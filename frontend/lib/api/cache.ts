@@ -17,13 +17,25 @@ class ApiCacheManager {
   private cache = new Map<string, CacheEntry<any>>();
   private inflight = new Map<string, Promise<{ data: any; requestId: string }>>();
   private defaultTtlMs = 60000; // 60s default TTL for dashboard and navigation state
+  private activeToken: string | null = null;
 
   /**
-   * Build consistent cache key from endpoint and options
+   * Bind current user/token to isolate cache namespaces
+   */
+  public setToken(token: string | null): void {
+    if (this.activeToken !== token) {
+      this.clear();
+      this.activeToken = token;
+    }
+  }
+
+  /**
+   * Build consistent cache key from endpoint, options, and current session scope
    */
   public buildKey(endpoint: string, options: RequestInit = {}): string {
     const method = (options.method || 'GET').toUpperCase();
-    return `${method}:${endpoint}`;
+    const tokenPart = this.activeToken ? this.activeToken.slice(-16) : 'guest';
+    return `${tokenPart}:${method}:${endpoint}`;
   }
 
   /**

@@ -169,18 +169,18 @@ class ApiSecurityService:
                 if any(ignored in root for ignored in [".git", "node_modules", "target", "build", "dist"]):
                     continue
                 for fname in files:
-                    if any(fname.endswith(ext) for ext in [".java", ".py", ".ts", ".js", ".go", ".proto", ".graphql"]):
+                    if any(fname.endswith(ext) for ext in [".java", ".py", ".ts", ".js", ".go", ".proto", ".graphql", ".gql"]):
                         fpath = os.path.join(root, fname)
                         rel = os.path.relpath(fpath, matched_ws).replace("\\", "/")
-                        if any(kw in rel.lower() for kw in ["route", "controller", "endpoint", "api", "app", "server", "main", "urls", "lesson", "user", "admin", "jwt"]) or len(file_map) < 10:
+                        if any(kw in rel.lower() for kw in ["route", "controller", "endpoint", "api", "app", "server", "main", "urls", "lesson", "user", "admin", "jwt", "auth", "graphql", "query", "resolver", "socket", "websocket", "ws", "gateway", "proto", "grpc", "model", "schema"]) or len(file_map) < 10:
                             try:
                                 with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
                                     file_map[rel] = f.read()
                             except Exception:
                                 pass
-                        if len(file_map) >= 30:
+                        if len(file_map) >= 60:
                             break
-                if len(file_map) >= 30:
+                if len(file_map) >= 60:
                     break
 
         analysis = self.discovery_engine.analyze_repository_files(file_map, repo_name)
@@ -196,6 +196,7 @@ class ApiSecurityService:
             "framework": analysis.get("frameworks", []),
             "branch": branch or "main",
             "repo_id": repo_id_str,
+            "files": file_map,
         })
 
         project_uuid = None

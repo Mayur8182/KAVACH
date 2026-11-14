@@ -146,13 +146,19 @@ class EntitlementService:
         res = await self.db.execute(stmt)
         org = res.scalars().first()
 
-        # 2. Check if any organization exists in the database
+        # 2. Check if user is an accepted member of any organization
         if not org:
-            stmt_any = select(Organization).order_by(Organization.created_at.desc()).limit(1)
-            res_any = await self.db.execute(stmt_any)
-            org = res_any.scalars().first()
+            from app.models.invitation import OrganizationMember
+            stmt_member = (
+                select(Organization)
+                .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
+                .where(OrganizationMember.user_id == user.id, OrganizationMember.is_active == True)
+                .limit(1)
+            )
+            res_member = await self.db.execute(stmt_member)
+            org = res_member.scalars().first()
 
-        # 3. Create default organization if none exists
+        # 3. Create dedicated personal organization if none exists
         if not org:
             org_id = uuid.uuid4()
             org_slug = f"org-{(user.name or 'workspace').lower().replace(' ', '-')[:20]}-{uuid.uuid4().hex[:4]}"
@@ -217,8 +223,8 @@ class EntitlementService:
             ent_res = await self.db.execute(ent_stmt)
             ent = ent_res.scalars().first()
             if not ent:
-                # Default: if user already has projects or completed onboarding, enable thing_code
-                is_initially_enabled = (prod_key == "thing_code") if getattr(user, "onboarding_completed", False) else False
+                # Default: enable thing_code as base workspace capability
+                is_initially_enabled = (prod_key == "thing_code")
                 ent = ProductEntitlement(
                     id=uuid.uuid4(),
                     organization_id=org.id,
@@ -490,12 +496,19 @@ class EntitlementService:
         org = res.scalars().first()
 
         if not org:
-            # Fall back to first organization
-            res_any = await self.db.execute(select(Organization).order_by(Organization.created_at.desc()).limit(1))
-            org = res_any.scalars().first()
+            # Check organization membership
+            from app.models.invitation import OrganizationMember
+            stmt_member = (
+                select(Organization)
+                .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
+                .where(OrganizationMember.user_id == user.id, OrganizationMember.is_active == True)
+                .limit(1)
+            )
+            res_member = await self.db.execute(stmt_member)
+            org = res_member.scalars().first()
 
         if not org:
-            # If no org exists yet, only allow onboarding or core code
+            # If no org exists yet, only allow core code
             return product_key == "thing_code"
 
         # Query entitlement
@@ -507,5 +520,9 @@ class EntitlementService:
         ).limit(1)
         ent_res = await self.db.execute(ent_stmt)
         ent = ent_res.scalars().first()
+
+        if ent is None:
+            # If not initialized, allow thing_code by default
+            return product_key == "thing_code"
 
         return bool(ent and ent.is_enabled)

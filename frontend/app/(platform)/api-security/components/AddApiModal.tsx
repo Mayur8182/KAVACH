@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { useApiSecurity } from '../context/ApiSecurityContext';
+import { KavachDropdown } from '@/components/ui/KavachDropdown';
 
 interface AddApiModalProps {
   isOpen: boolean;
@@ -435,42 +436,32 @@ export function AddApiModal({ isOpen, onClose, onSuccess }: AddApiModalProps) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Environment</label>
-              <select
+              <KavachDropdown
                 value={environment}
-                onChange={(e) => setEnvironment(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  backgroundColor: '#FFFFFF',
-                }}
-              >
-                <option value="PRODUCTION">Production</option>
-                <option value="STAGING">Staging</option>
-                <option value="DEVELOPMENT">Development</option>
-              </select>
+                onChange={(val) => setEnvironment(val)}
+                options={[
+                  { value: 'PRODUCTION', label: 'Production' },
+                  { value: 'STAGING', label: 'Staging' },
+                  { value: 'DEVELOPMENT', label: 'Development' },
+                ]}
+                fullWidth
+              />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Authentication Type</label>
-              <select
+              <KavachDropdown
                 value={authType}
-                onChange={(e) => setAuthType(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  backgroundColor: '#FFFFFF',
-                }}
-              >
-                <option value="NONE">None / Public API</option>
-                <option value="BEARER">Bearer Token (JWT)</option>
-                <option value="OAUTH2">OAuth 2.0</option>
-                <option value="API_KEY">API Key</option>
-                <option value="BASIC">Basic Auth</option>
-              </select>
+                onChange={(val) => setAuthType(val)}
+                options={[
+                  { value: 'NONE', label: 'None / Public API' },
+                  { value: 'BEARER', label: 'Bearer Token (JWT)' },
+                  { value: 'OAUTH2', label: 'OAuth 2.0' },
+                  { value: 'API_KEY', label: 'API Key' },
+                  { value: 'BASIC', label: 'Basic Auth' },
+                ]}
+                fullWidth
+              />
             </div>
           </div>
 

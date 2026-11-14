@@ -264,7 +264,7 @@ async def get_current_tenant_context(
         if not active_project:
             active_project = all_projects[0]
 
-    # Auto-provision baseline personal workspace & project if user has absolutely none
+    # Auto-provision baseline personal workspace if user has absolutely none
     if not active_workspace and not all_workspaces:
         owner_name = current_user.name or (current_user.email.split("@")[0] if current_user.email else "Workspace")
         new_ws = Workspace(
@@ -278,19 +278,6 @@ async def get_current_tenant_context(
         await db.flush()
         active_workspace = new_ws
         accessible_workspace_ids.add(new_ws.id)
-
-    if not active_project and not all_projects:
-        owner_name = current_user.name or (current_user.email.split("@")[0] if current_user.email else "Project")
-        new_proj = Project(
-            name=f"{owner_name.capitalize()}'s Project",
-            owner_id=current_user.id,
-            workspace_id=active_workspace.id if active_workspace else None,
-            description="Autonomous Security Project",
-        )
-        db.add(new_proj)
-        await db.flush()
-        active_project = new_proj
-        accessible_project_ids.add(new_proj.id)
 
     return TenantContext(
         user=current_user,

@@ -50,6 +50,7 @@ import {
   Award,
 } from 'lucide-react';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
+import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
 import { api } from '@/lib/api/client';
 
 type TabMode =
@@ -62,7 +63,7 @@ type TabMode =
   | 'guided';
 
 export default function DemoPage() {
-  const [activeTab, setActiveTab] = useState<TabMode>('book');
+  const [activeTab, setActiveTab] = useState<TabMode>('guided');
 
   // ---------------------------------------------------------------------------
   // 1. Book a Demo State
@@ -482,13 +483,13 @@ allow {
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 12px', borderRadius: '16px', backgroundColor: '#F1F5F9', border: '1px solid #E2E8F0', color: '#0F172A', fontSize: '12px', fontWeight: 600, marginBottom: '10px' }}>
               <Sparkles size={13} />
-              <span>Interactive Security Demo & Briefing Suite</span>
+              <span>Product walkthrough</span>
             </div>
             <h1 style={{ fontSize: '32px', fontWeight: 800, margin: '0 0 8px', letterSpacing: '-0.02em', color: '#0F172A' }}>
-              Kavach Interactive Demo Environment
+              See a security finding move from detection to review
             </h1>
             <p style={{ fontSize: '15px', color: '#64748B', maxWidth: '780px', margin: 0, lineHeight: 1.5 }}>
-              Test deterministic policy enforcement in real-time, execute live scanner checks, or schedule a technical briefing with our security engineers.
+              Explore the guided workflow, try the interactive policy workspace, or book time with the Kavach team.
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '12px 20px', borderRadius: '12px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
@@ -513,15 +514,11 @@ allow {
       {/* Main Tab Navigation Bar */}
       <div style={{ borderBottom: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', position: 'sticky', top: 68, zIndex: 40 }}>
         <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', overflowX: 'auto', padding: '0 24px', gap: '8px' }}>
-          {[
-            { id: 'book', label: 'Book a Demo', icon: Calendar },
-            { id: 'request', label: 'Request Demo Form', icon: Mail },
-            { id: 'contact', label: 'Contact Sales', icon: Building },
-            { id: 'enterprise', label: 'Enterprise Inquiry', icon: Shield },
-            { id: 'expert', label: 'Talk to Security Expert', icon: User },
-            { id: 'workspace', label: 'Demo Workspace', icon: Terminal, badge: 'Live' },
-            { id: 'guided', label: 'Guided Product Demo', icon: Play, badge: 'Tour' },
-          ].map((tab) => {
+          {([
+            { id: 'guided', label: 'Product walkthrough', icon: Play },
+            { id: 'workspace', label: 'Interactive policy demo', icon: Terminal },
+            { id: 'book', label: 'Talk to our team', icon: Calendar },
+          ] as { id: string; label: string; icon: any; badge?: string }[]).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (
@@ -535,10 +532,10 @@ allow {
                   padding: '16px 16px',
                   fontSize: '13px',
                   fontWeight: active ? 600 : 500,
-                  color: active ? '#2563EB' : '#64748B',
+                  color: active ? '#3F3A33' : '#64748B',
                   backgroundColor: 'transparent',
                   border: 'none',
-                  borderBottom: active ? '2px solid #2563EB' : '2px solid transparent',
+                  borderBottom: active ? '2px solid #3F3A33' : '2px solid transparent',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s ease',
@@ -553,8 +550,8 @@ allow {
                       fontWeight: 700,
                       padding: '2px 6px',
                       borderRadius: '10px',
-                      backgroundColor: active ? '#EFF6FF' : '#E2E8F0',
-                      color: active ? '#2563EB' : '#475569',
+                      backgroundColor: active ? '#F5F1E8' : '#E2E8F0',
+                      color: active ? '#3F3A33' : '#475569',
                     }}
                   >
                     {tab.badge}
@@ -594,7 +591,7 @@ allow {
                   <div style={{ backgroundColor: '#FFFFFF', padding: '16px', borderRadius: '8px', border: '1px solid #DCFCE7', fontSize: '13px', color: '#334155' }}>
                     <div><strong>Meeting Host:</strong> {bookSuccess.calendar_summary?.host}</div>
                     <div><strong>Date & Time:</strong> {bookSuccess.calendar_summary?.date} at {bookSuccess.calendar_summary?.time_slot} ({bookSuccess.calendar_summary?.timezone})</div>
-                    <div><strong>Meeting Room:</strong> <a href={bookSuccess.meeting_url} target="_blank" rel="noreferrer" style={{ color: '#2563EB' }}>{bookSuccess.meeting_url}</a></div>
+                    <div><strong>Meeting Room:</strong> <a href={bookSuccess.meeting_url} target="_blank" rel="noreferrer" style={{ color: '#3F3A33' }}>{bookSuccess.meeting_url}</a></div>
                     <div><strong>Lead Score:</strong> <span style={{ fontWeight: 600 }}>{bookSuccess.lead_score} / 100</span> ({bookSuccess.qualification_tier})</div>
                   </div>
                   <div style={{ marginTop: '20px', display: 'flex', gap: '12px' }}>
@@ -798,7 +795,7 @@ allow {
                   </button>
                   <Link
                     href="/sales/pipeline"
-                    style={{ padding: '8px 14px', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#2563EB', textDecoration: 'none' }}
+                    style={{ padding: '8px 14px', backgroundColor: '#F5F1E8', border: '1px solid #D8D1C3', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#3F3A33', textDecoration: 'none' }}
                   >
                     View Sales Pipeline
                   </Link>
@@ -1124,7 +1121,7 @@ allow {
         {activeTab === 'enterprise' && (
           <div style={{ maxWidth: '820px', margin: '0 auto', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '36px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
             <div style={{ marginBottom: '24px' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '12px', backgroundColor: '#F5F1E8', color: '#3F3A33', fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>
                 <Shield size={12} />
                 HIGH-ASSURANCE QUESTIONNAIRE
               </div>
@@ -1147,7 +1144,7 @@ allow {
                 <div style={{ marginTop: '16px', display: 'flex', gap: '12px' }}>
                   <Link
                     href="/sales/quote"
-                    style={{ padding: '8px 16px', backgroundColor: '#2563EB', color: '#FFFFFF', borderRadius: '6px', textDecoration: 'none', fontSize: '13px', fontWeight: 600 }}
+                    style={{ padding: '8px 16px', backgroundColor: '#3F3A33', color: '#FFFFFF', borderRadius: '6px', textDecoration: 'none', fontSize: '13px', fontWeight: 600 }}
                   >
                     Configure Enterprise Quote (CPQ)
                   </Link>
@@ -1254,7 +1251,7 @@ allow {
                   disabled={entSubmitting}
                   style={{
                     padding: '12px 24px',
-                    backgroundColor: '#1E293B',
+                    backgroundColor: '#DDD8CF',
                     color: '#FFFFFF',
                     borderRadius: '8px',
                     border: 'none',
@@ -1599,20 +1596,20 @@ allow {
                   </div>
 
                   {/* Right OPA Gate Card */}
-                  <div style={{ padding: '20px', borderRadius: '12px', backgroundColor: '#0B1120', color: '#FFFFFF', border: '1px solid #1E293B' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38BDF8', fontWeight: 700, fontSize: '13px', marginBottom: '10px' }}>
+                  <div style={{ padding: '20px', borderRadius: '12px', backgroundColor: '#F5F1E8', color: '#292722', border: '1px solid #DDD8CF' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6B6256', fontWeight: 700, fontSize: '13px', marginBottom: '10px' }}>
                       <ShieldCheck size={16} />
                       <span>OPA DETERMINISTIC GATEWAY DECISION</span>
                     </div>
-                    <div style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '6px', backgroundColor: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#F87171', fontWeight: 800, fontSize: '12px', marginBottom: '12px' }}>
+                    <div style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '6px', backgroundColor: '#FFF1F0', border: '1px solid #FECACA', color: '#B42318', fontWeight: 800, fontSize: '12px', marginBottom: '12px' }}>
                       DECISION: {simulationResult.policy_decision?.action}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '12px', lineHeight: 1.5 }}>
+                    <div style={{ fontSize: '12px', color: '#66645F', marginBottom: '12px', lineHeight: 1.5 }}>
                       {simulationResult.policy_decision?.reason}
                     </div>
-                    <div style={{ borderTop: '1px solid #1E293B', paddingTop: '10px', fontSize: '11px', color: '#64748B' }}>
+                    <div style={{ borderTop: '1px solid #DDD8CF', paddingTop: '10px', fontSize: '11px', color: '#66645F' }}>
                       <div>Cryptographic Evidence SHA-256:</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', color: '#38BDF8', wordBreak: 'break-all', marginTop: '4px' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', color: '#6B6256', wordBreak: 'break-all', marginTop: '4px' }}>
                         {simulationResult.policy_decision?.cryptographic_proof}
                       </div>
                     </div>
@@ -1644,7 +1641,7 @@ allow {
                     Step through the 5 core deterministic pillars of Kavach&apos;s enterprise security platform.
                   </p>
                 </div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#2563EB', backgroundColor: '#EFF6FF', padding: '6px 12px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#3F3A33', backgroundColor: '#F5F1E8', padding: '6px 12px', borderRadius: '8px' }}>
                   Step {currentStepIndex + 1} of {guidedSteps.length}
                 </div>
               </div>
@@ -1661,14 +1658,14 @@ allow {
                       style={{
                         padding: '10px 8px',
                         borderRadius: '8px',
-                        backgroundColor: isCurrent ? '#FFFFFF' : isDone ? '#EFF6FF' : '#F1F5F9',
-                        border: isCurrent ? '2px solid #2563EB' : '1px solid #CBD5E1',
+                        backgroundColor: isCurrent ? '#FFFFFF' : isDone ? '#F5F1E8' : '#F1F5F9',
+                        border: isCurrent ? '2px solid #3F3A33' : '1px solid #CBD5E1',
                         cursor: 'pointer',
                         textAlign: 'left',
                         transition: 'all 0.15s ease',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 700, color: isCurrent ? '#2563EB' : isDone ? '#1D4ED8' : '#64748B' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 700, color: isCurrent ? '#3F3A33' : isDone ? '#1D4ED8' : '#64748B' }}>
                         {isDone ? <Check size={12} color="#16A34A" /> : <span>{idx + 1}.</span>}
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{step.title}</span>
                       </div>
@@ -1754,20 +1751,20 @@ allow {
                   </div>
 
                   {/* Right Code Payload Inspector */}
-                  <div style={{ backgroundColor: '#0B1120', color: '#F8FAFC', borderRadius: '16px', border: '1px solid #1E293B', padding: '24px', overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid #1E293B', paddingBottom: '12px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#38BDF8', fontFamily: 'var(--font-mono)' }}>
+                  <div style={{ backgroundColor: '#F5F1E8', color: '#292722', borderRadius: '16px', border: '1px solid #DDD8CF', padding: '24px', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid #DDD8CF', paddingBottom: '12px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#6B6256', fontFamily: 'var(--font-mono)' }}>
                         EVALUATION_PAYLOAD.ts
                       </div>
                       <span style={{ fontSize: '11px', color: '#64748B' }}>Read-only Sandbox Preview</span>
                     </div>
 
-                    <pre style={{ margin: 0, fontSize: '13px', fontFamily: 'var(--font-mono)', lineHeight: 1.6, overflowX: 'auto', color: '#E2E8F0' }}>
+                    <pre style={{ margin: 0, fontSize: '13px', fontFamily: 'var(--font-mono)', lineHeight: 1.6, overflowX: 'auto', color: '#393630' }}>
                       <code>{current.codeSnippet}</code>
                     </pre>
 
-                    <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #1E293B', fontSize: '12px', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Sparkles size={14} color="#38BDF8" />
+                    <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #DDD8CF', fontSize: '12px', color: '#66645F', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Sparkles size={14} color="#6B6256" />
                       <span>Evaluated deterministically in &lt; 20ms using Open Policy Agent.</span>
                     </div>
                   </div>
@@ -1778,6 +1775,7 @@ allow {
         )}
 
       </main>
+      <EnterpriseFooter />
     </div>
   );
 }

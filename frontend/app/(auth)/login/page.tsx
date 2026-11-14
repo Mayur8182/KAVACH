@@ -191,10 +191,10 @@ export default function LoginPage() {
             if (!ent?.onboarding_completed) {
               router.push('/onboarding');
             } else {
-              router.push('/assistant');
+              router.push('/overview');
             }
           } catch {
-            router.push('/assistant');
+            router.push('/overview');
           }
         }
       } else {

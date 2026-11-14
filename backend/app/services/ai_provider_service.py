@@ -108,49 +108,39 @@ class AntigravityInvestigationProvider(InvestigationLLMProvider):
         }
 
     async def generate_patch(self, plan: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        affected = plan.get("affected_files", ["backend/app/api/users.py"])
-        target_file = affected[0] if affected else "backend/app/api/users.py"
+        affected = plan.get("affected_files", [context.get("file_path", "backend/app/api/users.py")])
+        target_file = affected[0] if affected else context.get("file_path", "backend/app/api/users.py")
         title = plan.get("title", "").lower()
+        source_code = context.get("source_code") or context.get("file_content")
 
-        if "sql" in title or "injection" in title:
-            orig = (
-                "def get_user_profile(user_id):\n"
-                "    query = f\"SELECT * FROM users WHERE id = {user_id}\"\n"
-                "    cursor = db.execute(query)\n"
-                "    return jsonify(cursor.fetchone())\n"
-            )
-            patched = (
-                "def get_user_profile(user_id):\n"
-                "    # [THING AUTOFIX] Parameterized query\n"
-                "    query = \"SELECT * FROM users WHERE id = %s\"\n"
-                "    cursor = db.execute(query, (user_id,))\n"
-                "    return jsonify(cursor.fetchone())\n"
-            )
+        if source_code:
+            lines = source_code.splitlines(keepends=True)
+            line_idx = max(0, int(context.get("line_number", 1)) - 1)
+            raw_lines = [l.rstrip("\r\n") for l in lines]
+            from app.services.code_api_security_engine import code_api_security_engine
+            env = code_api_security_engine._detect_file_environment(target_file, source_code)
+            
+            if "sql" in title or "injection" in title:
+                if env["language"] == "python":
+                    diff = code_api_security_engine._synthesize_sqli_patch_py(target_file, raw_lines, line_idx)
+                else:
+                    diff = code_api_security_engine._synthesize_sqli_patch_js(target_file, raw_lines, line_idx)
+            elif "auth" in title and "missing" in title:
+                route_meta = {"method": "POST", "path": context.get("endpoint", "/api")}
+                diff = code_api_security_engine._synthesize_missing_auth_patch(target_file, raw_lines, line_idx, route_meta)
+            elif "bola" in title or "idor" in title or "authorization" in title:
+                route_meta = {"method": "GET", "path": context.get("endpoint", "/api/:id")}
+                diff = code_api_security_engine._synthesize_bola_patch(target_file, raw_lines, line_idx, route_meta)
+            else:
+                diff = code_api_security_engine._synthesize_secret_patch(target_file, raw_lines, line_idx)
         else:
-            orig = (
-                "def test():\n"
-                "    pass\n"
-            )
-            patched = (
-                "def test():\n"
-                "    validate()\n"
-                "    pass\n"
-            )
-
-        orig_lines = orig.splitlines(keepends=True)
-        patched_lines = patched.splitlines(keepends=True)
-        diff = "".join(difflib.unified_diff(
-            orig_lines,
-            patched_lines,
-            fromfile=target_file,
-            tofile=target_file
-        ))
+            diff = f"--- a/{target_file}\n+++ b/{target_file}\n@@ -1,1 +1,2 @@\n+# [THING-SEC-FIX] Grounded remediation requires target file source context.\n"
 
         return {
             "patch_format": "unified_diff",
             "diff": diff,
             "affected_files": [target_file],
-            "generation_model": "antigravity-code-repair-v2",
+            "generation_model": "antigravity-grounded-repair-v2",
             "generation_provider": self.provider_name
         }
 
@@ -222,27 +212,33 @@ class GeminiInvestigationProvider(InvestigationLLMProvider):
         }
 
     async def generate_patch(self, plan: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        affected = plan.get("affected_files", ["backend/app/api/users.py"])
-        target = affected[0] if affected else "backend/app/api/users.py"
-        orig = (
-            "def get_user_profile(user_id):\n"
-            "    query = f\"SELECT * FROM users WHERE id = {user_id}\"\n"
-            "    cursor = db.execute(query)\n"
-            "    return jsonify(cursor.fetchone())\n"
-        )
-        patched = (
-            "def get_user_profile(user_id):\n"
-            "    # [THING AUTOFIX] Parameterized query\n"
-            "    query = \"SELECT * FROM users WHERE id = %s\"\n"
-            "    cursor = db.execute(query, (user_id,))\n"
-            "    return jsonify(cursor.fetchone())\n"
-        )
-        diff = "".join(difflib.unified_diff(
-            orig.splitlines(keepends=True),
-            patched.splitlines(keepends=True),
-            fromfile=target,
-            tofile=target
-        ))
+        affected = plan.get("affected_files", [context.get("file_path", "backend/app/api/users.py")])
+        target = affected[0] if affected else context.get("file_path", "backend/app/api/users.py")
+        title = plan.get("title", "").lower()
+        source_code = context.get("source_code") or context.get("file_content")
+
+        if source_code:
+            lines = source_code.splitlines(keepends=True)
+            line_idx = max(0, int(context.get("line_number", 1)) - 1)
+            raw_lines = [l.rstrip("\r\n") for l in lines]
+            from app.services.code_api_security_engine import code_api_security_engine
+            env = code_api_security_engine._detect_file_environment(target, source_code)
+            if "sql" in title or "injection" in title:
+                if env["language"] == "python":
+                    diff = code_api_security_engine._synthesize_sqli_patch_py(target, raw_lines, line_idx)
+                else:
+                    diff = code_api_security_engine._synthesize_sqli_patch_js(target, raw_lines, line_idx)
+            elif "auth" in title and "missing" in title:
+                route_meta = {"method": "POST", "path": context.get("endpoint", "/api")}
+                diff = code_api_security_engine._synthesize_missing_auth_patch(target, raw_lines, line_idx, route_meta)
+            elif "bola" in title or "idor" in title or "authorization" in title:
+                route_meta = {"method": "GET", "path": context.get("endpoint", "/api/:id")}
+                diff = code_api_security_engine._synthesize_bola_patch(target, raw_lines, line_idx, route_meta)
+            else:
+                diff = code_api_security_engine._synthesize_secret_patch(target, raw_lines, line_idx)
+        else:
+            diff = f"--- a/{target}\n+++ b/{target}\n@@ -1,1 +1,2 @@\n+# [THING-SEC-FIX] Grounded remediation requires target file source context.\n"
+
         return {
             "patch_format": "unified_diff",
             "diff": diff,
@@ -311,27 +307,33 @@ class DeterministicSecurityInvestigationProvider(InvestigationLLMProvider):
         }
 
     async def generate_patch(self, plan: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        affected = plan.get("affected_files", ["backend/app/api/users.py"])
-        target = affected[0] if affected else "backend/app/api/users.py"
-        orig = (
-            "def get_user_profile(user_id):\n"
-            "    query = f\"SELECT * FROM users WHERE id = {user_id}\"\n"
-            "    cursor = db.execute(query)\n"
-            "    return jsonify(cursor.fetchone())\n"
-        )
-        patched = (
-            "def get_user_profile(user_id):\n"
-            "    # [THING AUTOFIX] Parameterized query\n"
-            "    query = \"SELECT * FROM users WHERE id = %s\"\n"
-            "    cursor = db.execute(query, (user_id,))\n"
-            "    return jsonify(cursor.fetchone())\n"
-        )
-        diff = "".join(difflib.unified_diff(
-            orig.splitlines(keepends=True),
-            patched.splitlines(keepends=True),
-            fromfile=target,
-            tofile=target
-        ))
+        affected = plan.get("affected_files", [context.get("file_path", "backend/app/api/users.py")])
+        target = affected[0] if affected else context.get("file_path", "backend/app/api/users.py")
+        title = plan.get("title", "").lower()
+        source_code = context.get("source_code") or context.get("file_content")
+
+        if source_code:
+            lines = source_code.splitlines(keepends=True)
+            line_idx = max(0, int(context.get("line_number", 1)) - 1)
+            raw_lines = [l.rstrip("\r\n") for l in lines]
+            from app.services.code_api_security_engine import code_api_security_engine
+            env = code_api_security_engine._detect_file_environment(target, source_code)
+            if "sql" in title or "injection" in title:
+                if env["language"] == "python":
+                    diff = code_api_security_engine._synthesize_sqli_patch_py(target, raw_lines, line_idx)
+                else:
+                    diff = code_api_security_engine._synthesize_sqli_patch_js(target, raw_lines, line_idx)
+            elif "auth" in title and "missing" in title:
+                route_meta = {"method": "POST", "path": context.get("endpoint", "/api")}
+                diff = code_api_security_engine._synthesize_missing_auth_patch(target, raw_lines, line_idx, route_meta)
+            elif "bola" in title or "idor" in title or "authorization" in title:
+                route_meta = {"method": "GET", "path": context.get("endpoint", "/api/:id")}
+                diff = code_api_security_engine._synthesize_bola_patch(target, raw_lines, line_idx, route_meta)
+            else:
+                diff = code_api_security_engine._synthesize_secret_patch(target, raw_lines, line_idx)
+        else:
+            diff = f"--- a/{target}\n+++ b/{target}\n@@ -1,1 +1,2 @@\n+# [THING-SEC-FIX] Grounded remediation requires target file source context.\n"
+
         return {
             "patch_format": "unified_diff",
             "diff": diff,

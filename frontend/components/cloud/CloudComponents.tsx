@@ -234,21 +234,28 @@ export const CloudProviderCard: React.FC<{
       desc: 'IAM roles, S3 buckets, EC2, VPC security groups, GuardDuty, and EKS',
       color: '#f59e0b',
       icon: 'AWS',
-      link: '/cloud/aws',
+      link: '/cloud?view=as',
     },
     AZURE: {
       title: 'Microsoft Azure',
       desc: 'Entra ID, Storage Blobs, Virtual Machines, VNets, Defender, and AKS',
       color: '#0284c7',
       icon: 'Azure',
-      link: '/cloud/azure',
+      link: '/cloud?view=as',
     },
     GCP: {
       title: 'Google Cloud Platform',
       desc: 'Cloud IAM, GCS Storage, Compute Engine, VPC, Security Command Center, and GKE',
       color: '#ea4335',
       icon: 'GCP',
-      link: '/cloud/gcp',
+      link: '/cloud?view=as',
+    },
+    KUBERNETES: {
+      title: 'Kubernetes Clusters',
+      desc: 'K8s RBAC, PodSecurity, NetworkPolicies, Helm charts, and runtime posture',
+      color: '#326ce5',
+      icon: 'K8s',
+      link: '/cloud?view=as',
     },
   };
 

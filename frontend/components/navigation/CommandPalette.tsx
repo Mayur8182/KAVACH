@@ -1,473 +1,358 @@
 'use client';
 
+/**
+ * CommandPalette — Kavach Global Quick-Jump & Search
+ *
+ * API Security modules (all six steps) live here as primary navigation.
+ * Additional platform tools, AI Analyst, Policies, Settings also searchable.
+ * Opens on: search bar click · Ctrl+K / ⌘K · number keys 1–6 (while open)
+ */
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
-  Code2,
-  Cloud,
-  Crosshair,
-  ShieldCheck,
-  Bot,
-  Database,
-  CheckSquare,
-  Lock,
-  ArrowRight,
+  Layers,
   ShieldAlert,
-  Sliders,
-  FileCheck,
-  Activity,
   GitFork,
-  ExternalLink,
-  Sparkles,
-  Command,
+  Wrench,
+  FileText,
+  Code2,
+  Key,
+  Boxes,
+  Cloud,
+  ArrowRight,
+  Bot,
+  FileCheck2,
+  Settings,
+  X,
+  Activity,
+  Lock,
+  Cpu,
 } from 'lucide-react';
-import { CANONICAL_ROUTES, RouteContract, OwnershipDomain } from '@/types/navigation/routeRegistry';
-import { useEntitlements } from '@/lib/hooks/useEntitlements';
-import { useAccessControl } from '@/lib/hooks/useAccessControl';
 
-const DOMAIN_ICONS: Record<OwnershipDomain, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
-  CODE: Code2,
-  CLOUD: Cloud,
-  PROTECT: ShieldCheck,
-  AGENT: Bot,
-  ATTACK: Crosshair,
-  DATA: Database,
-  QA: CheckSquare,
-  GOVERNANCE: FileCheck,
-  PLATFORM: Sliders,
-};
-
-const DOMAIN_COLORS: Record<OwnershipDomain, { text: string; bg: string; border: string }> = {
-  CODE: { text: '#0F172A', bg: '#F1F5F9', border: '#CBD5E1' },
-  CLOUD: { text: '#0284C7', bg: '#EFF6FF', border: '#BFDBFE' },
-  PROTECT: { text: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0' },
-  AGENT: { text: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-  ATTACK: { text: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  DATA: { text: '#EA580C', bg: '#FFF7ED', border: '#FFEDD5' },
-  QA: { text: '#0F172A', bg: '#F1F5F9', border: '#E2E8F0' },
-  GOVERNANCE: { text: '#475569', bg: '#F8FAFC', border: '#E2E8F0' },
-  PLATFORM: { text: '#334155', bg: '#F1F5F9', border: '#CBD5E1' },
-};
-
-interface CommandPaletteProps {
+export interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+// ── Warm ivory palette ───────────────────────────────────────────────
+const C = {
+  bg:        '#FFFFFF',
+  bgWarm:    '#FAFAF8',
+  bgHover:   '#F5F3EF',
+  bgActive:  '#EFEDE8',
+  border:    '#E8E6E1',
+  borderSub: '#F0EDE8',
+  text:      '#1A1A1A',
+  textSub:   '#6B6B6B',
+  textMuted: '#9A9A96',
+  iconBg:    '#F5F3EF',
+  iconBgAct: '#ECEAE5',
+  numBg:     '#F5F3EF',
+  numBorder: '#E0DDD8',
+};
+
+interface PaletteItem {
+  num?: number;
+  id: string;
+  label: string;
+  description?: string;
+  group?: string;
+  icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  href: string;
+}
+
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {
   const router = useRouter();
-  const { isProductEnabled } = useEntitlements();
-  const { hasPermission } = useAccessControl();
-
   const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
 
-  const categories = ['ALL', 'CODE', 'CLOUD', 'PROTECT', 'AGENT', 'ATTACK', 'DATA', 'GOVERNANCE'];
+  // ── Primary: 6-step API Security workflow ───────────────────────
+  const apiSecurityItems = useMemo<PaletteItem[]>(() => [
+    { num: 1, id: 'api-inventory',    label: 'API Inventory',        description: 'Endpoint discovery, protocols & auth boundaries',    icon: Layers,     href: '/api-security/inventory'    },
+    { num: 2, id: 'api-analysis',     label: 'Security Analysis',    description: 'AST code audit & live endpoint fuzzing',              icon: ShieldAlert, href: '/api-security/analysis'     },
+    { num: 3, id: 'api-findings',     label: 'Findings',             description: 'Detected OWASP API Top 10 vulnerabilities',           icon: Lock,       href: '/api-security/findings'     },
+    { num: 4, id: 'api-attack-paths', label: 'Attack Paths',         description: 'Correlated multi-hop lateral exploit chains',         icon: GitFork,    href: '/api-security/attack-paths' },
+    { num: 5, id: 'api-remediation',  label: 'Remediation',          description: 'Automated patch synthesis & fix verification',        icon: Wrench,     href: '/api-security/fix-verify'   },
+    { num: 6, id: 'api-reports',      label: 'Reports & Compliance', description: 'Executive summaries & compliance exports',            icon: FileText,   href: '/api-security/reports'      },
+  ], []);
 
-  // Index canonical routes
-  const indexedRoutes = useMemo(() => {
-    return Object.values(CANONICAL_ROUTES).map((route) => {
-      const isEntitled = route.product === 'platform' || isProductEnabled(route.product);
-      const isAuthorized = hasPermission(route.requiredPermission);
-      return {
-        ...route,
-        isEntitled,
-        isAuthorized,
-      };
-    });
-  }, [isProductEnabled, hasPermission]);
+  // ── Secondary: AI tools & settings ──────────────────────────────
+  const toolItems = useMemo<PaletteItem[]>(() => [
+    { id: 'api-analyst',   label: 'AI Security Analyst', description: 'Natural-language queries over your API security data', group: 'AI & Configuration', icon: Bot,       href: '/api-security/analyst'   },
+    { id: 'api-policies',  label: 'Policies',             description: 'OPA policy rules for API security enforcement',       group: 'AI & Configuration', icon: FileCheck2, href: '/api-security/policies'  },
+    { id: 'api-settings',  label: 'API Security Settings',description: 'Scan targets, integrations & notification config',   group: 'AI & Configuration', icon: Settings,  href: '/api-security/settings'  },
+  ], []);
 
-  // Filter routes based on query and activeCategory
-  const filteredRoutes = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return indexedRoutes.filter((item) => {
-      const matchesCategory = activeCategory === 'ALL' || item.ownershipDomain === activeCategory;
-      if (!matchesCategory) return false;
+  // ── Tertiary: global platform tools ─────────────────────────────
+  const platformItems = useMemo<PaletteItem[]>(() => [
+    { id: 'plat-code',      label: 'Code Security (SAST)',   group: 'Platform', icon: Code2,  href: '/code'               },
+    { id: 'plat-secrets',   label: 'Secrets Detection',      group: 'Platform', icon: Key,    href: '/code/secrets'        },
+    { id: 'plat-containers',label: 'Container Security',     group: 'Platform', icon: Boxes,  href: '/container-security' },
+    { id: 'plat-cloud',     label: 'Cloud Security (CSPM)',  group: 'Platform', icon: Cloud,  href: '/cloud'               },
+    { id: 'plat-protect',   label: 'Runtime Defense',        group: 'Platform', icon: Cpu,    href: '/protect'             },
+    { id: 'plat-soc',       label: 'Security Operations',    group: 'Platform', icon: Activity,href: '/soc'               },
+  ], []);
 
-      if (!q) return true;
+  const allItems = useMemo(() => [...apiSecurityItems, ...toolItems, ...platformItems], [apiSecurityItems, toolItems, platformItems]);
 
-      const titleMatch = item.navigationLabel.toLowerCase().includes(q);
-      const pathMatch = item.path.toLowerCase().includes(q);
-      const summaryMatch = item.ownershipSummary.toLowerCase().includes(q);
-      const domainMatch = item.ownershipDomain.toLowerCase().includes(q);
-      const permissionMatch = item.requiredPermission.toLowerCase().includes(q);
-      const aliasMatch = item.aliases?.some((a) => a.toLowerCase().includes(q));
+  // ── Filtering ────────────────────────────────────────────────────
+  const q = query.trim().toLowerCase();
 
-      return titleMatch || pathMatch || summaryMatch || domainMatch || permissionMatch || aliasMatch;
-    });
-  }, [indexedRoutes, query, activeCategory]);
+  const visibleApi = useMemo(() =>
+    q ? apiSecurityItems.filter(i => i.label.toLowerCase().includes(q) || (i.description || '').toLowerCase().includes(q)) : apiSecurityItems
+  , [apiSecurityItems, q]);
 
-  // Reset index when filter or query changes
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query, activeCategory]);
+  const visibleTools = useMemo(() =>
+    toolItems.filter(i => !q || i.label.toLowerCase().includes(q) || (i.description || '').toLowerCase().includes(q))
+  , [toolItems, q]);
 
-  // Focus input on open
+  const visiblePlatform = useMemo(() =>
+    q ? platformItems.filter(i => i.label.toLowerCase().includes(q) || (i.group || '').toLowerCase().includes(q)) : []
+  , [platformItems, q]);
+
+  const flatVisible = useMemo(() => [...visibleApi, ...visibleTools, ...visiblePlatform], [visibleApi, visibleTools, visiblePlatform]);
+
+  // Reset selection when query changes
+  useEffect(() => { setSelectedIndex(0); }, [query]);
+
+  // Focus input when opened, clear on close
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => inputRef.current?.focus(), 40);
     } else {
       setQuery('');
-      setActiveCategory('ALL');
+      setSelectedIndex(0);
     }
   }, [isOpen]);
 
   // Keyboard navigation
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
+    if (!isOpen) return;
 
-      if (e.key === 'Escape') {
+    const handle = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
+
+      // Number shortcuts 1–6 when no query
+      if (!query && /^[1-6]$/.test(e.key)) {
+        const item = apiSecurityItems.find(i => i.num === Number(e.key));
+        if (item) { e.preventDefault(); router.push(item.href); onClose(); return; }
+      }
+
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(p => Math.min(p + 1, flatVisible.length - 1)); }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); setSelectedIndex(p => Math.max(p - 1, 0)); }
+      if (e.key === 'Enter' && flatVisible[selectedIndex]) {
         e.preventDefault();
-        onClose();
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % Math.max(1, filteredRoutes.length));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + filteredRoutes.length) % Math.max(1, filteredRoutes.length));
-      } else if (e.key === 'Enter' && filteredRoutes[selectedIndex]) {
-        e.preventDefault();
-        const target = filteredRoutes[selectedIndex];
-        router.push(target.path);
+        router.push(flatVisible[selectedIndex].href);
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, filteredRoutes, selectedIndex, router, onClose]);
-
-  // Scroll selected item into view
-  useEffect(() => {
-    if (listRef.current) {
-      const activeEl = listRef.current.children[selectedIndex] as HTMLElement;
-      if (activeEl) {
-        activeEl.scrollIntoView({ block: 'nearest' });
-      }
-    }
-  }, [selectedIndex]);
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, [isOpen, query, flatVisible, selectedIndex, router, onClose, apiSecurityItems]);
 
   if (!isOpen) return null;
 
+  const navigate = (href: string) => { router.push(href); onClose(); };
+
+  // ── Section renderer ─────────────────────────────────────────────
+  const renderItem = (item: PaletteItem, globalIdx: number) => {
+    const Icon = item.icon;
+    const active = globalIdx === selectedIndex;
+    return (
+      <button
+        key={item.id}
+        type="button"
+        onClick={() => navigate(item.href)}
+        onMouseEnter={() => setSelectedIndex(globalIdx)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '9px 14px',
+          borderRadius: '8px',
+          border: 'none',
+          background: active ? C.bgActive : 'transparent',
+          cursor: 'pointer',
+          textAlign: 'left',
+          transition: 'background 0.1s',
+          gap: '10px',
+        }}
+      >
+        {/* Icon + text */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
+          <div style={{
+            width: 30, height: 30, borderRadius: '7px',
+            background: active ? C.iconBgAct : C.iconBg,
+            border: `1px solid ${C.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Icon size={14} color={active ? '#1A1A1A' : '#6B6B6B'} strokeWidth={1.8} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <span style={{ fontSize: '13.5px', fontWeight: 500, color: C.text, lineHeight: 1.3 }}>
+              {item.label}
+            </span>
+            {item.description && (
+              <span style={{ fontSize: '11.5px', color: C.textMuted, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {item.description}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right: number badge or arrow */}
+        {item.num != null ? (
+          <span style={{
+            flexShrink: 0, width: 22, height: 22, borderRadius: '5px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '12px', fontWeight: 500, color: C.textMuted,
+            background: C.numBg, border: `1px solid ${C.numBorder}`,
+          }}>
+            {item.num}
+          </span>
+        ) : (
+          <ArrowRight size={13} color={C.textMuted} style={{ flexShrink: 0 }} />
+        )}
+      </button>
+    );
+  };
+
+  let globalIdx = 0;
+
   return (
+    // Backdrop
     <div
       role="dialog"
       aria-modal="true"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.72)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        paddingTop: '10vh',
-        fontFamily: "var(--font-sans, 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif)",
-      }}
+      aria-label="Command palette"
       onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(20,20,20,0.35)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        paddingTop: '12vh', paddingLeft: 16, paddingRight: 16,
+        colorScheme: 'light',
+      }}
     >
+      {/* Palette panel */}
       <div
+        onClick={e => e.stopPropagation()}
         style={{
-          width: '680px',
-          maxWidth: '92vw',
-          backgroundColor: '#FFFFFF',
-          border: '1px solid #E2E8F0',
-          borderRadius: '16px',
+          width: '100%', maxWidth: 560,
+          background: C.bg,
+          borderRadius: '14px',
+          border: `1px solid ${C.border}`,
+          boxShadow: '0 24px 64px rgba(0,0,0,0.14), 0 4px 16px rgba(0,0,0,0.08)',
           overflow: 'hidden',
-          boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
-          display: 'flex',
-          flexDirection: 'column',
+          display: 'flex', flexDirection: 'column',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
-        {/* Search Input Bar */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '16px 20px',
-            borderBottom: '1px solid #E2E8F0',
-            backgroundColor: '#FFFFFF',
-          }}
-        >
-          <img
-            src="/kavach-cube.png"
-            alt="Kavach"
-            style={{ width: '20px', height: '20px', objectFit: 'contain', flexShrink: 0 }}
-          />
+        {/* ── Search input row ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '14px 16px',
+          borderBottom: `1px solid ${C.borderSub}`,
+        }}>
+          <Search size={16} color={C.textMuted} style={{ flexShrink: 0 }} strokeWidth={1.8} />
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type a path, resource, scan or permission (e.g. /code/iac, sast, audit, drift)..."
+            placeholder="Go to..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={e => setQuery(e.target.value)}
             style={{
-              flexGrow: 1,
-              border: 'none',
+              flex: 1,
               background: 'transparent',
-              color: '#0F172A',
-              fontSize: '14.5px',
-              fontWeight: 500,
-              outline: 'none',
-              padding: 0,
+              border: 'none', outline: 'none',
+              fontSize: '14px', fontWeight: 400,
+              color: C.text,
+              caretColor: '#1A1A1A',
             }}
           />
-          <span
-            style={{
-              fontSize: '11px',
-              color: '#94A3B8',
-              backgroundColor: '#F1F5F9',
-              padding: '3px 7px',
-              borderRadius: '5px',
-              border: '1px solid #E2E8F0',
-            }}
-          >
-            ESC
-          </span>
-        </div>
-
-        {/* Category Filter Pills */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '10px 16px',
-            borderBottom: '1px solid #F1F5F9',
-            backgroundColor: '#F8FAFC',
-            overflowX: 'auto',
-          }}
-        >
-          {categories.map((cat) => {
-            const isActive = activeCategory === cat;
-            return (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setActiveCategory(cat)}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  border: isActive ? '1px solid #09090B' : '1px solid #E2E8F0',
-                  backgroundColor: isActive ? '#09090B' : '#FFFFFF',
-                  color: isActive ? '#FFFFFF' : '#64748B',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.12s ease',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {cat}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Route Results List */}
-        <div
-          ref={listRef}
-          style={{
-            maxHeight: '400px',
-            overflowY: 'auto',
-            padding: '8px',
-            backgroundColor: '#FFFFFF',
-          }}
-        >
-          {filteredRoutes.length === 0 ? (
-            <div style={{ padding: '36px 20px', textAlign: 'center', color: '#94A3B8', fontSize: '13px' }}>
-              No canonical routes or security capabilities found matching &ldquo;{query}&rdquo;
-            </div>
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+            >
+              <X size={14} color={C.textMuted} />
+            </button>
           ) : (
-            filteredRoutes.map((route, index) => {
-              const isSelected = index === selectedIndex;
-              const Icon = DOMAIN_ICONS[route.ownershipDomain] || Sliders;
-              const domainColor = DOMAIN_COLORS[route.ownershipDomain] || DOMAIN_COLORS.PLATFORM;
-
-              return (
-                <div
-                  key={route.id}
-                  onClick={() => {
-                    router.push(route.path);
-                    onClose();
-                  }}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    backgroundColor: isSelected ? '#F1F5F9' : 'transparent',
-                    cursor: 'pointer',
-                    transition: 'background 0.1s ease',
-                    marginBottom: '2px',
-                    border: isSelected ? '1px solid #E2E8F0' : '1px solid transparent',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                    <div
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
-                        backgroundColor: domainColor.bg,
-                        border: `1px solid ${domainColor.border}`,
-                        color: domainColor.text,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Icon size={16} />
-                    </div>
-
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span
-                          style={{
-                            fontSize: '13.5px',
-                            fontWeight: 600,
-                            color: isSelected ? '#0F172A' : '#1E293B',
-                          }}
-                        >
-                          {route.navigationLabel}
-                        </span>
-                        <code
-                          style={{
-                            fontSize: '11px',
-                            color: '#64748B',
-                            backgroundColor: '#F8FAFC',
-                            padding: '1px 5px',
-                            borderRadius: '4px',
-                            border: '1px solid #E2E8F0',
-                          }}
-                        >
-                          {route.path}
-                        </code>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '11.5px',
-                          color: '#64748B',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          maxWidth: '380px',
-                          marginTop: '2px',
-                        }}
-                      >
-                        {route.ownershipSummary}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Status & Badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                    {!route.isEntitled && (
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          backgroundColor: '#FEF2F2',
-                          color: '#DC2626',
-                          border: '1px solid #FECACA',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                        }}
-                      >
-                        <Lock size={10} />
-                        LOCKED
-                      </span>
-                    )}
-
-                    {!route.isAuthorized && route.isEntitled && (
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          backgroundColor: '#FFFBEB',
-                          color: '#D97706',
-                          border: '1px solid #FDE68A',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                        }}
-                      >
-                        <ShieldAlert size={10} />
-                        {route.requiredPermission}
-                      </span>
-                    )}
-
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        color: domainColor.text,
-                        backgroundColor: domainColor.bg,
-                        border: `1px solid ${domainColor.border}`,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
-                      }}
-                    >
-                      {route.ownershipDomain}
-                    </span>
-
-                    {isSelected && <ArrowRight size={14} color="#09090B" style={{ marginLeft: '4px' }} />}
-                  </div>
-                </div>
-              );
-            })
+            <kbd style={{
+              fontSize: '11px', fontWeight: 500, color: C.textMuted,
+              background: C.bgWarm, border: `1px solid ${C.border}`,
+              padding: '2px 8px', borderRadius: '5px', flexShrink: 0,
+              fontFamily: 'inherit',
+            }}>
+              Ctrl K
+            </kbd>
           )}
         </div>
 
-        {/* Footer Navigation Hints */}
-        <div
-          style={{
-            padding: '10px 18px',
-            borderTop: '1px solid #E2E8F0',
-            backgroundColor: '#F8FAFC',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '11px',
-            color: '#64748B',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <span>
-              <kbd style={{ backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1', padding: '1px 4px', borderRadius: '3px' }}>↑</kbd>{' '}
-              <kbd style={{ backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1', padding: '1px 4px', borderRadius: '3px' }}>↓</kbd>{' '}
-              to navigate
-            </span>
-            <span>
-              <kbd style={{ backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1', padding: '1px 4px', borderRadius: '3px' }}>↵</kbd>{' '}
-              to select
-            </span>
-            <span>
-              <kbd style={{ backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1', padding: '1px 4px', borderRadius: '3px' }}>ESC</kbd>{' '}
-              to dismiss
-            </span>
-          </div>
+        {/* ── Results ── */}
+        <div style={{ overflowY: 'auto', maxHeight: 400 }}>
 
-          <span style={{ fontWeight: 500, color: '#94A3B8' }}>
-            {filteredRoutes.length} canonical routes indexed
-          </span>
+          {/* API Security section */}
+          {visibleApi.length > 0 && (
+            <div style={{ padding: '10px 10px 4px' }}>
+              <div style={{ fontSize: '10.5px', fontWeight: 600, color: C.textMuted, letterSpacing: '0.07em', textTransform: 'uppercase', padding: '0 6px 6px' }}>
+                API Security
+              </div>
+              {visibleApi.map(item => { const el = renderItem(item, globalIdx); globalIdx++; return el; })}
+            </div>
+          )}
+
+          {/* AI & Config section */}
+          {visibleTools.length > 0 && (
+            <div style={{ padding: '8px 10px 4px', borderTop: visibleApi.length > 0 ? `1px solid ${C.borderSub}` : 'none' }}>
+              <div style={{ fontSize: '10.5px', fontWeight: 600, color: C.textMuted, letterSpacing: '0.07em', textTransform: 'uppercase', padding: '0 6px 6px' }}>
+                AI & Configuration
+              </div>
+              {visibleTools.map(item => { const el = renderItem(item, globalIdx); globalIdx++; return el; })}
+            </div>
+          )}
+
+          {/* Platform section — only shown when searching */}
+          {visiblePlatform.length > 0 && (
+            <div style={{ padding: '8px 10px 4px', borderTop: `1px solid ${C.borderSub}` }}>
+              <div style={{ fontSize: '10.5px', fontWeight: 600, color: C.textMuted, letterSpacing: '0.07em', textTransform: 'uppercase', padding: '0 6px 6px' }}>
+                Platform
+              </div>
+              {visiblePlatform.map(item => { const el = renderItem(item, globalIdx); globalIdx++; return el; })}
+            </div>
+          )}
+
+          {/* Empty state */}
+          {flatVisible.length === 0 && (
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: C.textMuted, fontSize: '13px' }}>
+              No results for &ldquo;{query}&rdquo;
+            </div>
+          )}
+        </div>
+
+        {/* ── Footer ── */}
+        <div style={{
+          borderTop: `1px solid ${C.borderSub}`,
+          padding: '8px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: C.bgWarm,
+        }}>
+          <span style={{ fontSize: '11px', color: C.textMuted }}>Press 1–6 to jump to any module</span>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            {[['↑↓', 'Navigate'], ['↵', 'Open'], ['Esc', 'Close']].map(([k, v]) => (
+              <span key={k} style={{ fontSize: '11px', color: C.textMuted, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <kbd style={{ fontSize: '10px', background: C.numBg, border: `1px solid ${C.numBorder}`, borderRadius: 4, padding: '1px 5px', fontFamily: 'inherit' }}>{k}</kbd>
+                {v}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>

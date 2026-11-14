@@ -455,50 +455,6 @@ class ThreatIntelligenceService:
             last_seen=now - timedelta(hours=8),
         )
         self.db.add_all([ind_cve1, ind_cve2, ind_cve3, ind_ip1, ind_dom1, ind_dom2, ind_hash1])
-
-        # 6. Correlate with active project if present
-        proj_stmt = select(Project).limit(1)
-        proj = (await self.db.execute(proj_stmt)).scalar_one_or_none()
-        if proj:
-            obs = ThreatObservation(
-                id=uuid.uuid4(),
-                indicator_id=ind_ip1.id,
-                project_id=proj.id,
-                observation_type="NETWORK_OUTBOUND",
-                observed_value="198.51.100.42",
-                observed_entity_id="payment-service",
-                observed_entity_type="WORKLOAD",
-                observed_at=now - timedelta(minutes=15),
-                evidence_reference="EVD-NET-84210",
-                context={"port": 443, "protocol": "TCP", "cluster": "us-east-1-prod", "bytes_sent": 4096},
-            )
-            self.db.add(obs)
-
-            match = ThreatMatch(
-                id=uuid.uuid4(),
-                project_id=proj.id,
-                indicator_id=ind_ip1.id,
-                match_key="TMT-202610-0042",
-                match_type="NETWORK",
-                observed_entity={"type": "WORKLOAD", "id": "payment-service", "ip": "10.0.12.44"},
-                observation_id=str(obs.id),
-                environment="PRODUCTION",
-                confidence="HIGH",
-                severity="CRITICAL",
-                status="CONFIRMED",
-                first_seen_at=now - timedelta(minutes=15),
-                last_seen_at=now - timedelta(minutes=2),
-                evidence_id="EVD-NET-84210",
-                details={
-                    "indicator_value": "198.51.100.42",
-                    "threat_actor": "APT29",
-                    "c2_protocol": "HTTPS",
-                    "technique": "T1071",
-                    "attack_chain_hop": "Step 3 (C2 Beaconing after SSRF token leak)",
-                },
-            )
-            self.db.add(match)
-
         await self.db.commit()
 
     async def list_sources(self) -> List[ThreatIntelligenceSource]:

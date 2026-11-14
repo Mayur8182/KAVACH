@@ -126,20 +126,23 @@ const nextConfig = {
   },
   async rewrites() {
     const backendPort = process.env.BACKEND_PORT || '8000';
-    const rawUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || `http://127.0.0.1:${backendPort}`;
+    const localUrl = `http://127.0.0.1:${backendPort}`;
+    let rawUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || localUrl;
     let backendUrl = rawUrl.trim();
+    // Safety guard: in local dev, always use local backend unless explicitly specified
+    if (backendUrl.includes('kavach-backend-3hdm.onrender.com') || !backendUrl) {
+      backendUrl = localUrl;
+    }
     if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
-      backendUrl = `https://${backendUrl}`;
+      backendUrl = `http://${backendUrl}`;
     }
     try {
       const parsed = new URL(backendUrl);
-      // If hostname is an internal Render service name (e.g. kavach-backend-3hdm) without domain dots
-      if (!parsed.hostname.includes('.') && parsed.hostname !== 'localhost') {
+      if (!parsed.hostname.includes('.') && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
         parsed.hostname = `${parsed.hostname}.onrender.com`;
         parsed.port = '';
         parsed.protocol = 'https:';
       }
-      // Render public web services route externally via standard HTTPS (port 443). Strip internal port :10000
       if (parsed.hostname.endsWith('.onrender.com')) {
         parsed.port = '';
         parsed.protocol = 'https:';

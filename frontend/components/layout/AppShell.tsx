@@ -60,7 +60,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     setCurrentEnv(e || null);
   }, [setCurrentEnv]);
 
-  const sidebarWidth = isCollapsed ? '64px' : '240px';
+  const isApiSecurityRoute = pathname?.startsWith('/api-security');
+  const sidebarWidth = isApiSecurityRoute ? '0px' : (isCollapsed ? '64px' : '240px');
 
   return (
     <div
@@ -74,13 +75,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         '--topbar-height': '56px',
       } as React.CSSProperties}
     >
-      {/* 1. Global SecuLayer Sidebar */}
-      <Sidebar
-        isCollapsed={isCollapsed}
-        onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
-        isMobileOpen={isMobileOpen}
-        onCloseMobile={() => setIsMobileOpen(false)}
-      />
+      {/* 1. Global SecuLayer Sidebar — hidden on API Security routes */}
+      {!isApiSecurityRoute && (
+        <Sidebar
+          isCollapsed={isCollapsed}
+          onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+          isMobileOpen={isMobileOpen}
+          onCloseMobile={() => setIsMobileOpen(false)}
+        />
+      )}
 
       {/* Main Column */}
       <div
@@ -90,7 +93,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           flexDirection: 'column',
           flex: 1,
           minWidth: 0,
-          width: `calc(100% - var(--sidebar-width, ${sidebarWidth}))`,
+          width: isApiSecurityRoute ? '100%' : `calc(100% - var(--sidebar-width, ${sidebarWidth}))`,
           transition: 'width 200ms cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
@@ -103,16 +106,19 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           currentEnv={currentEnv || undefined}
           onSelectEnv={handleSelectEnv}
           onOpenMobile={() => setIsMobileOpen(true)}
+          showBrandLogo={isApiSecurityRoute}
         />
 
         {/* 3. Page Container with Dual-Layer RouteGuard */}
         <main
+          id="main-content"
+          tabIndex={-1}
           style={{
             flexGrow: 1,
             display: 'flex',
             flexDirection: 'column',
             overflowY: 'auto',
-            backgroundColor: '#F8FAFC',
+            backgroundColor: isApiSecurityRoute ? '#F8FAFC' : '#F8FAFC',
             minHeight: 0,
             width: '100%',
           }}

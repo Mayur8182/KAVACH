@@ -46,7 +46,7 @@ export const ALL_PRODUCT_WORKSPACES: ProductWorkspaceConfig[] = [
     desc: 'Multi-Cloud CSPM, AWS, GCP, Azure & K8s Posture',
     icon: Cloud,
     href: '/cloud',
-    onboardHref: '/onboarding?product=cloud&workspace=cloud',
+    onboardHref: '/cloud?connect=true',
     color: '#09090B',
     bg: '#F4F4F5',
     border: '#E4E4E7',

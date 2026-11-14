@@ -15,6 +15,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
+import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
 
 const SOLUTIONS = [
   {
@@ -83,7 +84,7 @@ export default function SolutionsPage() {
       {/* Hero Header */}
       <section style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', padding: '64px 24px', textAlign: 'center' }}>
         <div style={{ maxWidth: '960px', margin: '0 auto' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', backgroundColor: '#EFF6FF', borderRadius: '16px', color: '#2563EB', fontSize: '12px', fontWeight: 600, marginBottom: '16px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', backgroundColor: '#F5F1E8', borderRadius: '16px', color: '#3F3A33', fontSize: '12px', fontWeight: 600, marginBottom: '16px' }}>
             <Sparkles size={14} />
             <span>Deterministic Security Across the SDLC</span>
           </div>
@@ -95,7 +96,7 @@ export default function SolutionsPage() {
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', flexWrap: 'wrap' }}>
             <Link
-              href="/onboarding"
+              href="/demo"
               style={{
                 padding: '11px 24px',
                 backgroundColor: '#0F172A',
@@ -110,7 +111,7 @@ export default function SolutionsPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1E293B')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0F172A')}
             >
-              Start Free Onboarding →
+              See the product demo →
             </Link>
             <Link
               href="/platform"
@@ -163,13 +164,13 @@ export default function SolutionsPage() {
                 className="solution-card-grid"
               >
                 <div>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '8px', backgroundColor: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '8px', backgroundColor: '#F5F1E8', color: '#3F3A33', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
                     <Icon size={22} />
                   </div>
                   <h2 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 8px', color: '#0F172A', letterSpacing: '-0.02em' }}>
                     {sol.title}
                   </h2>
-                  <p style={{ fontSize: '14px', fontWeight: 600, color: '#2563EB', margin: '0 0 10px' }}>
+                  <p style={{ fontSize: '14px', fontWeight: 600, color: '#3F3A33', margin: '0 0 10px' }}>
                     {sol.subtitle}
                   </p>
                   <p style={{ fontSize: '14px', color: '#64748B', lineHeight: 1.6, margin: '0 0 18px' }}>
@@ -183,7 +184,7 @@ export default function SolutionsPage() {
                       gap: '6px',
                       fontSize: '13px',
                       fontWeight: 600,
-                      color: '#2563EB',
+                      color: '#3F3A33',
                       textDecoration: 'none',
                     }}
                   >
@@ -214,37 +215,38 @@ export default function SolutionsPage() {
       </section>
 
       {/* Bottom CTA Banner */}
-      <section style={{ backgroundColor: '#0F172A', color: '#FFFFFF', padding: '56px 24px', textAlign: 'center', marginTop: 'auto' }}>
+      <section style={{ backgroundColor: '#F5F1E8', color: '#171717', borderTop: '1px solid #E4DED2', padding: '48px 24px', textAlign: 'center', marginTop: 'auto' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <h2 style={{ fontSize: '30px', fontWeight: 800, margin: '0 0 12px', letterSpacing: '-0.02em' }}>
             Ready to secure your engineering workflows?
           </h2>
-          <p style={{ fontSize: '15px', color: '#94A3B8', margin: '0 0 28px' }}>
-            Complete the 5-step onboarding wizard in less than 2 minutes. Real database persistence, real scans.
+          <p style={{ fontSize: '15px', color: '#66645F', margin: '0 0 28px' }}>
+            See how code, cloud, and runtime findings move into a clear review workflow.
           </p>
           <Link
-            href="/onboarding"
+            href="/demo"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
               padding: '12px 28px',
-              backgroundColor: '#FFFFFF',
-              color: '#0F172A',
+              backgroundColor: '#171717',
+              color: '#FFFFFF',
               borderRadius: '6px',
               fontSize: '14px',
               fontWeight: 600,
               textDecoration: 'none',
               transition: 'background-color 0.15s ease',
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F1F5F9')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#393939')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#171717')}
           >
-            <span>Launch Kavach Onboarding</span>
+            <span>Explore the product demo</span>
             <ArrowRight size={15} />
           </Link>
         </div>
       </section>
+      <EnterpriseFooter />
     </div>
   );
 }

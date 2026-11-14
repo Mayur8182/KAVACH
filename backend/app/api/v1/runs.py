@@ -64,19 +64,112 @@ class CreateRunRequest(BaseModel):
     scope: str = Field(default="full", description="Scan scope: full, changed, custom")
 
 
+async def _resolve_user_accessible_projects(current_user: Optional[User], db: AsyncSession) -> List[uuid.UUID]:
+    if not current_user:
+        return []
+    if getattr(current_user, "is_superuser", False):
+        return []
+    from app.models.invitation import OrganizationMember
+    owned = (await db.execute(select(Project.id).where(Project.owner_id == current_user.id))).scalars().all()
+    p_ids = set(owned)
+    try:
+        org_pids = (
+            await db.execute(
+                select(Project.id)
+                .join(OrganizationMember, OrganizationMember.organization_id == Project.organization_id)
+                .where(OrganizationMember.user_id == current_user.id, OrganizationMember.is_active == True)
+            )
+        ).scalars().all()
+        for pid in org_pids:
+            p_ids.add(pid)
+    except Exception:
+        pass
+    return list(p_ids)
+
+
+async def _check_scan_access(scan: Optional[SecurityScan], current_user: Optional[User], db: AsyncSession) -> bool:
+    if not scan or not current_user:
+        return False
+    if getattr(current_user, "is_superuser", False):
+        return True
+    if not scan.project_id:
+        return False
+    from app.models.invitation import OrganizationMember
+    proj = await db.get(Project, scan.project_id)
+    if not proj:
+        return False
+    if proj.owner_id == current_user.id:
+        return True
+    if proj.organization_id:
+        mem = await db.execute(
+            select(OrganizationMember.id).where(
+                and_(
+                    OrganizationMember.organization_id == proj.organization_id,
+                    OrganizationMember.user_id == current_user.id,
+                    OrganizationMember.is_active == True,
+                )
+            )
+        )
+        if mem.scalars().first():
+            return True
+    return False
+
+
+async def _resolve_scan(db: AsyncSession, run_id_str: str, current_user: Optional[User] = None) -> Optional[SecurityScan]:
+    """
+    Safely resolves a scan by UUID or prefix strictly scoped to authorized projects.
+    """
+    clean_id = (run_id_str or "").replace("RUN-", "").replace("run-", "").strip().lower()
+    scan = None
+    if len(clean_id) == 36:
+        try:
+            run_uuid = uuid.UUID(clean_id)
+            scan = await db.get(SecurityScan, run_uuid)
+        except Exception:
+            scan = None
+
+    if not scan and len(clean_id) >= 4:
+        from sqlalchemy import cast, String
+        stmt = (
+            select(SecurityScan)
+            .where(cast(SecurityScan.id, String).like(f"{clean_id}%"))
+            .order_by(desc(SecurityScan.created_at))
+            .limit(1)
+        )
+        res = await db.execute(stmt)
+        scan = res.scalars().first()
+
+    if not scan:
+        return None
+
+    if current_user and not await _check_scan_access(scan, current_user, db):
+        return None
+
+    return scan
+
+
 @router.get("/repositories", summary="List connected repositories for run execution")
 async def list_run_repositories(
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Returns real connected GitHub repositories from the database for the run initiator.
     """
+    is_super = getattr(current_user, "is_superuser", False)
+    accessible_pids = await _resolve_user_accessible_projects(current_user, db)
+
+    if not is_super and not accessible_pids:
+        return []
+
     stmt = (
         select(GitHubRepository, Project.name.label("project_name"))
         .outerjoin(Project, GitHubRepository.project_id == Project.id)
-        .order_by(desc(GitHubRepository.updated_at), desc(GitHubRepository.created_at))
     )
+    if not is_super:
+        stmt = stmt.where(GitHubRepository.project_id.in_(accessible_pids))
+
+    stmt = stmt.order_by(desc(GitHubRepository.updated_at), desc(GitHubRepository.created_at))
     res = await db.execute(stmt)
     rows = res.all()
 
@@ -100,22 +193,6 @@ async def list_run_repositories(
             "isPrivate": bool(repo.private),
         })
 
-    # Always ensure local security benchmark repository is available as a verified target
-    if "security_benchmark_repo" not in seen:
-        repos_data.append({
-            "id": "local-benchmark-fixture",
-            "name": "security_benchmark_repo",
-            "fullName": "security_benchmark_repo",
-            "owner": "local",
-            "defaultBranch": "main",
-            "cloneUrl": os.path.abspath("backend/scratch/security_benchmark_repo"),
-            "htmlUrl": "https://github.com/local/security_benchmark_repo",
-            "projectId": None,
-            "projectName": "Security Benchmark Fixture",
-            "visibility": "private",
-            "isPrivate": True,
-        })
-
     return repos_data
 
 
@@ -123,16 +200,22 @@ async def list_run_repositories(
 async def list_runs(
     limit: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Returns recent security runs persisted in the database.
+    Returns recent security runs persisted in the database scoped to current user.
     """
-    stmt = (
-        select(SecurityScan)
-        .order_by(desc(SecurityScan.started_at), desc(SecurityScan.created_at))
-        .limit(limit)
-    )
+    is_super = getattr(current_user, "is_superuser", False)
+    accessible_pids = await _resolve_user_accessible_projects(current_user, db)
+
+    if not is_super and not accessible_pids:
+        return []
+
+    stmt = select(SecurityScan)
+    if not is_super:
+        stmt = stmt.where(SecurityScan.project_id.in_(accessible_pids))
+    stmt = stmt.order_by(desc(SecurityScan.started_at), desc(SecurityScan.created_at)).limit(limit)
+
     res = await db.execute(stmt)
     scans = res.scalars().all()
 
@@ -177,7 +260,7 @@ async def list_runs(
         runs_data.append({
             "id": str(s.id),
             "runNumber": str(s.id)[:8],
-            "repository": repo_name or "Mayur8182/KAVACH",
+            "repository": repo_name or "Repository",
             "branch": branch_name,
             "commit": commit_val,
             "status": s.status,
@@ -199,35 +282,56 @@ async def list_runs(
 async def create_run(
     payload: CreateRunRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Creates and initiates an autonomous multi-agent security execution.
+    Creates and initiates an autonomous multi-agent security execution scoped to tenant.
     """
-    effective_user = current_user
-    if not effective_user:
-        u_stmt = select(User).order_by(User.created_at).limit(1)
-        effective_user = (await db.execute(u_stmt)).scalars().first()
-        if not effective_user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    is_super = getattr(current_user, "is_superuser", False)
+    accessible_pids = await _resolve_user_accessible_projects(current_user, db)
 
-    manager = RunManager(db)
     proj_uuid = None
     if payload.project_id:
         try:
             proj_uuid = uuid.UUID(payload.project_id)
-        except Exception:
-            pass
+            if not is_super and proj_uuid not in accessible_pids:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to requested project")
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid project_id")
+    else:
+        if accessible_pids:
+            proj_uuid = accessible_pids[0]
+        else:
+            from app.api.v1.workspaces import ensure_personal_workspace
+            ws = await ensure_personal_workspace(current_user, db)
+            p = Project(
+                id=uuid.uuid4(),
+                owner_id=current_user.id,
+                workspace_id=ws.id if ws else None,
+                organization_id=ws.organization_id if ws else None,
+                name="Default Security Project",
+                description="Primary security workspace for repository scans",
+            )
+            db.add(p)
+            await db.commit()
+            await db.refresh(p)
+            proj_uuid = p.id
 
     repo_uuid = None
     if payload.repository_id:
         try:
             repo_uuid = uuid.UUID(payload.repository_id)
-        except Exception:
-            pass
+            repo_obj = await db.get(GitHubRepository, repo_uuid)
+            if not repo_obj:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+            if not is_super and repo_obj.project_id not in accessible_pids and repo_obj.project_id != proj_uuid:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to repository")
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid repository_id")
 
+    manager = RunManager(db)
     scan = await manager.create_run(
-        current_user=effective_user,
+        current_user=current_user,
         repository_name=payload.repository,
         repository_id=repo_uuid,
         project_id=proj_uuid,
@@ -250,50 +354,16 @@ async def create_run(
     }
 
 
-async def _resolve_scan(db: AsyncSession, run_id_str: str) -> Optional[SecurityScan]:
-    """
-    Safely resolves a scan by UUID, string prefix, or gracefully resolves to the latest run.
-    """
-    clean_id = (run_id_str or "").replace("RUN-", "").replace("run-", "").strip().lower()
-    if len(clean_id) == 36:
-        try:
-            run_uuid = uuid.UUID(clean_id)
-            scan = await db.get(SecurityScan, run_uuid)
-            if scan:
-                return scan
-        except Exception:
-            pass
-
-    # Try lookup by UUID prefix if at least 4 characters provided
-    if len(clean_id) >= 4:
-        from sqlalchemy import cast, String
-        stmt = (
-            select(SecurityScan)
-            .where(cast(SecurityScan.id, String).like(f"{clean_id}%"))
-            .order_by(desc(SecurityScan.created_at))
-            .limit(1)
-        )
-        res = await db.execute(stmt)
-        found = res.scalars().first()
-        if found:
-            return found
-
-    # Fallback to latest real scan
-    stmt = select(SecurityScan).order_by(desc(SecurityScan.created_at)).limit(1)
-    res = await db.execute(stmt)
-    return res.scalars().first()
-
-
 @router.get("/{run_id}", summary="Get run details and state")
 async def get_run_details(
     run_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Returns full metadata, execution tasks for all 12 agents, and active findings for a run.
     """
-    scan = await _resolve_scan(db, run_id)
+    scan = await _resolve_scan(db, run_id, current_user)
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 
@@ -427,13 +497,15 @@ async def get_run_events(
     since_sequence: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Returns chronological events for replay and live UI state synchronization.
     """
-    scan = await _resolve_scan(db, run_id)
-    actual_run_id = scan.id if scan else None
+    scan = await _resolve_scan(db, run_id, current_user)
+    if not scan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+    actual_run_id = scan.id
 
     stmt = (
         select(ExecutionEvent)
@@ -441,7 +513,7 @@ async def get_run_events(
         .order_by(ExecutionEvent.created_at)
         .limit(limit)
     )
-    events = (await db.execute(stmt)).scalars().all() if actual_run_id else []
+    events = (await db.execute(stmt)).scalars().all()
     return [
         {
             "eventId": f"evt_{e.id}",
@@ -464,94 +536,51 @@ async def get_run_file_content(
     run_id: str,
     file_path: str = Query(..., description="Relative path in workspace, e.g. src/auth/session.ts"),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Serves inspected source files for the Monaco Code Viewer.
     Strictly enforces workspace containment to prevent path traversal attacks.
     """
+    scan = await _resolve_scan(db, run_id, current_user)
+    if not scan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+
     from app.integrations.github.workspace import GitHubWorkspaceManager
     wm = GitHubWorkspaceManager()
     clean_path = file_path.replace("\\", "/").lstrip("/")
 
-    scan = await _resolve_scan(db, run_id)
-    actual_run_id = scan.id if scan else None
-
     # 1. Check isolated job workspace
-    if actual_run_id:
-        workspace_dir = wm._get_job_workspace_path(actual_run_id)
-        target_abs = os.path.abspath(os.path.join(workspace_dir, clean_path))
-        if os.path.isfile(target_abs):
-            with open(target_abs, "r", encoding="utf-8", errors="replace") as f:
-                return {"file": clean_path, "content": f.read()}
-
-    # 2. Check candidate repository cached mirrors and other job workspaces
-    candidate_roots = [
-        os.path.abspath("backend/scratch/security_benchmark_repo"),
-        os.path.abspath("backend/scratch/github_workspaces"),
-        os.path.abspath("scratch/security_benchmark_repo"),
-        os.path.abspath("scratch/github_workspaces"),
-    ]
-    for root in candidate_roots:
-        if not os.path.isdir(root):
-            continue
-        # Check specific job workspace folder first
-        if actual_run_id:
-            cand_job = os.path.join(root, f"job_{actual_run_id}", clean_path)
-            if os.path.isfile(cand_job):
-                with open(cand_job, "r", encoding="utf-8", errors="replace") as f:
-                    return {"file": clean_path, "content": f.read()}
-
-        # Check all candidate subdirectories
-        for sub in os.listdir(root):
-            cand_file = os.path.join(root, sub, clean_path)
-            if os.path.isfile(cand_file):
-                with open(cand_file, "r", encoding="utf-8", errors="replace") as f:
-                    return {"file": clean_path, "content": f.read()}
-
-    # 3. Check local codebase files if inspecting self or repo files
-    local_path = os.path.abspath(clean_path)
-    if os.path.isfile(local_path):
-        with open(local_path, "r", encoding="utf-8", errors="replace") as f:
+    workspace_dir = wm._get_job_workspace_path(scan.id)
+    target_abs = os.path.abspath(os.path.join(workspace_dir, clean_path))
+    if target_abs.startswith(os.path.abspath(workspace_dir)) and os.path.isfile(target_abs):
+        with open(target_abs, "r", encoding="utf-8", errors="replace") as f:
             return {"file": clean_path, "content": f.read()}
 
-    # 4. Check if finding exists in database with code snippet
-    if actual_run_id:
-        finding_stmt = (
-            select(SecurityFinding)
-            .where(
+    # 2. Check if finding exists in database for this scan with code snippet
+    finding_stmt = (
+        select(SecurityFinding)
+        .where(
+            and_(
+                SecurityFinding.scan_id == scan.id,
                 or_(
                     SecurityFinding.file_path == clean_path,
                     SecurityFinding.file_path.ilike(f"%{os.path.basename(clean_path)}%")
                 )
             )
-            .limit(1)
         )
-        f_res = await db.execute(finding_stmt)
-        matched_finding = f_res.scalars().first()
-        if matched_finding and matched_finding.code_snippet:
-            return {
-                "file": clean_path,
-                "content": f"// Inspected source evidence for {clean_path}\n// Finding: {matched_finding.title} ({matched_finding.rule_id})\n\n" + matched_finding.code_snippet
-            }
+        .limit(1)
+    )
+    f_res = await db.execute(finding_stmt)
+    matched_finding = f_res.scalars().first()
+    snippet = getattr(matched_finding, "snippet", None) or getattr(matched_finding, "code_snippet", None)
+    if matched_finding and snippet:
+        return {
+            "file": clean_path,
+            "content": f"// Inspected source evidence for {clean_path}\n// Finding: {matched_finding.title} ({matched_finding.rule_id})\n\n" + snippet
+        }
 
-    # 5. Fallback safe synthesis for demo/benchmark files rather than throwing 404
-    if "session.ts" in clean_path:
-        synth = """export async function getUserByEmail(email: string) {
-  const query = `SELECT * FROM users WHERE email = '${email}'`;
-  const res = await db.query(query);
-  return res.rows[0];
-}
-
-export async function createSession(userId: string) {
-  return jwt.sign({
-    userId,
-  }, process.env.JWT_SECRET, {
-    expiresIn: '7d'
-  });
-}
-"""
-        return {"file": clean_path, "content": synth}
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"File {clean_path} not found in workspace for this run")
 
 
 @router.get("/{run_id}/stream", summary="SSE Event Stream fallback")
@@ -635,9 +664,9 @@ async def websocket_run_stream(
 async def pause_run_endpoint(
     run_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
-    scan = await _resolve_scan(db, run_id)
+    scan = await _resolve_scan(db, run_id, current_user)
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
     manager = RunManager(db)
@@ -649,9 +678,9 @@ async def pause_run_endpoint(
 async def resume_run_endpoint(
     run_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
-    scan = await _resolve_scan(db, run_id)
+    scan = await _resolve_scan(db, run_id, current_user)
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
     manager = RunManager(db)
@@ -663,9 +692,9 @@ async def resume_run_endpoint(
 async def cancel_run_endpoint(
     run_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
-    scan = await _resolve_scan(db, run_id)
+    scan = await _resolve_scan(db, run_id, current_user)
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
     manager = RunManager(db)
@@ -678,9 +707,9 @@ async def retry_task_endpoint(
     run_id: str,
     task_key: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
-    scan = await _resolve_scan(db, run_id)
+    scan = await _resolve_scan(db, run_id, current_user)
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
     manager = RunManager(db)
@@ -692,9 +721,9 @@ async def retry_task_endpoint(
 async def get_tool_output_endpoint(
     run_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
-    scan = await _resolve_scan(db, run_id)
+    scan = await _resolve_scan(db, run_id, current_user)
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 
@@ -728,9 +757,9 @@ async def get_tool_output_endpoint(
 async def get_inspected_files_endpoint(
     run_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
-    scan = await _resolve_scan(db, run_id)
+    scan = await _resolve_scan(db, run_id, current_user)
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 
@@ -772,50 +801,13 @@ async def get_inspected_files_endpoint(
         if clean_fp and clean_fp not in files_list:
             files_list.insert(0, clean_fp)
 
-    # 2. Discover full codebase source files from the current repository workspace
-    base_dir = os.path.abspath(".")
-    core_dirs = [
-        "src",
-        "frontend/app",
-        "frontend/components",
-        "frontend/lib",
-        "frontend/src",
-        "backend/app",
-        "infra",
-        "backend/scratch/security_benchmark_repo",
-    ]
-    valid_exts = {".ts", ".tsx", ".py", ".js", ".jsx", ".tf", ".yml", ".yaml"}
-
-    # Include root manifests and core files
-    for rf in ["src/auth/session.ts", "Dockerfile", "package.json", "docker-compose.yml", "render.yaml"]:
-        if rf not in files_list:
-            if os.path.isfile(os.path.join(base_dir, rf)) or os.path.isfile(os.path.join(base_dir, "backend/scratch/security_benchmark_repo", rf)):
-                files_list.append(rf)
-
-    for cd in core_dirs:
-        cd_path = os.path.join(base_dir, cd)
-        if not os.path.isdir(cd_path):
-            continue
-        for root, dirs, f_names in os.walk(cd_path):
-            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ["__pycache__", "node_modules", ".next"]]
-            for fn in f_names:
-                if any(fn.endswith(ext) for ext in valid_exts):
-                    rel = os.path.relpath(os.path.join(root, fn), base_dir).replace("\\", "/")
-                    if rel not in files_list:
-                        files_list.append(rel)
-                    if len(files_list) >= 287:
-                        break
-            if len(files_list) >= 287:
-                break
-
-    # Prioritize vulnerable files at the front
-    vulnerable_files = [fp for fp in files_list if fp in finding_map or "session.ts" in fp]
+    vulnerable_files = [fp for fp in files_list if fp in finding_map]
     clean_files = [fp for fp in files_list if fp not in vulnerable_files]
     ordered_files = vulnerable_files + clean_files
 
     return {
         "runId": str(scan.id),
-        "totalFiles": 287,
+        "totalFiles": len(ordered_files),
         "files": ordered_files[:100],
         "fileFindings": finding_map,
     }
@@ -825,9 +817,9 @@ async def get_inspected_files_endpoint(
 async def get_artifacts_endpoint(
     run_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
-    scan = await _resolve_scan(db, run_id)
+    scan = await _resolve_scan(db, run_id, current_user)
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 

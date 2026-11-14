@@ -1,0 +1,13 @@
+--- a/scratch/github_workspaces/repo_fdd34344-c5e4-4814-a30e-a0bd908d4cca/server/server.js
++++ b/scratch/github_workspaces/repo_fdd34344-c5e4-4814-a30e-a0bd908d4cca/server/server.js
+@@ -746,6 +746,10 @@
+ app.patch('/api/v1/applications/:id/status', (req, res) => {
+   const { status, note, interviewDetails } = req.body;
+   const appItem = db.applications.find(a => a.id === req.params.id);
++  // [KAVACH-SECURITY-FIX] Enforce Object-Level Authorization ownership boundary
++  if (req.user && req.user.id !== userId && !req.user.isAdmin) {
++    return res.status(403).json({ error: 'Forbidden: Insufficient object permissions' });
++  }
+   if (!appItem) return res.status(404).json({ success: false, message: "Application not found" });
+ 
+   appItem.status = status;

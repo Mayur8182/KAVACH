@@ -45,6 +45,58 @@ from app.services.github_service import GitHubService
 router = APIRouter(tags=["GitHub Integration"])
 
 
+async def _resolve_user_accessible_projects(current_user: User, db: AsyncSession) -> List[uuid.UUID]:
+    if getattr(current_user, "is_superuser", False):
+        return []
+    from app.models.project import Project
+    from app.models.invitation import OrganizationMember
+    from sqlalchemy import select
+    owned = (await db.execute(select(Project.id).where(Project.owner_id == current_user.id))).scalars().all()
+    p_ids = set(owned)
+    try:
+        org_pids = (
+            await db.execute(
+                select(Project.id)
+                .join(OrganizationMember, OrganizationMember.organization_id == Project.organization_id)
+                .where(OrganizationMember.user_id == current_user.id, OrganizationMember.is_active == True)
+            )
+        ).scalars().all()
+        for pid in org_pids:
+            p_ids.add(pid)
+    except Exception:
+        pass
+    return list(p_ids)
+
+
+async def _check_project_access(project_id: uuid.UUID, current_user: User, db: AsyncSession) -> bool:
+    if getattr(current_user, "is_superuser", False):
+        return True
+    from app.models.project import Project
+    from app.models.invitation import OrganizationMember
+    from sqlalchemy import select, and_
+    p = await db.get(Project, project_id)
+    if not p:
+        return False
+    if p.owner_id == current_user.id:
+        return True
+    if p.organization_id:
+        try:
+            mem = await db.execute(
+                select(OrganizationMember.id).where(
+                    and_(
+                        OrganizationMember.organization_id == p.organization_id,
+                        OrganizationMember.user_id == current_user.id,
+                        OrganizationMember.is_active == True,
+                    )
+                )
+            )
+            if mem.scalars().first():
+                return True
+        except Exception:
+            pass
+    return False
+
+
 class VerifyInstallationRequest(BaseModel):
     installation_id: int = Field(description="GitHub App Installation ID")
 
@@ -1277,8 +1329,18 @@ async def get_security_jobs_history(
     from sqlalchemy import select, desc
     from app.models.github import GitHubSecurityJob
 
-    # 1. Authoritative query for all historical jobs
-    all_stmt = select(GitHubSecurityJob).order_by(desc(GitHubSecurityJob.started_at), desc(GitHubSecurityJob.created_at))
+    # 1. Authoritative query for all historical jobs scoped to user accessible projects
+    is_super = getattr(current_user, "is_superuser", False)
+    accessible_pids = await _resolve_user_accessible_projects(current_user, db)
+
+    all_stmt = select(GitHubSecurityJob)
+    if not is_super:
+        if not accessible_pids:
+            all_stmt = all_stmt.where(GitHubSecurityJob.id == None)
+        else:
+            all_stmt = all_stmt.where(GitHubSecurityJob.project_id.in_(accessible_pids))
+
+    all_stmt = all_stmt.order_by(desc(GitHubSecurityJob.started_at), desc(GitHubSecurityJob.created_at))
     all_res = await db.execute(all_stmt)
     all_jobs = list(all_res.scalars().all())
 
@@ -1467,7 +1529,16 @@ async def export_security_job_history(
     import io
     import csv
 
-    stmt = select(GitHubSecurityJob).order_by(desc(GitHubSecurityJob.started_at))
+    is_super = getattr(current_user, "is_superuser", False)
+    accessible_pids = await _resolve_user_accessible_projects(current_user, db)
+
+    stmt = select(GitHubSecurityJob)
+    if not is_super:
+        if not accessible_pids:
+            stmt = stmt.where(GitHubSecurityJob.id == None)
+        else:
+            stmt = stmt.where(GitHubSecurityJob.project_id.in_(accessible_pids))
+    stmt = stmt.order_by(desc(GitHubSecurityJob.started_at))
     res = await db.execute(stmt)
     jobs = list(res.scalars().all())
 
@@ -1522,8 +1593,18 @@ async def get_all_security_jobs_overview(
         SecurityJobTypeCount,
     )
 
-    # 1. Fetch all jobs to compute authoritative global metrics
-    all_stmt = select(GitHubSecurityJob).order_by(desc(GitHubSecurityJob.started_at), desc(GitHubSecurityJob.created_at))
+    # 1. Fetch all jobs scoped to user accessible projects to compute authoritative metrics
+    is_super = getattr(current_user, "is_superuser", False)
+    accessible_pids = await _resolve_user_accessible_projects(current_user, db)
+
+    all_stmt = select(GitHubSecurityJob)
+    if not is_super:
+        if not accessible_pids:
+            all_stmt = all_stmt.where(GitHubSecurityJob.id == None)
+        else:
+            all_stmt = all_stmt.where(GitHubSecurityJob.project_id.in_(accessible_pids))
+
+    all_stmt = all_stmt.order_by(desc(GitHubSecurityJob.started_at), desc(GitHubSecurityJob.created_at))
     all_res = await db.execute(all_stmt)
     all_jobs = list(all_res.scalars().all())
 
@@ -1775,7 +1856,16 @@ async def export_security_jobs(
     import io
     import csv
 
-    stmt = select(GitHubSecurityJob).order_by(desc(GitHubSecurityJob.started_at))
+    is_super = getattr(current_user, "is_superuser", False)
+    accessible_pids = await _resolve_user_accessible_projects(current_user, db)
+
+    stmt = select(GitHubSecurityJob)
+    if not is_super:
+        if not accessible_pids:
+            stmt = stmt.where(GitHubSecurityJob.id == None)
+        else:
+            stmt = stmt.where(GitHubSecurityJob.project_id.in_(accessible_pids))
+    stmt = stmt.order_by(desc(GitHubSecurityJob.started_at))
     res = await db.execute(stmt)
     jobs = list(res.scalars().all())
 
@@ -1816,6 +1906,8 @@ async def get_security_job(
     job = await service.repo.get_job_by_id(job_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Security job not found")
+    if job.project_id and not await _check_project_access(job.project_id, current_user, db):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to security job")
     return job
 
 
@@ -1836,6 +1928,8 @@ async def delete_security_job(
     job = res.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Security job not found")
+    if job.project_id and not await _check_project_access(job.project_id, current_user, db):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to security job")
     await db.delete(job)
     await db.commit()
     return {"status": "DELETED", "job_id": str(job_id)}
@@ -1851,6 +1945,12 @@ async def get_active_repository_scan(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    from app.models.github import GitHubRepository
+    repo = await db.get(GitHubRepository, repository_id)
+    if not repo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+    if repo.project_id and not await _check_project_access(repo.project_id, current_user, db):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to repository")
     service = GitHubService(db)
     active = await service.repo.get_active_job_for_repository(repository_id)
     return active
@@ -1867,6 +1967,12 @@ async def list_github_repository_jobs(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    from app.models.github import GitHubRepository
+    repo = await db.get(GitHubRepository, repository_id)
+    if not repo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+    if repo.project_id and not await _check_project_access(repo.project_id, current_user, db):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to repository")
     service = GitHubService(db)
     return await service.repo.list_jobs_for_repository(repository_id, limit=limit)
 
@@ -1885,6 +1991,8 @@ async def cancel_security_job(
     job = await service.repo.get_job_by_id(job_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Security job not found")
+    if job.project_id and not await _check_project_access(job.project_id, current_user, db):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to security job")
     if job.status not in ("COMPLETED", "FAILED", "CANCELLED"):
         job.status = "CANCELLED"
         job.completed_at = datetime.now(timezone.utc)
@@ -1904,15 +2012,16 @@ async def list_all_security_jobs(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.services.code.repository_service import CodeRepositoryService
-    service = CodeRepositoryService(db)
-    projects = await service.project_repo.list_projects_for_user(current_user.id)
-    if not projects:
+    accessible_pids = await _resolve_user_accessible_projects(current_user, db)
+    if not getattr(current_user, "is_superuser", False) and not accessible_pids:
         return []
 
     from app.services.github_service import GitHubService
     gh_service = GitHubService(db)
-    return await gh_service.repo.list_jobs_for_project(projects[0].id, limit=limit)
+    target_pid = accessible_pids[0] if accessible_pids else None
+    if not target_pid:
+        return []
+    return await gh_service.repo.list_jobs_for_project(target_pid, limit=limit)
 
 
 @router.get(
@@ -1926,6 +2035,8 @@ async def list_project_security_jobs(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await _check_project_access(project_id, current_user, db):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to project")
     service = GitHubService(db)
     return await service.repo.list_jobs_for_project(project_id, limit=limit)
 

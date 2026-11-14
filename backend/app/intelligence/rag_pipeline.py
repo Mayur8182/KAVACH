@@ -66,13 +66,13 @@ class SecurityRAGPipeline:
         from app.models.user import User
         from app.models.invitation import OrganizationMember
 
-        user = (await self.db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+        user = (await self.db.execute(select(User).where(User.id == user_id))).scalar_one_or_none() if user_id else None
         is_superuser = getattr(user, "is_superuser", False) if user else False
 
         if is_superuser:
             all_projs = (await self.db.execute(select(Project.id))).scalars().all()
             auth_projs = set(all_projs)
-        else:
+        elif user_id:
             auth_proj_q = select(Project.id).where(Project.owner_id == user_id)
             auth_projs = set((await self.db.execute(auth_proj_q)).scalars().all())
             try:
@@ -85,46 +85,48 @@ class SecurityRAGPipeline:
                     auth_projs.add(pid)
             except Exception:
                 pass
+        else:
+            auth_projs = set()
 
-        if not auth_projs:
-            fallback_projs = (await self.db.execute(select(Project.id).limit(50))).scalars().all()
-            auth_projs = set(fallback_projs)
-
-        target_proj_ids: List[uuid.UUID] = list(auth_projs)
         if project_id:
             try:
                 p_uuid = project_id if isinstance(project_id, uuid.UUID) else uuid.UUID(str(project_id))
                 if p_uuid in auth_projs or is_superuser:
                     target_proj_ids = [p_uuid]
-                elif not auth_projs:
-                    target_proj_ids = [p_uuid]
+                else:
+                    # Explicit request for unauthorized project -> deny by scoping to empty
+                    target_proj_ids = []
             except Exception:
-                pass
+                target_proj_ids = []
+        else:
+            target_proj_ids = list(auth_projs)
 
         # 1. Fetch real findings strictly within authorized projects
-        f_query = select(SecurityFinding).order_by(desc(SecurityFinding.detected_at), desc(SecurityFinding.created_at)).limit(50)
-        if target_proj_ids:
-            f_query = f_query.where(SecurityFinding.project_id.in_(target_proj_ids))
-        if repository_names:
-            f_query = f_query.where(
-                or_(
-                    SecurityFinding.repository.in_(repository_names),
-                    SecurityFinding.file_path.ilike(f"%{repository_names[0]}%"),
+        findings = []
+        if is_superuser or target_proj_ids:
+            f_query = select(SecurityFinding).order_by(desc(SecurityFinding.detected_at), desc(SecurityFinding.created_at)).limit(50)
+            if not is_superuser or target_proj_ids:
+                f_query = f_query.where(SecurityFinding.project_id.in_(target_proj_ids))
+            if repository_names:
+                f_query = f_query.where(
+                    or_(
+                        SecurityFinding.repository.in_(repository_names),
+                        SecurityFinding.file_path.ilike(f"%{repository_names[0]}%"),
+                    )
                 )
-            )
 
-        f_res = await self.db.execute(f_query)
-        findings = f_res.scalars().all()
+            f_res = await self.db.execute(f_query)
+            findings = f_res.scalars().all()
 
-        # Fallback to any recent findings WITHIN authorized projects only (tenant isolation)
-        if not findings and target_proj_ids:
-            fallback_f_query = (
-                select(SecurityFinding)
-                .where(SecurityFinding.project_id.in_(target_proj_ids))
-                .order_by(desc(SecurityFinding.detected_at), desc(SecurityFinding.created_at))
-                .limit(30)
-            )
-            findings = (await self.db.execute(fallback_f_query)).scalars().all()
+            # Fallback to any recent findings WITHIN authorized projects only (tenant isolation)
+            if not findings and target_proj_ids:
+                fallback_f_query = (
+                    select(SecurityFinding)
+                    .where(SecurityFinding.project_id.in_(target_proj_ids))
+                    .order_by(desc(SecurityFinding.detected_at), desc(SecurityFinding.created_at))
+                    .limit(30)
+                )
+                findings = (await self.db.execute(fallback_f_query)).scalars().all()
 
         for f in findings:
             context["findings"].append({
@@ -142,19 +144,21 @@ class SecurityRAGPipeline:
             })
 
         # 2. Fetch real recent scans
-        s_query = select(SecurityScan).order_by(desc(SecurityScan.created_at)).limit(10)
-        if target_proj_ids:
-            s_query = s_query.where(SecurityScan.project_id.in_(target_proj_ids))
-        s_res = await self.db.execute(s_query)
-        scans = s_res.scalars().all()
-        if not scans and target_proj_ids:
-            fallback_s_query = (
-                select(SecurityScan)
-                .where(SecurityScan.project_id.in_(target_proj_ids))
-                .order_by(desc(SecurityScan.created_at))
-                .limit(10)
-            )
-            scans = (await self.db.execute(fallback_s_query)).scalars().all()
+        scans = []
+        if is_superuser or target_proj_ids:
+            s_query = select(SecurityScan).order_by(desc(SecurityScan.created_at)).limit(10)
+            if not is_superuser or target_proj_ids:
+                s_query = s_query.where(SecurityScan.project_id.in_(target_proj_ids))
+            s_res = await self.db.execute(s_query)
+            scans = s_res.scalars().all()
+            if not scans and target_proj_ids:
+                fallback_s_query = (
+                    select(SecurityScan)
+                    .where(SecurityScan.project_id.in_(target_proj_ids))
+                    .order_by(desc(SecurityScan.created_at))
+                    .limit(10)
+                )
+                scans = (await self.db.execute(fallback_s_query)).scalars().all()
 
         for s in scans:
             context["recent_scans"].append({
@@ -172,8 +176,12 @@ class SecurityRAGPipeline:
         # 4. Fetch active security policies scoped to authorized projects or global
         try:
             p_q = select(SecurityPolicy).limit(10)
-            if target_proj_ids:
+            if is_superuser:
+                pass
+            elif target_proj_ids:
                 p_q = p_q.where(or_(SecurityPolicy.project_id.in_(target_proj_ids), SecurityPolicy.scope == "GLOBAL"))
+            else:
+                p_q = p_q.where(SecurityPolicy.scope == "GLOBAL")
             p_res = await self.db.execute(p_q)
             policies = p_res.scalars().all()
             for p in policies:

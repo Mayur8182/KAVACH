@@ -9,9 +9,12 @@ import {
   Shield,
   Clock,
   Cpu,
+  Zap,
 } from 'lucide-react';
 import { KavachApiLayout } from '../components/KavachApiLayout';
 import { useApiSecurity } from '../context/ApiSecurityContext';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Button } from '@/components/ui/Button';
 
 export default function ApiSecuritySettingsPage() {
   const { selectedApi } = useApiSecurity();
@@ -29,137 +32,91 @@ export default function ApiSecuritySettingsPage() {
 
   return (
     <KavachApiLayout activeApiId={selectedApi?.id}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-              API Security Settings
-            </h1>
-            <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0' }}>
-              Configure isolated scan workers, concurrency limits, and execution safeguards.
-            </p>
-          </div>
+      <div className="w-full space-y-6">
+        <PageHeader
+          title="API Security Configuration"
+          subtitle="Configure isolated scan workers, concurrency limits, and execution safeguards."
+          breadcrumbs={[
+            { label: 'API Security', href: '/api-security' },
+            { label: 'Settings' },
+          ]}
+          actions={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSave}
+            >
+              {isSaved ? <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+              <span>{isSaved ? 'Settings Saved' : 'Save Changes'}</span>
+            </Button>
+          }
+        />
 
-          <button
-            type="button"
-            onClick={handleSave}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: isSaved ? '#10B981' : '#2563EB',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '8px 18px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            {isSaved ? <CheckCircle2 size={15} /> : <Save size={15} />}
-            <span>{isSaved ? 'Settings Saved' : 'Save Changes'}</span>
-          </button>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '10px',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '18px',
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-6 shadow-xs max-w-3xl space-y-6">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-900 dark:text-slate-100 block">
               Worker Concurrency
             </label>
-            <span style={{ fontSize: '12px', color: '#64748B' }}>
-              Maximum parallel security worker tasks dispatched simultaneously.
-            </span>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Maximum parallel security worker tasks dispatched simultaneously during active fuzzing.
+            </p>
             <input
               type="number"
               value={workerConcurrency}
               onChange={(e) => setWorkerConcurrency(e.target.value)}
-              style={{
-                width: '180px',
-                padding: '8px 12px',
-                fontSize: '13px',
-                border: '1px solid #CBD5E1',
-                borderRadius: '6px',
-              }}
+              className="w-48 px-3 py-2 text-xs bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-900 dark:text-slate-100 block">
               Request Timeout (seconds)
             </label>
-            <span style={{ fontSize: '12px', color: '#64748B' }}>
-              Hard deadline for individual HTTP/GraphQL security probes.
-            </span>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Hard deadline for individual HTTP, GraphQL, and RPC security probes before aborting.
+            </p>
             <input
               type="number"
               value={requestTimeout}
               onChange={(e) => setRequestTimeout(e.target.value)}
-              style={{
-                width: '180px',
-                padding: '8px 12px',
-                fontSize: '13px',
-                border: '1px solid #CBD5E1',
-                borderRadius: '6px',
-              }}
+              className="w-48 px-3 py-2 text-xs bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-900 dark:text-slate-100 block">
               Maximum Request Rate (Requests/Sec)
             </label>
-            <span style={{ fontSize: '12px', color: '#64748B' }}>
-              Throttles test probes to prevent accidental denial-of-service on production targets.
-            </span>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Throttles test probes to prevent accidental denial-of-service on staging or production targets.
+            </p>
             <input
               type="number"
               value={maxRps}
               onChange={(e) => setMaxRps(e.target.value)}
-              style={{
-                width: '180px',
-                padding: '8px 12px',
-                fontSize: '13px',
-                border: '1px solid #CBD5E1',
-                borderRadius: '6px',
-              }}
+              className="w-48 px-3 py-2 text-xs bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingTop: '16px',
-              borderTop: '1px solid #F1F5F9',
-            }}
-          >
+          <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-zinc-800">
             <div>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', display: 'block' }}>
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block">
                 Automated Verification on PR Merge
               </span>
-              <span style={{ fontSize: '12px', color: '#64748B' }}>
+              <span className="text-xs text-slate-500 dark:text-zinc-400">
                 Automatically triggers a targeted security test when pull requests addressing findings are merged.
               </span>
             </div>
 
-            <input
-              type="checkbox"
-              checked={autoVerification}
-              onChange={(e) => setAutoVerification(e.target.checked)}
-              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-            />
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={autoVerification}
+                onChange={(e) => setAutoVerification(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
           </div>
         </div>
       </div>

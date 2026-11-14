@@ -363,17 +363,21 @@ async def _handle_cloud_security_scan(
     provider = payload.get("provider", "ALL")
     project_id_str = payload.get("project_id")
 
-    await update_progress(15, f"Connecting to {provider} cloud provider endpoints & verifying IAM roles")
+    await update_progress(5, f"Starting {provider} cloud assessment")
     svc = CloudService(db)
 
     proj_uuid = uuid.UUID(project_id_str) if project_id_str else None
 
-    await update_progress(40, "Auditing cloud storage encryption, firewalls, and public ingress rules")
-    await update_progress(70, "Evaluating CIS Foundations Benchmarks and SOC 2 Type II controls")
+    scan_result = await svc.execute_cloud_scan(
+        project_id=proj_uuid,
+        provider=provider,
+        progress_callback=update_progress,
+    )
 
-    scan_result = await svc.execute_cloud_scan(project_id=proj_uuid, provider=provider)
+    if scan_result.get("assessment_status") == "FAILED":
+        raise RuntimeError("No connected cloud account passed provider validation; see connection errors in Cloud Settings.")
 
-    await update_progress(100, f"Cloud scan completed. Evaluated {scan_result.get('resources_evaluated', 0)} resources.")
+    await update_progress(100, f"Cloud assessment finished. Evaluated {scan_result.get('resources_evaluated', 0)} resources.")
     return scan_result
 
 

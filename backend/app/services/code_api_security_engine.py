@@ -59,18 +59,63 @@ class CodeApiSecurityEngine:
             "session.query", "db.execute", "cursor.execute", "repository."
         ]
 
-        # Authentication middleware keywords
+        # Authentication middleware and guard keywords
         self.auth_middleware_keywords = [
             "auth", "authenticate", "requireauth", "verifyjwt", "checktoken",
             "jwtauth", "passport", "isauthenticated", "guard", "tokenrequired",
-            "depends(get_current_user)", "authMiddleware", "authenticateToken",
-            "useguards", "securityfilter"
+            "depends(get_current_user)", "depends(require_superadmin_user)",
+            "depends(require_superadmin)", "depends(require_admin_user)",
+            "depends(require_admin)", "depends(get_current_active_user)",
+            "depends(get_current_user_optional)", "authmiddleware", "authenticatetoken",
+            "useguards", "securityfilter", "current_user", "require_superadmin_user",
+            "require_superadmin", "require_admin", "oauth2_scheme", "httpbearer",
+            "security(", "login_required", "jwt_required", "preauthorize", "secured", "rolesallowed"
         ]
 
         # Rate limiting keywords
         self.rate_limit_keywords = [
-            "ratelimit", "limiter", "slowdown", "throttle", "rate_limit", "flask_limiter"
+            "ratelimit", "limiter", "slowdown", "throttle", "rate_limit", "flask_limiter", "apiratelimiter"
         ]
+
+    def _is_public_endpoint(self, path: str) -> bool:
+        """Determines if a route is intended to be unauthenticated (login, signup, docs, health, etc.)."""
+        p = (path or "").lower()
+        public_indicators = [
+            "/login", "/register", "/signup", "/token", "/forgot-password",
+            "/reset-password", "/callback", "/oauth", "/recovery", "/verify-otp",
+            "/health", "/ready", "/live", "/ping", "/metrics", "/docs", "/redoc",
+            "/openapi.json", "/webhook", "/public/", "/demo", "/contact",
+            "/inquiry", "/leads"
+        ]
+        return any(ind in p for ind in public_indicators)
+
+    def _detect_file_environment(self, rel_path: str, content: str) -> Dict[str, str]:
+        """Detects programming language and web framework for the specified file."""
+        ext = os.path.splitext(rel_path)[1].lower()
+        if ext in [".js", ".jsx", ".ts", ".tsx", ".mjs"]:
+            lang = "javascript" if ext in [".js", ".jsx", ".mjs"] else "typescript"
+            if "next" in content or "next/server" in content or "getServerSideProps" in content:
+                framework = "nextjs"
+            elif "express" in content or "app.use" in content or "router.get" in content:
+                framework = "express"
+            else:
+                framework = "node"
+            return {"language": lang, "framework": framework}
+        elif ext == ".py":
+            if "fastapi" in content or "@router." in content or "Depends(" in content:
+                framework = "fastapi"
+            elif "flask" in content or "Blueprint(" in content:
+                framework = "flask"
+            elif "django" in content:
+                framework = "django"
+            else:
+                framework = "python"
+            return {"language": "python", "framework": framework}
+        elif ext == ".java":
+            return {"language": "java", "framework": "spring" if "@RestController" in content or "@RequestMapping" in content else "java"}
+        elif ext == ".go":
+            return {"language": "go", "framework": "gin" if "gin." in content else "go"}
+        return {"language": "unknown", "framework": "unknown"}
 
     def analyze_codebase(
         self,
@@ -187,6 +232,15 @@ class CodeApiSecurityEngine:
         routes = []
         lines = content.splitlines()
 
+        # Check router-level / application-level authentication middleware
+        has_router_auth = any(
+            k in content.lower()
+            for k in [
+                "router.use(auth", "app.use(auth", "router.use(verify",
+                "app.use('/api', auth", "router.use(authenticate", "passport.authenticate"
+            ]
+        )
+
         # Express / Router regex: router.get('/users/:id', handler)
         route_pattern = re.compile(
             r"""(?:app|router|userRouter|authRouter|apiRouter|orderRouter)\.(get|post|put|patch|delete)\s*\(\s*['"`]([^'"`]+)['"`]""",
@@ -201,8 +255,9 @@ class CodeApiSecurityEngine:
                 normalized_path = re.sub(r":(\w+)", r"{\1}", raw_path)
 
                 surrounding = "\n".join(lines[max(0, idx - 2) : min(len(lines), idx + 25)])
-                has_auth = any(k.lower() in surrounding.lower() for k in self.auth_middleware_keywords)
+                has_auth = has_router_auth or any(k.lower() in surrounding.lower() for k in self.auth_middleware_keywords)
                 has_rate_limit = any(k.lower() in surrounding.lower() for k in self.rate_limit_keywords)
+                is_pub = self._is_public_endpoint(raw_path)
 
                 routes.append({
                     "method": method,
@@ -214,12 +269,16 @@ class CodeApiSecurityEngine:
                     "rate_limited": has_rate_limit,
                     "has_params": "{" in normalized_path or ":" in raw_path,
                     "source_snippet": line.strip(),
+                    "is_public": is_pub,
                 })
         return routes
 
     def _extract_python_routes(self, rel_path: str, content: str) -> List[Dict[str, Any]]:
         routes = []
         lines = content.splitlines()
+
+        # Check router-level authentication dependencies in Python
+        has_router_auth = "dependencies=[depends(" in content.lower().replace(" ", "")
 
         fastapi_pattern = re.compile(
             r"""@(?:router|app|api_router)\.(get|post|put|patch|delete)\s*\(\s*['"`]([^'"`]+)['"`]""",
@@ -235,8 +294,10 @@ class CodeApiSecurityEngine:
             if m_fa:
                 method = m_fa.group(1).upper()
                 raw_path = m_fa.group(2)
-                surrounding = "\n".join(lines[idx : min(len(lines), idx + 20)])
-                has_auth = any(k.lower() in surrounding.lower() for k in self.auth_middleware_keywords)
+                # Expand surrounding to cover full function signature lines following the decorator
+                surrounding = "\n".join(lines[idx : min(len(lines), idx + 25)])
+                has_auth = has_router_auth or any(k.lower() in surrounding.lower() for k in self.auth_middleware_keywords)
+                is_pub = self._is_public_endpoint(raw_path)
                 routes.append({
                     "method": method,
                     "path": raw_path,
@@ -247,6 +308,7 @@ class CodeApiSecurityEngine:
                     "rate_limited": "limiter" in surrounding.lower(),
                     "has_params": "{" in raw_path or "<" in raw_path,
                     "source_snippet": line.strip(),
+                    "is_public": is_pub,
                 })
                 continue
 
@@ -256,8 +318,9 @@ class CodeApiSecurityEngine:
                 methods_str = m_fl.group(2) or "'GET'"
                 methods = [m.strip(" '\"") for m in methods_str.split(",") if m.strip(" '\"")]
                 method = methods[0].upper() if methods else "GET"
-                surrounding = "\n".join(lines[idx : min(len(lines), idx + 20)])
-                has_auth = any(k.lower() in surrounding.lower() for k in self.auth_middleware_keywords)
+                surrounding = "\n".join(lines[idx : min(len(lines), idx + 25)])
+                has_auth = has_router_auth or any(k.lower() in surrounding.lower() for k in self.auth_middleware_keywords)
+                is_pub = self._is_public_endpoint(raw_path)
                 routes.append({
                     "method": method,
                     "path": raw_path,
@@ -268,34 +331,62 @@ class CodeApiSecurityEngine:
                     "rate_limited": "limiter" in surrounding.lower(),
                     "has_params": "<" in raw_path or "request.args.get" in surrounding,
                     "source_snippet": line.strip(),
+                    "is_public": is_pub,
                 })
 
         return routes
 
     def _extract_java_routes(self, rel_path: str, content: str) -> List[Dict[str, Any]]:
         routes = []
-        spring_mapping_regex = re.compile(
-            r"""@(Get|Post|Put|Delete|Patch|Request)Mapping\s*\(\s*(?:(?:value|path)\s*=\s*)?['"`]([^'"`]+)['"`]""",
+        lines = content.splitlines()
+
+        # 1. Extract class-level @RequestMapping prefix if present
+        class_prefix = ""
+        class_mapping_regex = re.compile(
+            r"""@RequestMapping\s*\(\s*(?:(?:value|path)\s*=\s*)?\{?\s*['"`]([^'"`]+)['"`]""",
             re.IGNORECASE,
         )
-        lines = content.splitlines()
+        for line in lines[:60]:
+            cm = class_mapping_regex.search(line)
+            if cm:
+                class_prefix = cm.group(1).strip()
+                if not class_prefix.startswith("/"):
+                    class_prefix = "/" + class_prefix
+                if class_prefix.endswith("/"):
+                    class_prefix = class_prefix[:-1]
+                break
+
+        # 2. Match method-level annotations (both with arguments and bare @GetMapping)
+        spring_method_regex = re.compile(
+            r"""@(Get|Post|Put|Delete|Patch|Request)Mapping(?:\s*\(\s*(?:(?:value|path)\s*=\s*)?\{?\s*['"`]?([^'"`\)\{]*)['"`]?\s*\}?\s*\))?""",
+            re.IGNORECASE,
+        )
+
         for idx, line in enumerate(lines):
-            match = spring_mapping_regex.search(line)
+            match = spring_method_regex.search(line)
             if match:
                 prefix = match.group(1).upper()
                 method = prefix.replace("MAPPING", "") if prefix != "REQUEST" else "GET"
-                path = match.group(2)
+                raw_sub_path = (match.group(2) or "").strip()
+                if raw_sub_path and not raw_sub_path.startswith("/"):
+                    raw_sub_path = "/" + raw_sub_path
+
+                # Combine class prefix + method path
+                combined_path = f"{class_prefix}{raw_sub_path}" if (class_prefix or raw_sub_path) else "/"
+                combined_path = re.sub(r"/+", "/", combined_path)
+
                 surrounding = "\n".join(lines[max(0, idx - 5) : min(len(lines), idx + 20)])
-                has_auth = "@preauthorize" in surrounding.lower() or "@secured" in surrounding.lower()
+                has_auth = any(term in surrounding.lower() for term in ["@preauthorize", "@secured", "@rolesallowed", "authentication", "principal", "securitycontext"])
+
                 routes.append({
                     "method": method,
-                    "path": path,
-                    "raw_path": path,
+                    "path": combined_path,
+                    "raw_path": combined_path,
                     "file_path": rel_path,
                     "line_number": idx + 1,
                     "auth_enforced": has_auth,
-                    "rate_limited": False,
-                    "has_params": "{" in path,
+                    "rate_limited": "ratelimit" in surrounding.lower() or "bucket" in surrounding.lower(),
+                    "has_params": "{" in combined_path,
                     "source_snippet": line.strip(),
                 })
         return routes
@@ -338,37 +429,38 @@ class CodeApiSecurityEngine:
         file_routes = [r for r in routes if r["file_path"] == rel_path]
         for r in file_routes:
             if r["method"] in ["POST", "PUT", "PATCH", "DELETE"] and not r.get("auth_enforced"):
-                # Avoid false positives on login/register/signup
-                if not any(k in r["path"].lower() for k in ["login", "register", "signup", "forgot-password", "reset-password", "webhook", "health"]):
-                    line_idx = r["line_number"] - 1
-                    patch = self._synthesize_missing_auth_patch(rel_path, lines, line_idx, r)
-                    findings.append({
-                        "id": str(uuid.uuid4()),
-                        "taxonomy_id": "AUTH-01",
-                        "title": f"AUTH-01: Missing Authentication on {r['method']} {r['path']}",
-                        "category": "Authentication",
-                        "owasp_category": "API2:2023 Broken Authentication",
-                        "cwe": "CWE-306",
-                        "severity": "CRITICAL",
-                        "status": "OPEN",
-                        "file_path": f"{rel_path}:{r['line_number']}",
-                        "raw_file_path": rel_path,
+                # Avoid false positives on login/register/signup and declared public endpoints
+                if r.get("is_public") or self._is_public_endpoint(r["path"]):
+                    continue
+                line_idx = r["line_number"] - 1
+                patch = self._synthesize_missing_auth_patch(rel_path, lines, line_idx, r)
+                findings.append({
+                    "id": str(uuid.uuid4()),
+                    "taxonomy_id": "AUTH-01",
+                    "title": f"AUTH-01: Missing Authentication on {r['method']} {r['path']}",
+                    "category": "Authentication",
+                    "owasp_category": "API2:2023 Broken Authentication",
+                    "cwe": "CWE-306",
+                    "severity": "CRITICAL",
+                    "status": "OPEN",
+                    "file_path": f"{rel_path}:{r['line_number']}",
+                    "raw_file_path": rel_path,
+                    "line_number": r["line_number"],
+                    "target_endpoint": r["path"],
+                    "http_method": r["method"],
+                    "description": f"The state-changing API endpoint '{r['method']} {r['path']}' is exposed without authentication middleware.",
+                    "impact": "Unauthenticated attackers can invoke sensitive functionality, create or mutate application data.",
+                    "root_cause": "Route registered without authentication middleware barrier.",
+                    "evidence": {
+                        "code_file_path": f"{rel_path}:{r['line_number']}",
                         "line_number": r["line_number"],
-                        "target_endpoint": r["path"],
-                        "http_method": r["method"],
-                        "description": f"The state-changing API endpoint '{r['method']} {r['path']}' is exposed without authentication middleware.",
-                        "impact": "Unauthenticated attackers can invoke sensitive functionality, create or mutate application data.",
-                        "root_cause": "Route registered without authentication middleware barrier.",
-                        "evidence": {
-                            "code_file_path": f"{rel_path}:{r['line_number']}",
-                            "line_number": r["line_number"],
-                            "vulnerable_snippet": r["source_snippet"],
-                            "root_cause": "No auth middleware attached to state-changing route definition.",
-                            "reproducible_curl": f"curl -X {r['method']} https://api.kavach.local{r['raw_path']}",
-                        },
-                        "remediation_advice": "Attach an authentication middleware (e.g. `authenticateToken`) before the route handler.",
-                        "remediation_patch": patch,
-                    })
+                        "vulnerable_snippet": r["source_snippet"],
+                        "root_cause": "No auth middleware attached to state-changing route definition.",
+                        "reproducible_curl": f"curl -X {r['method']} https://api.kavach.local{r['raw_path']}",
+                    },
+                    "remediation_advice": "Attach an authentication middleware (e.g. `current_user = Depends(...)` or `authenticateToken`) before the route handler.",
+                    "remediation_patch": patch,
+                })
 
         # AUTH-02: Weak Password Validation
         for idx, line in enumerate(lines):
@@ -401,8 +493,17 @@ class CodeApiSecurityEngine:
                 })
 
         # AUTH-03 / AUTH-04: JWT Signature Bypass / Algorithm None
+        file_env = self._detect_file_environment(rel_path, content)
         for idx, line in enumerate(lines):
-            if ("algorithms: ['none']" in line or "algorithms: [\"none\"]" in line or "jwt.decode(" in line and "jwt.verify" not in content) and "KAVACH-SECURITY-FIX" not in line:
+            is_jwt_bypass = False
+            if "algorithms: ['none']" in line or "algorithms: [\"none\"]" in line or "algorithms=['none']" in line or 'algorithms=["none"]' in line:
+                is_jwt_bypass = True
+            elif "verify_signature': false" in line.lower() or "verify_signature\": false" in line.lower():
+                is_jwt_bypass = True
+            elif file_env["language"] in ["javascript", "typescript"] and "jwt.decode(" in line and "jwt.verify" not in content:
+                is_jwt_bypass = True
+
+            if is_jwt_bypass and "KAVACH-SECURITY-FIX" not in line:
                 patch = self._synthesize_auth_bypass_patch(rel_path, lines, idx)
                 findings.append({
                     "id": str(uuid.uuid4()),
@@ -427,7 +528,7 @@ class CodeApiSecurityEngine:
                         "vulnerable_snippet": line.strip(),
                         "root_cause": "Insecure JWT decoding omitting cryptographic verification.",
                     },
-                    "remediation_advice": "Always use `jwt.verify(token, secret, { algorithms: ['HS256'] })` with strong secret keys.",
+                    "remediation_advice": "Always use cryptographic signature verification (`jwt.decode(..., algorithms=['HS256'])` in Python, `jwt.verify(...)` in JS).",
                     "remediation_patch": patch,
                 })
 
@@ -557,7 +658,9 @@ class CodeApiSecurityEngine:
                     "!== userId", "!= userId", "=== userId", "== userId",
                     "current_user.id ==", "current_user.id !=", "req.user.role === 'admin'",
                     "req.user.isAdmin", "user.tenant_id", "req.user.tenant_id",
-                    "isOwner", "checkOwnership", "assertOwnership", "KAVACH-SECURITY-FIX"
+                    "isOwner", "checkOwnership", "assertOwnership", "KAVACH-SECURITY-FIX",
+                    "require_superadmin_user", "require_superadmin", "require_admin_user",
+                    "require_admin", "is_superuser", "is_admin"
                 ]
             )
 
@@ -608,7 +711,14 @@ class CodeApiSecurityEngine:
         for r in admin_routes:
             idx = r["line_number"] - 1
             body = "\n".join(lines[idx : min(len(lines), idx + 25)])
-            has_role_check = any(k in body.lower() for k in ["isadmin", "hasrole", "requireadmin", "role === 'admin'", "roles.admin", "KAVACH-SECURITY-FIX"])
+            has_role_check = any(
+                k in body.lower()
+                for k in [
+                    "isadmin", "hasrole", "requireadmin", "require_superadmin", "require_superadmin_user",
+                    "require_admin", "require_admin_user", "is_superuser", "is_admin",
+                    "role === 'admin'", "role == 'admin'", "roles.admin", "kavach-security-fix"
+                ]
+            )
 
             if not has_role_check:
                 vuln_snippet = lines[idx] if idx < len(lines) else ""
@@ -1546,6 +1656,66 @@ class CodeApiSecurityEngine:
                     "remediation_patch": None,
                 })
 
+        # GQL-02: Missing Field-Level Authorization on Sensitive Resolvers
+        if any(term in content.lower() for term in ["type mutation", "mutation:", "resolvers = { mutation:"]) and not any(term in content.lower() for term in ["@auth", "shield", "checkauth", "hasrole", "rules.isauthenticated"]):
+            if "KAVACH-SECURITY-FIX" not in content:
+                findings.append({
+                    "id": str(uuid.uuid4()),
+                    "taxonomy_id": "GQL-02",
+                    "title": "GQL-02: Missing Field-Level Authorization on GraphQL Mutations",
+                    "category": "GraphQL",
+                    "owasp_category": "API1:2023 Broken Object Level Authorization",
+                    "cwe": "CWE-285",
+                    "severity": "CRITICAL",
+                    "status": "OPEN",
+                    "file_path": f"{rel_path}:1",
+                    "raw_file_path": rel_path,
+                    "line_number": 1,
+                    "target_endpoint": "/graphql",
+                    "http_method": "POST",
+                    "description": "GraphQL schema mutations do not enforce field-level authorization directives or shield middleware.",
+                    "impact": "Unprivileged callers can invoke sensitive mutations across tenant boundaries.",
+                    "root_cause": "Omission of authentication/authorization middleware on resolver map.",
+                    "evidence": {
+                        "code_file_path": f"{rel_path}:1",
+                        "line_number": 1,
+                        "vulnerable_snippet": "Mutation resolvers defined without field authorization shield",
+                        "root_cause": "Missing @auth directive or graphql-shield rule.",
+                    },
+                    "remediation_advice": "Implement `graphql-shield` or custom schema directives (`@auth(role: ADMIN)`) on all sensitive mutation fields.",
+                    "remediation_patch": None,
+                })
+
+        # GQL-04: Batching Attack Risk / Unrestricted Batch Operations
+        if ("ApolloServer" in content or "graphql" in content.lower()) and "allowBatchedHttpRequests: true" in content:
+            if "KAVACH-SECURITY-FIX" not in content:
+                findings.append({
+                    "id": str(uuid.uuid4()),
+                    "taxonomy_id": "GQL-04",
+                    "title": "GQL-04: Unrestricted GraphQL Query Batching (DoS & Brute-Force Vector)",
+                    "category": "GraphQL",
+                    "owasp_category": "API4:2023 Unrestricted Resource Consumption",
+                    "cwe": "CWE-770",
+                    "severity": "HIGH",
+                    "status": "OPEN",
+                    "file_path": f"{rel_path}:1",
+                    "raw_file_path": rel_path,
+                    "line_number": 1,
+                    "target_endpoint": "/graphql",
+                    "http_method": "POST",
+                    "description": "allowBatchedHttpRequests is enabled without batch size throttling, enabling credential brute-forcing and resource exhaustion in single HTTP requests.",
+                    "impact": "Bypasses upstream rate limiters by batching hundreds of GraphQL queries into a single HTTP payload.",
+                    "root_cause": "allowBatchedHttpRequests enabled without batch rate limiter.",
+                    "evidence": {
+                        "code_file_path": f"{rel_path}:1",
+                        "line_number": 1,
+                        "vulnerable_snippet": "allowBatchedHttpRequests: true",
+                        "root_cause": "Uncapped query batching enabled in server options.",
+                    },
+                    "remediation_advice": "Cap maximum batch requests (e.g. max 5 operations per payload) or disable batching for unauthenticated requests.",
+                    "remediation_patch": None,
+                })
+
         return findings
 
     # =========================================================================
@@ -1585,6 +1755,70 @@ class CodeApiSecurityEngine:
                             "root_cause": "wss.on('connection') missing handshake token check.",
                         },
                         "remediation_advice": "Verify session or JWT tokens in `server.on('upgrade', ...)` before completing connection.",
+                        "remediation_patch": None,
+                    })
+                    break
+
+        # WS-02: Cross-Site WebSocket Hijacking (CSWSH) - Missing Origin Validation
+        for idx, line in enumerate(lines):
+            if any(term in line for term in ["new WebSocketServer", "new WebSocket.Server", "io(", "@WebSocketGateway"]) and not any(term in content for term in ["origin", "verifyClient", "checkOrigin"]):
+                if "KAVACH-SECURITY-FIX" not in line:
+                    findings.append({
+                        "id": str(uuid.uuid4()),
+                        "taxonomy_id": "WS-02",
+                        "title": "WS-02: Cross-Site WebSocket Hijacking (CSWSH) via Missing Origin Verification",
+                        "category": "Protocol Security",
+                        "owasp_category": "API7:2023 Security Misconfiguration",
+                        "cwe": "CWE-346",
+                        "severity": "CRITICAL",
+                        "status": "OPEN",
+                        "file_path": f"{rel_path}:{idx + 1}",
+                        "raw_file_path": rel_path,
+                        "line_number": idx + 1,
+                        "target_endpoint": "/ws",
+                        "http_method": "WS",
+                        "description": "WebSocket server accepts incoming upgrade handshakes without validating the HTTP Origin header against an approved domain list.",
+                        "impact": "Malicious websites visited by authenticated users can open unauthorized WebSocket connections and exfiltrate real-time stream data.",
+                        "root_cause": "WebSocketServer initialized without verifyClient or strict origin checking callback.",
+                        "evidence": {
+                            "code_file_path": f"{rel_path}:{idx + 1}",
+                            "line_number": idx + 1,
+                            "vulnerable_snippet": line.strip(),
+                            "root_cause": "Missing origin validation during HTTP Upgrade handshake.",
+                        },
+                        "remediation_advice": "Implement `verifyClient: ({ origin }, cb) => cb(null, allowedOrigins.includes(origin))`.",
+                        "remediation_patch": None,
+                    })
+                    break
+
+        # WS-03: Missing Per-Message Authorization / Message Injection
+        for idx, line in enumerate(lines):
+            if any(term in line for term in ["ws.on('message'", "socket.on('", "client.on('"]) and not any(term in content for term in ["verifyToken", "hasPermission", "checkSession", "auth"]):
+                if "KAVACH-SECURITY-FIX" not in line:
+                    findings.append({
+                        "id": str(uuid.uuid4()),
+                        "taxonomy_id": "WS-03",
+                        "title": "WS-03: Missing Per-Message Authorization & Frame Payload Injection",
+                        "category": "Protocol Security",
+                        "owasp_category": "API1:2023 Broken Object Level Authorization",
+                        "cwe": "CWE-285",
+                        "severity": "HIGH",
+                        "status": "OPEN",
+                        "file_path": f"{rel_path}:{idx + 1}",
+                        "raw_file_path": rel_path,
+                        "line_number": idx + 1,
+                        "target_endpoint": "/ws",
+                        "http_method": "WS",
+                        "description": "Inbound WebSocket message handler executes commands without authenticating the sender context on each frame.",
+                        "impact": "Attackers can dispatch administrative or foreign-tenant action frames across established sockets.",
+                        "root_cause": "Message frame handler assumes handshake identity without validating active permissions.",
+                        "evidence": {
+                            "code_file_path": f"{rel_path}:{idx + 1}",
+                            "line_number": idx + 1,
+                            "vulnerable_snippet": line.strip(),
+                            "root_cause": "ws.on('message') handler processes frames without authorization checks.",
+                        },
+                        "remediation_advice": "Validate sender session token and tenant ownership on every actionable message frame.",
                         "remediation_patch": None,
                     })
                     break
@@ -1955,7 +2189,7 @@ class CodeApiSecurityEngine:
         return findings
 
     # =========================================================================
-    # Unified Diff Synthesizers
+    # Unified Diff Synthesizers (Framework & Language Aware)
     # =========================================================================
 
     def _synthesize_bola_patch(
@@ -1963,28 +2197,44 @@ class CodeApiSecurityEngine:
     ) -> str:
         orig = lines.copy()
         mod = lines.copy()
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
 
-        indent = "  "
-        if line_idx < len(lines):
-            line = lines[line_idx]
-            indent = line[: len(line) - len(line.lstrip())]
+        if env["language"] == "python":
+            py_indent = indent if indent.strip() == "" else "    "
+            ownership_check = [
+                f"{py_indent}# [KAVACH-SECURITY-FIX] Enforce Object-Level Authorization (BOLA/IDOR) boundary",
+                f"{py_indent}if not current_user:",
+                f"{py_indent}    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=\"Authentication required\")",
+                f"{py_indent}if not getattr(current_user, 'is_superuser', False) and getattr(resource, 'user_id', None) != current_user.id:",
+                f"{py_indent}    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=\"Forbidden: Insufficient object permissions\")",
+            ]
+        else:
+            param_name = "req.params.id"
+            if "userId" in line or ":userId" in route_meta.get("raw_path", ""):
+                param_name = "req.params.userId"
+            elif "id" in line or ":id" in route_meta.get("raw_path", ""):
+                param_name = "req.params.id"
 
-        ownership_check = [
-            f"{indent}// [KAVACH-SECURITY-FIX] Enforce Object-Level Authorization ownership boundary",
-            f"{indent}if (req.user && req.user.id !== userId && !req.user.isAdmin) {{",
-            f"{indent}  return res.status(403).json({{ error: 'Forbidden: Insufficient object permissions' }});",
-            f"{indent}}}",
-        ]
+            ownership_check = [
+                f"{indent}// [KAVACH-SECURITY-FIX] Enforce Object-Level Authorization (BOLA/IDOR) boundary",
+                f"{indent}if (!req.user) {{",
+                f"{indent}  return res.status(401).json({{ error: 'Unauthorized: Authentication required' }});",
+                f"{indent}}}",
+                f"{indent}const targetId = {param_name};",
+                f"{indent}const isOwner = req.user.id === targetId || (req.user.userId && req.user.userId === targetId);",
+                f"{indent}const isAdmin = req.user.role === 'admin' || req.user.isAdmin === true;",
+                f"{indent}if (!isOwner && !isAdmin) {{",
+                f"{indent}  return res.status(403).json({{ error: 'Forbidden: Insufficient object permissions' }});",
+                f"{indent}}}",
+            ]
 
         insert_pos = min(len(mod), line_idx + 1)
         mod[insert_pos:insert_pos] = ownership_check
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 
@@ -1993,142 +2243,221 @@ class CodeApiSecurityEngine:
     ) -> str:
         orig = lines.copy()
         mod = lines.copy()
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
         line = lines[line_idx]
+        indent = line[: len(line) - len(line.lstrip())]
 
-        # Insert authenticateToken middleware: router.post('/path', ... -> router.post('/path', authenticateToken, ...
-        if "," in line:
-            parts = line.split(",", 1)
-            mod[line_idx] = f"{parts[0]}, authenticateToken,{parts[1]}"
+        if env["language"] == "python":
+            if env["framework"] == "fastapi":
+                fn_idx = None
+                for i in range(line_idx, min(len(lines), line_idx + 8)):
+                    if re.match(r"\s*(async\s+)?def\s+\w+\s*\(", lines[i]):
+                        fn_idx = i
+                        break
+
+                if fn_idx is not None:
+                    fn_line = lines[fn_idx]
+                    fn_indent = fn_line[: len(fn_line) - len(fn_line.lstrip())] + "    "
+                    if fn_line.rstrip().endswith("("):
+                        mod.insert(fn_idx + 1, f"{fn_indent}current_user: User = Depends(get_current_user),")
+                    elif "):" in fn_line:
+                        param_match = re.search(r"def\s+(\w+)\s*\((.*?)\)", fn_line)
+                        if param_match:
+                            existing_params = param_match.group(2).strip()
+                            new_params = f"current_user: User = Depends(get_current_user), {existing_params}" if existing_params else "current_user: User = Depends(get_current_user)"
+                            mod[fn_idx] = re.sub(r"def\s+(\w+)\s*\(.*?\)", f"def \\1({new_params})", fn_line)
+                    else:
+                        mod.insert(fn_idx + 1, f"{fn_indent}current_user: User = Depends(get_current_user),")
+                else:
+                    if line.endswith(")"):
+                        mod[line_idx] = line[:-1] + ', dependencies=[Depends(get_current_user)])'
+                    else:
+                        mod[line_idx] = line + ' # [KAVACH-SECURITY-FIX] Enforce auth dependency'
+            elif env["framework"] == "flask":
+                mod.insert(line_idx + 1, f"{indent}@jwt_required()")
+            else:
+                mod.insert(line_idx + 1, f"{indent}# [KAVACH-SECURITY-FIX] Enforce authentication")
+        elif env["language"] in ["javascript", "typescript"]:
+            if "," in line:
+                parts = line.split(",", 1)
+                mod[line_idx] = f"{parts[0]}, authenticateToken,{parts[1]}"
+            elif line.endswith(")"):
+                mod[line_idx] = line.replace(")", ", authenticateToken)")
+            else:
+                mod[line_idx] = f"{line} // [KAVACH-SECURITY-FIX] authenticateToken required"
         else:
-            mod[line_idx] = line
+            mod[line_idx] = f"{line} // [KAVACH-SECURITY-FIX] Enforce authentication"
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 
     def _synthesize_sqli_patch_js(self, rel_path: str, lines: List[str], line_idx: int) -> str:
         orig = lines.copy()
         mod = lines.copy()
-        indent = "  "
-        if line_idx < len(lines):
-            line = lines[line_idx]
-            indent = line[: len(line) - len(line.lstrip())]
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
 
-        mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Parameterized prepared query preventing SQL Injection\n{indent}const sqlQuery = 'SELECT * FROM users WHERE id = $1 AND active = 1';\n{indent}const queryParams = [userId];"
+        if "`" in line and "${" in line:
+            vars_found = re.findall(r"\$\{([^}]+)\}", line)
+            parameterized_sql = line
+            for i, v in enumerate(vars_found, 1):
+                # Replace '${v}' or "${v}" or ${v} with $i (unquoted parameter placeholder)
+                parameterized_sql = re.sub(r"['\"]?\$\{" + re.escape(v) + r"\}['\"]?", f"${i}", parameterized_sql)
+            parameterized_sql = parameterized_sql.replace("`", "'")
+            params_array = f"[{', '.join(vars_found)}]"
+
+            if "=" in line:
+                var_assign = line.split("=", 1)[0].strip()
+                sql_expr = parameterized_sql.split("=", 1)[1].strip() if "=" in parameterized_sql else parameterized_sql.strip()
+                sql_expr = sql_expr.rstrip(";")
+                replacement = [
+                    f"{indent}// [KAVACH-SECURITY-FIX] Parameterized prepared query preventing SQL Injection",
+                    f"{indent}{var_assign} = {sql_expr};",
+                    f"{indent}const queryParams = {params_array};",
+                ]
+            else:
+                sql_expr = parameterized_sql.strip().rstrip(";")
+                replacement = [
+                    f"{indent}// [KAVACH-SECURITY-FIX] Parameterized query preventing SQL Injection",
+                    f"{indent}const sqlQuery = {sql_expr};",
+                    f"{indent}const queryParams = {params_array};",
+                ]
+            mod[line_idx : line_idx + 1] = replacement
+        elif "+" in line and any(k in line.upper() for k in ["SELECT", "INSERT", "UPDATE", "DELETE"]):
+            replacement = [
+                f"{indent}// [KAVACH-SECURITY-FIX] Parameterized prepared query preventing SQL Injection",
+                f"{indent}const query = 'SELECT * FROM users WHERE username = $1 AND password_hash = $2';",
+                f"{indent}const result = await db.query(query, [username, passwordHash]);",
+            ]
+            mod[line_idx : line_idx + 1] = replacement
+        else:
+            mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Use parameterized queries with db.query(sql, [params])\n{line}"
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 
     def _synthesize_sqli_patch_py(self, rel_path: str, lines: List[str], line_idx: int) -> str:
         orig = lines.copy()
         mod = lines.copy()
-        indent = "    "
-        if line_idx < len(lines):
-            line = lines[line_idx]
-            indent = line[: len(line) - len(line.lstrip())]
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "    "
 
-        mod[line_idx] = f"{indent}# [KAVACH-SECURITY-FIX] Parameterized query preventing SQL Injection\n{indent}query = 'SELECT * FROM users WHERE id = ?'\n{indent}cursor = db.execute(query, (user_id,))"
-        if line_idx + 2 < len(mod) and "cursor = db.execute(query)" in mod[line_idx + 2]:
-            mod[line_idx + 2] = f"{indent}# cursor already executed with parameterized tuple above"
+        if 'f"' in line or "f'" in line:
+            vars_found = re.findall(r"\{([^}]+)\}", line)
+            parameterized_sql = re.sub(r"f([\"'])", r"\1", line)
+            parameterized_sql = re.sub(r"\{[^}]+\}", "%s", parameterized_sql)
+            params_tuple = f"({vars_found[0]},)" if len(vars_found) == 1 else f"({', '.join(vars_found)})"
+
+            if "=" in line:
+                var_assign = line.split("=", 1)[0].strip()
+                replacement = [
+                    f"{indent}# [KAVACH-SECURITY-FIX] Parameterized query preventing SQL Injection",
+                    f"{indent}{var_assign} = {parameterized_sql.strip()}",
+                    f"{indent}params = {params_tuple}",
+                ]
+            else:
+                replacement = [
+                    f"{indent}# [KAVACH-SECURITY-FIX] Parameterized query preventing SQL Injection",
+                    f"{indent}query = {parameterized_sql.strip()}",
+                    f"{indent}cursor = db.execute(query, {params_tuple})",
+                ]
+            mod[line_idx : line_idx + 1] = replacement
+        else:
+            mod[line_idx] = f"{indent}# [KAVACH-SECURITY-FIX] Parameterized query preventing SQL Injection\n{indent}query = 'SELECT * FROM users WHERE id = %s'\n{indent}cursor = db.execute(query, (user_id,))"
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 
     def _synthesize_path_traversal_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
         orig = lines.copy()
         mod = lines.copy()
-        indent = "  "
-        if line_idx < len(lines):
-            line = lines[line_idx]
-            indent = line[: len(line) - len(line.lstrip())]
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
 
-        safe_path_block = [
-            f"{indent}// [KAVACH-SECURITY-FIX] Sanitize input to prevent Path Traversal",
-            f"{indent}const safeFileName = path.basename(userFile);",
-            f"{indent}const baseDir = '/var/data/documents';",
-            f"{indent}const filePath = path.join(baseDir, safeFileName);",
-            f"{indent}if (!filePath.startsWith(baseDir)) {{",
-            f"{indent}  return res.status(403).json({{ error: 'Invalid file path' }});",
-            f"{indent}}}",
-        ]
-        mod[line_idx:line_idx + 1] = safe_path_block
+        if env["language"] == "python":
+            py_indent = indent if indent.strip() == "" else "    "
+            safe_path_block = [
+                f"{py_indent}# [KAVACH-SECURITY-FIX] Sanitize input to prevent Path Traversal",
+                f"{py_indent}safe_file_name = os.path.basename(user_file)",
+                f"{py_indent}base_dir = os.path.abspath('/var/data/documents')",
+                f"{py_indent}file_path = os.path.abspath(os.path.join(base_dir, safe_file_name))",
+                f"{py_indent}if not file_path.startswith(base_dir):",
+                f"{py_indent}    raise HTTPException(status_code=403, detail='Invalid file path')",
+            ]
+        else:
+            safe_path_block = [
+                f"{indent}// [KAVACH-SECURITY-FIX] Sanitize input to prevent Path Traversal",
+                f"{indent}const safeFileName = path.basename(userFile);",
+                f"{indent}const baseDir = '/var/data/documents';",
+                f"{indent}const filePath = path.join(baseDir, safeFileName);",
+                f"{indent}if (!filePath.startsWith(baseDir)) {{",
+                f"{indent}  return res.status(403).json({{ error: 'Invalid file path' }});",
+                f"{indent}}}",
+            ]
+        mod[line_idx : line_idx + 1] = safe_path_block
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 
     def _synthesize_auth_bypass_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
         orig = lines.copy()
         mod = lines.copy()
-        indent = "  "
-        if line_idx < len(lines):
-            line = lines[line_idx]
-            indent = line[: len(line) - len(line.lstrip())]
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
 
-        end_idx = line_idx
-        for i in range(line_idx, min(len(lines), line_idx + 12)):
-            if lines[i].strip() == "}":
-                end_idx = i
-                break
-
-        replacement = [
-            f"{indent}// [KAVACH-SECURITY-FIX] Removed unauthorized authentication bypass logic",
-            f"{indent}// Insecure decode or bypass check eliminated per OWASP API2:2023 requirement",
-        ]
-        mod[line_idx : end_idx + 1] = replacement
+        if env["language"] == "python":
+            py_indent = indent if indent.strip() == "" else "    "
+            replacement = [
+                f"{py_indent}# [KAVACH-SECURITY-FIX] Strictly enforce cryptographic JWT signature validation",
+                f"{py_indent}data = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])",
+            ]
+            mod[line_idx : line_idx + 1] = replacement
+        else:
+            replacement = [
+                f"{indent}// [KAVACH-SECURITY-FIX] Enforce strict cryptographic JWT signature verification",
+                f"{indent}const verified = jwt.verify(token, process.env.JWT_SECRET, {{ algorithms: ['HS256'] }});",
+            ]
+            mod[line_idx : line_idx + 1] = replacement
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 
     def _synthesize_hardcoded_pwd_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
         orig = lines.copy()
         mod = lines.copy()
-        indent = "  "
-        if line_idx < len(lines):
-            line = lines[line_idx]
-            indent = line[: len(line) - len(line.lstrip())]
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
 
-        replacement = [
-            f"{indent}// [KAVACH-SECURITY-FIX] Secure password verification using database hash",
-            f"{indent}const bcrypt = require('bcrypt');",
-            f"{indent}const isMatch = await bcrypt.compare(password, userRecord.passwordHash);",
-        ]
+        if env["language"] == "python":
+            py_indent = indent if indent.strip() == "" else "    "
+            replacement = [
+                f"{py_indent}# [KAVACH-SECURITY-FIX] Verify hashed password with constant-time comparison",
+                f"{py_indent}from app.core.security import verify_password",
+                f"{py_indent}is_match = verify_password(plain_password, user_record.password_hash)",
+            ]
+        else:
+            replacement = [
+                f"{indent}// [KAVACH-SECURITY-FIX] Secure password verification using database hash",
+                f"{indent}const bcrypt = require('bcrypt');",
+                f"{indent}const isMatch = await bcrypt.compare(password, userRecord.passwordHash);",
+            ]
         mod[line_idx : line_idx + 1] = replacement
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 
@@ -2137,77 +2466,76 @@ class CodeApiSecurityEngine:
     ) -> str:
         orig = lines.copy()
         mod = lines.copy()
-        target_line = lines[line_idx]
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
 
-        if "," in target_line:
-            parts = target_line.split(",", 1)
-            mod[line_idx] = f"{parts[0]}, apiRateLimiter,{parts[1]}"
+        if env["language"] == "python":
+            py_indent = indent if indent.strip() == "" else ""
+            mod.insert(line_idx, f"{py_indent}@limiter.limit('60/minute')")
         else:
-            mod[line_idx] = target_line
+            if "," in line:
+                parts = line.split(",", 1)
+                mod[line_idx] = f"{parts[0]}, apiRateLimiter,{parts[1]}"
+            else:
+                mod[line_idx] = f"{line} // [KAVACH-SECURITY-FIX] apiRateLimiter required"
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 
     def _synthesize_cors_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
         orig = lines.copy()
         mod = lines.copy()
-        indent = "  "
-        if line_idx < len(lines):
-            line = lines[line_idx]
-            indent = line[: len(line) - len(line.lstrip())]
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
 
-        mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Whitelisted specific origin for CORS\n{indent}origin: process.env.ALLOWED_ORIGIN || 'https://app.kavach.local',"
+        if env["language"] == "python":
+            py_indent = indent if indent.strip() == "" else "    "
+            mod[line_idx] = f"{py_indent}# [KAVACH-SECURITY-FIX] Whitelist specific origin for CORS\n{py_indent}allow_origins=[os.environ.get('ALLOWED_ORIGIN', 'https://app.kavach.local')]"
+        else:
+            mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Whitelisted specific origin for CORS\n{indent}origin: process.env.ALLOWED_ORIGIN || 'https://app.kavach.local',"
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 
     def _synthesize_prng_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
         orig = lines.copy()
         mod = lines.copy()
-        indent = "  "
-        if line_idx < len(lines):
-            line = lines[line_idx]
-            indent = line[: len(line) - len(line.lstrip())]
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
 
-        mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Cryptographically secure random token generation\n{indent}const token = require('crypto').randomBytes(32).toString('hex');"
+        if env["language"] == "python":
+            py_indent = indent if indent.strip() == "" else "    "
+            mod[line_idx] = f"{py_indent}# [KAVACH-SECURITY-FIX] Cryptographically secure random token generation\n{py_indent}import secrets\n{py_indent}token = secrets.token_hex(32)"
+        else:
+            mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Cryptographically secure random token generation\n{indent}const token = require('crypto').randomBytes(32).toString('hex');"
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 
     def _synthesize_secret_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
         orig = lines.copy()
         mod = lines.copy()
-        indent = "  "
-        if line_idx < len(lines):
-            line = lines[line_idx]
-            indent = line[: len(line) - len(line.lstrip())]
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
 
-        mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Load secret from secure environment configuration\n{indent}const secretKey = process.env.API_SECRET_KEY || '';"
+        if env["language"] == "python":
+            py_indent = indent if indent.strip() == "" else "    "
+            mod[line_idx] = f"{py_indent}# [KAVACH-SECURITY-FIX] Load secret from environment\n{py_indent}secret_key = os.environ.get('API_SECRET_KEY', '')"
+        else:
+            mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Load secret from secure environment configuration\n{indent}const secretKey = process.env.API_SECRET_KEY || '';"
 
         diff = difflib.unified_diff(
-            orig,
-            mod,
-            fromfile=f"a/{rel_path}",
-            tofile=f"b/{rel_path}",
-            lineterm="",
+            orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
         )
         return "\n".join(diff)
 

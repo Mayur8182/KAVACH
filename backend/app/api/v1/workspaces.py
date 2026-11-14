@@ -20,7 +20,7 @@ from sqlalchemy import select, func, or_, and_, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user_optional
+from app.core.security import get_current_user, get_current_user_optional
 from app.models.audit_event import AuditEvent
 from app.models.github import GitHubRepository
 from app.models.invitation import OrganizationMember, Invitation
@@ -227,12 +227,15 @@ async def ensure_personal_workspace(user: User, db: AsyncSession) -> Workspace:
         org_stmt = select(Organization).where(Organization.owner_id == user.id).order_by(Organization.created_at.desc()).limit(1)
         user_org = (await db.execute(org_stmt)).scalar_one_or_none()
         if not user_org:
-            latest_res = await db.execute(select(Organization).order_by(Organization.created_at.desc()).limit(1))
-            user_org = latest_res.scalar_one_or_none()
+            # Check membership
+            mem_stmt = select(OrganizationMember.organization_id).where(OrganizationMember.user_id == user.id, OrganizationMember.is_active == True)
+            user_mem_org_id = (await db.execute(mem_stmt)).scalar_one_or_none()
+            if user_mem_org_id:
+                user_org = (await db.execute(select(Organization).where(Organization.id == user_mem_org_id))).scalar_one_or_none()
 
         if not user_org:
             org_id = uuid.uuid4()
-            org_name = f"{user.name or 'Personal'}'s Org"
+            org_name = f"{user.name or 'Personal'}'s Organization"
             user_org = Organization(
                 id=org_id,
                 name=org_name,
@@ -301,16 +304,9 @@ async def ensure_personal_workspace(user: User, db: AsyncSession) -> Workspace:
     description="Returns real workspaces from PostgreSQL/SQLite with accurate project and repository counts.",
 )
 async def list_workspaces(
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> WorkspaceListResponse:
-    if not current_user:
-        # Fall back to finding the active user from the database
-        res_u = await db.execute(select(User).order_by(User.created_at.desc()).limit(1))
-        current_user = res_u.scalars().first()
-        if not current_user:
-            return WorkspaceListResponse(personal=[], organizations=[], items=[])
-
     # 1. Ensure personal workspace exists
     personal_ws = await ensure_personal_workspace(current_user, db)
     p_proj_count, p_repo_count = await get_workspace_counts(personal_ws.id, db)
@@ -356,12 +352,24 @@ async def list_workspaces(
         for o in (await db.execute(mem_orgs_stmt)).scalars().all():
             all_orgs[str(o.id)] = o
 
-    # If user has no organizations, check if an organization exists in the system or create a default one
+    # If user has no organizations, create a dedicated one for the user
     if not all_orgs:
-        latest_org_res = await db.execute(select(Organization).order_by(Organization.created_at.desc()).limit(1))
-        latest_org = latest_org_res.scalars().first()
-        if latest_org:
-            all_orgs[str(latest_org.id)] = latest_org
+        new_org_id = uuid.uuid4()
+        user_name = current_user.name or current_user.email.split("@")[0]
+        user_org = Organization(
+            id=new_org_id,
+            name=f"{user_name}'s Organization",
+            slug=f"org-{str(current_user.id)[:8]}",
+            owner_id=current_user.id,
+            owner_name=user_name,
+            owner_email=current_user.email,
+            org_type="Enterprise",
+            industry="Technology",
+            status="ACTIVE",
+        )
+        db.add(user_org)
+        await db.flush()
+        all_orgs[str(new_org_id)] = user_org
 
     # Build organizations groups with their workspaces
     org_groups: List[OrganizationWorkspacesGroup] = []
@@ -457,15 +465,9 @@ async def list_workspaces(
 async def create_workspace(
     payload: WorkspaceCreatePayload,
     request: Request,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> WorkspaceItem:
-    if not current_user:
-        res_u = await db.execute(select(User).order_by(User.created_at.desc()).limit(1))
-        current_user = res_u.scalars().first()
-        if not current_user:
-            raise HTTPException(status_code=401, detail="Authentication required to create a workspace")
-
     audit = AuditService(db)
     request_id = getattr(request.state, "request_id", None)
     ws_uuid = uuid.uuid4()
@@ -489,8 +491,26 @@ async def create_workspace(
             except ValueError:
                 target_org = (await db.execute(select(Organization).where(Organization.slug == payload.organization_id))).scalar_one_or_none()
 
+            if target_org:
+                # Verify that current_user has access to this organization
+                if target_org.owner_id != current_user.id and not getattr(current_user, "is_superuser", False):
+                    mem_check = await db.execute(
+                        select(OrganizationMember.id).where(
+                            and_(
+                                OrganizationMember.organization_id == target_org.id,
+                                OrganizationMember.user_id == current_user.id,
+                                OrganizationMember.is_active == True,
+                            )
+                        )
+                    )
+                    if not mem_check.scalars().first():
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Cross-tenant access denied: You do not have access to this organization",
+                        )
+
         if not target_org:
-            # Fall back to user's first organization or latest
+            # Check user's owned organization
             target_org = (await db.execute(
                 select(Organization).where(Organization.owner_id == current_user.id).order_by(Organization.created_at.desc()).limit(1)
             )).scalar_one_or_none()
@@ -498,12 +518,13 @@ async def create_workspace(
         if not target_org:
             # Create a new organization for this user
             org_uuid = uuid.uuid4()
+            user_name = current_user.name or current_user.email.split("@")[0]
             target_org = Organization(
                 id=org_uuid,
                 name=f"{clean_name} Org",
                 slug=f"{slug_base}-org-{uuid.uuid4().hex[:4]}",
                 owner_id=current_user.id,
-                owner_name=current_user.name or current_user.email,
+                owner_name=user_name,
                 owner_email=current_user.email,
                 org_type="Enterprise",
                 industry="Technology",
@@ -519,14 +540,13 @@ async def create_workspace(
             select(Organization).where(Organization.owner_id == current_user.id).order_by(Organization.created_at.desc()).limit(1)
         )).scalar_one_or_none()
         if not target_org:
-            target_org = (await db.execute(select(Organization).order_by(Organization.created_at.desc()).limit(1))).scalar_one_or_none()
-        if not target_org:
+            user_name = current_user.name or current_user.email.split("@")[0]
             target_org = Organization(
                 id=uuid.uuid4(),
-                name=f"{current_user.name or 'Personal'}'s Org",
+                name=f"{user_name}'s Organization",
                 slug=f"org-{str(current_user.id)[:8]}",
                 owner_id=current_user.id,
-                owner_name=current_user.name or current_user.email,
+                owner_name=user_name,
                 owner_email=current_user.email,
                 org_type="Enterprise",
                 industry="Technology",
@@ -612,14 +632,14 @@ async def create_workspace(
 
 async def check_workspace_access(ws: Workspace, current_user: Optional[User], db: AsyncSession, write: bool = False):
     if not current_user:
-        return
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     if getattr(current_user, "is_superuser", False):
         return
     if ws.workspace_type == "PERSONAL":
         if ws.owner_id and ws.owner_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Access denied to personal workspace")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to personal workspace")
         return
-    # For ORGANIZATION workspaces: check organization membership
+    # For ORGANIZATION workspaces: check organization membership or org ownership
     if ws.organization_id:
         from app.models.invitation import OrganizationMember
         mem_stmt = select(OrganizationMember).where(
@@ -629,9 +649,13 @@ async def check_workspace_access(ws: Workspace, current_user: Optional[User], db
         )
         membership = (await db.execute(mem_stmt)).scalars().first()
         if not membership and ws.owner_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Access denied to organization workspace")
+            org = (await db.execute(select(Organization).where(Organization.id == ws.organization_id))).scalar_one_or_none()
+            if not org or org.owner_id != current_user.id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to organization workspace")
         if write and membership and getattr(membership, "role", "") == "viewer":
-            raise HTTPException(status_code=403, detail="Viewer role cannot modify workspace")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Viewer role cannot modify workspace")
+    elif ws.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to workspace")
 
 
 @router.get(
@@ -642,7 +666,7 @@ async def check_workspace_access(ws: Workspace, current_user: Optional[User], db
 )
 async def get_workspace(
     workspace_id: uuid.UUID,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> WorkspaceItem:
     stmt = select(Workspace).where(Workspace.id == workspace_id)
@@ -693,7 +717,7 @@ async def update_workspace(
     workspace_id: uuid.UUID,
     payload: WorkspaceUpdatePayload,
     request: Request,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> WorkspaceItem:
     stmt = select(Workspace).where(Workspace.id == workspace_id)
@@ -771,10 +795,15 @@ async def update_workspace(
 async def delete_workspace(
     workspace_id: uuid.UUID,
     request: Request,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     stmt = select(Workspace).where(Workspace.id == workspace_id)
+    ws = (await db.execute(stmt)).scalar_one_or_none()
+    if not ws:
+        raise HTTPException(status_code=404, detail=f"Workspace '{workspace_id}' not found")
+
+    await check_workspace_access(ws, current_user, db, write=True)
     ws = (await db.execute(stmt)).scalar_one_or_none()
     if not ws:
         raise HTTPException(status_code=404, detail=f"Workspace '{workspace_id}' not found")
@@ -838,8 +867,15 @@ async def delete_workspace(
 )
 async def list_workspace_projects(
     workspace_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[ProjectInWorkspaceItem]:
+    ws = (await db.execute(select(Workspace).where(Workspace.id == workspace_id))).scalar_one_or_none()
+    if not ws:
+        raise HTTPException(status_code=404, detail=f"Workspace '{workspace_id}' not found")
+
+    await check_workspace_access(ws, current_user, db, write=False)
+
     stmt = select(Project).where(
         and_(Project.workspace_id == workspace_id, Project.deleted_at.is_(None))
     ).order_by(Project.created_at.desc())
@@ -885,18 +921,14 @@ async def create_workspace_project(
     workspace_id: uuid.UUID,
     payload: ProjectInWorkspaceCreatePayload,
     request: Request,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectInWorkspaceItem:
     ws = (await db.execute(select(Workspace).where(Workspace.id == workspace_id))).scalar_one_or_none()
     if not ws:
         raise HTTPException(status_code=404, detail=f"Workspace '{workspace_id}' not found")
 
-    if not current_user:
-        res_u = await db.execute(select(User).order_by(User.created_at.desc()).limit(1))
-        current_user = res_u.scalars().first()
-        if not current_user:
-            raise HTTPException(status_code=401, detail="Authentication required")
+    await check_workspace_access(ws, current_user, db, write=True)
 
     audit = AuditService(db)
     request_id = getattr(request.state, "request_id", None)
@@ -968,8 +1000,15 @@ async def create_workspace_project(
 )
 async def list_workspace_repositories(
     workspace_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[RepositoryInWorkspaceItem]:
+    ws = (await db.execute(select(Workspace).where(Workspace.id == workspace_id))).scalar_one_or_none()
+    if not ws:
+        raise HTTPException(status_code=404, detail=f"Workspace '{workspace_id}' not found")
+
+    await check_workspace_access(ws, current_user, db, write=False)
+
     # Repos directly linked to workspace OR linked to projects in this workspace
     proj_ids_stmt = select(Project.id).where(
         and_(Project.workspace_id == workspace_id, Project.deleted_at.is_(None))
@@ -1021,9 +1060,14 @@ async def assign_repository_to_project(
     workspace_id: uuid.UUID,
     repo_id: uuid.UUID,
     project_id: uuid.UUID = Query(..., description="Target project ID"),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    ws = (await db.execute(select(Workspace).where(Workspace.id == workspace_id))).scalar_one_or_none()
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    await check_workspace_access(ws, current_user, db, write=True)
+
     repo = (await db.execute(select(GitHubRepository).where(GitHubRepository.id == repo_id))).scalar_one_or_none()
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -1031,6 +1075,9 @@ async def assign_repository_to_project(
     proj = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    if proj.owner_id != current_user.id and not getattr(current_user, "is_superuser", False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant access denied to project")
 
     repo.project_id = proj.id
     repo.workspace_id = workspace_id
@@ -1048,9 +1095,14 @@ async def remove_repository_from_workspace(
     workspace_id: uuid.UUID,
     repo_id: uuid.UUID,
     request: Request,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    ws = (await db.execute(select(Workspace).where(Workspace.id == workspace_id))).scalar_one_or_none()
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    await check_workspace_access(ws, current_user, db, write=True)
+
     repo = (await db.execute(select(GitHubRepository).where(GitHubRepository.id == repo_id))).scalar_one_or_none()
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -1065,7 +1117,7 @@ async def remove_repository_from_workspace(
         action="REPOSITORY_DISCONNECTED",
         resource_type="repository",
         actor_type="user",
-        actor_id=current_user.email if current_user else "admin",
+        actor_id=current_user.email,
         resource_id=str(repo_id),
         workspace_id=workspace_id,
         status="SUCCESS",
@@ -1088,6 +1140,7 @@ async def remove_repository_from_workspace(
 )
 async def get_organization_overview(
     organization_id: str,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> OrganizationOverviewResponse:
     # Resolve Organization by UUID or slug
@@ -1100,6 +1153,20 @@ async def get_organization_overview(
 
     if not org:
         raise HTTPException(status_code=404, detail=f"Organization '{organization_id}' not found")
+
+    # Authorize organization access
+    if org.owner_id != current_user.id and not getattr(current_user, "is_superuser", False):
+        mem_check = await db.execute(
+            select(OrganizationMember.id).where(
+                and_(
+                    OrganizationMember.organization_id == org.id,
+                    OrganizationMember.user_id == current_user.id,
+                    OrganizationMember.is_active == True,
+                )
+            )
+        )
+        if not mem_check.scalars().first():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant access denied to organization")
 
     # 1. Total workspaces in org
     ws_stmt = select(Workspace).where(

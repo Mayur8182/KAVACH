@@ -215,11 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       pathname.startsWith('/findings') ||
       pathname.startsWith('/scans'));
 
-  const isCloudWorkspace =
-    (pathname.startsWith('/cloud') && !pathname.includes('/docker') && !pathname.includes('/iac')) ||
-    pathname.startsWith('/attack') ||
-    pathname.startsWith('/kubernetes') ||
-    pathname.startsWith('/compliance');
+  const isCloudWorkspace = pathname.startsWith('/cloud');
 
   const isAdminWorkspace = pathname.startsWith('/settings');
 
@@ -254,12 +250,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
     dependencies?: number;
   }>({});
 
+  const [cloudAgentState, setCloudAgentState] = useState<{
+    isActive: boolean;
+    issuesCount: number;
+    attackPathsCount: number;
+    coveragePct: number;
+    statusText: string;
+  }>({
+    isActive: false,
+    issuesCount: 0,
+    attackPathsCount: 0,
+    coveragePct: 0,
+    statusText: 'No cloud connected',
+  });
+
   useEffect(() => {
     let active = true;
     const fetchBadges = async () => {
       // Do not fetch or show global benchmark/demo findings when no project is scoped
       if (!currentProject?.id) {
-        if (active) setBadgeCounts({});
+        if (active) {
+          setBadgeCounts({});
+          setCloudAgentState({
+            isActive: false,
+            issuesCount: 0,
+            attackPathsCount: 0,
+            coveragePct: 0,
+            statusText: 'Awaiting cloud connection',
+          });
+        }
         return;
       }
       try {
@@ -276,10 +295,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
       } catch {
         if (active) setBadgeCounts({});
       }
+
+      if (isCloudWorkspace) {
+        try {
+          const [cc, ap] = await Promise.all([
+            api.cloud.commandCenter(currentProject.id).catch(() => null),
+            api.cloud.attackPaths(currentProject.id).catch(() => null),
+          ]);
+          if (active && cc) {
+            setCloudAgentState({
+              isActive: cc.master_agent?.is_active ?? false,
+              issuesCount: cc.critical_issues || cc.total_issues || 0,
+              attackPathsCount: ap?.items?.length || 0,
+              coveragePct: cc.master_agent?.coverage_percentage ?? 0,
+              statusText: cc.master_agent?.is_active
+                ? `${cc.master_agent.coverage_percentage}% of areas assessed`
+                : 'Awaiting cloud connection',
+            });
+          }
+        } catch {
+          if (active) {
+            setCloudAgentState({
+              isActive: false,
+              issuesCount: 0,
+              attackPathsCount: 0,
+              coveragePct: 0,
+              statusText: 'Awaiting cloud connection',
+            });
+          }
+        }
+      }
     };
     fetchBadges();
     return () => { active = false; };
-  }, [currentProject?.id]);
+  }, [currentProject?.id, isCloudWorkspace]);
 
   // ── 0. UNIFIED CORE WORKSPACE NAVIGATION (Daily DevSecOps Flow, Zero Duplicates) ──
   const coreWorkspaceItems: NavItem[] = [
@@ -295,7 +344,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     { id: 'ws-fixes', label: 'Fixes & Patches', href: '/fixes', icon: Sparkles },
     { id: 'ws-runs', label: 'Security Runs', href: '/runs', icon: PlayCircle },
-    { id: 'ws-assistant', label: 'Assistant', href: '/assistant', icon: Bot, badge: 'AI', badgeBg: '#2563EB' },
     { id: 'ws-reports', label: 'Reports', href: '/reports', icon: FileText },
   ];
 
@@ -328,7 +376,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     { id: 'sc-iac', label: 'IaC Security', href: '/code/iac', icon: Layers },
     { id: 'sc-containers', label: 'Container Security', href: '/code/container-security', icon: Container },
-    { id: 'sc-api-security', label: 'API Security', href: '/api-security', icon: Network, badge: 'New', badgeBg: '#18181B' },
+    { id: 'sc-api-security', label: 'API Security', href: '/api-security/analysis', icon: Network, badge: 'New', badgeBg: '#18181B' },
   ];
 
   // ── 2. GOVERNANCE & POLICIES ──
@@ -466,19 +514,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'code-settings', label: 'Code Settings', href: '/code/settings', icon: Settings },
   ];
 
-  // ── 2. THING CLOUD (Cloud Infrastructure & Runtime Security) ──
-  const cloudInfraItems: NavItem[] = [
-    { id: 'cloud-overview', label: 'Cloud Overview', href: '/cloud', icon: Cloud },
-    { id: 'cloud-k8s', label: 'Kubernetes', href: '/cloud/kubernetes', icon: Boxes },
-  ];
-
-  const cloudConfigItems: NavItem[] = [
-    { id: 'cloud-docker', label: 'Container Security', href: '/cloud/docker', icon: Container },
-  ];
-
-  const cloudGovItems: NavItem[] = [
-    { id: 'cloud-attack', label: 'Attack Surface', href: '/attack/surface', icon: Crosshair },
-    { id: 'cloud-compliance', label: 'Compliance', href: '/governance', icon: FileCheck2 },
+  // ── 2. KAVACH CLOUD (Autonomous AI Cloud Security) ──
+  const cloudAutonomousItems: NavItem[] = [
+    { id: 'cloud-overview', label: 'Overview', href: '/cloud?view=ov', icon: LayoutGrid },
+    {
+      id: 'cloud-command-center',
+      label: 'Agent command center',
+      href: '/cloud?view=cm',
+      icon: Bot,
+      badge: 'AI',
+      badgeBg: '#2563EB',
+    },
+    {
+      id: 'cloud-issues',
+      label: 'Security issues',
+      href: '/cloud?view=fi',
+      icon: ShieldAlert,
+      badge: cloudAgentState.issuesCount > 0 ? cloudAgentState.issuesCount : undefined,
+      badgeBg: '#DC2626',
+    },
+    { id: 'cloud-assets', label: 'Assets', href: '/cloud?view=as', icon: Layers },
+    {
+      id: 'cloud-attack-paths',
+      label: 'Attack paths',
+      href: '/cloud?view=ag',
+      icon: Target,
+      badge: cloudAgentState.attackPathsCount > 0 ? cloudAgentState.attackPathsCount : undefined,
+      badgeBg: '#EA580C',
+    },
+    { id: 'cloud-security-graph', label: 'Security graph', href: '/cloud?view=sg', icon: Network },
+    { id: 'cloud-fixes', label: 'Fixes & remediations', href: '/cloud?view=fx', icon: Sparkles },
+    { id: 'cloud-activity', label: 'Activity', href: '/cloud?view=ac', icon: Activity },
+    { id: 'cloud-connect', label: 'Connect cloud', href: '/cloud?view=cn', icon: Link2 },
+    { id: 'cloud-reports', label: 'Reports', href: '/cloud?view=rp', icon: FileText },
   ];
 
   // ── 3. ADMINISTRATION (Identity, Security & Organization) ──
@@ -532,17 +600,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const apiSecurityItems: NavItem[] = [
-    { id: 'api-overview', label: 'Overview', href: '/api-security', icon: LayoutGrid },
-    { id: 'api-discovery', label: 'Repository Discovery', href: '/api-security/discovery', icon: FolderGit2 },
-    { id: 'api-inventory', label: 'API Inventory', href: '/api-security/apis', icon: Network },
+    { id: 'api-inventory', label: 'API Inventory', href: '/api-security/inventory', icon: Network },
     { id: 'api-analysis', label: 'Security Analysis', href: '/api-security/analysis', icon: Target },
     { id: 'api-findings', label: 'Findings', href: '/api-security/findings', icon: ShieldAlert },
     { id: 'api-attack-paths', label: 'Attack Paths', href: '/api-security/attack-paths', icon: Crosshair },
-    { id: 'api-analyst', label: 'AI Analyst', href: '/api-security/analyst', icon: Bot },
-    { id: 'api-reports', label: 'Reports', href: '/api-security/reports', icon: FileCheck2 },
-    { id: 'api-integrations', label: 'Integrations', href: '/api-security/integrations', icon: Link2 },
-    { id: 'api-policies', label: 'Policies', href: '/api-security/policies', icon: CheckSquare },
-    { id: 'api-settings', label: 'Settings', href: '/api-security/settings', icon: Settings },
+    { id: 'api-remediation', label: 'Remediation', href: '/api-security/remediation', icon: GitPullRequest },
+    { id: 'api-reports', label: 'Reports & Compliance', href: '/api-security/reports', icon: FileCheck2 },
+    { id: 'api-analyst', label: 'AI Security Analyst', href: '/api-security/analyst', icon: Bot },
   ];
 
   // ── 4A. DEPENDENCIES & SCA ENGINE EXCLUSIVE NAVIGATION ──
@@ -856,15 +920,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (href === '/code/supply-chain') {
       return pathname.startsWith('/code/supply-chain');
     }
-    if (href === '/cloud') {
+    if (href.startsWith('/cloud')) {
+      if (href.includes('view=')) {
+        const targetView = href.split('view=')[1];
+        if (typeof window !== 'undefined') {
+          const search = window.location.search || window.location.hash;
+          if (search.includes(`view=${targetView}`) || search.includes(`#${targetView}`)) return true;
+          if (targetView === 'ov' && (!search || search === '?view=ov' || search === '#ov')) return true;
+        }
+        return false;
+      }
       return (
         pathname === '/cloud' ||
-        pathname === '/cloud/' ||
-        (pathname.startsWith('/cloud') &&
-          !pathname.includes('/iac') &&
-          !pathname.includes('/docker') &&
-          !pathname.includes('/kubernetes') &&
-          !pathname.includes('/compliance'))
+        pathname === '/cloud/'
       );
     }
     if (href === '/kubernetes') {
@@ -1331,14 +1399,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div style={{ marginBottom: '4px' }}>
               {itemRenderer(cloudBackItem)}
             </div>
-            {headerRenderer('Cloud & Infrastructure')}
-            {cloudInfraItems.map(itemRenderer)}
+            {headerRenderer('CLOUD WORKSPACE')}
+            {cloudAutonomousItems.map(itemRenderer)}
 
-            {headerRenderer('Posture & Configuration')}
-            {cloudConfigItems.map(itemRenderer)}
-
-            {headerRenderer('Perimeter & Governance')}
-            {cloudGovItems.map(itemRenderer)}
+            {/* AI Agent Status Card */}
+            {!isCollapsed && (
+              <Link
+                href="/cloud?view=cm"
+                style={{
+                  display: 'block',
+                  marginTop: '16px',
+                  padding: '14px',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0',
+                  background: '#FFFFFF',
+                  boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.15s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '13px', color: '#0F172A' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: cloudAgentState.isActive ? '#16A34A' : '#94A3B8', display: 'inline-block' }}></span>
+                  {cloudAgentState.isActive ? 'Master Agent active' : 'Master Agent idle'}
+                </div>
+                <div style={{ color: '#64748B', fontSize: '11.5px', margin: '4px 0 10px' }}>
+                  {cloudAgentState.isActive ? 'Autonomous security active' : 'Connect cloud to activate'}
+                </div>
+                <div style={{ height: '6px', borderRadius: '3px', background: '#E2E8F0', overflow: 'hidden' }}>
+                  <div style={{ width: `${cloudAgentState.coveragePct}%`, height: '100%', background: cloudAgentState.isActive ? '#16A34A' : '#CBD5E1', borderRadius: '3px' }}></div>
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{cloudAgentState.statusText}</span>
+                  <span style={{ color: '#2563EB', fontWeight: 600 }}>Command center →</span>
+                </div>
+              </Link>
+            )}
           </>
         )}
 
@@ -1388,14 +1484,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {sastItems.map(itemRenderer)}
 
             {headerRenderer('AI & Multi-Agent Guard')}
-            {itemRenderer({
-              id: 'sast-nav-assistant',
-              label: 'AI Security Assistant',
-              href: '/assistant',
-              icon: Bot,
-              badge: 'AI',
-              badgeBg: '#2563EB',
-            })}
             {itemRenderer({
               id: 'sast-nav-agent-guard',
               label: 'Autonomous Agent Guard',

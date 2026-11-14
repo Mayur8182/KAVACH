@@ -39,6 +39,7 @@ import {
   FileCheck2,
 } from 'lucide-react';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
+import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
 import { SearchModal } from '@/components/common/SearchModal';
 import { TalkToExpertModal } from '@/components/common/TalkToExpertModal';
 import { KavachMark } from '@/components/common/KavachLogo';
@@ -188,9 +189,9 @@ export default function KavachPlatformPage() {
       id: 'code',
       title: 'Code Security',
       sub: 'SAST • SCA • Secrets',
-      icon: <Code2 size={18} color="#2563EB" />,
-      color: '#2563EB',
-      bg: '#EFF6FF',
+      icon: <Code2 size={18} color="#3F3A33" />,
+      color: '#3F3A33',
+      bg: '#F5F1E8',
       details: 'Deep static analysis with custom rules, software composition analysis with license checking, and pre-commit secret detection.',
       href: '/code',
     },
@@ -287,9 +288,9 @@ export default function KavachPlatformPage() {
                   gap: '8px',
                   padding: '5px 14px',
                   borderRadius: '9999px',
-                  backgroundColor: '#EFF6FF',
-                  border: '1px solid #BFDBFE',
-                  color: '#2563EB',
+                  backgroundColor: '#F5F1E8',
+                  border: '1px solid #D8D1C3',
+                  color: '#3F3A33',
                   fontSize: '11px',
                   fontWeight: 700,
                   letterSpacing: '0.06em',
@@ -347,7 +348,7 @@ export default function KavachPlatformPage() {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#1E293B' }}>
-                <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#F5F1E8', color: '#3F3A33', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Check size={13} strokeWidth={3} />
                 </div>
                 <span><strong>Sub-20ms Policy Decisions:</strong> Compiled Rego v1.0 rules evaluate runtime syscalls and PR gates at wire speed.</span>
@@ -371,7 +372,7 @@ export default function KavachPlatformPage() {
                   gap: '8px',
                   padding: '12px 24px',
                   borderRadius: '8px',
-                  backgroundColor: '#2563EB',
+                  backgroundColor: '#3F3A33',
                   color: '#FFFFFF',
                   fontWeight: 600,
                   fontSize: '14px',
@@ -380,7 +381,7 @@ export default function KavachPlatformPage() {
                   transition: 'background-color 0.15s ease',
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1D4ED8')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2563EB')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#3F3A33')}
               >
                 <span>Explore Platform</span>
                 <ArrowRight size={16} />
@@ -411,7 +412,7 @@ export default function KavachPlatformPage() {
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
               >
-                <Zap size={15} color="#2563EB" />
+                <Zap size={15} color="#3F3A33" />
                 <span>Simulate Threat Invariant</span>
               </button>
             </div>
@@ -476,7 +477,7 @@ export default function KavachPlatformPage() {
                     borderRadius: '6px',
                     border: 'none',
                     backgroundColor: visualizerTab === 'simulator' ? '#FFFFFF' : 'transparent',
-                    color: visualizerTab === 'simulator' ? '#2563EB' : '#64748B',
+                    color: visualizerTab === 'simulator' ? '#3F3A33' : '#64748B',
                     boxShadow: visualizerTab === 'simulator' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
                     cursor: 'pointer',
                     display: 'flex',
@@ -518,20 +519,20 @@ export default function KavachPlatformPage() {
                   style={{
                     padding: '14px 18px',
                     borderRadius: '10px',
-                    border: selectedPlane === 'code' ? '2px solid #2563EB' : '1px solid #E2E8F0',
-                    backgroundColor: selectedPlane === 'code' ? '#EFF6FF' : '#F8FAFC',
+                    border: selectedPlane === 'code' ? '2px solid #3F3A33' : '1px solid #E2E8F0',
+                    backgroundColor: selectedPlane === 'code' ? '#F5F1E8' : '#F8FAFC',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <FileCode2 size={16} color="#2563EB" />
+                      <FileCode2 size={16} color="#3F3A33" />
                       <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
                         Plane 4 · Code &amp; Supply Chain Surface
                       </span>
                     </div>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#2563EB', backgroundColor: '#DBEAFE', padding: '2px 8px', borderRadius: '4px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#3F3A33', backgroundColor: '#E9E4DA', padding: '2px 8px', borderRadius: '4px' }}>
                       PRE-MERGE GATE
                     </span>
                   </div>
@@ -671,7 +672,7 @@ export default function KavachPlatformPage() {
                   </div>
                   <Link
                     href={selectedPlane === 'code' ? '/code' : selectedPlane === 'mcp' ? '/agent' : selectedPlane === 'opa' ? '/governance' : '/protect'}
-                    style={{ fontSize: '12px', fontWeight: 700, color: '#2563EB', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                    style={{ fontSize: '12px', fontWeight: 700, color: '#3F3A33', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
                   >
                     <span>Inspect Invariants →</span>
                   </Link>
@@ -703,8 +704,8 @@ export default function KavachPlatformPage() {
                         style={{
                           padding: '12px 14px',
                           borderRadius: '8px',
-                          border: isSelected ? '2px solid #2563EB' : '1px solid #E2E8F0',
-                          backgroundColor: isSelected ? '#EFF6FF' : '#FFFFFF',
+                          border: isSelected ? '2px solid #3F3A33' : '1px solid #E2E8F0',
+                          backgroundColor: isSelected ? '#F5F1E8' : '#FFFFFF',
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
                         }}
@@ -730,7 +731,7 @@ export default function KavachPlatformPage() {
                       <span style={{ fontSize: '12px', fontWeight: 600, color: '#0F172A' }}>
                         Simulating Payload:
                       </span>
-                      <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '11.5px', color: '#2563EB', wordBreak: 'break-all' }}>
+                      <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '11.5px', color: '#3F3A33', wordBreak: 'break-all' }}>
                         {activeScenario.payload}
                       </span>
                     </div>
@@ -761,9 +762,9 @@ export default function KavachPlatformPage() {
 
                   {/* 4-Step Animated Evaluation Pipeline */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '6px' }}>
-                    <div style={{ padding: '8px 10px', borderRadius: '6px', backgroundColor: simStep >= 1 ? '#EFF6FF' : '#FFFFFF', border: `1px solid ${simStep >= 1 ? '#93C5FD' : '#E2E8F0'}`, textAlign: 'center' }}>
+                    <div style={{ padding: '8px 10px', borderRadius: '6px', backgroundColor: simStep >= 1 ? '#F5F1E8' : '#FFFFFF', border: `1px solid ${simStep >= 1 ? '#B8AE9C' : '#E2E8F0'}`, textAlign: 'center' }}>
                       <div style={{ fontSize: '10px', color: '#64748B' }}>Step 1</div>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: simStep >= 1 ? '#1E40AF' : '#94A3B8' }}>CI / MCP Ingest</div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: simStep >= 1 ? '#3F3A33' : '#94A3B8' }}>CI / MCP Ingest</div>
                     </div>
                     <div style={{ padding: '8px 10px', borderRadius: '6px', backgroundColor: simStep >= 2 ? '#FAF5FF' : '#FFFFFF', border: `1px solid ${simStep >= 2 ? '#D8B4FE' : '#E2E8F0'}`, textAlign: 'center' }}>
                       <div style={{ fontSize: '10px', color: '#64748B' }}>Step 2</div>
@@ -874,8 +875,8 @@ export default function KavachPlatformPage() {
                 width: '38px',
                 height: '38px',
                 borderRadius: '8px',
-                backgroundColor: '#EFF6FF',
-                color: '#2563EB',
+                backgroundColor: '#F5F1E8',
+                color: '#3F3A33',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1000,8 +1001,8 @@ export default function KavachPlatformPage() {
                   style={{
                     padding: '16px 14px',
                     borderRadius: '10px',
-                    border: `1.5px solid ${isCurrent ? '#2563EB' : '#E2E8F0'}`,
-                    backgroundColor: isCurrent ? '#EFF6FF' : '#FFFFFF',
+                    border: `1.5px solid ${isCurrent ? '#3F3A33' : '#E2E8F0'}`,
+                    backgroundColor: isCurrent ? '#F5F1E8' : '#FFFFFF',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -1012,8 +1013,8 @@ export default function KavachPlatformPage() {
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <div style={{ color: isCurrent ? '#2563EB' : '#475569' }}>{stage.icon}</div>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: isCurrent ? '#1E40AF' : '#0F172A' }}>
+                  <div style={{ color: isCurrent ? '#3F3A33' : '#475569' }}>{stage.icon}</div>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: isCurrent ? '#3F3A33' : '#0F172A' }}>
                     {stage.name}
                   </span>
                   <span style={{ fontSize: '11px', color: '#64748B' }}>{stage.audience}</span>
@@ -1037,7 +1038,7 @@ export default function KavachPlatformPage() {
             }}
           >
             <div>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563EB', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#3F3A33', textTransform: 'uppercase' }}>
                 Active Phase Gate: {lifecycleStages.find((s) => s.id === activeStage)?.name}
               </div>
               <div style={{ fontSize: '13px', color: '#334155', marginTop: '2px' }}>
@@ -1140,7 +1141,7 @@ export default function KavachPlatformPage() {
               <Link
                 href={pillars.find((p) => p.id === activePillar)?.href || '/code'}
                 style={{
-                  color: '#2563EB',
+                  color: '#3F3A33',
                   fontWeight: 700,
                   display: 'flex',
                   alignItems: 'center',
@@ -1198,6 +1199,7 @@ export default function KavachPlatformPage() {
       </main>
 
       {/* Global Modals */}
+      <EnterpriseFooter />
       <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
       <TalkToExpertModal isOpen={expertOpen} onClose={() => setExpertOpen(false)} />
 

@@ -368,6 +368,11 @@ async def create_remediation_pull_request(
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found")
 
+    from app.services.finding_service import FindingService
+    fs = FindingService(db)
+    if not await fs._check_finding_access(finding, current_user):
+        raise HTTPException(status_code=403, detail="Access denied to requested finding")
+
     from app.models.scan import SecurityScan
     from app.models.github import GitHubRepository
 
@@ -385,15 +390,14 @@ async def create_remediation_pull_request(
                 if repo:
                     repo_id = repo.id
 
-    if not repo_id:
-        # Fallback to any active repo
-        fallback_q = select(GitHubRepository).limit(1)
-        fallback_repo = (await db.execute(fallback_q)).scalar_one_or_none()
-        if fallback_repo:
-            repo_id = fallback_repo.id
+    if not repo_id and finding.project_id:
+        repo_q = select(GitHubRepository).where(GitHubRepository.project_id == finding.project_id).limit(1)
+        repo = (await db.execute(repo_q)).scalar_one_or_none()
+        if repo:
+            repo_id = repo.id
 
     if not repo_id:
-        raise HTTPException(status_code=400, detail="Finding is not bound to a GitHub repository")
+        raise HTTPException(status_code=400, detail="Finding is not bound to a connected GitHub repository in this project")
 
     branch = (payload and payload.branch) or f"remediation/fix-{finding.rule_id.lower().replace('_', '-')}-{str(uuid.uuid4())[:6]}"
     title = (payload and payload.title) or f"fix(security): Remediate {finding.rule_id} in {finding.file_path}"
@@ -782,6 +786,31 @@ class CreateCodeRepositoryRequest(BaseModel):
     project_id: Optional[str] = None
 
 
+@router.get(
+    "/repositories",
+    response_model=RepositoryHealthResponse,
+    summary="List code repositories and their health status",
+)
+async def list_code_repositories(
+    project_id: Optional[str] = Query(None),
+    page: Optional[int] = Query(None, ge=1),
+    pageSize: Optional[int] = Query(None, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> RepositoryHealthResponse:
+    return await get_repository_health(
+        project_id=project_id,
+        page=page,
+        pageSize=pageSize,
+        limit=limit,
+        offset=offset,
+        current_user=current_user,
+        db=db,
+    )
+
+
 @router.post(
     "/repositories",
     response_model=ConnectRepositoryResponse,
@@ -875,29 +904,30 @@ async def connect_code_repository(
                 p_stmt = select(Project).where(Project.id == target_proj_uuid)
                 p_res = await db.execute(p_stmt)
                 cand = p_res.scalars().first()
-                if cand:
-                    # Allow if superuser, owner, or organization member
-                    if getattr(current_user, "is_superuser", False) or cand.owner_id == current_user.id:
-                        project = cand
-                    else:
-                        from app.models.invitation import OrganizationMember
-                        if cand.organization_id:
-                            m_stmt = select(OrganizationMember.id).where(
-                                and_(
-                                    OrganizationMember.organization_id == cand.organization_id,
-                                    OrganizationMember.user_id == current_user.id,
-                                    OrganizationMember.is_active == True,
-                                )
-                            )
-                            m_res = await db.execute(m_stmt)
-                            if m_res.scalars().first():
-                                project = cand
-                            else:
-                                project = cand  # Active project in user workspace
-                        else:
-                            project = cand
+                if not cand:
+                    raise HTTPException(status_code=404, detail="Project not found")
+
+                is_authorized = False
+                if getattr(current_user, "is_superuser", False) or cand.owner_id == current_user.id:
+                    is_authorized = True
+                elif cand.organization_id:
+                    from app.models.invitation import OrganizationMember
+                    m_stmt = select(OrganizationMember.id).where(
+                        and_(
+                            OrganizationMember.organization_id == cand.organization_id,
+                            OrganizationMember.user_id == current_user.id,
+                            OrganizationMember.is_active == True,
+                        )
+                    )
+                    m_res = await db.execute(m_stmt)
+                    if m_res.scalars().first():
+                        is_authorized = True
+
+                if not is_authorized:
+                    raise HTTPException(status_code=403, detail="Access denied to requested project")
+                project = cand
             except (ValueError, TypeError):
-                pass
+                raise HTTPException(status_code=400, detail="Invalid project_id")
 
         if not project:
             try:
@@ -940,16 +970,13 @@ async def connect_code_repository(
                 project = None
 
         if not project:
-            try:
-                res = await db.execute(select(Project).order_by(Project.created_at.desc()).limit(1))
-                project = res.scalars().first()
-            except Exception:
-                project = None
-
-        if not project:
+            from app.api.v1.workspaces import ensure_personal_workspace
+            ws = await ensure_personal_workspace(current_user, db)
             project = Project(
                 id=uuid.uuid4(),
                 owner_id=current_user.id,
+                workspace_id=ws.id if ws else None,
+                organization_id=ws.organization_id if ws else None,
                 name=f"{repo_name.replace('-', ' ').title()}",
                 description=f"Continuous security governance for {full_name}",
                 environment=target_env,
@@ -959,32 +986,20 @@ async def connect_code_repository(
             await db.commit()
             await db.refresh(project)
 
-        # 4. Check or create GitHubRepository
+        # 4. Check or create GitHubRepository for this project
         existing_stmt = select(GitHubRepository).where(
-            or_(
-                GitHubRepository.full_name == full_name,
-                GitHubRepository.full_name.ilike(full_name),
+            and_(
+                GitHubRepository.project_id == project.id,
+                or_(
+                    GitHubRepository.full_name == full_name,
+                    GitHubRepository.full_name.ilike(full_name),
+                )
             )
         ).limit(1)
         existing_res = await db.execute(existing_stmt)
         repo = existing_res.scalars().first()
 
         if repo:
-            target_ws_id = getattr(project, 'workspace_id', None)
-            if repo.project_id != project.id or (target_ws_id and repo.workspace_id != target_ws_id):
-                repo.project_id = project.id
-                if target_ws_id:
-                    repo.workspace_id = target_ws_id
-                await db.execute(
-                    update(GitHubSecurityJob)
-                    .where(GitHubSecurityJob.repository_id == repo.id)
-                    .values(project_id=project.id)
-                )
-                await db.execute(
-                    update(SecurityScan)
-                    .where(SecurityScan.target_path == repo.full_name)
-                    .values(project_id=project.id)
-                )
             repo.default_branch = target_branch
             repo.html_url = html_url
             repo.clone_url = clone_url
@@ -1939,7 +1954,7 @@ async def update_secret_remediation_settings(
 
 
 # ─────────────────────────────────────────────
-# Policies & Compliance (/code/settings/policies & /code/policies)
+# Policies & Compliance (/code/settings/policies & /code/policies) - auto-reloaded
 # ─────────────────────────────────────────────
 
 @router.get(

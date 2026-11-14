@@ -22,6 +22,10 @@ import {
   UserCheck,
   Cpu,
   Layers,
+  Cloud,
+  Network,
+  Server,
+  ShieldAlert,
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -454,6 +458,133 @@ export function PolicyVerdictMockup() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   FEATURE: AUTONOMOUS CLOUD SECURITY AGENT (MASTER + 18 SPECIALISTS)
+───────────────────────────────────────────────────────────────────────────── */
+export function CloudAgentMockup() {
+  const [fixed, setFixed] = useState(false);
+
+  return (
+    <MockupWindow title="Master Cloud Agent · AWS us-east-1" badge="18 Specialists Active" badgeColor="#38BDF8">
+      {/* Topology summary banner */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 12px',
+          backgroundColor: '#060910',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '8px',
+          marginBottom: '14px',
+          fontSize: '11px',
+          fontFamily: 'JetBrains Mono, monospace',
+        }}
+      >
+        <span style={{ color: '#94A3B8' }}>AWS STS Session: <span style={{ color: '#38BDF8' }}>KavachReadOnly</span></span>
+        <span style={{ color: fixed ? '#34D399' : '#F87171', fontWeight: 700 }}>
+          {fixed ? '● 0 Attack Paths' : '● 1 Critical Path'}
+        </span>
+      </div>
+
+      {/* Visual Attack Path Nodes */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '8px',
+          marginBottom: '14px',
+          textAlign: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <div style={{ backgroundColor: '#0B0F19', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+          <Network size={14} color="#94A3B8" style={{ margin: '0 auto 2px' }} />
+          <div style={{ fontSize: '10px', color: '#F1F5F9', fontWeight: 600 }}>0.0.0.0/0</div>
+          <div style={{ fontSize: '8.5px', color: '#64748B' }}>Internet</div>
+        </div>
+
+        <div style={{ backgroundColor: '#0B0F19', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+          <Server size={14} color="#38BDF8" style={{ margin: '0 auto 2px' }} />
+          <div style={{ fontSize: '10px', color: '#F1F5F9', fontWeight: 600 }}>ALB Ingress</div>
+          <div style={{ fontSize: '8.5px', color: '#64748B' }}>Port 443</div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: fixed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.12)',
+            padding: '8px 4px',
+            borderRadius: '6px',
+            border: fixed ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+          }}
+        >
+          <Database size={14} color={fixed ? '#34D399' : '#EF4444'} style={{ margin: '0 auto 2px' }} />
+          <div style={{ fontSize: '10px', color: fixed ? '#34D399' : '#F87171', fontWeight: 700 }}>RDS Aurora</div>
+          <div style={{ fontSize: '8.5px', color: '#94A3B8' }}>{fixed ? 'Private' : 'Public:5432'}</div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: fixed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.12)',
+            padding: '8px 4px',
+            borderRadius: '6px',
+            border: fixed ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+          }}
+        >
+          <Layers size={14} color={fixed ? '#34D399' : '#F59E0B'} style={{ margin: '0 auto 2px' }} />
+          <div style={{ fontSize: '10px', color: fixed ? '#34D399' : '#FBBF24', fontWeight: 700 }}>S3 Lake</div>
+          <div style={{ fontSize: '8.5px', color: '#94A3B8' }}>{fixed ? 'Secured' : 'Public ACL'}</div>
+        </div>
+      </div>
+
+      {/* Choke Point Alert and Fix Action */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 14px',
+          backgroundColor: fixed ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+          border: fixed ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(239, 68, 68, 0.25)',
+          borderRadius: '8px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {fixed ? <CheckCircle2 size={16} color="#34D399" /> : <ShieldAlert size={16} color="#EF4444" />}
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: fixed ? '#34D399' : '#F87171' }}>
+              {fixed ? 'Cloud Perimeter Hardened' : 'Attack Path Choke Point: RDS Ingress'}
+            </div>
+            <div style={{ fontSize: '10.5px', color: '#94A3B8', fontFamily: 'monospace' }}>
+              {fixed ? 'Rescan verified 0 exposures · Terraform committed' : 'Direct public access to production database'}
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setFixed(!fixed)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            backgroundColor: fixed ? '#0F172A' : '#10B981',
+            color: '#FFFFFF',
+            border: fixed ? '1px solid rgba(255, 255, 255, 0.15)' : 'none',
+            borderRadius: '6px',
+            fontSize: '11px',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          {fixed ? 'Reset' : 'Execute Fix'}
+        </button>
+      </div>
+    </MockupWindow>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    FEATURE 3 MOCKUP: 1-CLICK VERIFIED GITHUB PULL REQUEST
 ───────────────────────────────────────────────────────────────────────────── */
 export function PrMockup() {
@@ -557,21 +688,28 @@ export const FuseProductShowcase: React.FC = () => {
   const steps = [
     {
       num: '01',
-      badge: 'CONTINUOUS AST DISCOVERY',
+      badge: 'CONTINUOUS MULTI-ENGINE DISCOVERY',
       title: 'Real multi-engine scanners execute in under 4 seconds.',
       desc: 'Kavach runs semantic AST parsing with Semgrep, entropy secret auditing with Gitleaks, and CVE vulnerability analysis concurrently in a sandboxed runtime. Zero simulated scan results.',
       mockup: <DiscoveryMockup />,
     },
     {
       num: '02',
+      badge: 'AUTONOMOUS CLOUD AGENTS',
+      title: 'Master Cloud Agent coordinates 18 specialist agents.',
+      desc: 'Connect AWS, Azure, or GCP. Kavach maps multi-cloud topologies, traces ingress paths from the public internet down to databases and storage, and pinpoints exploit choke points automatically.',
+      mockup: <CloudAgentMockup />,
+    },
+    {
+      num: '03',
       badge: 'DETERMINISTIC DECISION GATE',
       title: 'LLM proposes. Deterministic OPA security policies decide.',
       desc: 'Never trust an unverified AI code suggestion. Kavach passes every synthesized patch through cryptographic OPA Rego blueprints to ensure zero regressions and verified syntax invariants.',
       mockup: <PolicyVerdictMockup />,
     },
     {
-      num: '03',
-      badge: 'ONE-CLICK RESOLUTION',
+      num: '04',
+      badge: 'ONE-CLICK VERIFIED RESOLUTION',
       title: 'From critical alert to verified GitHub PR in 1 click.',
       desc: 'Autonomous remediation that engineering teams actually trust. Kavach creates a dedicated git branch, runs rescan verification tests, and publishes a signed pull request with SLSA Level 3 attestations.',
       mockup: <PrMockup />,

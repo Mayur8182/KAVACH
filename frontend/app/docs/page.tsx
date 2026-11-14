@@ -28,6 +28,7 @@ import {
   GitBranch,
 } from 'lucide-react';
 import { KavachHeader } from '@/components/navigation/SecuLayerHeader';
+import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
 
 interface DocSectionContent {
   category: string;
@@ -59,6 +60,9 @@ const DOC_SECTIONS = [
     title: 'Security Engines',
     items: [
       { id: 'sast-secrets', title: 'SAST & Secret Detection' },
+      { id: 'api-security', title: 'API Security' },
+      { id: 'dependency-security', title: 'Dependency Security' },
+      { id: 'iac-security', title: 'Infrastructure as Code' },
       { id: 'container-sbom', title: 'Containers & CycloneDX SBOM' },
       { id: 'cloud-cspm', title: 'Cloud Misconfiguration & IaC' },
       { id: 'runtime-ebpf', title: 'eBPF Behavioral Runtime' },
@@ -94,9 +98,9 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
     principle: 'LLM proposes. Deterministic security systems decide. Runtime evidence proves.',
     items: [
       {
-        heading: '1. Launch the End-to-End Onboarding Wizard',
-        text: 'Set up your real multi-tenant organization, workspace, git repository connection, and deployment target. All onboarding settings are persisted in PostgreSQL with immutable cryptographic audit logging.',
-        link: { label: 'Launch Onboarding Wizard →', href: '/onboarding/organization' },
+        heading: '1. Create a project and connect a repository',
+        text: 'Create a project, link a GitHub repository from Integrations, then choose the security scans you want to run. The project keeps its repository, scan history, findings, and review actions together.',
+        link: { label: 'Open code security →', href: '/code' },
       },
       {
         heading: '2. Install the Antigravity CLI (agy)',
@@ -202,6 +206,36 @@ const DOC_DETAILS: Record<string, DocSectionContent> = {
         heading: 'Deterministic Remediation Workflow',
         text: 'When a security finding is detected, Kavach generates an exact unified diff. The code must undergo automated re-scanning and pass cleanly before status updates to FIXED.',
       },
+    ],
+  },
+  'api-security': {
+    category: 'Security Engines',
+    title: 'API Security Review',
+    subtitle: 'Review API routes, identity checks, object access, and sensitive response fields as one traceable workflow.',
+    items: [
+      { heading: '1. Map routes and request inputs', text: 'Inventory the route, HTTP method, parameters, request body, and the handler that consumes each input. Start with the affected endpoint and its direct code path.' },
+      { heading: '2. Check identity and object authorization', text: 'Verify authentication, tenant boundaries, and object ownership checks before a handler reads or changes a record. Record the route and authorization evidence with the finding.' },
+      { heading: '3. Review the proposed fix', text: 'Keep the suggested change scoped to the affected route. Re-run the relevant checks and require a human review before creating or merging a pull request.', link: { label: 'Open API security →', href: '/products/api-security' } },
+    ],
+  },
+  'dependency-security': {
+    category: 'Security Engines',
+    title: 'Dependency Security',
+    subtitle: 'Follow a vulnerable package through direct and transitive dependencies, then review an update before it lands.',
+    items: [
+      { heading: '1. Read manifests and lockfiles', text: 'Use the repository’s package manifest and lockfile to identify resolved package versions and the paths that bring them into the application.' },
+      { heading: '2. Connect advisories to the dependency path', text: 'Show the affected package, advisory, severity, and whether the dependency is direct or transitive. Confirm exploitability and reachability in the application context.' },
+      { heading: '3. Compare and review an update', text: 'Choose a candidate version, inspect compatibility and lockfile changes, then run checks before a reviewer approves the update.', link: { label: 'Open supply chain security →', href: '/products/supply-chain' } },
+    ],
+  },
+  'iac-security': {
+    category: 'Security Engines',
+    title: 'Infrastructure as Code Security',
+    subtitle: 'Trace a risky infrastructure setting from its source file to the policy result and reviewed configuration change.',
+    items: [
+      { heading: '1. Identify the resource and setting', text: 'Locate the Terraform, Kubernetes, or other supported configuration resource and show the exact setting that creates exposure.' },
+      { heading: '2. Evaluate the policy and impact', text: 'Explain the failed policy, affected resource, and relevant environment context. Confirm the expected behavior before changing infrastructure.' },
+      { heading: '3. Apply and re-evaluate a proposed change', text: 'Review a minimal configuration diff, evaluate the updated resource against policy, and route the change for human approval.', link: { label: 'Open IaC security →', href: '/products/iac-security' } },
     ],
   },
   'container-sbom': {
@@ -479,7 +513,7 @@ export default function DocsPage() {
       <div style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', padding: '36px 24px' }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', backgroundColor: '#EFF6FF', borderRadius: '16px', color: '#2563EB', fontSize: '12px', fontWeight: 600, marginBottom: '10px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', backgroundColor: '#F5F1E8', borderRadius: '16px', color: '#3F3A33', fontSize: '12px', fontWeight: 600, marginBottom: '10px' }}>
               <Sparkles size={13} />
               <span>Kavach 2026 Developer Documentation</span>
             </div>
@@ -538,8 +572,8 @@ export default function DocsPage() {
                         borderRadius: '6px',
                         fontSize: '13px',
                         fontWeight: isActive ? 600 : 400,
-                        backgroundColor: isActive ? '#EFF6FF' : 'transparent',
-                        color: isActive ? '#2563EB' : '#475569',
+                        backgroundColor: isActive ? '#F5F1E8' : 'transparent',
+                        color: isActive ? '#3F3A33' : '#475569',
                         border: 'none',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
@@ -564,18 +598,18 @@ export default function DocsPage() {
               Write deterministic OPA Rego security contracts for your CI/CD delivery pipelines.
             </p>
             <Link
-              href="/onboarding/organization"
+              href="/code"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
                 fontSize: '12px',
                 fontWeight: 600,
-                color: '#2563EB',
+                color: '#3F3A33',
                 textDecoration: 'none',
               }}
             >
-              <span>Start Onboarding</span>
+              <span>Read the quickstart</span>
               <ArrowRight size={12} />
             </Link>
           </div>
@@ -588,7 +622,7 @@ export default function DocsPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748B', marginBottom: '8px' }}>
               <span>{activeContent.category}</span>
               <span>/</span>
-              <span style={{ color: '#2563EB', fontWeight: 600 }}>{activeContent.title}</span>
+              <span style={{ color: '#3F3A33', fontWeight: 600 }}>{activeContent.title}</span>
             </div>
 
             <h2 style={{ fontSize: '28px', fontWeight: 800, margin: '0 0 10px', color: '#0F172A', letterSpacing: '-0.02em' }}>
@@ -601,9 +635,9 @@ export default function DocsPage() {
 
             {/* Principle Alert Box if present */}
             {activeContent.principle && (
-              <div style={{ padding: '16px 20px', borderRadius: '8px', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF', fontSize: '14px', lineHeight: 1.5, marginBottom: '28px' }}>
+              <div style={{ padding: '16px 20px', borderRadius: '8px', backgroundColor: '#F5F1E8', border: '1px solid #D8D1C3', color: '#3F3A33', fontSize: '14px', lineHeight: 1.5, marginBottom: '28px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '4px' }}>
-                  <Shield size={16} color="#2563EB" />
+                  <Shield size={16} color="#3F3A33" />
                   <span>Architectural Principle</span>
                 </div>
                 <div>{activeContent.principle}</div>
@@ -646,7 +680,7 @@ export default function DocsPage() {
                           alignItems: 'center',
                           gap: '6px',
                           padding: '8px 16px',
-                          backgroundColor: '#2563EB',
+                          backgroundColor: '#3F3A33',
                           color: '#FFFFFF',
                           borderRadius: '6px',
                           fontSize: '13px',
@@ -669,7 +703,7 @@ export default function DocsPage() {
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <Link
-                  href="/onboarding/organization"
+                  href="/integrations"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -684,7 +718,7 @@ export default function DocsPage() {
                     textDecoration: 'none',
                   }}
                 >
-                  <span>Open Onboarding</span>
+                  <span>Open integrations</span>
                 </Link>
                 <Link
                   href="/platform"
@@ -693,7 +727,7 @@ export default function DocsPage() {
                     alignItems: 'center',
                     gap: '6px',
                     padding: '8px 16px',
-                    backgroundColor: '#2563EB',
+                    backgroundColor: '#3F3A33',
                     borderRadius: '6px',
                     fontSize: '13px',
                     fontWeight: 600,
@@ -709,6 +743,7 @@ export default function DocsPage() {
           </div>
         </main>
       </div>
+      <EnterpriseFooter />
     </div>
   );
 }

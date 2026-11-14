@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
+import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
 
 interface ResourceItem {
   id: string;
@@ -117,7 +118,7 @@ export default function ResourcesPage() {
       {/* Header Banner */}
       <section style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', padding: '56px 24px', textAlign: 'center' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', backgroundColor: '#EFF6FF', borderRadius: '16px', color: '#2563EB', fontSize: '12px', fontWeight: 600, marginBottom: '14px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', backgroundColor: '#F5F1E8', borderRadius: '16px', color: '#3F3A33', fontSize: '12px', fontWeight: 600, marginBottom: '14px' }}>
             <Sparkles size={14} />
             <span>Kavach Knowledge & Research Center</span>
           </div>
@@ -174,7 +175,7 @@ export default function ResourcesPage() {
                   borderRadius: '20px',
                   fontSize: '13px',
                   fontWeight: isActive ? 600 : 500,
-                  backgroundColor: isActive ? '#2563EB' : '#F1F5F9',
+                  backgroundColor: isActive ? '#3F3A33' : '#F1F5F9',
                   color: isActive ? '#FFFFFF' : '#475569',
                   border: 'none',
                   cursor: 'pointer',
@@ -204,11 +205,11 @@ export default function ResourcesPage() {
                 boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                 transition: 'transform 0.15s ease, box-shadow 0.15s ease',
               }}
-              className="hover:border-blue-400"
+              className="hover:border-stone-400"
             >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', backgroundColor: '#EFF6FF', color: '#2563EB', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', backgroundColor: '#F5F1E8', color: '#3F3A33', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     {item.badge}
                   </span>
                   <span style={{ fontSize: '12px', color: '#94A3B8' }}>{item.readTime}</span>
@@ -232,7 +233,7 @@ export default function ResourcesPage() {
                     gap: '4px',
                     fontSize: '13px',
                     fontWeight: 600,
-                    color: '#2563EB',
+                    color: '#3F3A33',
                     textDecoration: 'none',
                   }}
                 >
@@ -244,6 +245,7 @@ export default function ResourcesPage() {
           ))}
         </div>
       </section>
+      <EnterpriseFooter />
     </div>
   );
 }

@@ -15,6 +15,7 @@ class GitHubStatusResponse(BaseModel):
     message: Optional[str] = None
     installations_count: int = 0
     connected_repos_count: int = 0
+    installation_ids: List[int] = Field(default_factory=list)
 
 
 class GitHubRepositoryResponse(BaseModel):

@@ -35,7 +35,7 @@ import { useScope } from '@/context/ScopeContext';
 import { api } from '@/lib/api/client';
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher';
 import { KavachLogo } from '@/components/common/KavachLogo';
-import { ConnectGithubModal } from '@/components/assistant/ConnectGithubModal';
+import { ProjectGitHubConnectModal } from '@/components/repositories/ProjectGitHubConnectModal';
 import { EmptyState, SkeletonCard } from '@/components/ui';
 import type { ProjectInWorkspaceItem, RepositoryInWorkspaceItem } from '@/types/api/workspaces';
 
@@ -51,7 +51,7 @@ export default function WorkspaceProjectsAndRepositoriesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const { currentWorkspace, setCurrentProject } = useScope();
+  const { currentWorkspace, currentProject, setCurrentProject } = useScope();
 
   const [activeTab, setActiveTab] = useState<'projects' | 'repositories'>(
     tabParam === 'repositories' ? 'repositories' : 'projects'
@@ -66,14 +66,14 @@ export default function WorkspaceProjectsAndRepositoriesPage() {
   // Modals
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showConnectGithubModal, setShowConnectGithubModal] = useState(false);
+  const [connectProject, setConnectProject] = useState<{ id: string; name: string } | null>(null);
+  const [githubInstallationId, setGithubInstallationId] = useState<number | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedRepoToAssign, setSelectedRepoToAssign] = useState<RepositoryInWorkspaceItem | null>(null);
   const [targetProjectId, setTargetProjectId] = useState<string>('');
 
   // Create Project State
   const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDesc, setNewProjectDesc] = useState('');
-  const [newProjectLang, setNewProjectLang] = useState('TypeScript');
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [createProjectError, setCreateProjectError] = useState<string | null>(null);
 
@@ -102,6 +102,18 @@ export default function WorkspaceProjectsAndRepositoriesPage() {
     loadWorkspaceData();
   }, [loadWorkspaceData]);
 
+  useEffect(() => {
+    const linkedProjectId = searchParams.get('githubProject');
+    const installationId = Number(searchParams.get('installationId'));
+    if (!linkedProjectId || !Number.isFinite(installationId) || installationId <= 0) return;
+    const project = projects.find((item) => item.id === linkedProjectId);
+    if (!project) return;
+    setConnectProject({ id: project.id, name: project.name });
+    setGithubInstallationId(installationId);
+    setShowConnectGithubModal(true);
+    router.replace('/projects');
+  }, [projects, router, searchParams]);
+
   // Handle Project Creation
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,15 +125,14 @@ export default function WorkspaceProjectsAndRepositoriesPage() {
     try {
       const created = await api.workspaces.createProject(currentWorkspace.id, {
         name: newProjectName.trim(),
-        description: newProjectDesc.trim() || undefined,
-        primary_language: newProjectLang,
-        environment: 'development',
       });
 
+      setConnectProject({ id: created.id, name: created.name || newProjectName.trim() });
+      setGithubInstallationId(null);
       setNewProjectName('');
-      setNewProjectDesc('');
       setShowCreateProjectModal(false);
-      loadWorkspaceData();
+      setShowConnectGithubModal(true);
+      void loadWorkspaceData();
     } catch (err: any) {
       setCreateProjectError(err?.message || 'Failed to create project');
     } finally {
@@ -365,8 +376,18 @@ export default function WorkspaceProjectsAndRepositoriesPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {activeTab === 'repositories' ? (
-              <button
-                onClick={() => setShowConnectGithubModal(true)}
+                <button
+                onClick={() => {
+                  const project = currentProject ? projects.find((item) => item.id === currentProject.id) : projects[0];
+                  if (project) {
+                    setConnectProject({ id: project.id, name: project.name });
+                    setGithubInstallationId(null);
+                    setShowConnectGithubModal(true);
+                  } else {
+                    setActiveTab('projects');
+                    setShowCreateProjectModal(true);
+                  }
+                }}
                 style={{
                   padding: '9px 18px',
                   borderRadius: 8,
@@ -580,6 +601,9 @@ export default function WorkspaceProjectsAndRepositoriesPage() {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                      <button type="button" onClick={() => { setConnectProject({ id: p.id, name: p.name }); setGithubInstallationId(null); setShowConnectGithubModal(true); }} style={{ padding: '7px 10px', border: '1px solid #cbd5e1', borderRadius: 7, background: '#fff', color: '#334155', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                        {p.repository_count ? 'Add repository' : 'Connect repository'}
+                      </button>
                       <span style={{ fontSize: 12, color: '#94A3B8' }}>
                         {p.last_activity}
                       </span>
@@ -878,51 +902,6 @@ export default function WorkspaceProjectsAndRepositoriesPage() {
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#1E293B', marginBottom: 6 }}>
-                  Description <span style={{ color: '#94A3B8', fontWeight: 400 }}>(optional)</span>
-                </label>
-                <textarea
-                  value={newProjectDesc}
-                  onChange={(e) => setNewProjectDesc(e.target.value)}
-                  placeholder="e.g. Core microservices and cloud infrastructure"
-                  rows={2}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: 8,
-                    border: '1px solid #CBD5E1',
-                    fontSize: 13,
-                    boxSizing: 'border-box',
-                    fontFamily: 'inherit',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#1E293B', marginBottom: 6 }}>
-                  Primary Language
-                </label>
-                <select
-                  value={newProjectLang}
-                  onChange={(e) => setNewProjectLang(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: 8,
-                    border: '1px solid #CBD5E1',
-                    fontSize: 13,
-                    backgroundColor: '#FFFFFF',
-                  }}
-                >
-                  <option value="TypeScript">TypeScript / Node.js</option>
-                  <option value="Python">Python</option>
-                  <option value="Go">Go</option>
-                  <option value="Java">Java</option>
-                  <option value="Rust">Rust</option>
-                </select>
-              </div>
-
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
                 <button
                   type="button"
@@ -1039,9 +1018,12 @@ export default function WorkspaceProjectsAndRepositoriesPage() {
       )}
 
       {/* Connect GitHub Modal */}
-      <ConnectGithubModal
+      <ProjectGitHubConnectModal
         isOpen={showConnectGithubModal}
-        onClose={() => setShowConnectGithubModal(false)}
+        projectId={connectProject?.id || null}
+        projectName={connectProject?.name || ''}
+        installationId={githubInstallationId}
+        onClose={() => { setShowConnectGithubModal(false); setGithubInstallationId(null); }}
         onConnected={() => loadWorkspaceData()}
       />
     </div>

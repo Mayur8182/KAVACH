@@ -3,6 +3,8 @@
  * Persists session token upon authentication and clears upon logout.
  */
 
+import { apiCache } from '@/lib/api/cache';
+
 const STORAGE_KEY = 'seculayer_auth_token';
 
 let inMemoryToken: string | null = null;
@@ -51,6 +53,7 @@ export function getAuthToken(): string | null {
 
 export function setAuthToken(token: string): void {
   inMemoryToken = token;
+  apiCache.setToken(token);
   if (typeof window !== 'undefined') {
     try {
       sessionStorage.setItem(STORAGE_KEY, token);
@@ -65,10 +68,29 @@ export function setAuthToken(token: string): void {
 
 export function clearAuthToken(): void {
   inMemoryToken = null;
+  apiCache.clear();
+  apiCache.setToken(null);
   if (typeof window !== 'undefined') {
     try {
       sessionStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('secu_active_workspace_id');
+      localStorage.removeItem('secu_active_project_id');
+      localStorage.removeItem('secu_active_repo');
+      sessionStorage.removeItem('secu_active_workspace_id');
+      sessionStorage.removeItem('secu_active_project_id');
+      sessionStorage.removeItem('secu_active_repo');
+
+      // Also clean up any lingering tenant-scoped keys in localStorage
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('secu_') || key.startsWith('kavach_'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+
       const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
       document.cookie = `${STORAGE_KEY}=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
     } catch {

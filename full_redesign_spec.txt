@@ -1,0 +1,1121 @@
+<USER_REQUEST>
+# KAVACH API SECURITY — COMPLETE UI/UX REDESIGN & IMPLEMENTATION
+
+## PROJECT OBJECTIVE
+
+Redesign the entire existing Kavach API Security module using the supplied visual references as the primary design direction.
+
+The goal is to transform the existing generic cybersecurity dashboard into a premium, modern, YC-backed startup-style enterprise security product.
+
+This is NOT a simple theme update.
+
+Redesign the complete information architecture, navigation experience, page compositions, visual hierarchy, components, spacing, typography, interaction patterns, and responsive layouts.
+
+Every page must look like part of the same product, but each page must have its own purpose-built layout.
+
+**Core design principle: SAME DESIGN SYSTEM, DIFFERENT PAGE COMPOSITIONS.**
+
+---
+
+# 1. DESIGN DIRECTION
+
+Use the supplied reference images as the visual source of truth.
+
+### Visual language
+
+- Premium YC startup aesthetic.
+- Minimalist, editorial, developer-focused design.
+- Swiss-inspired typography and spacing.
+- Clean enterprise security interface.
+- Warm white / off-white backgrounds.
+- Charcoal and near-black typography.
+- Subtle neutral borders.
+- Minimal shadows.
+- Precise alignment and spacing.
+- Clear information hierarchy.
+- Compact but readable technical data.
+- Functional, sophisticated interactions.
+
+### Color system
+
+Do NOT use blue as the primary interface color.
+
+Use this color system:
+
+- Primary background: warm off-white (#F8F7F4).
+- Surface: white (#FFFFFF).
+- Primary text: charcoal (#171717).
+- Secondary text: muted gray (#737373).
+- Borders: light neutral gray (#E7E5E0).
+- Primary actions: near-black (#171717).
+- Success: muted green.
+- Critical: restrained red.
+- High: muted orange.
+- Medium: muted amber.
+- Low: neutral gray.
+
+Use severity colors only when communicating actual security severity.
+
+Avoid colorful decoration.
+
+### Strictly prohibited
+
+- Generic AI SaaS dashboard templates.
+- Blue gradient dashboards.
+- Purple or blue glowing backgrounds.
+- Excessive rounded cards.
+- Four identical KPI cards on every page.
+- Huge empty hero sections.
+- Repeated horizontal workflow steppers.
+- Everything inside one giant container.
+- Horizontal scrolling to fit page content.
+- Decorative graphs without actual data.
+- Fake statistics and placeholder findings.
+- Unnecessary illustrations.
+- Excessive animations.
+- Floating cards everywhere.
+
+---
+
+# 2. GLOBAL NAVIGATION REDESIGN
+
+Remove the permanent vertical left sidebar from the API Security module.
+
+Replace it with a unified command-based navigation system.
+
+### Global top navigation
+
+Build a compact header containing:
+
+1. Kavach logo.
+2. API Security product label.
+3. Global command/search field.
+4. Keyboard shortcut indicator (Ctrl + K).
+5. Notifications.
+6. User profile and account menu.
+
+Example:
+
+Kavach / API Security
+
+[ Search or run a command... Ctrl K ]
+
+[Notifications] [Profile]
+
+### Command palette
+
+When the user clicks the search field or presses Ctrl + K, open a searchable command palette.
+
+It must provide navigation to:
+
+- API Inventory
+- Security Analysis
+- Findings
+- Attack Paths
+- Remediation
+- Reports & Compliance
+- AI Security Analyst
+- Policies
+- Settings
+
+The command palette should support:
+
+- Search by page name.
+- Search by endpoint.
+- Search by vulnerability.
+- Search by repository.
+- Search by CWE/CVE identifier.
+- Recent pages.
+- Keyboard navigation.
+- Enter to open selected result.
+- Escape to close.
+
+Do not permanently display the vertical navigation.
+
+### Repository context
+
+Display the active repository and environment context where relevant:
+
+- Repository name.
+- Branch.
+- Connection status.
+- Environment.
+- Discovered endpoint count.
+
+Keep this context compact.
+
+### Navigation behavior
+
+Use breadcrumbs for page hierarchy.
+
+Use contextual tabs only when required by the current page.
+
+Do not force all pages to use the same horizontal navigation structure.
+
+---
+
+# 3. GLOBAL DESIGN SYSTEM
+
+Create reusable design primitives.
+
+### Typography
+
+Use a modern font such as Inter or Geist.
+
+Establish a consistent scale:
+
+- Page title: 28–36px.
+- Section heading: 18–22px.
+- Subheading: 14–16px.
+- Body: 13–14px.
+- Metadata: 11–12px.
+- Technical identifiers: monospace.
+
+Use strong typography rather than excessive borders and colors.
+
+### Components
+
+Build reusable components:
+
+- GlobalHeader
+- CommandPalette
+- RepositorySelector
+- EnvironmentSelector
+- Breadcrumbs
+- PageHeader
+- DataTable
+- FilterBar
+- SearchInput
+- SeverityIndicator
+- StatusIndicator
+- EmptyState
+- LoadingState
+- ErrorState
+- ConfirmationDialog
+- SideDrawer
+- DetailPanel
+- CodeDiffViewer
+- ExecutionLog
+- EvidenceViewer
+- Pagination
+- ToastNotifications
+
+Use consistent component behavior throughout the module.
+
+Do not make every component a separate large card.
+
+Use whitespace, typography, dividers and alignment to create structure.
+
+---
+
+# 4. PAGE-BY-PAGE REDESIGN
+
+IMPORTANT: Every page needs its own layout composition.
+
+Do not duplicate the same dashboard structure across all pages.
+
+## PAGE 01 — API INVENTORY
+
+### Purpose
+Discover, catalog and manage APIs and endpoints.
+
+### Layout: API Explorer
+
+Build an endpoint-focused workspace.
+
+Top section:
+- API Inventory title.
+- Repository context.
+- Scan APIs action.
+- Import OpenAPI action.
+- Connect Source action.
+
+Summary:
+Present endpoint information as compact inline statistics rather than four large cards.
+
+Include:
+- Total APIs and services.
+- Total endpoints.
+- Public endpoints.
+- Protected endpoints.
+- High/critical exposure.
+- Protocol coverage.
+
+Main content:
+
+Build a structured API endpoint explorer.
+
+Table columns:
+- HTTP Method.
+- Route Path.
+- Service.
+- Protocol.
+- Authentication.
+- Risk Level.
+- Findings.
+- Source Location.
+- Last Scanned.
+- Actions.
+
+Filters:
+- REST.
+- GraphQL.
+- WebSockets.
+- gRPC.
+- SOAP/XML.
+- Risk level.
+- Authentication state.
+- Service.
+- HTTP method.
+
+Add:
+- Search by route.
+- Group by service.
+- Group by protocol.
+- Expandable endpoint details.
+- Endpoint source-code location.
+- Pagination.
+
+Endpoint detail view:
+
+When a route is selected, open a contextual detail panel containing:
+
+- Route information.
+- HTTP method.
+- Authentication requirements.
+- Authorization boundaries.
+- Parameters.
+- Request schema.
+- Response schema.
+- Related findings.
+- Related attack paths.
+- Source-code location.
+- Scan history.
+
+Do not put the complete endpoint detail inside the inventory table.
+
+---
+
+## PAGE 02 — SECURITY ANALYSIS
+
+### Purpose
+Configure and execute deterministic API security tests.
+
+### Layout: Analysis Configuration Workspace
+
+This page must look like a professional security testing environment, not a normal analytics dashboard.
+
+Top:
+- Security Analysis title.
+- Active repository.
+- Environment selector.
+- Run Security Analysis action.
+
+Use contextual tabs:
+- Configuration.
+- Scope.
+- Advanced.
+- Execution History.
+
+Main layout:
+
+LEFT / MAIN WORKSPACE:
+
+A. Target Repository
+- Repository selector.
+- Branch selector.
+- Repository connection status.
+
+B. Environment Target
+- Development.
+- Staging.
+- Production.
+- Custom environment.
+
+C. Target Scope
+- All Endpoints.
+- High-Risk Endpoints.
+- Selected Endpoints.
+- Specific Services.
+
+D. Security Test Categories
+
+Support:
+
+- Broken Authentication.
+- Broken Object Level Authorization (BOLA).
+- Broken Function Level Authorization.
+- Broken Object Property Level Authorization.
+- Unrestricted Resource Consumption.
+- Security Misconfiguration.
+- Server-Side Request Forgery.
+- Injection.
+- Improper Inventory Management.
+- Unsafe Consumption of APIs.
+- Business Logic Abuse.
+- Sensitive Data Exposure.
+- CORS Misconfiguration.
+- WebSocket Security.
+- GraphQL Security.
+- Cryptography and Secrets.
+- Logging and Monitoring.
+
+Each category must include:
+- Checkbox.
+- Name.
+- OWASP/CWE identifier.
+- Short explanation.
+- Selected state.
+- Configuration details.
+
+RIGHT / EXECUTION PANEL:
+
+Pre-flight diagnostics:
+- Repository readiness.
+- Endpoint availability.
+- Authentication readiness.
+- Test runner status.
+- Network requirements.
+
+Execution configuration:
+- Worker concurrency.
+- Rate limits.
+- Request timeout.
+- Retry settings.
+- Safe testing mode.
+
+Execution summary:
+- Selected test categories.
+- Target endpoints.
+- Execution mode.
+- Estimated duration.
+
+Bottom action:
+Run Security Analysis.
+
+Execution state must show actual backend progress and logs.
+
+Never show fabricated progress.
+
+---
+
+## PAGE 03 — FINDINGS
+
+### Purpose
+Provide the authoritative vulnerability ledger.
+
+### Layout: Security Findings Ledger
+
+Do not use a traditional four-card KPI dashboard.
+
+Top:
+- API Vulnerability Findings.
+- Repository context.
+- Export JSON/CSV action.
+- Refresh action.
+
+Summary:
+Use compact inline severity statistics:
+
+- Total findings.
+- Critical.
+- High.
+- Medium.
+- Low.
+- Resolved.
+- Accepted risk.
+
+Main section:
+
+Build a professional vulnerability table.
+
+Columns:
+- Severity.
+- Finding ID.
+- Vulnerability Title.
+- CWE/CVE.
+- OWASP Category.
+- Affected Endpoint.
+- Source Location.
+- Status.
+- Last Detected.
+- Action.
+
+Filters:
+- Severity.
+- Category.
+- Status.
+- Endpoint.
+- Repository.
+- CWE/CVE.
+- Date discovered.
+
+Finding details:
+
+Opening a finding should display a dedicated detailed inspection view.
+
+Sections:
+
+1. Finding Overview.
+2. Technical Description.
+3. Root Cause Analysis.
+4. Affected Endpoints.
+5. Evidence.
+6. HTTP Request.
+7. HTTP Response.
+8. Source Code.
+9. Attack Scenario.
+10. Business Impact.
+11. Remediation Recommendation.
+12. Verification Status.
+
+Include a clear action to inspect the related attack path.
+
+Finding details must preserve real scanner evidence.
+
+---
+
+## PAGE 04 — ATTACK PATHS
+
+### Purpose
+Correlate vulnerabilities into realistic exploitation chains.
+
+### Layout: Attack Path Investigation Workspace
+
+This page must be visually different from Inventory and Findings.
+
+The main focus should be attack-path visualization.
+
+Top:
+- Attack Paths title.
+- Repository context.
+- Re-correlate action.
+- Last analysis status.
+
+Summary:
+- Total attack paths.
+- Critical exploit chains.
+- High-severity paths.
+- Correlation status.
+
+Main workspace:
+
+A. Attack Path Graph
+
+Use a proper node-edge visualization.
+
+Show:
+- Entry point.
+- Vulnerable endpoint.
+- Authentication weakness.
+- Authorization weakness.
+- Data access.
+- Privilege escalation.
+- Final impact.
+
+Each node must be selectable.
+
+Connections must represent actual relationships.
+
+B. Attack Path Details
+
+Display:
+- Attack Path ID.
+- Severity.
+- Likelihood.
+- Confidence.
+- Affected endpoints.
+- Linked findings.
+- Attack prerequisites.
+- Exploitation sequence.
+- Business impact.
+
+C. Exploit Chain Timeline
+
+Display sequential attack steps with:
+- Step number.
+- Vulnerability.
+- Endpoint.
+- Evidence.
+- Transition to next step.
+
+D. Investigation Panel
+
+Include:
+- Related findings.
+- Source-code locations.
+- Evidence references.
+- Recommended security controls.
+
+Do not represent unrelated findings as a connected attack chain.
+
+Do not fabricate attack paths.
+
+---
+
+## PAGE 05 — REMEDIATION
+
+### Purpose
+Generate, review, apply and verify security fixes.
+
+### Layout: Developer Remediation Workspace
+
+This must look like a developer code review environment.
+
+Top:
+- Remediation title.
+- Repository.
+- Branch.
+- GitHub integration.
+- Refresh status.
+
+Use compact remediation statistics:
+- Fixes available.
+- Pending remediation.
+- Applied patches.
+- Verified fixes.
+- Failed verification.
+
+Main section:
+
+A. Remediation Queue
+
+Display vulnerability items with:
+- Severity.
+- Finding ID.
+- Vulnerability name.
+- Affected route.
+- File location.
+- Patch status.
+
+B. Root Cause Analysis
+
+For the selected finding show:
+- Root cause.
+- Vulnerable code location.
+- Why the issue exists.
+- Security impact.
+
+C. Code Diff Viewer
+
+Use a professional Git diff layout.
+
+Show:
+- Original code.
+- Proposed code.
+- Added lines.
+- Removed lines.
+- File path.
+- Line numbers.
+
+Use clear red/green diff indicators.
+
+D. Fix Actions
+
+- Generate Patch.
+- Review Patch.
+- Apply Patch to Codebase.
+- Create GitHub Pull Request.
+- Reject Patch.
+
+E. Verification
+
+After a patch is applied:
+- Run targeted security tests.
+- Re-scan affected endpoint.
+- Verify vulnerability resolution.
+- Check regressions.
+- Record verification evidence.
+
+F. Remediation History
+
+Show:
+- Previous patches.
+- Applied changes.
+- Failed attempts.
+- Verification history.
+- Pull request status.
+
+CRITICAL:
+
+Generating a patch must not automatically mean that it has been applied.
+
+Applying a patch must not automatically mean that the vulnerability is fixed.
+
+Only mark a finding verified after successful security validation.
+
+---
+
+## PAGE 06 — REPORTS & COMPLIANCE
+
+### Purpose
+Generate security reports, maintain evidence and manage integrations.
+
+### Layout: Report Builder Workspace
+
+This page should look like a professional document/report creation environment.
+
+Top:
+- Reports & Compliance.
+- Generate Report.
+- Export History.
+
+Main layout:
+
+LEFT: Report Configuration
+
+Report scope:
+- Entire repository.
+- Selected services.
+- Selected endpoints.
+- Selected findings.
+- Specific attack paths.
+
+Report types:
+- Executive Security Report.
+- Technical Vulnerability Report.
+- API Security Assessment.
+- OWASP API Top 10 Report.
+- Remediation Report.
+- Compliance Evidence Report.
+
+Export formats:
+- PDF.
+- JSON.
+- CSV.
+- HTML.
+
+Included sections:
+- Executive Summary.
+- Scope.
+- Methodology.
+- Findings.
+- Attack Paths.
+- Technical Evidence.
+- Remediation.
+- Verification.
+- Compliance Mapping.
+
+RIGHT: Integrations
+
+- GitHub.
+- GitLab.
+- Jenkins.
+- Slack.
+- Jira.
+- Webhooks.
+
+Show:
+- Connected status.
+- Configuration status.
+- Last synchronization.
+- Permissions.
+- Configure / Disconnect actions.
+
+BOTTOM:
+
+Report preview.
+
+Generated report history:
+- Report name.
+- Created date.
+- Scope.
+- Format.
+- Status.
+- Download action.
+
+Evidence integrity:
+- SHA-256 hash.
+- Timestamp.
+- Evidence validation.
+- Report integrity status.
+
+---
+
+## PAGE 07 — AI SECURITY ANALYST
+
+### Purpose
+Provide an operational AI assistant for API security investigations.
+
+### Layout: Developer Security Copilot
+
+Use a dedicated conversational workspace.
+
+Main area:
+- Conversation history.
+- Prompt input.
+- Repository context.
+- Investigation results.
+- Evidence references.
+
+Suggested actions:
+- Explain a vulnerability.
+- Investigate an endpoint.
+- Trace an attack path.
+- Explain root cause.
+- Recommend remediation.
+- Review a patch.
+- Summarize security posture.
+
+Right contextual panel:
+- Current repository.
+- Active finding.
+- Related endpoints.
+- Related attack paths.
+- Evidence.
+
+The AI must use actual backend data and available tools.
+
+Do not create fake chat responses or pretend that an action has executed.
+
+For execution actions, display:
+- Tool name.
+- Execution status.
+- Logs.
+- Results.
+- Errors.
+- Evidence.
+
+Require confirmation before sensitive destructive actions.
+
+---
+
+## PAGE 08 — POLICIES
+
+### Layout: Security Policy Workspace
+
+Include:
+
+- API security policies.
+- Authentication policies.
+- Authorization policies.
+- Rate-limiting rules.
+- Sensitive data policies.
+- API exposure policies.
+- Environment-specific policies.
+- OWASP compliance policies.
+
+Provide:
+- Policy creation.
+- Policy editing.
+- Enable/disable.
+- Scope assignment.
+- Version history.
+- Policy testing.
+- Violation history.
+
+---
+
+## PAGE 09 — SETTINGS
+
+### Layout: Product Configuration Workspace
+
+Sections:
+
+- Repository Connections.
+- API Discovery Settings.
+- Scan Configuration.
+- Execution Runners.
+- Authentication Configuration.
+- Environment Management.
+- Notification Preferences.
+- Team and Access Control.
+- Audit Logs.
+- Integration Management.
+
+Keep each settings section purpose-built.
+
+---
+
+# 5. PAGE LAYOUT DIFFERENTIATION
+
+This is one of the most important requirements.
+
+Do not reuse the same page skeleton for all pages.
+
+Use the following composition rules:
+
+| Page | Unique composition |
+|---|---|
+| API Inventory | Explorer + endpoint table + detail drawer |
+| Security Analysis | Configuration workspace + execution rail |
+| Findings | Full-width vulnerability ledger + investigation detail |
+| Attack Paths | Interactive graph + exploit-chain investigation |
+| Remediation | Code editor + diff + verification |
+| Reports | Report builder + integration workspace |
+| AI Analyst | Conversational workspace + evidence context |
+| Policies | Policy list + configuration editor |
+| Settings | Section navigation + configuration forms |
+
+Keep the global header and design language consistent.
+
+Change the content composition according to the job being performed.
+
+---
+
+# 6. INTERACTION AND MOTION DESIGN
+
+Use subtle, purposeful motion.
+
+Required interactions:
+
+- Command palette opens with Ctrl + K.
+- Smooth navigation between modules.
+- Subtle hover states.
+- Expandable endpoint rows.
+- Slide-in detail panels.
+- Animated node selection in attack graphs.
+- Real execution log streaming.
+- Code diff highlighting.
+- Toast notifications.
+- Loading skeletons.
+- Progress indicators tied to backend events.
+- Clear empty, loading, success and failure states.
+
+Animations should be fast and restrained.
+
+Do not use unnecessary bouncing, glowing or continuous decorative animation.
+
+Respect reduced-motion preferences.
+
+---
+
+# 7. RESPONSIVE DESIGN
+
+The complete API Security module must work on:
+
+- Desktop.
+- Laptop.
+- Tablet.
+- Mobile.
+
+Desktop:
+Use the full workspace and contextual panels.
+
+Tablet:
+Reflow multi-column layouts and allow detail panels to become overlays.
+
+Mobile:
+- Compact header.
+- Search-based navigation.
+- Single-column content.
+- Horizontally scrollable tables only when genuinely necessary, with usable mobile alternatives.
+- Bottom contextual navigation where appropriate.
+- Full-screen detail drawers.
+- Touch-friendly controls.
+
+No page should have accidental horizontal overflow.
+
+---
+
+# 8. FUNCTIONAL AND BACKEND INTEGRITY
+
+IMPORTANT: This is a redesign of an existing working security product.
+
+Do not turn the application into a static prototype.
+
+Before implementation:
+
+1. Inspect the entire existing API Security frontend.
+2. Identify all routes and components.
+3. Inspect existing backend endpoints.
+4. Understand existing data models.
+5. Identify existing API integrations.
+6. Understand scanner execution workflows.
+7. Identify authentication and authorization logic.
+8. Map existing state management.
+9. Preserve existing working features.
+
+Do not remove or replace functional capabilities just to simplify the UI.
+
+All actions must connect to real backend workflows.
+
+Examples:
+
+- Scan APIs must execute real discovery.
+- Run Security Analysis must execute actual test suites.
+- Findings must load persisted scanner results.
+- Attack Paths must use real correlation results.
+- Generate Patch must produce a real proposed code diff.
+- Apply Patch must modify the intended code safely.
+- Verify Fix must execute security validation.
+- Create GitHub PR must use the actual connected integration.
+- Generate Report must produce a real report artifact.
+
+Never hardcode:
+- Vulnerability counts.
+- Scan progress.
+- Endpoint counts.
+- Repository status.
+- Patch counts.
+- Verification status.
+- Attack paths.
+
+Use actual backend responses.
+
+Preserve existing RBAC, tenant isolation, authentication and authorization.
+
+Do not expose secrets or sensitive repository data.
+
+---
+
+# 9. CODE QUALITY AND IMPLEMENTATION
+
+Use the existing project architecture and technology stack.
+
+Do not rewrite the application unnecessarily.
+
+Requirements:
+
+- Reusable components.
+- Consistent design tokens.
+- Maintainable CSS.
+- Responsive layouts.
+- Accessible controls.
+- Proper loading states.
+- Error handling.
+- Empty states.
+- Typed API responses where applicable.
+- No duplicate components.
+- No unused code.
+- No fake interactions.
+- No unnecessary dependencies.
+
+Keep business logic separate from presentation logic.
+
+Do not break existing API contracts.
+
+Do not remove backend functionality.
+
+---
+
+# 10. TESTING AND VALIDATION
+
+After implementation, verify every page.
+
+Test:
+
+1. API Inventory.
+2. Security Analysis.
+3. Findings.
+4. Attack Paths.
+5. Remediation.
+6. Reports & Compliance.
+7. AI Security Analyst.
+8. Policies.
+9. Settings.
+
+Validate:
+
+- Navigation.
+- Search and command palette.
+- Filters.
+- Sorting.
+- Pagination.
+- Endpoint selection.
+- Detail drawers.
+- Scan execution.
+- Execution logs.
+- Findings loading.
+- Attack graph interactions.
+- Patch generation.
+- Patch application.
+- Fix verification.
+- Report generation.
+- Integrations.
+- RBAC.
+- Mobile responsiveness.
+
+Run existing project tests and add focused tests for redesigned functionality where necessary.
+
+Do not delete existing test files just to make the build pass.
+
+Fix actual regressions.
+
+---
+
+# 11. IMPLEMENTATION PHASES
+
+### Phase 1 — Audit
+Inspect current architecture, routes, data and backend workflows.
+
+### Phase 2 — Design System
+Implement global tokens, typography, header, command palette and reusable components.
+
+### Phase 3 — Core Pages
+Redesign:
+- API Inventory.
+- Security Analysis.
+- Findings.
+
+### Phase 4 — Investigation
+Redesign:
+- Attack Paths.
+- Remediation.
+
+### Phase 5 — Reporting
+Redesign:
+- Reports & Compliance.
+- Integrations.
+- Evidence views.
+
+### Phase 6 — Assistant & Configuration
+Redesign:
+- AI Security Analyst.
+- Policies.
+- Settings.
+
+### Phase 7 — Responsive & QA
+Test all screens, interactions, backend actions and responsive breakpoints.
+
+---
+
+# 12. FINAL ACCEPTANCE CRITERIA
+
+The work is complete only when:
+
+- Permanent vertical sidebar is removed from the API Security workspace.
+- Global command/search navigation works.
+- All nine pages are redesigned.
+- Each page has its own distinct layout.
+- All pages share one consistent design system.
+- No blue primary theme remains.
+- No repetitive generic KPI-card dashboards remain.
+- No forced horizontal workflow strip is used.
+- No accidental horizontal page scrolling exists.
+- Existing backend functionality remains intact.
+- All security data is real and persisted.
+- All primary actions work.
+- Desktop, tablet and mobile layouts are verified.
+
+## FINAL INSTRUCTION
+
+Think like a senior product designer and frontend architect building a serious YC-backed cybersecurity startup.
+
+Do not simply beautify the existing dashboard.
+
+Reimagine how developers and security engineers interact with API security data.
+
+Make the product feel premium, focused, fast, technical, trustworthy and production-ready.
+
+The reference images define the visual language.
+
+The existing Kavach architecture defines the functionality.
+
+Preserve the functionality. Redesign the experience.
+
+**One unified Kavach design system. Nine purpose-built page layouts. Zero generic dashboard templates.**  Look this only apply in my API security platoform okan in api seucirty dashabrod only 
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-11-14T14:50:55+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\USER\Desktop\YC THING\backend\app\services\api_security_testing_engine.py (LANGUAGE_UNSPECIFIED)
+Cursor is on line: 1
+Other open documents:
+- c:\Users\USER\Desktop\YC THING\frontend\app\(platform)\api-security\page.tsx (LANGUAGE_UNSPECIFIED)
+- c:\Users\USER\Desktop\YC THING\frontend\components\security\ProductSecurityLifecycle.tsx (LANGUAGE_UNSPECIFIED)
+- c:\Users\USER\Desktop\YC THING\frontend\components\navigation\Topbar.tsx (LANGUAGE_UNSPECIFIED)
+- c:\Users\USER\Desktop\YC THING\frontend\app\(platform)\secrets\page.tsx (LANGUAGE_UNSPECIFIED)
+- c:\Users\USER\Desktop\YC THING\frontend\app\(platform)\iac\page.tsx (LANGUAGE_UNSPECIFIED)
+</ADDITIONAL_METADATA>

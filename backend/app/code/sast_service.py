@@ -226,10 +226,6 @@ class SASTService:
             pass
 
         if not allowed_ids:
-            all_proj_q = select(Project.id).limit(50)
-            all_projs = list((await self.db.execute(all_proj_q)).scalars().all())
-            if all_projs:
-                return False, all_projs
             return True, []
 
         return False, list(allowed_ids)
@@ -1201,7 +1197,7 @@ class SASTService:
             # Fallback: auto-resolve or create project for current user
             from app.models.project import Project
             user_id = getattr(self.current_user, "id", None)
-            proj_stmt = select(Project).where(Project.owner_id == user_id).limit(1) if user_id else select(Project).limit(1)
+            proj_stmt = select(Project).where(Project.owner_id == user_id).limit(1) if user_id else select(Project).where(Project.id == None)
             existing_proj = (await self.db.execute(proj_stmt)).scalars().first()
             if not existing_proj:
                 existing_proj = Project(

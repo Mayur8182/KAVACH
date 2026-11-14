@@ -26,6 +26,38 @@ class FindingService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def _check_finding_access(self, finding: Optional[SecurityFinding], current_user: Optional[User]) -> bool:
+        if not current_user or not finding:
+            return False
+        if getattr(current_user, "is_superuser", False):
+            return True
+        if not finding.project_id:
+            return False
+        from app.models.project import Project
+        from app.models.invitation import OrganizationMember
+        from sqlalchemy import and_
+        proj = await self.db.get(Project, finding.project_id)
+        if not proj:
+            return False
+        if proj.owner_id == current_user.id:
+            return True
+        if proj.organization_id:
+            try:
+                mem = await self.db.execute(
+                    select(OrganizationMember.id).where(
+                        and_(
+                            OrganizationMember.organization_id == proj.organization_id,
+                            OrganizationMember.user_id == current_user.id,
+                            OrganizationMember.is_active == True,
+                        )
+                    )
+                )
+                if mem.scalars().first():
+                    return True
+            except Exception:
+                pass
+        return False
+
     async def get_finding_detail(
         self, 
         finding_id: str, 
@@ -55,11 +87,8 @@ class FindingService:
             return None
 
         # Enforce tenant project authorization
-        if finding.project_id and current_user and not getattr(current_user, "is_superuser", False):
-            from app.models.project import Project
-            proj = await self.db.get(Project, finding.project_id)
-            if proj and proj.owner_id != current_user.id:
-                return None
+        if not await self._check_finding_access(finding, current_user):
+            return None
             
         meta = finding.raw_metadata or {}
         if isinstance(meta, str):
@@ -108,37 +137,23 @@ class FindingService:
             except Exception as e:
                 logger.debug(f"Could not extract dynamic patch for finding {finding.id}: {e}")
 
-        # Fallback to finding snippet or clean notice if source file is unreadable
-        if not original_code:
-            original_code = finding.snippet or f"# Source file '{finding.file_path or 'unspecified'}'"
-            patched_code = f"# Mitigated {finding.rule_id}\n{original_code}"
-            unified_diff = f"--- a/{finding.file_path or 'source'}\n+++ b/{finding.file_path or 'source'}\n@@ -1,1 +1,2 @@\n+{patched_code}"
-
-        primary_fix = RemediationSuggestion(
-            id=uuid.UUID("11111111-2222-3333-4444-555555555555"),
-            title=rem.get("title", f"Remediate {finding.rule_id}"),
-            description=rem.get("description", f"Remediation patch addressing {finding.title}."),
-            diff=CodeDiff(
-                original_code=original_code,
-                patched_code=patched_code,
-                unified_diff=unified_diff,
-            ),
-            is_recommended=True,
-        )
-
-        alternative_fixes = [
-            RemediationSuggestion(
-                id=uuid.UUID("22222222-3333-4444-5555-666666666666"),
-                title=f"Defensive input validation for {finding.rule_id}",
-                description="Apply strict boundary parameter verification and input sanitization.",
-                diff=CodeDiff(
-                    original_code=original_code,
-                    patched_code=patched_code,
-                    unified_diff=unified_diff,
-                ),
-                is_recommended=False,
+        # Only expose a patch when it is grounded in the stored finding metadata or
+        # generated from the actual repository source above. Never invent a diff.
+        remediation_suggestions = []
+        if original_code and patched_code and unified_diff:
+            remediation_suggestions.append(
+                RemediationSuggestion(
+                    id=uuid.uuid4(),
+                    title=rem.get("title") or f"Remediate {finding.rule_id}",
+                    description=rem.get("description") or f"Patch generated for {finding.file_path or 'the affected source file'}.",
+                    diff=CodeDiff(
+                        original_code=original_code,
+                        patched_code=patched_code,
+                        unified_diff=unified_diff,
+                    ),
+                    is_recommended=True,
+                )
             )
-        ]
 
         # Safely parse references whether they are dicts or strings
         refs = []
@@ -153,25 +168,8 @@ class FindingService:
             elif isinstance(r, str):
                 refs.append(RemediationReference(title="Reference Link", url=r))
 
-        secure_preview = (
-            "@app.route('/user', methods=['GET'])\n"
-            "def get_user():\n"
-            "    user_id = request.args.get('id')\n"
-            "    query = \"SELECT * FROM users WHERE id = %s\"\n"
-            "    cursor = db.execute(query, (user_id,))\n"
-            "    user = cursor.fetchone()\n"
-            "    if user:\n"
-            "        return jsonify(user)\n"
-            "    else:\n"
-            "        return jsonify({'error': 'User not found'}), 404"
-        )
-
-        manual_instructions = (
-            "1. Locate file: src/routes/user.py around line 42.\n"
-            "2. Ensure parameter placeholders (%s for psycopg2/PyMySQL, or ? for sqlite3) are used.\n"
-            "3. Pass untrusted input via cursor.execute(query, (user_id,)).\n"
-            "4. Never use Python f-strings or format strings to construct SQL commands."
-        )
+        secure_preview = patched_code if remediation_suggestions else None
+        manual_instructions = rem.get("manual_fix_instructions")
 
         return SecurityFindingDetailResponse(
             id=finding.id,
@@ -205,22 +203,20 @@ class FindingService:
                 {"title": "Integrity Impact", "description": "Potential unauthorized modification", "type": "integrity"},
             ]),
             affected_assets={
-                "repository": getattr(finding, "repository", None) or meta.get("repository") or "connected-repo",
-                "file": finding.file_path or "src/app.py",
-                "branch": getattr(finding, "branch", None) or meta.get("branch") or "main",
-                "service": "backend",
-                "environment": "production"
+                "repository": getattr(finding, "repository", None) or meta.get("repository"),
+                "file": finding.file_path,
+                "branch": getattr(finding, "branch", None) or meta.get("branch"),
             },
-            remediation_description=rem.get("description") or "Automated deterministic security fix.",
+            remediation_description=rem.get("description"),
             references=refs,
             similar_findings=meta.get("similar_findings", []),
             activity_logs=meta.get("activity_logs", [
                 {"title": "Finding detected", "subtitle": f"Detected by {meta.get('scanner_name', 'Security Engine')}", "type": "detection", "time": "Just now"},
             ]),
-            vulnerable_code=finding.snippet or rem.get("original_code") or "# Unsafe pattern",
-            fixed_code=rem.get("patched_code") or f"# Patched implementation of {finding.file_path}\n# Secure parameterized code",
-            remediation_suggestions=[primary_fix],
-            alternative_fixes=alternative_fixes,
+            vulnerable_code=finding.snippet or original_code,
+            fixed_code=patched_code if remediation_suggestions else None,
+            remediation_suggestions=remediation_suggestions,
+            alternative_fixes=[],
             manual_fix_instructions=manual_instructions,
             secure_code_preview=secure_preview,
             evidence=evidence
@@ -254,11 +250,8 @@ class FindingService:
             raise ValueError(f"Finding '{clean_id}' not found")
 
         # Enforce tenant project authorization
-        if finding.project_id and current_user and not getattr(current_user, "is_superuser", False):
-            from app.models.project import Project
-            proj = await self.db.get(Project, finding.project_id)
-            if proj and proj.owner_id != current_user.id:
-                raise ValueError("Unauthorized access to project finding")
+        if not await self._check_finding_access(finding, current_user):
+            raise ValueError("Unauthorized access to project finding")
             
         # 1. Look up the suggestion by suggestion_id in the DB (for this exercise we extract from meta)
         meta = finding.raw_metadata or {}
@@ -439,80 +432,65 @@ class FindingService:
             raise ValueError(f"Finding '{clean_id}' not found")
 
         # Enforce tenant project authorization
-        if finding.project_id and current_user and not getattr(current_user, "is_superuser", False):
-            from app.models.project import Project
-            proj = await self.db.get(Project, finding.project_id)
-            if proj and proj.owner_id != current_user.id:
-                raise ValueError("Unauthorized access to project finding")
+        if not await self._check_finding_access(finding, current_user):
+            raise ValueError("Unauthorized access to project finding")
 
-        # Resolve associated repository robustly
-        repo = None
-        target_pid = getattr(finding, "project_id", None)
-        if not target_pid and current_user:
-            p_stmt = select(Project.id).where(Project.owner_id == current_user.id).limit(1)
-            target_pid = (await self.db.execute(p_stmt)).scalar_one_or_none()
-        if not target_pid and getattr(finding, "scan_id", None):
-            scan = await self.db.get(SecurityScan, finding.scan_id)
-            if scan:
-                target_pid = scan.project_id
+        # Resolve associated repository robustly within the finding's authorized project
+        target_pid = finding.project_id
+        if not target_pid:
+            raise ValueError(f"Finding '{clean_id}' is not linked to any valid project.")
 
-        # 1. Sanitize repository parameters — filter out generic placeholder tokens like 'target', 'repository', etc.
         dummy_tokens = ("target", "repository", "codebase", "none", "null", "undefined", "")
         meaningful_repo = repository if repository and repository.lower().strip() not in dummy_tokens else None
         f_repo_raw = getattr(finding, "repository", None)
         meaningful_finding_repo = f_repo_raw if f_repo_raw and f_repo_raw.lower().strip() not in dummy_tokens else None
 
-        if not target_pid and current_user:
-            p_stmt = select(Project.id).where(Project.owner_id == current_user.id).order_by(desc(Project.created_at)).limit(1)
-            target_pid = (await self.db.execute(p_stmt)).scalar_one_or_none()
-        if not target_pid:
-            raise ValueError(f"Finding '{clean_id}' is not linked to any valid project.")
+        repo = None
+        # 1. Direct finding repository association
+        if getattr(finding, "repository_id", None):
+            repo = await self.db.get(GitHubRepository, finding.repository_id)
+            if repo and repo.project_id != target_pid and not getattr(current_user, "is_superuser", False):
+                repo = None
 
-        # 2. Try resolving repository by explicit parameter
-        if meaningful_repo:
+        # 2. Try resolving repository by explicit parameter within target_pid
+        if not repo and meaningful_repo:
             clean_target = meaningful_repo.split("/")[-1].replace(".git", "")
             repo_res = await self.db.execute(
                 select(GitHubRepository).where(
-                    or_(
-                        GitHubRepository.name == clean_target,
-                        GitHubRepository.full_name.ilike(f"%{clean_target}%")
+                    and_(
+                        GitHubRepository.project_id == target_pid,
+                        or_(
+                            GitHubRepository.name == clean_target,
+                            GitHubRepository.full_name.ilike(f"%{clean_target}%")
+                        )
                     )
                 ).limit(1)
             )
             repo = repo_res.scalar_one_or_none()
 
-        # 3. Try resolving via finding's direct repository association
-        if not repo and getattr(finding, "repository_id", None):
-            repo = await self.db.get(GitHubRepository, finding.repository_id)
-
+        # 3. Try resolving via finding's direct repository name within target_pid
         if not repo and meaningful_finding_repo:
             clean_target = meaningful_finding_repo.split("/")[-1].replace(".git", "")
             repo_res = await self.db.execute(
                 select(GitHubRepository).where(
-                    or_(
-                        GitHubRepository.name == clean_target,
-                        GitHubRepository.full_name.ilike(f"%{clean_target}%")
+                    and_(
+                        GitHubRepository.project_id == target_pid,
+                        or_(
+                            GitHubRepository.name == clean_target,
+                            GitHubRepository.full_name.ilike(f"%{clean_target}%")
+                        )
                     )
                 ).limit(1)
             )
             repo = repo_res.scalar_one_or_none()
 
-        # 4. Lookup any authentic connected repository for this project or database
-        if not repo and target_pid:
+        # 4. Lookup any authentic connected repository for this specific project
+        if not repo:
             proj_repo_stmt = select(GitHubRepository).where(GitHubRepository.project_id == target_pid).order_by(desc(GitHubRepository.created_at)).limit(1)
             repo = (await self.db.execute(proj_repo_stmt)).scalar_one_or_none()
 
         if not repo:
-            any_repo_stmt = select(GitHubRepository).order_by(desc(GitHubRepository.created_at)).limit(1)
-            repo = (await self.db.execute(any_repo_stmt)).scalar_one_or_none()
-
-        # 5. Fallback to connected RealIntegration for GitHub
-        if not repo:
-            from app.models.integration_models import RealIntegration, RealIntegrationRepository
-            r_stmt = select(RealIntegration).where(
-                RealIntegration.provider == "github",
-                RealIntegration.status == "connected",
-            ).order_by(desc(RealIntegration.updated_at)).limit(1)
+            raise ValueError(f"No connected repository found for project {target_pid}. Please connect a repository first.")
             r_integ = (await self.db.execute(r_stmt)).scalar_one_or_none()
             if r_integ:
                 rir_stmt = select(RealIntegrationRepository).where(RealIntegrationRepository.integration_id == r_integ.id).limit(1)

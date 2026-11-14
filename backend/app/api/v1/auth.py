@@ -1,3 +1,4 @@
+import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -5,6 +6,8 @@ from typing import Any, Dict, List, Optional
 import httpx
 import jwt
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
+
+logger = logging.getLogger("thing.auth")
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,25 +42,23 @@ def generate_oauth_state(provider: str) -> str:
 def verify_oauth_state(state: Optional[str], expected_provider: str) -> bool:
     """Validates signature, expiration, and provider binding of OAuth state token."""
     if not state or state.strip() == "":
-        # When user logs in directly via GitHub OAuth redirect without CSRF state, allow code exchange
-        return True
+        logger.warning("OAuth state verification rejected: missing state token (CSRF defense).")
+        return False
     settings = get_settings()
     try:
-        data = jwt.decode(state, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        data = jwt.decode(
+            state,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            options={"require": ["exp", "provider"]},
+        )
         return data.get("provider") == expected_provider
     except jwt.ExpiredSignatureError:
-        # If state expired by just a couple minutes, verify provider matches to avoid blocking users
-        try:
-            unverified = jwt.decode(state, options={"verify_signature": False, "verify_exp": False})
-            return unverified.get("provider") == expected_provider
-        except Exception:
-            return True
-    except Exception:
-        try:
-            unverified = jwt.decode(state, options={"verify_signature": False, "verify_exp": False})
-            return unverified.get("provider") == expected_provider
-        except Exception:
-            return True
+        logger.warning(f"OAuth state token has expired for provider: {expected_provider}")
+        return False
+    except Exception as exc:
+        logger.warning(f"OAuth state cryptographic signature verification failed: {exc}")
+        return False
 
 
 
@@ -76,23 +77,6 @@ async def register_user(
     request_id = getattr(request.state, "request_id", None)
     service = UserService(db)
     user = await service.register(payload, request_id=request_id)
-
-    # Ensure default personal workspace project exists for new user
-    from app.models.project import Project
-    from sqlalchemy import select
-    proj_stmt = select(Project).where(Project.owner_id == user.id).limit(1)
-    proj_res = await db.execute(proj_stmt)
-    if not proj_res.scalars().first():
-        new_proj = Project(
-            id=uuid.uuid4(),
-            owner_id=user.id,
-            name=f"{user.name}'s Project",
-            description=f"Personal security workspace for {user.name}",
-            environment="production",
-            application_type="web_service",
-        )
-        db.add(new_proj)
-        await db.commit()
 
     return UserResponse.model_validate(user)
 
@@ -682,16 +666,25 @@ async def resend_verification(
     # Dispatch real SMTP verification email
     from app.services.email_service import email_service
     settings = get_settings()
-    verification_url = f"{settings.public_app_url}/verify-email/success?token={new_token}"
+    origin = request.headers.get("origin")
+    app_url = origin if origin else ("http://localhost:3002" if "kavachsecurity.me" in settings.public_app_url else settings.public_app_url)
+    verification_url = f"{app_url}/verify-email/success?token={new_token}"
     user_name = user.name if user else None
     try:
-        await email_service.send_verification_email(
+        res = await email_service.send_verification_email(
             recipient_email=target_email,
             verification_url=verification_url,
             user_name=user_name,
         )
-    except Exception:
-        pass
+        import logging
+        logging.getLogger("secure-control-plane.email").info(
+            f"Verification email resent to {target_email}: {res}"
+        )
+    except Exception as exc:
+        import logging
+        logging.getLogger("secure-control-plane.email").error(
+            f"Failed to resend verification email to {target_email}: {exc}", exc_info=True
+        )
 
     return AuthStatusResponse(
         status="success",

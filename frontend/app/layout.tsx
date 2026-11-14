@@ -9,8 +9,8 @@ import { ToastProvider } from '@/components/providers/ToastProvider';
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kavachsecurity.me';
 
 export const viewport: Viewport = {
-  themeColor: '#0F172A',
-  colorScheme: 'light dark',
+  themeColor: '#FFFFFF',
+  colorScheme: 'light',
   width: 'device-width',
   initialScale: 1,
 };
@@ -103,8 +103,10 @@ export default function RootLayout({
         <link rel="icon" href="/kavach-cube.png" type="image/png" />
         <link rel="shortcut icon" href="/kavach-cube.png" />
         <link rel="apple-touch-icon" href="/kavach-cube.png" />
+        {/* Editorial serif & clean sans fonts for premium typography */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
         {/* Machine-extractable Schema.org Structured Data (JSON-LD) for SEO & AI Answer Engines */}
         <script
           type="application/ld+json"

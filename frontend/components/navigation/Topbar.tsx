@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { CommandPalette } from './CommandPalette';
+import { ConnectRepoButton } from '@/components/common/ConnectRepoButton';
 import { TaskQueueDrawer } from '@/components/tasks/TaskQueueDrawer';
 import { api } from '@/lib/api/client';
 import { redirectToLogin, clearAuthToken, getAuthToken } from '@/lib/auth/token';
@@ -470,7 +471,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             }
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     // Global keyboard listener for ⌘K / Ctrl+K
@@ -554,12 +555,12 @@ export const Topbar: React.FC<TopbarProps> = ({
         aria-label="Global Topbar"
         style={{
           height: 'var(--topbar-height, 56px)',
-          backgroundColor: '#ffffff',
-          borderBottom: '1px solid #E2E8F0',
+          backgroundColor: '#FFFFFF',
+          borderBottom: '1px solid #E8E6E1',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px',
+          padding: '0 24px',
           position: 'sticky',
           top: 0,
           zIndex: 40,
@@ -567,6 +568,8 @@ export const Topbar: React.FC<TopbarProps> = ({
           flexWrap: 'nowrap',
           overflowX: 'clip',
           boxSizing: 'border-box',
+          colorScheme: 'light',
+          color: '#1A1A1A',
           fontFamily: "var(--font-sans, 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif)",
         }}
       >
@@ -638,23 +641,25 @@ export const Topbar: React.FC<TopbarProps> = ({
                 e.currentTarget.style.backgroundColor = '#ffffff';
               }}
             >
-              <div
-                style={{
-                  width: '20px',
-                  height: '20px',
-                  borderRadius: '5px',
-                  backgroundColor: activeWorkspace.bg,
-                  border: `1px solid ${activeWorkspace.border}`,
-                  color: activeWorkspace.color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <ActiveIcon size={12} />
-              </div>
-              <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap' }}>
+              {!pathname.startsWith('/api-security') && (
+                <div
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '5px',
+                    backgroundColor: activeWorkspace.bg,
+                    border: `1px solid ${activeWorkspace.border}`,
+                    color: activeWorkspace.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <ActiveIcon size={12} />
+                </div>
+              )}
+              <span style={{ fontSize: '13px', fontWeight: pathname.startsWith('/api-security') ? 500 : 600, color: '#0F172A', whiteSpace: 'nowrap' }}>
                 {activeWorkspace.name}
               </span>
               <ChevronDown size={13} color="#94A3B8" style={{ marginLeft: '2px', flexShrink: 0 }} />
@@ -792,7 +797,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                 <button
                   onClick={() => {
                     setIsWorkspaceOpen(false);
-                    router.push('/onboarding?product=cloud&workspace=cloud');
+                    router.push('/cloud?connect=true');
                   }}
                   style={{
                     width: '100%',
@@ -846,8 +851,8 @@ export const Topbar: React.FC<TopbarProps> = ({
             )}
           </div>
 
-          {/* Project Selector Dropdown */}
-          <div ref={projectRef} className="kavach-hide-tablet-mobile" style={{ position: 'relative' }}>
+          {/* Project Selector Dropdown — hidden on API Security */}
+          <div ref={projectRef} className="kavach-hide-tablet-mobile" style={{ position: 'relative', display: pathname.startsWith('/api-security') ? 'none' : undefined }}>
             <button
               onClick={() => setIsProjectDropdownOpen(!isProjectDropdownOpen)}
               style={{
@@ -1100,8 +1105,8 @@ export const Topbar: React.FC<TopbarProps> = ({
             )}
           </div>
 
-          {/* Dynamic Scope Dropdown (matches active workspace product) */}
-          <div ref={repoRef} className="kavach-hide-tablet-mobile" style={{ position: 'relative' }}>
+          {/* Dynamic Scope Dropdown (matches active workspace product) — hidden on API Security */}
+          <div ref={repoRef} className="kavach-hide-tablet-mobile" style={{ position: 'relative', display: pathname.startsWith('/api-security') ? 'none' : undefined }}>
             <button
               onClick={() => setIsRepoDropdownOpen(!isRepoDropdownOpen)}
               style={{
@@ -1205,54 +1210,58 @@ export const Topbar: React.FC<TopbarProps> = ({
 
         </div>
 
-        {/* Center: Search Bar (Flexible, Responsive) */}
-        <div style={{ flex: '0 1 210px', maxWidth: '220px', minWidth: '60px', position: 'relative' }}>
+        {/* Center: Compact global search — 320-380px, 42px, warm ivory */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          flex: '0 0 auto',
+          width: pathname.startsWith('/api-security') ? '360px' : '320px',
+          maxWidth: '380px',
+          minWidth: '200px',
+        }}>
           <div
             onClick={() => setIsCommandOpen(true)}
+            role="button"
+            aria-label="Open command palette"
+            tabIndex={0}
+            onKeyDown={e => e.key === 'Enter' && setIsCommandOpen(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              height: '34px',
-              padding: '0 8px',
-              borderRadius: '6px',
-              backgroundColor: '#F8FAFC',
-              border: '1px solid #E2E8F0',
+              height: '42px',
+              padding: '0 14px',
+              borderRadius: '10px',
+              backgroundColor: '#F5F3EF',
+              border: '1px solid #E8E6E1',
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
+              width: '100%',
               boxSizing: 'border-box',
+              transition: 'border-color 0.15s, background 0.15s',
+              gap: 8,
             }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = '#CBD5E1';
-              e.currentTarget.style.backgroundColor = '#FFFFFF';
+            onMouseOver={e => {
+              e.currentTarget.style.borderColor = '#D4D1CB';
+              e.currentTarget.style.backgroundColor = '#EFEDE8';
             }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = '#E2E8F0';
-              e.currentTarget.style.backgroundColor = '#F8FAFC';
+            onMouseOut={e => {
+              e.currentTarget.style.borderColor = '#E8E6E1';
+              e.currentTarget.style.backgroundColor = '#F5F3EF';
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-              <img
-                src="/kavach-cube.png"
-                alt="Kavach"
-                style={{ width: '14px', height: '14px', objectFit: 'contain', flexShrink: 0 }}
-              />
-              <span style={{ fontSize: '13px', color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                Search code, findings...
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+              <Search size={15} color="#9A9A96" style={{ flexShrink: 0 }} strokeWidth={1.8} />
+              <span style={{ fontSize: '13px', color: '#9A9A96', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Go to...
               </span>
             </div>
             <kbd
-              className="kavach-hide-small-mobile"
               style={{
-                fontSize: '9.5px',
-                fontWeight: 600,
-                color: '#64748B',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #CBD5E1',
-                padding: '0 4px',
-                borderRadius: '3px',
-                fontFamily: 'inherit',
-                flexShrink: 0,
+                fontSize: '11px', fontWeight: 500, color: '#9A9A96',
+                backgroundColor: 'rgba(255,255,255,0.7)',
+                border: '1px solid #D8D5CF',
+                padding: '2px 8px', borderRadius: '5px',
+                fontFamily: 'inherit', flexShrink: 0, whiteSpace: 'nowrap',
               }}
             >
               Ctrl K
@@ -1260,37 +1269,46 @@ export const Topbar: React.FC<TopbarProps> = ({
           </div>
         </div>
 
+        {/* Connect Repo — non-api-security routes only */}
+        {!pathname.startsWith('/api-security') && (
+          <div className="kavach-hide-small-mobile" style={{ flexShrink: 0 }}>
+            <ConnectRepoButton size="sm" />
+          </div>
+        )}
+
         {/* Right Side: Task Queue, Bell & User Profile */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           {/* Asynchronous Task Queue Trigger */}
-          <button
-            onClick={() => setIsTaskDrawerOpen(true)}
-            aria-label="View background task worker queue"
-            title="Asynchronous Task Queue & Workers"
-            style={{
-              width: '32px',
-              height: '32px',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '6px',
-              color: '#64748B',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.color = '#0F172A';
-              e.currentTarget.style.backgroundColor = '#F1F5F9';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.color = '#64748B';
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <Activity size={16} />
-          </button>
+          {!pathname.startsWith('/api-security') && (
+            <button
+              onClick={() => setIsTaskDrawerOpen(true)}
+              aria-label="View background task worker queue"
+              title="Asynchronous Task Queue & Workers"
+              style={{
+                width: '32px',
+                height: '32px',
+                background: 'transparent',
+                border: 'none',
+                borderRadius: '6px',
+                color: '#64748B',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.color = '#0F172A';
+                e.currentTarget.style.backgroundColor = '#F1F5F9';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.color = '#64748B';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <Activity size={16} />
+            </button>
+          )}
 
           {/* Notifications Trigger with Count Badge */}
           <div ref={notifRef} style={{ position: 'relative' }}>
@@ -1396,34 +1414,51 @@ export const Topbar: React.FC<TopbarProps> = ({
               >
                 {currentUser?.name
                   ? currentUser.name
-                      .split(' ')
-                      .map((n) => n[0])
-                      .filter(Boolean)
-                      .join('')
-                      .substring(0, 2)
-                      .toUpperCase()
+                    .split(' ')
+                    .map((n) => n[0])
+                    .filter(Boolean)
+                    .join('')
+                    .substring(0, 2)
+                    .toUpperCase()
                   : currentUser?.email
-                  ? currentUser.email.substring(0, 2).toUpperCase()
-                  : 'G'}
+                    ? currentUser.email.substring(0, 2).toUpperCase()
+                    : 'G'}
               </div>
-              <div className="kavach-hide-small-mobile" style={{ textAlign: 'left', lineHeight: '1.2' }}>
-                <div
+              {pathname.startsWith('/api-security') ? (
+                <span
+                  className="kavach-hide-small-mobile"
                   style={{
-                    fontSize: '12.5px',
-                    fontWeight: 600,
+                    fontSize: '13px',
+                    fontWeight: 500,
                     color: '#0F172A',
-                    maxWidth: '110px',
+                    maxWidth: '140px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {currentUser?.name || currentUser?.email?.split('@')[0] || 'Account'}
+                  {currentUser?.name || 'Mayur Bharvad'}
+                </span>
+              ) : (
+                <div className="kavach-hide-small-mobile" style={{ textAlign: 'left', lineHeight: '1.2' }}>
+                  <div
+                    style={{
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      color: '#0F172A',
+                      maxWidth: '110px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {currentUser?.name || currentUser?.email?.split('@')[0] || 'Account'}
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: '#64748B' }}>
+                    {currentUser ? (currentUser.role || 'Member') : 'Signed Out'}
+                  </div>
                 </div>
-                <div style={{ fontSize: '10.5px', color: '#64748B' }}>
-                  {currentUser ? (currentUser.role || 'Member') : 'Signed Out'}
-                </div>
-              </div>
+              )}
               <ChevronDown size={13} color="#94A3B8" className="kavach-hide-small-mobile" style={{ flexShrink: 0 }} />
             </button>
 

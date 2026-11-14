@@ -486,41 +486,34 @@ class IntegrationsService:
 
                 # If no API results (e.g. offline or sandbox), scan real local repositories and projects
                 if not raw_repos:
-                    # Discover from workspace projects table
-                    proj_stmt = select(Project)
+                    # Discover strictly from this tenant's real projects
+                    proj_filters = [Project.organization_id == organization_id]
+                    if user:
+                        proj_filters.append(Project.owner_id == user.id)
+                    proj_stmt = select(Project).where(or_(*proj_filters))
                     proj_res = await self.db.execute(proj_stmt)
                     db_projects = proj_res.scalars().all()
 
-                    default_repos = [
-                        ("frontend-app", "seculayer/frontend-app", "https://github.com/seculayer/frontend-app", False, "main", "Scanned"),
-                        ("backend-service", "seculayer/backend-service", "https://github.com/seculayer/backend-service", True, "main", "Scanned"),
-                        ("devops-infra", "seculayer/devops-infra", "https://github.com/seculayer/devops-infra", False, "main", "Not Scanned"),
-                        ("ml-models", "seculayer/ml-models", "https://github.com/seculayer/ml-models", True, "main", "Scanned"),
-                        ("portfolio", "seculayer/portfolio", "https://github.com/seculayer/portfolio", False, "main", "Not Scanned"),
-                    ]
-
-                    # Add active project repositories
                     for p in db_projects:
-                        if p.name not in [r[0] for r in default_repos]:
-                            default_repos.append(
-                                (p.name, f"seculayer/{p.name}", p.repository_url or f"https://github.com/seculayer/{p.name}", True, "main", "Scanned")
-                            )
-
-                    for rname, rfull, rurl, rpriv, rbranch, rstatus in default_repos:
-                        raw_repos.append({
-                            "id": abs(hash(rfull)) % 10000000,
-                            "name": rname,
-                            "full_name": rfull,
-                            "html_url": rurl,
-                            "private": rpriv,
-                            "default_branch": rbranch,
-                            "scan_status": rstatus,
-                        })
+                        if p.repository_url:
+                            repo_name = p.repository_url.rstrip("/").split("/")[-1].replace(".git", "")
+                            raw_repos.append({
+                                "id": abs(hash(p.repository_url)) % 10000000,
+                                "name": p.name or repo_name,
+                                "full_name": f"{repo_name}/{repo_name}" if "/" not in repo_name else repo_name,
+                                "html_url": p.repository_url,
+                                "private": False,
+                                "default_branch": "main",
+                                "scan_status": "Not Scanned",
+                            })
 
                 items_found = len(raw_repos)
 
-                # Fetch first active project to link
-                proj_stmt = select(Project).limit(1)
+                # Fetch active project for this tenant to link
+                proj_filters = [Project.organization_id == organization_id]
+                if user:
+                    proj_filters.append(Project.owner_id == user.id)
+                proj_stmt = select(Project).where(or_(*proj_filters)).limit(1)
                 first_p = (await self.db.execute(proj_stmt)).scalar_one_or_none()
                 proj_id = first_p.id if first_p else None
 
@@ -678,7 +671,10 @@ class IntegrationsService:
                         items_created += 1
 
                 # Also update GitLab in SecurityJobIntegration
-                proj_stmt = select(Project).limit(1)
+                proj_filters = [Project.organization_id == organization_id]
+                if user:
+                    proj_filters.append(Project.owner_id == user.id)
+                proj_stmt = select(Project).where(or_(*proj_filters)).limit(1)
                 first_p = (await self.db.execute(proj_stmt)).scalar_one_or_none()
                 proj_id = first_p.id if first_p else None
 
@@ -716,7 +712,10 @@ class IntegrationsService:
                 items_created = 0
                 items_updated = 1
 
-                proj_stmt = select(Project).limit(1)
+                proj_filters = [Project.organization_id == organization_id]
+                if user:
+                    proj_filters.append(Project.owner_id == user.id)
+                proj_stmt = select(Project).where(or_(*proj_filters)).limit(1)
                 first_p = (await self.db.execute(proj_stmt)).scalar_one_or_none()
                 proj_id = first_p.id if first_p else None
 
@@ -1706,8 +1705,11 @@ class IntegrationsService:
                 while (await self.db.execute(select(GitHubRepository).where(GitHubRepository.github_repository_id == calc_gh_id))).scalar_one_or_none():
                     calc_gh_id += 1
 
-                # Create GitHubRepository on the fly so platform modules can bind assignments
-                first_proj = (await self.db.execute(select(Project).limit(1))).scalar_one_or_none()
+                # Create GitHubRepository on the fly scoped to this tenant so platform modules can bind assignments
+                proj_filters = [Project.organization_id == organization_id]
+                if user:
+                    proj_filters.append(Project.owner_id == user.id)
+                first_proj = (await self.db.execute(select(Project).where(or_(*proj_filters)).limit(1))).scalar_one_or_none()
                 gh_repo_obj = GitHubRepository(
                     id=uuid.uuid4(),
                     project_id=first_proj.id if first_proj else None,
@@ -1854,11 +1856,19 @@ class IntegrationsService:
             integ.last_sync_status = "SUCCESS"
             integ.updated_at = now
 
-            # Sync or create CloudConnection in cloud_connections table
-            first_proj = (await self.db.execute(select(Project).limit(1))).scalar_one_or_none()
+            # Sync or create CloudConnection scoped to tenant
+            proj_filters = [Project.organization_id == organization_id]
+            if user:
+                proj_filters.append(Project.owner_id == user.id)
+            first_proj = (await self.db.execute(select(Project).where(or_(*proj_filters)).limit(1))).scalar_one_or_none()
             proj_id = first_proj.id if first_proj else uuid.uuid4()
 
-            cloud_stmt = select(CloudConnection).where(CloudConnection.provider == prov.upper())
+            cloud_stmt = select(CloudConnection).where(
+                and_(
+                    CloudConnection.project_id == proj_id,
+                    CloudConnection.provider == prov.upper(),
+                )
+            )
             cloud_conn = (await self.db.execute(cloud_stmt)).scalar_one_or_none()
             if not cloud_conn:
                 cloud_conn = CloudConnection(

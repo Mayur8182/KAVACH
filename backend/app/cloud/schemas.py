@@ -95,7 +95,7 @@ class CloudConnectionsResponse(BaseModel):
 
 
 class ConnectProviderRequest(BaseModel):
-    provider: str  # AWS | AZURE | GCP
+    provider: str  # AWS | AZURE | GCP | KUBERNETES
     connection_name: str
     authentication_method: str
     account_identifier: Optional[str] = None
@@ -104,6 +104,29 @@ class ConnectProviderRequest(BaseModel):
     gcp_project_identifier: Optional[str] = None
     default_region: Optional[str] = "us-east-1"
     credentials_payload: Optional[Dict[str, Any]] = None  # Processed in memory, never stored in plaintext
+
+
+class SetupInstructionsResponse(BaseModel):
+    provider: str
+    instructions_title: str
+    instructions_markdown: str
+    external_id: Optional[str] = None
+    kavach_account_id: Optional[str] = None
+    trust_policy: Optional[Dict[str, Any]] = None
+    required_permissions: List[str] = []
+    cli_snippet: Optional[str] = None
+    cloudformation_template_json: Optional[str] = None
+    cloudformation_quick_create_url: Optional[str] = None
+
+
+class ConnectionValidationResponse(BaseModel):
+    success: bool
+    status: str
+    message: str
+    account_identifier: Optional[str] = None
+    discovered_resources_count: int = 0
+    observations_count: int = 0
+    details: Dict[str, Any] = {}
 
 
 # ─────────────────────────────────────────────
@@ -422,6 +445,15 @@ class CloudExposuresResponse(BaseModel):
     critical_exposures: int
 
 
+class CloudAttackPathStep(BaseModel):
+    name: str
+    subtitle: str
+    type: str  # "net", "vm", "iam", "db", "bucket", "k8", etc.
+    provider: str  # "Net", "AWS", "Azure", "GCP"
+    severity: Optional[str] = None
+    fix_id: Optional[str] = None
+
+
 class CloudAttackPathItem(BaseModel):
     id: str
     title: str
@@ -429,14 +461,58 @@ class CloudAttackPathItem(BaseModel):
     target_asset: str
     confidence: str  # VERIFIED | PARTIAL | UNKNOWN
     blast_radius_score: str
-    nodes: List[Dict[str, Any]]
-    edges: List[Dict[str, Any]]
-    provenance: str
+    severity: str = "High"  # Critical | High | Medium
+    why: str = ""
+    fix_issue_id: Optional[str] = None
+    steps: List[CloudAttackPathStep] = []
+    edge_labels: List[str] = []
+    nodes: List[Dict[str, Any]] = []
+    edges: List[Dict[str, Any]] = []
+    provenance: str = ""
 
 
 class CloudAttackPathsResponse(BaseModel):
     items: List[CloudAttackPathItem]
     total: int
+
+
+class SecurityGraphNode(BaseModel):
+    id: str
+    name: str
+    subtitle: str
+    provider: str
+    resource_type: str
+    severity: Optional[str] = None
+    issue_id: Optional[str] = None
+    is_internet_facing: bool = False
+    x: float = 0.0
+    y: float = 0.0
+
+
+class SecurityGraphEdge(BaseModel):
+    source: str
+    target: str
+    label: str
+    is_risky: bool = False
+
+
+class SecurityGraphBoundary(BaseModel):
+    provider: str
+    label: str
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+class CloudSecurityGraphResponse(BaseModel):
+    nodes: List[SecurityGraphNode]
+    edges: List[SecurityGraphEdge]
+    boundaries: List[SecurityGraphBoundary]
+    assets_mapped: int
+    relationships_count: int
+    internet_facing_count: int
+    risky_connections_count: int
 
 
 class BlastRadiusNode(BaseModel):
@@ -514,3 +590,127 @@ class CloudEvidenceResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+# ─────────────────────────────────────────────
+# 19. Autonomous AI Cloud Security Engineer Models
+# ─────────────────────────────────────────────
+
+class CloudIssueSafetyCheck(BaseModel):
+    text: str
+    pass_check: bool = Field(alias="pass")
+
+    class Config:
+        populate_by_name = True
+
+
+class CloudIssueDiffItem(BaseModel):
+    change_type: str  # "r" for removed, "a" for added
+    line: str
+
+
+class CloudAutonomousIssueItem(BaseModel):
+    id: str
+    title: str
+    severity: str  # Critical | High | Medium | Low
+    cloud: str    # AWS | Azure | GCP | Kubernetes
+    resource: str
+    region: str
+    what_is_wrong: str
+    why_dangerous: str
+    what_kavach_will_do: str
+    expected_result: str
+    diff: List[List[str]]  # [["r", "old"], ["a", "new"]]
+    business_risk: str
+    responsible_agent: str
+    rule_id: str
+    resource_arn: str
+    evidence_json: Dict[str, Any]
+    safety_checks: List[Dict[str, Any]]
+    status: str = "OPEN"  # OPEN | RESOLVED
+    fix_policy: str = "CONFIRM_IMPACT"  # ONE_CLICK_FIX | CONFIRM_IMPACT | MANUAL_APPROVAL
+
+
+class SpecialistAgentStatus(BaseModel):
+    id: str
+    name: str
+    category: str
+    status: str  # COMPLETED | FAILED | ACCESS_MISSING | NOT_CONNECTED | RUNNING | WAITING
+    role: str = ""
+    resources_inspected: int = 0
+    findings_count: int = 0
+    duration_s: int = 0
+    message: Optional[str] = None
+    technical_logs: List[str] = []
+
+
+class MasterAgentStatus(BaseModel):
+    is_active: bool = True
+    last_assessment_at: Optional[datetime] = None
+    coverage_percentage: int
+    coverage_summary: str
+    missing_permissions: List[str]
+    specialist_agents: List[SpecialistAgentStatus]
+    execution_id: str = "EXE-20481"
+    started_at: Optional[str] = None
+    objective: str = "Full multi-cloud autonomous security assessment"
+    current_phase: str = "Results"  # Connect, Discover, Assess, Investigate, Results
+    recent_logs: List[Dict[str, Any]] = []
+
+
+class CloudCommandCenterResponse(BaseModel):
+    total_resources: int
+    total_issues: int
+    critical_issues: int
+    high_issues: int
+    medium_issues: int
+    resolved_issues: int
+    master_agent: MasterAgentStatus
+    connected_clouds: List[Dict[str, Any]]
+    priority_issues: List[CloudAutonomousIssueItem]
+    activity_timeline: List[Dict[str, Any]]
+
+
+class RemediationExecutionRequest(BaseModel):
+    action_type: str = "APPLY_RESTRICTION"
+    force_approve: bool = False
+
+
+class RemediationExecutionResponse(BaseModel):
+    action_id: str
+    issue_id: str
+    status: str  # RESOLVED | FAILED
+    executed_at: datetime
+    executed_by: str
+    before_state: Dict[str, Any]
+    after_state: Dict[str, Any]
+    verification_records: List[str]
+    audit_record_id: str
+    message: str
+    report_id: Optional[str] = None
+    report_markdown: Optional[str] = None
+
+
+class CloudSecurityReportItem(BaseModel):
+    id: str
+    name: str
+    report_type: str  # POSTURE_AUDIT | REMEDIATION_CERTIFICATE | COMPLIANCE_CIS
+    provider: str     # AWS | AZURE | GCP | MULTI_CLOUD
+    target_scope: str # e.g. "AWS Account 407268186423 (us-east-1)"
+    findings_count: int = 0
+    critical_count: int = 0
+    high_count: int = 0
+    resolved_count: int = 0
+    verification_status: str = "VERIFIED"  # VERIFIED | PENDING
+    generated_at: datetime
+    generated_by: str
+    download_url: str = ""
+    summary_markdown: str = ""
+    evidence_payload: Dict[str, Any] = {}
+
+
+class CloudReportsListResponse(BaseModel):
+    reports: List[CloudSecurityReportItem]
+    total: int
+
+

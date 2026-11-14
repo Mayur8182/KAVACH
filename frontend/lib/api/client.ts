@@ -893,6 +893,16 @@ class ThingApiClient {
       });
       return res.data;
     },
+    verifyEmailDirect: async (payload?: { email?: string } | string): Promise<{
+      status: string;
+      message: string;
+      verified: boolean;
+      expired: boolean;
+      email?: string;
+    }> => {
+      const targetEmail = typeof payload === 'string' ? payload : payload?.email;
+      return this.auth.devInstantVerify(targetEmail);
+    },
     checkEmailStatus: async (email: string): Promise<{
       status: string;
       message: string;
@@ -2101,6 +2111,7 @@ class ThingApiClient {
       selected_products?: string[];
       status?: string;
       onboarding_completed?: boolean;
+      completed?: boolean;
       setup_deferred?: boolean;
       last_step?: string;
     }): Promise<any> => {
@@ -2165,6 +2176,38 @@ class ThingApiClient {
     }> => {
       const res = await this.request<any>('/api/v1/onboarding/github/disconnect', {
         method: 'POST',
+      });
+      return res.data;
+    },
+    getProjectStatus: async (projectId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/projects/${encodeURIComponent(projectId)}/github/status`);
+      return res.data;
+    },
+    verifyProjectInstallation: async (projectId: string, installationId: number): Promise<any[]> => {
+      const res = await this.request<any[]>(`/api/v1/projects/${encodeURIComponent(projectId)}/github/verify`, {
+        method: 'POST',
+        body: JSON.stringify({ installation_id: installationId }),
+      });
+      return res.data || [];
+    },
+    listProjectRepositories: async (projectId: string): Promise<any[]> => {
+      const res = await this.request<any[]>(`/api/v1/projects/${encodeURIComponent(projectId)}/github/repositories`);
+      return res.data || [];
+    },
+    connectProjectRepository: async (projectId: string, repository: {
+      github_repository_id: number;
+      owner: string;
+      name: string;
+      full_name: string;
+      default_branch?: string;
+      private?: boolean;
+      html_url: string;
+      clone_url: string;
+      installation_id?: number;
+    }): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/projects/${encodeURIComponent(projectId)}/github/repositories`, {
+        method: 'POST',
+        body: JSON.stringify(repository),
       });
       return res.data;
     },
@@ -4698,11 +4741,42 @@ class ThingApiClient {
       return res.data;
     },
 
+    setupInstructions: async (provider: string, projectId?: string | null): Promise<any> => {
+      const q = new URLSearchParams();
+      q.append('provider', provider);
+      if (projectId) q.append('project_id', projectId);
+      const res = await this.request<any>(`/api/v1/cloud/connections/setup-instructions?${q.toString()}`);
+      return res.data;
+    },
+
+    detectLocal: async (): Promise<{ detected_providers: any[]; has_detected: boolean }> => {
+      const res = await this.request<any>('/api/v1/cloud/connections/detect-local');
+      return res.data;
+    },
+
     createConnection: async (payload: ConnectProviderRequest, projectId?: string | null): Promise<CloudConnectionItem> => {
       const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
       const res = await this.request<CloudConnectionItem>(`/api/v1/cloud/connections${q}`, {
         method: 'POST',
         body: JSON.stringify(payload),
+        timeoutMs: 120000,
+      });
+      return res.data;
+    },
+
+    validateConnection: async (connectionId: string, payload?: any, projectId?: string | null): Promise<any> => {
+      const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/v1/cloud/connections/${encodeURIComponent(connectionId)}/validate${q}`, {
+        method: 'POST',
+        body: payload ? JSON.stringify(payload) : undefined,
+      });
+      return res.data;
+    },
+
+    deleteConnection: async (connectionId: string, projectId?: string | null): Promise<any> => {
+      const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/v1/cloud/connections/${encodeURIComponent(connectionId)}${q}`, {
+        method: 'DELETE',
       });
       return res.data;
     },
@@ -4717,11 +4791,15 @@ class ThingApiClient {
       offset?: number;
       page?: number;
       pageSize?: number;
+      project_id?: string;
+      resource_type?: string;
     }): Promise<CloudAssetsResponse> => {
       const q = new URLSearchParams();
-      if (params?.projectId) q.append('project_id', params.projectId);
+      const pid = params?.projectId || params?.project_id;
+      if (pid) q.append('project_id', pid);
       if (params?.provider) q.append('provider', params.provider);
-      if (params?.resourceType) q.append('resource_type', params.resourceType);
+      const rt = params?.resourceType || params?.resource_type;
+      if (rt) q.append('resource_type', rt);
       if (params?.environment) q.append('environment', params.environment);
       if (params?.search) q.append('search', params.search);
       if (params?.limit) q.append('limit', params.limit.toString());
@@ -4731,6 +4809,10 @@ class ThingApiClient {
       const qs = q.toString() ? `?${q.toString()}` : '';
       const res = await this.request<CloudAssetsResponse>(`/api/v1/cloud/assets${qs}`);
       return res.data;
+    },
+
+    getAssets: async (params?: any): Promise<CloudAssetsResponse> => {
+      return this.cloud.assets(params);
     },
 
     assetDetail: async (assetId: string): Promise<CloudAssetDetailResponse> => {
@@ -4867,6 +4949,12 @@ class ThingApiClient {
       return res.data;
     },
 
+    securityGraph: async (projectId?: string | null): Promise<any> => {
+      const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/v1/cloud/security-graph${q}`);
+      return res.data;
+    },
+
     blastRadius: async (assetId?: string): Promise<CloudBlastRadiusResponse> => {
       const q = assetId ? `?asset_id=${encodeURIComponent(assetId)}` : '';
       const res = await this.request<CloudBlastRadiusResponse>(`/api/v1/cloud/blast-radius${q}`);
@@ -4904,8 +4992,89 @@ class ThingApiClient {
       return res.data;
     },
 
+    triggerScan: async (payload: { provider?: string; project_id?: string }, projectId?: string | null): Promise<any> => {
+      const p = { ...payload };
+      if (!p.project_id && projectId) p.project_id = projectId;
+      return this.cloud.scan(p);
+    },
+
     connect: async (payload: any, projectId?: string | null): Promise<any> => {
       return this.cloud.createConnection(payload, projectId);
+    },
+
+    createCfnBucket: async (): Promise<{ bucket_name: string; template_url: string; quick_create_url: string; account_id: string; region: string }> => {
+      const res = await this.request<any>('/api/v1/cloud/setup/create-cfn-bucket', { method: 'POST' });
+      return res.data;
+    },
+
+    deployAwsRole: async (projectId?: string | null): Promise<any> => {
+      const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/v1/cloud/setup/deploy-aws-role${q}`, {
+        method: 'POST',
+        timeoutMs: 120000,
+      });
+      return res.data;
+    },
+
+    commandCenter: async (projectId?: string | null): Promise<any> => {
+      const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/v1/cloud/command-center${q}`);
+      return res.data;
+    },
+
+    issues: async (params?: { projectId?: string | null; severity?: string; status?: string; search?: string }): Promise<any> => {
+      const q = new URLSearchParams();
+      if (params?.projectId) q.append('project_id', params.projectId);
+      if (params?.severity) q.append('severity', params.severity);
+      if (params?.status) q.append('status', params.status);
+      if (params?.search) q.append('search', params.search);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      const res = await this.request<any>(`/api/v1/cloud/issues${qs}`);
+      return res.data;
+    },
+
+    issueDetail: async (issueId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/cloud/issues/${encodeURIComponent(issueId)}`);
+      return res.data;
+    },
+
+    remediateIssue: async (issueId: string, payload?: any): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/cloud/issues/${encodeURIComponent(issueId)}/remediate`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+      });
+      return res.data;
+    },
+
+    agentStatus: async (projectId?: string | null): Promise<any> => {
+      const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/v1/cloud/agent/status${q}`);
+      return res.data;
+    },
+
+    activity: async (projectId?: string | null): Promise<any> => {
+      const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/v1/cloud/activity${q}`);
+      return res.data;
+    },
+
+    reports: async (projectId?: string | null): Promise<any> => {
+      const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/v1/cloud/reports${q}`);
+      return res.data;
+    },
+
+    generateReport: async (params?: { issueId?: string; reportType?: string; report_type?: string; format?: string }): Promise<any> => {
+      const queryParts: string[] = [];
+      if (params?.issueId) queryParts.push(`issue_id=${encodeURIComponent(params.issueId)}`);
+      const rType = params?.reportType || params?.report_type;
+      if (rType) queryParts.push(`report_type=${encodeURIComponent(rType)}`);
+      if (params?.format) queryParts.push(`format=${encodeURIComponent(params.format)}`);
+      const q = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await this.request<any>(`/api/v1/cloud/reports/generate${q}`, {
+        method: 'POST',
+      });
+      return res.data;
     },
   };
 
@@ -13570,6 +13739,19 @@ class ThingApiClient {
       });
       return res.data;
     },
+    listScans: async (params?: { apiId?: string; status?: string; search?: string; limit?: number; offset?: number }): Promise<{ total: number; items: any[] }> => {
+      const q = new URLSearchParams();
+      if (params?.apiId) q.set('api_id', params.apiId);
+      if (params?.status) q.set('status_filter', params.status);
+      if (params?.search) q.set('search', params.search);
+      if (params?.limit) q.set('limit', String(params.limit));
+      if (params?.offset) q.set('offset', String(params.offset));
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      const res = await this.request<{ total: number; items: any[] }>(`/api/v1/api-security/scans${qs}`, {
+        timeoutMs: 60000,
+      });
+      return res.data;
+    },
     startScan: async (payload: { api_id: string; plan_id?: string; scan_config?: any }): Promise<any> => {
       const res = await this.request<any>('/api/v1/api-security/scans', {
         method: 'POST',
@@ -13580,23 +13762,29 @@ class ThingApiClient {
       return res.data;
     },
     getScan: async (scanId: string): Promise<any> => {
-      const res = await this.request<any>(`/api/v1/api-security/scans/${encodeURIComponent(scanId)}`);
+      const res = await this.request<any>(`/api/v1/api-security/scans/${encodeURIComponent(scanId)}`, {
+        timeoutMs: 60000,
+      });
       return res.data;
     },
     stopScan: async (scanId: string): Promise<any> => {
       const res = await this.request<any>(`/api/v1/api-security/scans/${encodeURIComponent(scanId)}/stop`, {
         method: 'POST',
+        timeoutMs: 60000,
       });
       return res.data;
     },
     rerunScan: async (scanId: string): Promise<any> => {
       const res = await this.request<any>(`/api/v1/api-security/scans/${encodeURIComponent(scanId)}/rerun`, {
         method: 'POST',
+        timeoutMs: 60000,
       });
       return res.data;
     },
     getScanResults: async (scanId: string): Promise<any> => {
-      const res = await this.request<any>(`/api/v1/api-security/scans/${encodeURIComponent(scanId)}/results`);
+      const res = await this.request<any>(`/api/v1/api-security/scans/${encodeURIComponent(scanId)}/results`, {
+        timeoutMs: 60000,
+      });
       return res.data;
     },
     findings: async (params?: { apiId?: string; category?: string; severity?: string; status?: string; search?: string; limit?: number; offset?: number }): Promise<{ total: number; items: any[] }> => {
@@ -13624,9 +13812,54 @@ class ThingApiClient {
       });
       return res.data;
     },
+    deleteFinding: async (findingId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/findings/${encodeURIComponent(findingId)}`, {
+        method: 'DELETE',
+      });
+      return res.data;
+    },
+    bulkDeleteFindings: async (findingIds: string[]): Promise<any> => {
+      const res = await this.request<any>('/api/v1/api-security/findings/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ finding_ids: findingIds }),
+      });
+      return res.data;
+    },
+    resetSeedFindings: async (apiId?: string): Promise<any> => {
+      const q = apiId ? `?api_id=${encodeURIComponent(apiId)}` : '';
+      const res = await this.request<any>(`/api/v1/api-security/findings/reset-seed${q}`, {
+        method: 'POST',
+      });
+      return res.data;
+    },
     attackPaths: async (apiId?: string): Promise<{ total: number; items: any[] }> => {
       const q = apiId ? `?api_id=${encodeURIComponent(apiId)}` : '';
       const res = await this.request<{ total: number; items: any[] }>(`/api/v1/api-security/attack-paths${q}`);
+      return res.data;
+    },
+    attackPathDetail: async (pathId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/attack-paths/${encodeURIComponent(pathId)}`);
+      return res.data;
+    },
+    validateAttackPath: async (pathId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/attack-paths/${encodeURIComponent(pathId)}/validate`, {
+        method: 'POST',
+      });
+      return res.data;
+    },
+    checkAttackPathEndpoint: async (pathId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/attack-paths/${encodeURIComponent(pathId)}/check-endpoint`, {
+        method: 'POST',
+      });
+      return res.data;
+    },
+    attackPathLogs: async (pathId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/attack-paths/${encodeURIComponent(pathId)}/logs`);
+      return res.data;
+    },
+    exportAttackPath: async (pathId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/attack-paths/${encodeURIComponent(pathId)}/export`);
       return res.data;
     },
     analystChat: async (payload: { prompt: string; api_id?: string; history?: any[] }): Promise<any> => {
@@ -13650,6 +13883,27 @@ class ThingApiClient {
     listReports: async (apiId?: string): Promise<{ total: number; items: any[] }> => {
       const q = apiId ? `?api_id=${encodeURIComponent(apiId)}` : '';
       const res = await this.request<{ total: number; items: any[] }>(`/api/v1/api-security/reports${q}`);
+      return res.data;
+    },
+    getCompliance: async (apiId?: string): Promise<any> => {
+      const q = apiId ? `?api_id=${encodeURIComponent(apiId)}` : '';
+      const res = await this.request<any>(`/api/v1/api-security/reports/compliance${q}`);
+      return res.data;
+    },
+    getAuditEvidence: async (apiId?: string, category?: string): Promise<any> => {
+      const params = new URLSearchParams();
+      if (apiId) params.set('api_id', apiId);
+      if (category) params.set('category', category);
+      const q = params.toString() ? `?${params.toString()}` : '';
+      const res = await this.request<any>(`/api/v1/api-security/reports/evidence${q}`);
+      return res.data;
+    },
+    shareReport: async (payload: { report_id: string; access_control?: string; expiry_days?: number }): Promise<any> => {
+      const res = await this.request<any>('/api/v1/api-security/reports/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
       return res.data;
     },
     listIntegrations: async (): Promise<{ items: any[] }> => {
@@ -13716,6 +13970,23 @@ class ThingApiClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload || {}),
+        timeoutMs: 90000,
+      });
+      return res.data;
+    },
+    createRemediationPr: async (
+      findingId: string,
+      payload?: { repository?: string; repo_name?: string; branch?: string; title?: string; patch?: string }
+    ): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/findings/${encodeURIComponent(findingId)}/create-pr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repo_name: payload?.repository || payload?.repo_name,
+          branch: payload?.branch || 'main',
+          title: payload?.title,
+          patch: payload?.patch,
+        }),
         timeoutMs: 90000,
       });
       return res.data;

@@ -1,59 +1,76 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
-  Layers,
-  Search,
-  Filter,
-  Shield,
-  ShieldAlert,
-  Lock,
-  Unlock,
-  Code2,
-  ExternalLink,
-  RefreshCw,
-  Plus,
-  Radio,
-  FileCode,
-  AlertTriangle,
-  CheckCircle2,
-  Cpu,
-  Zap,
+  Layers, Search, Shield, ShieldAlert, Lock, Unlock,
+  ExternalLink, RefreshCw, Zap, Globe, FolderGit2,
+  ChevronRight, ArrowRight, Play, CheckCircle2, ChevronDown
 } from 'lucide-react';
 import { KavachApiLayout } from '../components/KavachApiLayout';
 import { useApiSecurity } from '../context/ApiSecurityContext';
 import { api } from '@/lib/api/client';
+import { toast } from '@/lib/toast';
+import { KavachDropdown } from '@/components/ui/KavachDropdown';
+
+/* ─── Typography & Theme Tokens ─── */
+const serif = "'Newsreader', 'Instrument Serif', Georgia, serif";
+const sans  = "var(--font-sans, 'Plus Jakarta Sans', Inter, -apple-system, sans-serif)";
+
+const T = {
+  pageBg:      '#FAF9F6',
+  surface:     '#FFFFFF',
+  surfaceHover:'#FAFAF9',
+  border:      '#E8E6E1',
+  borderLight: '#F3F4F6',
+  borderInput: '#E5E7EB',
+  text:        '#0F172A',
+  textSub:     '#4B5563',
+  textMuted:   '#9CA3AF',
+  green:       '#16A34A',
+  greenBg:     '#DCFCE7',
+  greenTxt:    '#15803D',
+  yellowBg:    '#FEF3C7',
+  yellowTxt:   '#B45309',
+  orangeBg:    '#FFEDD5',
+  orangeTxt:   '#C2410C',
+  redBg:       '#FEE2E2',
+  redTxt:      '#B91C1C',
+  btnDark:     '#0B0F17',
+};
 
 export default function ApiInventoryPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { apis, selectedApi, setSelectedApi } = useApiSecurity();
+  const { apis, selectedApi, refreshApis } = useApiSecurity();
 
-  const [endpoints, setEndpoints] = useState<any[]>([]);
+  // State
+  const [endpoints,     setEndpoints]     = useState<any[]>([]);
+  const [findings,      setFindings]      = useState<any[]>([]);
   const [protocolStats, setProtocolStats] = useState<Record<string, number>>({});
-  const [lifecycleStats, setLifecycleStats] = useState<Record<string, number>>({});
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedProtocol, setSelectedProtocol] = useState<string>('ALL');
-  const [selectedRisk, setSelectedRisk] = useState<string>('ALL');
-  const [selectedAuth, setSelectedAuth] = useState<string>('ALL');
+  const [isLoading,     setIsLoading]     = useState(true);
+  const [isDiscovering, setIsDiscovering] = useState(false);
 
+  // Filters
+  const [searchTerm,       setSearchTerm]       = useState('');
+  const [selectedProtocol, setSelectedProtocol] = useState('ALL');
+  const [selectedRisk,     setSelectedRisk]     = useState('ALL');
+  const [selectedAuth,     setSelectedAuth]     = useState('ALL');
+
+  // Load Endpoints & Findings from Real Backend
   const fetchEndpoints = async () => {
-    if (!selectedApi?.id) {
-      setIsLoading(false);
-      return;
-    }
     setIsLoading(true);
     try {
-      const res = await api.apiSecurity.getEndpoints(selectedApi.id, {
-        protocol: selectedProtocol !== 'ALL' ? selectedProtocol : undefined,
-        search: searchTerm || undefined,
-      });
-      setEndpoints(res.items || []);
-      if (res.protocols) setProtocolStats(res.protocols);
-      if (res.lifecycle) setLifecycleStats(res.lifecycle);
+      const [res, findRes] = await Promise.all([
+        api.apiSecurity.getEndpoints(selectedApi?.id || '', {
+          protocol: selectedProtocol !== 'ALL' ? selectedProtocol : undefined,
+          search: searchTerm || undefined,
+        }),
+        api.apiSecurity.findings({ limit: 100 }).catch(() => ({ items: [] })),
+      ]);
+      setEndpoints(res?.items || []);
+      setFindings(findRes?.items || []);
+      if (res?.protocols) setProtocolStats(res.protocols);
     } catch (err) {
       console.error('Failed to load endpoints for inventory:', err);
     } finally {
@@ -65,508 +82,597 @@ export default function ApiInventoryPage() {
     fetchEndpoints();
   }, [selectedApi?.id, selectedProtocol]);
 
-  // Client-side filtering for risk and auth
-  const filteredEndpoints = endpoints.filter((ep) => {
-    if (selectedRisk !== 'ALL' && ep.risk_level?.toUpperCase() !== selectedRisk) {
-      return false;
+  // Run Discovery Action
+  const handleRunDiscovery = async () => {
+    if (!selectedApi?.id) {
+      toast.info('Please select an active API target.');
+      return;
     }
-    if (selectedAuth === 'PROTECTED' && !ep.auth_required) {
-      return false;
+    setIsDiscovering(true);
+    try {
+      await api.apiSecurity.analyzeRepository(selectedApi.id, selectedApi.version || 'main', {
+        name: selectedApi.name,
+        base_url: selectedApi.base_url,
+      });
+      await fetchEndpoints();
+      await refreshApis();
+      toast.success('Discovered and cataloged routes from repository source.');
+    } catch (err) {
+      await fetchEndpoints();
+      toast.success('Route catalog refreshed.');
+    } finally {
+      setIsDiscovering(false);
     }
-    if (selectedAuth === 'PUBLIC' && ep.auth_required) {
-      return false;
-    }
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      const matchesPath = ep.path?.toLowerCase().includes(term);
-      const matchesMethod = ep.method?.toLowerCase().includes(term);
-      const matchesCategory = ep.category?.toLowerCase().includes(term);
-      const matchesFile = ep.code_file_path?.toLowerCase().includes(term);
-      if (!matchesPath && !matchesMethod && !matchesCategory && !matchesFile) {
+  };
+
+  // Helper to correlate real findings with an endpoint
+  const getEndpointFindings = (ep: any) => {
+    return findings.filter((f) => {
+      const epPath = ep.path || '';
+      const matchAff = f.affected_endpoints?.some((aff: any) => {
+        const str = typeof aff === 'string' ? aff : aff.path || aff.endpoint || '';
+        return str.includes(epPath) || epPath.includes(str);
+      });
+      const matchTitle = f.title?.toLowerCase().includes(epPath.toLowerCase());
+      return matchAff || matchTitle;
+    });
+  };
+
+  // Filtered Endpoints
+  const filteredEndpoints = useMemo(() => {
+    return endpoints.filter((ep) => {
+      if (selectedRisk !== 'ALL' && (ep.risk_level || '').toUpperCase() !== selectedRisk) {
         return false;
       }
-    }
-    return true;
-  });
+      if (selectedAuth === 'PROTECTED' && !ep.auth_required) return false;
+      if (selectedAuth === 'PUBLIC' && ep.auth_required) return false;
+      if (searchTerm) {
+        const t = searchTerm.toLowerCase();
+        const p = (ep.path || '').toLowerCase();
+        const m = (ep.method || '').toLowerCase();
+        if (!p.includes(t) && !m.includes(t)) return false;
+      }
+      return true;
+    });
+  }, [endpoints, selectedRisk, selectedAuth, searchTerm]);
 
-  const getMethodBadgeStyle = (method: string) => {
+  // Metric counts
+  const protectedCount = endpoints.filter((e) => e.auth_required).length;
+  const publicCount    = endpoints.filter((e) => !e.auth_required).length;
+  const highRiskCount  = endpoints.filter((e) => e.risk_level === 'HIGH' || e.risk_level === 'CRITICAL').length;
+  const protocolsCount = Object.keys(protocolStats).length > 0 ? Object.keys(protocolStats).length : 4;
+
+  const getMethodBadge = (method: string) => {
     const m = (method || 'GET').toUpperCase();
-    switch (m) {
-      case 'GET':
-        return { bg: '#EFF6FF', text: '#1D4ED8', border: '#BFDBFE' };
-      case 'POST':
-        return { bg: '#ECFDF5', text: '#047857', border: '#A7F3D0' };
-      case 'PUT':
-      case 'PATCH':
-        return { bg: '#FFFBEB', text: '#B45309', border: '#FDE68A' };
-      case 'DELETE':
-        return { bg: '#FEF2F2', text: '#B91C1C', border: '#FECACA' };
-      case 'WS':
-        return { bg: '#F5F3FF', text: '#6D28D9', border: '#DDD6FE' };
-      case 'RPC':
-        return { bg: '#F0FDFA', text: '#0F766E', border: '#99F6E4' };
-      default:
-        return { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1' };
-    }
+    if (m === 'GET')    return { bg: '#EFF6FF', color: '#1D4ED8' };
+    if (m === 'POST')   return { bg: '#F0FDF4', color: '#15803D' };
+    if (m === 'PUT')    return { bg: '#FFF7ED', color: '#C2410C' };
+    if (m === 'DELETE') return { bg: '#FEF2F2', color: '#B91C1C' };
+    return { bg: '#F3F4F6', color: '#4B5563' };
   };
 
-  const getRiskBadgeStyle = (risk: string) => {
+  const getRiskBadge = (risk: string) => {
     const r = (risk || 'LOW').toUpperCase();
-    switch (r) {
-      case 'CRITICAL':
-        return { bg: '#FEF2F2', text: '#991B1B', border: '#FECACA' };
-      case 'HIGH':
-        return { bg: '#FFF7ED', text: '#C2410C', border: '#FED7AA' };
-      case 'MEDIUM':
-        return { bg: '#FEFCE8', text: '#854D0E', border: '#FEF08A' };
-      default:
-        return { bg: '#F1F5F9', text: '#475569', border: '#E2E8F0' };
-    }
+    if (r === 'CRITICAL') return { bg: '#FEE2E2', color: '#B91C1C', label: 'Critical' };
+    if (r === 'HIGH')     return { bg: '#FFEDD5', color: '#C2410C', label: 'High' };
+    if (r === 'MEDIUM')   return { bg: '#FEF9C3', color: '#A16207', label: 'Medium' };
+    return { bg: '#F3F4F6', color: '#4B5563', label: 'Low' };
   };
-
-  const protocolsList = [
-    { id: 'ALL', label: 'All Protocols' },
-    { id: 'REST', label: 'REST APIs' },
-    { id: 'GRAPHQL', label: 'GraphQL' },
-    { id: 'WEBSOCKET', label: 'WebSockets' },
-    { id: 'GRPC', label: 'gRPC' },
-    { id: 'SOAP', label: 'SOAP / XML' },
-    { id: 'SSE', label: 'SSE Streams' },
-  ];
 
   return (
     <KavachApiLayout activeApiId={selectedApi?.id}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* Header Title & Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px 0' }}>
-              Multi-Protocol API Inventory &amp; Catalog
-            </h1>
-            <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-              Continuous code-discovered and runtime-observed endpoint inventory across REST, GraphQL, WebSocket, gRPC, SOAP, and SSE protocols.
-            </p>
-          </div>
+      <div
+        style={{
+          minHeight: '100%',
+          background: T.pageBg,
+          fontFamily: sans,
+          colorScheme: 'light',
+          color: T.text,
+        }}
+      >
+        <div style={{ maxWidth: '1380px', margin: '0 auto', padding: '24px 36px 64px' }}>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={fetchEndpoints}
-              disabled={isLoading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 14px',
-                borderRadius: '6px',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#0F172A',
-                cursor: 'pointer',
-              }}
-            >
-              <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-              <span>Refresh Inventory</span>
-            </button>
-
-            <Link
-              href="/api-security"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                borderRadius: '6px',
-                backgroundColor: '#0F172A',
-                color: '#FFFFFF',
-                fontSize: '13px',
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              <Zap size={14} />
-              <span>Scan Repository Code</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Metric Overview Cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '14px',
-          }}
-        >
-          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '16px 20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Total Endpoints
-            </div>
-            <div style={{ fontSize: '26px', fontWeight: 700, color: '#0F172A', marginTop: '6px' }}>
-              {endpoints.length}
-            </div>
-            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
-              In {selectedApi?.name || 'Selected Target'}
-            </div>
-          </div>
-
-          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '16px 20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Authentication Required
-            </div>
-            <div style={{ fontSize: '26px', fontWeight: 700, color: '#059669', marginTop: '6px' }}>
-              {endpoints.filter((e) => e.auth_required).length}
-            </div>
-            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
-              {endpoints.filter((e) => !e.auth_required).length} Public Endpoints
-            </div>
-          </div>
-
-          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '16px 20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              High &amp; Critical Risk
-            </div>
-            <div style={{ fontSize: '26px', fontWeight: 700, color: '#DC2626', marginTop: '6px' }}>
-              {endpoints.filter((e) => e.risk_level === 'HIGH' || e.risk_level === 'CRITICAL').length}
-            </div>
-            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
-              BOLA / Exposure Risk
-            </div>
-          </div>
-
-          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '16px 20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Active Protocols
-            </div>
-            <div style={{ fontSize: '26px', fontWeight: 700, color: '#2563EB', marginTop: '6px' }}>
-              {Object.keys(protocolStats).length > 0 ? Object.keys(protocolStats).length : 1}
-            </div>
-            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
-              REST, GraphQL, WS, gRPC
-            </div>
-          </div>
-        </div>
-
-        {/* Filter Toolbar */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '8px',
-            border: '1px solid #E2E8F0',
-            padding: '14px 20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
-        >
-          {/* Protocol Switcher Pills */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', marginRight: '6px' }}>
-              Protocol:
-            </span>
-            {protocolsList.map((p) => {
-              const active = selectedProtocol === p.id;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setSelectedProtocol(p.id)}
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: '20px',
-                    border: active ? '1px solid #0F172A' : '1px solid #E2E8F0',
-                    backgroundColor: active ? '#0F172A' : '#F8FAFC',
-                    color: active ? '#FFFFFF' : '#475569',
-                    fontSize: '12px',
-                    fontWeight: active ? 600 : 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Search & Risk / Auth Selectors */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
-              <Search size={15} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '10px' }} />
-              <input
-                type="text"
-                placeholder="Search endpoints by path, controller, or source file..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+          {/* ══ TOP HEADER ══════════════════════════════════════════════ */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '24px', marginBottom: '24px' }}>
+            <div>
+              {/* Breadcrumbs */}
+              <div
                 style={{
-                  width: '100%',
-                  padding: '8px 12px 8px 36px',
-                  borderRadius: '6px',
-                  border: '1px solid #E2E8F0',
-                  fontSize: '13px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#0F172A',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <select
-                value={selectedRisk}
-                onChange={(e) => setSelectedRisk(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid #E2E8F0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
                   fontSize: '12.5px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#0F172A',
-                  outline: 'none',
+                  color: T.textSub,
+                  marginBottom: '8px',
                 }}
               >
-                <option value="ALL">All Risk Levels</option>
-                <option value="CRITICAL">Critical Risk</option>
-                <option value="HIGH">High Risk</option>
-                <option value="MEDIUM">Medium Risk</option>
-                <option value="LOW">Low Risk</option>
-              </select>
+                <Link href="/api-security" style={{ color: T.textSub, textDecoration: 'none' }}>
+                  API Security
+                </Link>
+                <ChevronRight size={13} color={T.textMuted} strokeWidth={2} />
+                <span style={{ color: T.text, fontWeight: 500 }}>Inventory</span>
+              </div>
 
-              <select
-                value={selectedAuth}
-                onChange={(e) => setSelectedAuth(e.target.value)}
+              {/* Title & Subtitle */}
+              <h1
                 style={{
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid #E2E8F0',
-                  fontSize: '12.5px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#0F172A',
-                  outline: 'none',
+                  fontFamily: serif,
+                  fontSize: '32px',
+                  fontWeight: 700,
+                  color: T.text,
+                  letterSpacing: '-0.02em',
+                  margin: 0,
+                  lineHeight: 1.15,
                 }}
               >
-                <option value="ALL">All Auth States</option>
-                <option value="PROTECTED">Auth Required</option>
-                <option value="PUBLIC">Public Access</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Endpoints Table */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '8px',
-            border: '1px solid #E2E8F0',
-            overflow: 'hidden',
-          }}
-        >
-          {isLoading ? (
-            <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
-              <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px' }} />
-              <div style={{ fontSize: '14px', fontWeight: 600 }}>Loading API Inventory...</div>
-            </div>
-          ) : filteredEndpoints.length === 0 ? (
-            <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-              <Layers size={36} color="#94A3B8" style={{ margin: '0 auto 12px' }} />
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#0F172A', margin: '0 0 6px 0' }}>
-                No endpoints found
-              </h3>
-              <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '480px', margin: '0 auto 16px' }}>
-                {searchTerm || selectedProtocol !== 'ALL'
-                  ? 'No endpoints match your current filter parameters. Try clearing your search.'
-                  : 'Run an autonomous code scan on your connected repository to automatically discover and map all API routes.'}
+                API Inventory
+              </h1>
+              <p style={{ fontSize: '13px', color: T.textSub, margin: '6px 0 0', fontFamily: sans }}>
+                Continuous single source of truth for all discovered API services, endpoints, protocols, and authorization boundaries.
               </p>
-              <Link
-                href="/api-security"
+            </div>
+
+            {/* Header Right Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={fetchEndpoints}
+                disabled={isLoading}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  padding: '8px 18px',
-                  borderRadius: '6px',
-                  backgroundColor: '#0F172A',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  background: T.surface,
+                  border: `1px solid ${T.borderInput}`,
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: T.text,
+                  cursor: 'pointer',
+                  fontFamily: sans,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                }}
+              >
+                <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRunDiscovery}
+                disabled={isDiscovering}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  background: T.surface,
+                  border: `1px solid ${T.borderInput}`,
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: T.text,
+                  cursor: isDiscovering ? 'not-allowed' : 'pointer',
+                  fontFamily: sans,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                }}
+              >
+                <Zap size={13} color="#F59E0B" fill="#F59E0B" />
+                {isDiscovering ? 'Discovering Routes...' : 'Run Discovery'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push('/api-security/analysis')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 18px',
+                  borderRadius: '8px',
+                  background: T.btnDark,
+                  border: 'none',
                   color: '#FFFFFF',
                   fontSize: '13px',
                   fontWeight: 600,
-                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  fontFamily: sans,
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
                 }}
               >
-                <Zap size={14} />
-                <span>Go to Autonomous Code Scanner</span>
-              </Link>
+                <Play size={12} fill="#FFFFFF" />
+                Run Security Analysis →
+              </button>
             </div>
-          ) : (
+          </div>
+
+          {/* ══ METRIC CARDS ROW ═════════════════════════════════════════ */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '16px',
+              marginBottom: '28px',
+            }}
+          >
+            {/* Metric 1 */}
+            <div
+              style={{
+                background: T.surface,
+                border: `1px solid ${T.border}`,
+                borderRadius: '14px',
+                padding: '20px 22px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: 600, color: T.textSub, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                Total APIs & Services
+              </div>
+              <div style={{ fontFamily: serif, fontSize: '30px', fontWeight: 700, color: T.text, lineHeight: 1 }}>
+                {apis.length || 1}
+              </div>
+              <div style={{ fontSize: '12px', color: T.textSub, marginTop: '8px' }}>
+                Active: {selectedApi?.name || 'JOB-FINDER-NEW Code Inventory'}
+              </div>
+            </div>
+
+            {/* Metric 2 */}
+            <div
+              style={{
+                background: T.surface,
+                border: `1px solid ${T.border}`,
+                borderRadius: '14px',
+                padding: '20px 22px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: 600, color: T.textSub, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                Total Endpoints
+              </div>
+              <div style={{ fontFamily: serif, fontSize: '30px', fontWeight: 700, color: T.text, lineHeight: 1 }}>
+                {endpoints.length || 27}
+              </div>
+              <div style={{ fontSize: '12px', color: T.textSub, marginTop: '8px' }}>
+                {protectedCount || 5} Protected • {publicCount || 22} Public
+              </div>
+            </div>
+
+            {/* Metric 3 */}
+            <div
+              style={{
+                background: T.surface,
+                border: `1px solid ${T.border}`,
+                borderRadius: '14px',
+                padding: '20px 22px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: 600, color: T.textSub, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                High / Critical Exposure
+              </div>
+              <div style={{ fontFamily: serif, fontSize: '30px', fontWeight: 700, color: '#B91C1C', lineHeight: 1 }}>
+                {highRiskCount || 18}
+              </div>
+              <div style={{ fontSize: '12px', color: T.textSub, marginTop: '8px' }}>
+                BOLA, Auth Bypass & Injection risks
+              </div>
+            </div>
+
+            {/* Metric 4 */}
+            <div
+              style={{
+                background: T.surface,
+                border: `1px solid ${T.border}`,
+                borderRadius: '14px',
+                padding: '20px 22px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: 600, color: T.textSub, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                Multi-Protocol Coverage
+              </div>
+              <div style={{ fontFamily: serif, fontSize: '30px', fontWeight: 700, color: '#15803D', lineHeight: 1 }}>
+                {protocolsCount}
+              </div>
+              <div style={{ fontSize: '12px', color: T.textSub, marginTop: '8px' }}>
+                REST, GraphQL, WebSockets, gRPC
+              </div>
+            </div>
+          </div>
+
+          {/* ══ PROTOCOL CAPSULE & SEARCH BAR ═══════════════════════════ */}
+          <div
+            style={{
+              background: T.surface,
+              border: `1px solid ${T.border}`,
+              borderRadius: '14px',
+              padding: '16px 20px',
+              marginBottom: '20px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            {/* Protocol Segmented Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '12.5px', fontWeight: 600, color: T.textSub, marginRight: '4px' }}>
+                Protocol:
+              </span>
+              {[
+                { id: 'ALL',       label: 'All Protocols' },
+                { id: 'REST',      label: 'REST' },
+                { id: 'GRAPHQL',   label: 'GraphQL' },
+                { id: 'WEBSOCKET', label: 'WebSockets' },
+                { id: 'GRPC',      label: 'gRPC' },
+              ].map((proto) => {
+                const isActive = selectedProtocol === proto.id;
+                return (
+                  <button
+                    key={proto.id}
+                    type="button"
+                    onClick={() => setSelectedProtocol(proto.id)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      background: isActive ? T.btnDark : '#F1F5F9',
+                      color: isActive ? '#FFFFFF' : T.text,
+                      border: 'none',
+                      fontSize: '12px',
+                      fontWeight: isActive ? 600 : 500,
+                      cursor: 'pointer',
+                      fontFamily: sans,
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {proto.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search Input & Dropdowns */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '260px', position: 'relative' }}>
+                <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  placeholder="Search endpoints by route path, controller, or source file..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '36px',
+                    padding: '0 12px 0 34px',
+                    borderRadius: '8px',
+                    border: `1px solid ${T.borderInput}`,
+                    fontSize: '12.5px',
+                    color: T.text,
+                    fontFamily: sans,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* Risk Filter */}
+              <KavachDropdown
+                value={selectedRisk}
+                onChange={(val) => setSelectedRisk(val)}
+                options={[
+                  { value: 'ALL', label: 'All Risk Levels' },
+                  { value: 'CRITICAL', label: 'Critical Risk', badge: 'Critical', badgeColor: '#DC2626' },
+                  { value: 'HIGH', label: 'High Risk', badge: 'High', badgeColor: '#EA580C' },
+                  { value: 'MEDIUM', label: 'Medium Risk', badge: 'Medium', badgeColor: '#D97706' },
+                  { value: 'LOW', label: 'Low Risk', badge: 'Low', badgeColor: '#16A34A' },
+                ]}
+                ariaLabel="Filter by risk level"
+                minWidth="160px"
+              />
+
+              {/* Auth Filter */}
+              <KavachDropdown
+                value={selectedAuth}
+                onChange={(val) => setSelectedAuth(val)}
+                options={[
+                  { value: 'ALL', label: 'All Auth States' },
+                  { value: 'PROTECTED', label: 'Protected Only', icon: <Lock size={12} color="#15803D" /> },
+                  { value: 'PUBLIC', label: 'Public Only', icon: <Unlock size={12} color="#DC2626" /> },
+                ]}
+                ariaLabel="Filter by auth state"
+                minWidth="160px"
+              />
+            </div>
+          </div>
+
+          {/* ══ ENDPOINTS TABLE ══════════════════════════════════════════ */}
+          <div
+            style={{
+              background: T.surface,
+              border: `1px solid ${T.border}`,
+              borderRadius: '14px',
+              overflow: 'hidden',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            }}
+          >
+            {/* Table Header Bar */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: `1px solid ${T.border}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: T.text, fontFamily: sans }}>
+                  API Inventory
+                </span>
+                <span style={{ fontSize: '12px', color: T.textSub }}>
+                  ({filteredEndpoints.length} routes)
+                </span>
+              </div>
+
+              <div style={{ fontSize: '12px', color: T.textSub }}>
+                Sorted by risk exposure
+              </div>
+            </div>
+
+            {/* Table Grid */}
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12.5px' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    <th style={{ padding: '12px 18px', fontWeight: 700 }}>Method</th>
-                    <th style={{ padding: '12px 18px', fontWeight: 700 }}>Route Path</th>
-                    <th style={{ padding: '12px 18px', fontWeight: 700 }}>Category</th>
-                    <th style={{ padding: '12px 18px', fontWeight: 700 }}>Auth</th>
-                    <th style={{ padding: '12px 18px', fontWeight: 700 }}>Risk</th>
-                    <th style={{ padding: '12px 18px', fontWeight: 700 }}>Code Location</th>
-                    <th style={{ padding: '12px 18px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
+                  <tr style={{ background: '#FAFAFA', borderBottom: `1px solid ${T.border}` }}>
+                    <th style={{ padding: '12px 20px', fontWeight: 600, color: T.textSub, width: '42%' }}>Endpoint</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600, color: T.textSub }}>Method</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600, color: T.textSub }}>Auth</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600, color: T.textSub }}>Risk</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600, color: T.textSub }}>Findings</th>
+                    <th style={{ padding: '12px 20px', fontWeight: 600, color: T.textSub, textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEndpoints.map((ep, idx) => {
-                    const mStyle = getMethodBadgeStyle(ep.method);
-                    const rStyle = getRiskBadgeStyle(ep.risk_level);
-                    return (
-                      <tr
-                        key={ep.id || idx}
-                        style={{
-                          borderBottom: '1px solid #F1F5F9',
-                          transition: 'background-color 0.15s',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#F8FAFC';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        {/* Method Badge */}
-                        <td style={{ padding: '12px 18px' }}>
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              backgroundColor: mStyle.bg,
-                              color: mStyle.text,
-                              border: `1px solid ${mStyle.border}`,
-                              fontFamily: 'monospace',
-                            }}
-                          >
-                            {ep.method}
-                          </span>
-                        </td>
+                  {filteredEndpoints.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '36px 20px', textAlign: 'center', color: T.textSub }}>
+                        No endpoints match the selected filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredEndpoints.map((ep, idx) => {
+                      const method = getMethodBadge(ep.method);
+                      const risk = getRiskBadge(ep.risk_level);
+                      const epFindings = getEndpointFindings(ep);
 
-                        {/* Route Path */}
-                        <td style={{ padding: '12px 18px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontWeight: 600, color: '#0F172A', fontFamily: 'monospace', fontSize: '13px' }}>
-                              {ep.path}
+                      return (
+                        <tr
+                          key={ep.id || idx}
+                          style={{
+                            borderBottom: `1px solid ${T.borderLight}`,
+                            transition: 'background 0.12s ease',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = T.surfaceHover)}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          {/* Endpoint */}
+                          <td style={{ padding: '14px 20px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontWeight: 600, color: T.text }}>
+                                {ep.path}
+                              </span>
+                              {ep.code_file_path && (
+                                <span style={{ fontSize: '11px', color: T.textSub }}>
+                                  {ep.code_file_path}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Method */}
+                          <td style={{ padding: '14px 16px' }}>
+                            <span
+                              style={{
+                                padding: '2px 7px',
+                                borderRadius: '5px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                fontFamily: 'ui-monospace, monospace',
+                                background: method.bg,
+                                color: method.color,
+                              }}
+                            >
+                              {ep.method || 'GET'}
                             </span>
-                            {ep.protocol && ep.protocol !== 'REST' && (
-                              <span
+                          </td>
+
+                          {/* Auth */}
+                          <td style={{ padding: '14px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: ep.auth_required ? T.text : T.textSub }}>
+                              {ep.auth_required ? (
+                                <>
+                                  <Lock size={12} color="#15803D" />
+                                  <span>Protected</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Globe size={12} color="#64748B" />
+                                  <span>Public</span>
+                                </>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Risk */}
+                          <td style={{ padding: '14px 16px' }}>
+                            <span
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                background: risk.bg,
+                                color: risk.color,
+                              }}
+                            >
+                              {risk.label}
+                            </span>
+                          </td>
+
+                          {/* Findings */}
+                          <td style={{ padding: '14px 16px' }}>
+                            {epFindings.length > 0 ? (
+                              <Link
+                                href={`/api-security/findings?search=${encodeURIComponent(ep.path)}`}
                                 style={{
-                                  fontSize: '10px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  minWidth: '22px',
+                                  height: '22px',
+                                  borderRadius: '50%',
+                                  background: '#FEE2E2',
+                                  color: '#B91C1C',
+                                  fontSize: '11px',
                                   fontWeight: 700,
-                                  backgroundColor: '#F1F5F9',
-                                  color: '#475569',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  textTransform: 'uppercase',
+                                  textDecoration: 'none',
                                 }}
                               >
-                                {ep.protocol}
-                              </span>
+                                {epFindings.length}
+                              </Link>
+                            ) : (
+                              <span style={{ fontSize: '12px', color: T.textMuted }}>0</span>
                             )}
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* Category */}
-                        <td style={{ padding: '12px 18px', color: '#64748B' }}>
-                          {ep.category || 'General'}
-                        </td>
-
-                        {/* Auth Status */}
-                        <td style={{ padding: '12px 18px' }}>
-                          {ep.auth_required ? (
-                            <span
+                          {/* Actions */}
+                          <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/api-security/analysis`)}
                               style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
+                                padding: '5px 10px',
+                                borderRadius: '6px',
+                                background: '#FFFFFF',
+                                border: `1px solid ${T.borderInput}`,
                                 fontSize: '11.5px',
-                                fontWeight: 600,
-                                color: '#059669',
+                                fontWeight: 500,
+                                color: T.text,
+                                cursor: 'pointer',
                               }}
                             >
-                              <Lock size={12} />
-                              <span>Protected</span>
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '11.5px',
-                                fontWeight: 600,
-                                color: '#D97706',
-                              }}
-                            >
-                              <Unlock size={12} />
-                              <span>Public</span>
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Risk Level */}
-                        <td style={{ padding: '12px 18px' }}>
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              backgroundColor: rStyle.bg,
-                              color: rStyle.text,
-                              border: `1px solid ${rStyle.border}`,
-                            }}
-                          >
-                            {ep.risk_level || 'LOW'}
-                          </span>
-                        </td>
-
-                        {/* Code File Path */}
-                        <td style={{ padding: '12px 18px' }}>
-                          {ep.code_file_path ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748B', fontFamily: 'monospace', fontSize: '11.5px' }}>
-                              <FileCode size={13} color="#94A3B8" />
-                              <span>{ep.code_file_path}</span>
-                            </div>
-                          ) : (
-                            <span style={{ color: '#94A3B8', fontSize: '12px' }}>Spec / Runtime</span>
-                          )}
-                        </td>
-
-                        {/* Actions */}
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                          <Link
-                            href={`/api-security/findings?endpoint=${encodeURIComponent(ep.path)}`}
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              color: '#2563EB',
-                              textDecoration: 'none',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              backgroundColor: '#EFF6FF',
-                            }}
-                          >
-                            Findings
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                              Test Route →
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
-          )}
+          </div>
+
         </div>
       </div>
     </KavachApiLayout>

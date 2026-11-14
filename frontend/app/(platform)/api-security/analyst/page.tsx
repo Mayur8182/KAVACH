@@ -17,6 +17,8 @@ import {
 import { KavachApiLayout } from '../components/KavachApiLayout';
 import { useApiSecurity } from '../context/ApiSecurityContext';
 import { api } from '@/lib/api/client';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Button } from '@/components/ui/Button';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -43,15 +45,6 @@ export default function AiSecurityAnalystPage() {
     'How can I improve my API security?',
   ];
 
-  const agentCapabilities = [
-    { title: 'Analyze your API structure', desc: 'Evaluates OpenAPI specifications, route handlers, and data models.' },
-    { title: 'Investigate findings with evidence', desc: 'Examines HTTP request/response traces and assertion failures.' },
-    { title: 'Correlate related findings', desc: 'Identifies compounding vulnerabilities across multiple endpoints.' },
-    { title: 'Suggest remediation steps', desc: 'Generates language-specific patch proposals and code diffs.' },
-    { title: 'Help with verification/testing', desc: 'Formulates targeted security test plans to confirm fixes.' },
-    { title: 'Provide security best practices', desc: 'Aligns defenses with OWASP API Security Top 10 guidelines.' },
-  ];
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -60,21 +53,25 @@ export default function AiSecurityAnalystPage() {
     scrollToBottom();
   }, [messages]);
 
-  // If initialPrompt exists on mount, auto-send it
   useEffect(() => {
     if (initialPrompt && messages.length === 0) {
       handleSendMessage(initialPrompt);
     }
   }, [initialPrompt]);
 
-  const handleSendMessage = async (textToSend?: string) => {
-    const prompt = (textToSend || inputPrompt).trim();
-    if (!prompt || isLoading) return;
+  const handleSendMessage = async (promptToSend?: string) => {
+    const prompt = promptToSend || inputPrompt;
+    if (!prompt.trim() || isLoading) return;
 
     const newMessages: ChatMessage[] = [
       ...messages,
-      { role: 'user', content: prompt, timestamp: new Date().toLocaleTimeString() },
+      {
+        role: 'user',
+        content: prompt,
+        timestamp: new Date().toLocaleTimeString(),
+      },
     ];
+
     setMessages(newMessages);
     setInputPrompt('');
     setIsLoading(true);
@@ -111,97 +108,41 @@ export default function AiSecurityAnalystPage() {
 
   return (
     <KavachApiLayout activeApiId={selectedApi?.id}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px', margin: '0 auto' }}>
-        {/* Title */}
-        <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-            AI Security Analyst
-          </h1>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0' }}>
-            Get insights, investigate findings and get remediation guidance.
-          </p>
-        </div>
+      <div className="w-full space-y-6">
+        <PageHeader
+          title="AI Security Analyst"
+          subtitle="Interactive reasoning engine for investigating findings, attack chains, and code remediation."
+          breadcrumbs={[
+            { label: 'API Security', href: '/api-security' },
+            { label: 'Analyst' },
+          ]}
+        />
 
-        {/* Two Column Grid: Chat Area (Left) + Capabilities Panel (Right) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px' }}>
-          {/* Left Column: Chat Container */}
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              height: 'calc(100vh - 210px)',
-              minHeight: '520px',
-              overflow: 'hidden',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            }}
-          >
+        {/* Full Width Chat Container */}
+        <div className="w-full">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl flex flex-col h-[calc(100vh-250px)] min-h-[540px] overflow-hidden shadow-xs w-full">
             {/* Messages Area */}
-            <div
-              style={{
-                flex: 1,
-                padding: '24px',
-                overflowY: 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '18px',
-              }}
-            >
+            <div className="flex-1 p-6 overflow-y-auto space-y-4">
               {messages.length === 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '40px 20px', margin: 'auto 0' }}>
-                  <div
-                    style={{
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '10px',
-                      backgroundColor: '#F5F3FF',
-                      color: '#7C3AED',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '14px',
-                    }}
-                  >
-                    <Bot size={24} />
+                <div className="flex flex-col items-center text-center p-8 m-auto">
+                  <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-900/60 flex items-center justify-center mb-3">
+                    <Bot className="w-6 h-6" />
                   </div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                     Kavach Gemini Security Analyst
                   </h3>
-                  <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '440px', margin: '6px 0 24px 0' }}>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mt-1 mb-6">
                     Ask specific questions regarding vulnerability impact, BOLA access control, injection risks, or remediation patches.
                   </p>
 
                   {/* Suggestion Chips */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '580px', width: '100%' }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
                     {suggestedPrompts.map((suggestion, idx) => (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => handleSendMessage(suggestion)}
-                        style={{
-                          padding: '10px 14px',
-                          borderRadius: '8px',
-                          backgroundColor: '#F8FAFC',
-                          border: '1px solid #E2E8F0',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          color: '#334155',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#EFF6FF';
-                          e.currentTarget.style.borderColor = '#BFDBFE';
-                          e.currentTarget.style.color = '#1D4ED8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#F8FAFC';
-                          e.currentTarget.style.borderColor = '#E2E8F0';
-                          e.currentTarget.style.color = '#334155';
-                        }}
+                        className="p-3 rounded-lg bg-slate-50 dark:bg-zinc-850/60 border border-slate-200 dark:border-zinc-700/80 text-xs font-medium text-slate-700 dark:text-zinc-300 text-left hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:border-blue-300 dark:hover:border-blue-800 hover:text-blue-600 dark:hover:text-blue-400 transition"
                       >
                         {suggestion}
                       </button>
@@ -215,77 +156,36 @@ export default function AiSecurityAnalystPage() {
                 return (
                   <div
                     key={idx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '12px',
-                      alignSelf: isUser ? 'flex-end' : 'flex-start',
-                      maxWidth: '85%',
-                    }}
+                    className={`flex items-start gap-3 max-w-[85%] ${
+                      isUser ? 'ml-auto flex-row-reverse' : ''
+                    }`}
                   >
                     {!isUser && (
-                      <div
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '50%',
-                          backgroundColor: '#F5F3FF',
-                          color: '#7C3AED',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          marginTop: '2px',
-                        }}
-                      >
-                        <Bot size={16} />
+                      <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <Bot className="w-4 h-4" />
                       </div>
                     )}
 
                     <div
-                      style={{
-                        padding: '12px 16px',
-                        borderRadius: '10px',
-                        backgroundColor: isUser ? '#2563EB' : '#F8FAFC',
-                        color: isUser ? '#FFFFFF' : '#0F172A',
-                        border: isUser ? 'none' : '1px solid #E2E8F0',
-                        fontSize: '13px',
-                        lineHeight: 1.6,
-                        whiteSpace: 'pre-wrap',
-                      }}
+                      className={`p-4 rounded-xl text-xs leading-relaxed whitespace-pre-wrap ${
+                        isUser
+                          ? 'bg-blue-600 text-white rounded-tr-xs'
+                          : 'bg-slate-50 dark:bg-zinc-800/80 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-zinc-700 rounded-tl-xs'
+                      }`}
                     >
                       {msg.content}
                       <span
-                        style={{
-                          display: 'block',
-                          fontSize: '10px',
-                          color: isUser ? 'rgba(255,255,255,0.7)' : '#94A3B8',
-                          marginTop: '6px',
-                          textAlign: 'right',
-                        }}
+                        className={`block text-[10px] mt-1.5 text-right ${
+                          isUser ? 'text-blue-200' : 'text-slate-400 dark:text-zinc-500'
+                        }`}
                       >
                         {msg.timestamp}
                       </span>
                     </div>
 
                     {isUser && (
-                      <div
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '50%',
-                          backgroundColor: '#2563EB',
-                          color: '#FFFFFF',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          marginTop: '2px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                        }}
-                      >
-                        MS
+                      <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                        <User className="w-4 h-4" />
                       </div>
                     )}
                   </div>
@@ -293,20 +193,9 @@ export default function AiSecurityAnalystPage() {
               })}
 
               {isLoading && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748B', fontSize: '13px' }}>
-                  <div
-                    style={{
-                      width: '30px',
-                      height: '30px',
-                      borderRadius: '50%',
-                      backgroundColor: '#F5F3FF',
-                      color: '#7C3AED',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Loader2 size={16} className="animate-spin" />
+                <div className="flex items-center gap-2.5 text-xs text-slate-500 dark:text-zinc-400">
+                  <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   </div>
                   <span>Reasoning with Gemini API security models...</span>
                 </div>
@@ -321,98 +210,26 @@ export default function AiSecurityAnalystPage() {
                 e.preventDefault();
                 handleSendMessage();
               }}
-              style={{
-                padding: '14px 20px',
-                borderTop: '1px solid #F1F5F9',
-                display: 'flex',
-                gap: '10px',
-                backgroundColor: '#FFFFFF',
-              }}
+              className="p-3.5 border-t border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-850/60 flex items-center gap-2.5"
             >
               <input
                 type="text"
                 value={inputPrompt}
                 onChange={(e) => setInputPrompt(e.target.value)}
-                placeholder="Ask anything about your API security..."
+                placeholder="Ask anything about your API security posture, findings, or patches..."
                 disabled={isLoading}
-                style={{
-                  flex: 1,
-                  padding: '10px 14px',
-                  fontSize: '13px',
-                  borderRadius: '6px',
-                  border: '1px solid #CBD5E1',
-                  outline: 'none',
-                }}
+                className="flex-1 px-3.5 py-2 text-xs bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 type="submit"
                 disabled={isLoading || !inputPrompt.trim()}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '10px 18px',
-                  backgroundColor: '#2563EB',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: isLoading || !inputPrompt.trim() ? 'not-allowed' : 'pointer',
-                }}
               >
                 <span>Send</span>
-                <Send size={14} />
-              </button>
+                <Send className="w-3.5 h-3.5 ml-1.5" />
+              </Button>
             </form>
-          </div>
-
-          {/* Right Column: Agent Capabilities */}
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-              height: 'fit-content',
-            }}
-          >
-            <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-              Agent Capabilities
-            </h2>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {agentCapabilities.map((cap, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <div
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: '#EFF6FF',
-                      color: '#2563EB',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginTop: '2px',
-                    }}
-                  >
-                    <CheckCircle2 size={13} />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', display: 'block' }}>
-                      {cap.title}
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.4 }}>
-                      {cap.desc}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

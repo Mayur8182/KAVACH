@@ -292,6 +292,12 @@ export const ScopeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
         } else {
           if (mounted) {
+            setCurrentProjectState(null);
+            setCurrentEnvState(null);
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('secu_active_project_id');
+              localStorage.removeItem('secu_active_repo');
+            }
             await loadRepositories(null, activeWs?.id);
           }
         }
