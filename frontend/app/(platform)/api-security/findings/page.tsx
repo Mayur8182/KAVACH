@@ -6,12 +6,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search, ChevronDown, ChevronRight, Play, History,
   Shield, AlertCircle, CheckCircle2, Clock, Bug,
-  RotateCcw, Sparkles, Trash2, ArrowRight, Copy, Check,
+  RotateCcw, Sparkles, Trash2, ArrowRight, ArrowLeft, Copy, Check,
   Terminal, Info, Layers, Sliders, ExternalLink, Filter,
   X, Loader2, Code2, Link2, AlertTriangle, Undo2,
   GitFork, Crown, Database, User, Wrench,
 } from 'lucide-react';
 import { KavachApiLayout } from '../components/KavachApiLayout';
+import { KavachShimmer } from '../components/KavachSkeleton';
 import { useApiSecurity } from '../context/ApiSecurityContext';
 import { api } from '@/lib/api/client';
 import { toast } from '@/lib/toast';
@@ -238,12 +239,28 @@ export default function FindingsPage() {
 
   const { apis, selectedApi } = useApiSecurity();
 
+  // Server-Side Pagination State
+  const [currentPage,      setCurrentPage]      = useState(1);
+  const [pageSize,         setPageSize]         = useState(10);
+  const [totalCount,       setTotalCount]       = useState(0);
+  const [totalPages,       setTotalPages]       = useState(1);
+  const [targetStats,      setTargetStats]      = useState<any>({
+    total: 0,
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    resolved: 0,
+    attack_paths: 0,
+  });
+
   // State
   const [findings,         setFindings]         = useState<any[]>([]);
   const [loading,          setLoading]          = useState(true);
   const [selectedIds,      setSelectedIds]      = useState<string[]>([]);
   const [selectedFinding,  setSelectedFinding]  = useState<any | null>(null);
   const [searchQuery,      setSearchQuery]      = useState('');
+  const [debouncedSearch,  setDebouncedSearch]  = useState('');
   
   // Custom Filters State
   const [severityFilter,   setSeverityFilter]   = useState('ALL');
@@ -269,11 +286,20 @@ export default function FindingsPage() {
   const [lastDeletedFindings, setLastDeletedFindings] = useState<any[]>([]);
 
   // Refs for closing popovers on outside click
-  const severityRef    = useRef<HTMLDivElement | null>(null);
-  const categoryRef    = useRef<HTMLDivElement | null>(null);
-  const statusRef      = useRef<HTMLDivElement | null>(null);
-  const bulkStatusRef  = useRef<HTMLDivElement | null>(null);
+  const severityRef      = useRef<HTMLDivElement | null>(null);
+  const categoryRef      = useRef<HTMLDivElement | null>(null);
+  const statusRef        = useRef<HTMLDivElement | null>(null);
+  const bulkStatusRef    = useRef<HTMLDivElement | null>(null);
   const detailsStatusRef = useRef<HTMLDivElement | null>(null);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Outside click listener
   useEffect(() => {
@@ -322,31 +348,63 @@ export default function FindingsPage() {
     }
   };
 
-  // Load findings from backend
+  // Load findings with server-side pagination and real DB stats
   const loadFindings = async () => {
     setLoading(true);
     try {
+      const statusParam = statusFilter.length > 0 && !statusFilter.includes('ALL') 
+        ? statusFilter.join(',') 
+        : undefined;
+
       const res = await api.apiSecurity.findings({
         apiId: selectedApi?.id,
-        limit: 100,
+        page: currentPage,
+        pageSize: pageSize,
+        search: debouncedSearch.trim() || undefined,
+        severity: severityFilter !== 'ALL' ? severityFilter : undefined,
+        category: categoryFilter !== 'ALL' ? categoryFilter : undefined,
+        status: statusParam,
       });
 
       const items = res?.items || [];
-      const cleanedItems = items.map((f: any) => ({
-        ...f,
-        displayTitle: normalizeTitle(f.title),
-        displayOwasp: normalizeOwasp(f.owasp_category, f.title),
-        displaySubtitle: getSubtitle(normalizeTitle(f.title), f.category),
-      }));
+      const cleanedItems = items.map((f: any) => {
+        const dTitle = normalizeTitle(f.title);
+        const ep0 = (f.affected_endpoints && f.affected_endpoints[0]) || '';
+        const paramMatch = ep0.includes('{') ? ep0.match(/\{([^}]+)\}/)?.[1] : null;
+
+        return {
+          ...f,
+          displayTitle: dTitle,
+          displayOwasp: normalizeOwasp(f.owasp_category, f.title),
+          displaySubtitle: getSubtitle(dTitle, f.category),
+          affected_parameters: f.affected_parameters || paramMatch || 'id',
+        };
+      });
 
       setFindings(cleanedItems);
+      const computedTotal = res?.total ?? cleanedItems.length;
+      const computedPages = res?.pages ?? (Math.ceil(computedTotal / pageSize) || 1);
+      setTotalCount(computedTotal);
+      setTotalPages(computedPages);
+      
+      if (res?.stats) {
+        setTargetStats(res.stats);
+      }
 
       if (cleanedItems.length > 0) {
-        setSelectedFinding(cleanedItems[0]);
-        // Default select 2 rows like in reference screenshot
-        if (cleanedItems.length >= 3) {
+        setSelectedFinding((prev: any) => {
+          if (prev && cleanedItems.some((item: any) => item.id === prev.id)) {
+            return cleanedItems.find((item: any) => item.id === prev.id);
+          }
+          return cleanedItems[0];
+        });
+
+        // Default select 2 rows like in reference screenshot on initial load if none selected
+        if (selectedIds.length === 0 && cleanedItems.length >= 3) {
           setSelectedIds([cleanedItems[0].id, cleanedItems[2].id]);
         }
+      } else {
+        setSelectedFinding(null);
       }
     } catch (err) {
       console.error('Failed to load findings:', err);
@@ -357,7 +415,7 @@ export default function FindingsPage() {
 
   useEffect(() => {
     loadFindings();
-  }, [selectedApi?.id]);
+  }, [selectedApi?.id, currentPage, pageSize, severityFilter, categoryFilter, statusFilter, debouncedSearch]);
 
   // Handle row selection
   const toggleSelectRow = (id: string, e?: React.MouseEvent) => {
@@ -368,10 +426,10 @@ export default function FindingsPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === filteredFindings.length) {
+    if (selectedIds.length === findings.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredFindings.map((f) => f.id));
+      setSelectedIds(findings.map((f) => f.id));
     }
   };
 
@@ -456,14 +514,13 @@ export default function FindingsPage() {
     setIsDeleteModalOpen(false);
 
     try {
-      // Call backend API if available
       if (api.apiSecurity.bulkDeleteFindings) {
         await api.apiSecurity.bulkDeleteFindings(selectedIds).catch(() => null);
       }
       setFindings((prev) => prev.filter((f) => !selectedIds.includes(f.id)));
+      setTotalCount((prev) => Math.max(0, prev - selectedIds.length));
       setSelectedIds([]);
 
-      // Select another finding if the active one was deleted
       if (selectedFinding && selectedIds.includes(selectedFinding.id)) {
         const remaining = findings.filter((f) => !selectedIds.includes(f.id));
         setSelectedFinding(remaining[0] || null);
@@ -479,6 +536,7 @@ export default function FindingsPage() {
   const handleUndoDelete = () => {
     if (lastDeletedFindings.length === 0) return;
     setFindings((prev) => [...lastDeletedFindings, ...prev]);
+    setTotalCount((prev) => prev + lastDeletedFindings.length);
     toast.success(`Restored ${lastDeletedFindings.length} findings`);
     setLastDeletedFindings([]);
   };
@@ -491,7 +549,7 @@ export default function FindingsPage() {
         await api.apiSecurity.resetSeedFindings(selectedApi?.id);
       }
       await loadFindings();
-      toast.success('Restored 12 standard security findings');
+      toast.success('Restored standard security findings');
     } catch {
       toast.error('Failed to reset findings');
     } finally {
@@ -513,40 +571,6 @@ export default function FindingsPage() {
     setTimeout(() => setCopiedEvidence(false), 2000);
   };
 
-  // Filtered Findings Calculation
-  const filteredFindings = useMemo(() => {
-    return findings.filter((f) => {
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchTitle = (f.displayTitle || f.title)?.toLowerCase().includes(q);
-        const matchEndpoint = f.affected_endpoints?.some((e: string) => e.toLowerCase().includes(q));
-        const matchCwe = f.cwe?.toLowerCase().includes(q);
-        const matchOwasp = (f.displayOwasp || f.owasp_category)?.toLowerCase().includes(q);
-        if (!matchTitle && !matchEndpoint && !matchCwe && !matchOwasp) return false;
-      }
-      if (severityFilter !== 'ALL' && (f.severity || '').toUpperCase() !== severityFilter) {
-        return false;
-      }
-      if (categoryFilter !== 'ALL') {
-        const c = categoryFilter.toLowerCase();
-        const fCat = (f.category || '').toLowerCase();
-        const fOwasp = (f.displayOwasp || f.owasp_category || '').toLowerCase();
-        if (!fCat.includes(c) && !fOwasp.includes(c)) return false;
-      }
-      if (statusFilter.length > 0 && !statusFilter.includes('ALL')) {
-        const currentNorm = (f.status || 'OPEN').toUpperCase();
-        if (!statusFilter.includes(currentNorm)) return false;
-      }
-      return true;
-    });
-  }, [findings, searchQuery, severityFilter, categoryFilter, statusFilter]);
-
-  // Counts for Metric Strip
-  const criticalCount = findings.filter((f) => (f.severity || '').toUpperCase() === 'CRITICAL').length;
-  const highCount     = findings.filter((f) => (f.severity || '').toUpperCase() === 'HIGH').length;
-  const mediumCount   = findings.filter((f) => (f.severity || '').toUpperCase() === 'MEDIUM').length;
-  const lowCount      = findings.filter((f) => (f.severity || '').toUpperCase() === 'LOW').length;
-
   return (
     <KavachApiLayout activeApiId={selectedApi?.id}>
       <div
@@ -558,10 +582,10 @@ export default function FindingsPage() {
           color: T.text,
         }}
       >
-        <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '24px 40px 64px' }}>
+        <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '20px 32px 56px' }}>
 
-          {/* ══ HEADER ══════════════════════════════════════════════════ */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '24px', marginBottom: '18px' }}>
+          {/* ══ HEADER: COMPACT SERIF TITLE + SEPARATE COMPACT SCAN CARD ══════ */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', marginBottom: '16px' }}>
             <div>
               {/* Breadcrumb */}
               <div
@@ -569,9 +593,9 @@ export default function FindingsPage() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  fontSize: '12.5px',
+                  fontSize: '12px',
                   color: T.textSub,
-                  marginBottom: '8px',
+                  marginBottom: '6px',
                 }}
               >
                 <Link
@@ -580,7 +604,7 @@ export default function FindingsPage() {
                 >
                   API Security
                 </Link>
-                <ChevronRight size={13} color={T.textMuted} strokeWidth={2} />
+                <ChevronRight size={12} color={T.textMuted} strokeWidth={2} />
                 <span style={{ color: T.text, fontWeight: 500 }}>Findings</span>
               </div>
 
@@ -588,53 +612,85 @@ export default function FindingsPage() {
               <h1
                 style={{
                   fontFamily: serif,
-                  fontSize: '32px',
+                  fontSize: '26px',
                   fontWeight: 700,
                   color: T.text,
                   letterSpacing: '-0.02em',
                   margin: 0,
-                  lineHeight: 1.15,
+                  lineHeight: 1.2,
                 }}
               >
                 Findings
               </h1>
-              <p style={{ fontSize: '13px', color: T.textSub, margin: '5px 0 0', fontFamily: sans }}>
+              <p style={{ fontSize: '12.5px', color: T.textSub, margin: '4px 0 0', fontFamily: sans }}>
                 Security issues detected in your APIs with severity, impact, attack path, and recommended actions.
               </p>
             </div>
 
-            {/* Header Right: Active Scan Pill & Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-              {/* Scan Meta Badge Container */}
+            {/* Header Right: Separate compact scan card + Action buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              {/* Separate compact scan card */}
               <div
                 style={{
+                  background: '#FFFFFF',
+                  border: `1px solid ${T.border}`,
+                  borderRadius: '9px',
+                  padding: '7px 14px',
                   display: 'flex',
                   flexDirection: 'column',
-                  alignItems: 'flex-end',
-                  gap: '3px',
+                  gap: '2px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: T.text, fontFamily: sans }}>
+                  <span style={{ fontSize: '12.5px', fontWeight: 600, color: T.text, fontFamily: sans }}>
                     Scan #{queryScanId || 'SCN-0482'}
                   </span>
                   <span
                     style={{
                       background: T.greenBg,
                       color: T.greenTxt,
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       fontWeight: 600,
-                      padding: '2px 8px',
-                      borderRadius: '12px',
+                      padding: '1.5px 7px',
+                      borderRadius: '10px',
                     }}
                   >
                     Completed
                   </span>
                 </div>
-                <div style={{ fontSize: '12px', color: T.textSub, fontFamily: sans }}>
+                <div style={{ fontSize: '11px', color: T.textSub, fontFamily: sans }}>
                   Nov 14, 2026 • 6m 12s • 27 endpoints
                 </div>
               </div>
+
+              {/* Back to Overview Button */}
+              <button
+                type="button"
+                onClick={() => router.push('/api-security')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  height: '36px',
+                  padding: '0 12px',
+                  borderRadius: '8px',
+                  background: T.surface,
+                  border: `1px solid ${T.borderInput}`,
+                  fontSize: '12.5px',
+                  fontWeight: 500,
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontFamily: sans,
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#CBD5E1')}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.borderInput)}
+              >
+                <ArrowLeft size={13} color="#374151" strokeWidth={1.8} />
+                Back to Overview
+              </button>
 
               {/* View Scan History Button */}
               <button
@@ -643,12 +699,13 @@ export default function FindingsPage() {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '7px',
-                  padding: '8px 16px',
+                  gap: '6px',
+                  height: '36px',
+                  padding: '0 14px',
                   borderRadius: '8px',
                   background: T.surface,
                   border: `1px solid ${T.borderInput}`,
-                  fontSize: '13px',
+                  fontSize: '12.5px',
                   fontWeight: 500,
                   color: '#374151',
                   cursor: 'pointer',
@@ -658,7 +715,7 @@ export default function FindingsPage() {
                 onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#CBD5E1')}
                 onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.borderInput)}
               >
-                <History size={14} color="#374151" strokeWidth={1.8} />
+                <History size={13} color="#374151" strokeWidth={1.8} />
                 View Scan History
               </button>
 
@@ -669,199 +726,199 @@ export default function FindingsPage() {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '7px',
-                  padding: '8px 18px',
+                  gap: '6px',
+                  height: '36px',
+                  padding: '0 16px',
                   borderRadius: '8px',
                   background: T.btnDark,
                   border: 'none',
                   color: '#FFFFFF',
-                  fontSize: '13px',
+                  fontSize: '12.5px',
                   fontWeight: 600,
                   cursor: 'pointer',
                   fontFamily: sans,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.14)',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
                   transition: 'all 0.15s ease',
                 }}
               >
-                <Play size={12} stroke="#FFFFFF" fill="none" strokeWidth={2.2} />
+                <Play size={11} stroke="#FFFFFF" fill="none" strokeWidth={2.2} />
                 Run New Scan
               </button>
             </div>
           </div>
 
-          {/* ══ SEVERITY KPI METRICS STRIP CARD ═════════════════════════ */}
-          <div
-            style={{
-              background: T.surface,
-              border: `1px solid ${T.border}`,
-              borderRadius: '12px',
-              padding: '16px 24px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-              marginBottom: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '24px',
-            }}
-          >
-            {/* 1. Total Findings */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  background: '#F8FAFC',
-                  border: `1px solid ${T.borderInput}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Bug size={16} color="#475569" strokeWidth={1.8} />
-              </div>
-              <div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
-                  {findings.length || 12}
-                </div>
-                <div style={{ fontSize: '12px', color: T.textSub, marginTop: '2px', fontFamily: sans }}>
-                  Total Findings
-                </div>
-              </div>
-            </div>
-
-            <div style={{ width: '1px', height: '30px', background: T.borderLight }} />
-
-            {/* 2. Critical */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }} />
-              <div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
-                  {criticalCount || 2}
-                </div>
-                <div style={{ fontSize: '12px', color: T.textSub, marginTop: '2px', fontFamily: sans }}>
-                  Critical
-                </div>
-              </div>
-            </div>
-
-            <div style={{ width: '1px', height: '30px', background: T.borderLight }} />
-
-            {/* 3. High */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F97316' }} />
-              <div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
-                  {highCount || 3}
-                </div>
-                <div style={{ fontSize: '12px', color: T.textSub, marginTop: '2px', fontFamily: sans }}>
-                  High
-                </div>
-              </div>
-            </div>
-
-            <div style={{ width: '1px', height: '30px', background: T.borderLight }} />
-
-            {/* 4. Medium */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B' }} />
-              <div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
-                  {mediumCount || 4}
-                </div>
-                <div style={{ fontSize: '12px', color: T.textSub, marginTop: '2px', fontFamily: sans }}>
-                  Medium
-                </div>
-              </div>
-            </div>
-
-            <div style={{ width: '1px', height: '30px', background: T.borderLight }} />
-
-            {/* 5. Low */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#9CA3AF' }} />
-              <div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
-                  {lowCount || 3}
-                </div>
-                <div style={{ fontSize: '12px', color: T.textSub, marginTop: '2px', fontFamily: sans }}>
-                  Low
-                </div>
-              </div>
-            </div>
-
-            <div style={{ width: '1px', height: '30px', background: T.borderLight }} />
-
-            {/* 6. Attack Paths */}
-            <div
-              onClick={() => router.push('/api-security/attack-paths')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                cursor: 'pointer',
-                padding: '4px 8px',
-                borderRadius: '8px',
-                transition: 'background 0.15s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-            >
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  background: '#DCFCE7',
-                  border: '1px solid #BBF7D0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <GitFork size={16} color="#15803D" strokeWidth={2} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div>
-                  <div style={{ fontSize: '18px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
-                    5
-                  </div>
-                  <div style={{ fontSize: '12px', color: T.textSub, marginTop: '2px', fontFamily: sans }}>
-                    Attack Paths
-                  </div>
-                </div>
-                <ChevronRight size={14} color="#94A3B8" />
-              </div>
-            </div>
-          </div>
-
-          {/* ══ TWO-COLUMN GRID: TABLE & FINDING DETAILS ══════════════ */}
+          {/* ══ TWO-COLUMN GRID: LEFT CONTENT & RIGHT STICKY DETAILS ══════════ */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 380px',
-              gap: '24px',
+              gridTemplateColumns: selectedFinding ? 'minmax(0, 1fr) 365px' : '1fr',
+              gap: '16px',
               alignItems: 'start',
             }}
           >
-            {/* ── LEFT COLUMN: FILTERS, BULK ACTIONS, TABLE ─────────── */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* ── LEFT COLUMN: KPI (LEFT WIDTH ONLY) + FILTERS + TABLE + PAGINATION ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', minWidth: 0 }}>
 
-              {/* Filter Controls Row */}
+              {/* 1. SEVERITY KPI METRICS STRIP CARD (LEFT WIDTH ONLY!) */}
+              <div
+                style={{
+                  background: T.surface,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: '12px',
+                  padding: '12px 18px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                }}
+              >
+                {/* 1. Total Findings */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    style={{
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '7px',
+                      background: '#F8FAFC',
+                      border: `1px solid ${T.borderInput}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Bug size={15} color="#475569" strokeWidth={1.8} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '17px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
+                      {loading ? <KavachShimmer width="24px" height="18px" /> : (targetStats.total || totalCount)}
+                    </div>
+                    <div style={{ fontSize: '11px', color: T.textSub, marginTop: '2px', fontFamily: sans, whiteSpace: 'nowrap' }}>
+                      Total Findings
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ width: '1px', height: '26px', background: T.borderLight }} />
+
+                {/* 2. Critical */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: '17px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
+                      {loading ? <KavachShimmer width="20px" height="18px" /> : targetStats.critical}
+                    </div>
+                    <div style={{ fontSize: '11px', color: T.textSub, marginTop: '2px', fontFamily: sans }}>
+                      Critical
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ width: '1px', height: '26px', background: T.borderLight }} />
+
+                {/* 3. High */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F97316', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: '17px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
+                      {loading ? <KavachShimmer width="20px" height="18px" /> : targetStats.high}
+                    </div>
+                    <div style={{ fontSize: '11px', color: T.textSub, marginTop: '2px', fontFamily: sans }}>
+                      High
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ width: '1px', height: '26px', background: T.borderLight }} />
+
+                {/* 4. Medium */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: '17px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
+                      {loading ? <KavachShimmer width="20px" height="18px" /> : targetStats.medium}
+                    </div>
+                    <div style={{ fontSize: '11px', color: T.textSub, marginTop: '2px', fontFamily: sans }}>
+                      Medium
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ width: '1px', height: '26px', background: T.borderLight }} />
+
+                {/* 5. Low */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#9CA3AF', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: '17px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
+                      {loading ? <KavachShimmer width="20px" height="18px" /> : targetStats.low}
+                    </div>
+                    <div style={{ fontSize: '11px', color: T.textSub, marginTop: '2px', fontFamily: sans }}>
+                      Low
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ width: '1px', height: '26px', background: T.borderLight }} />
+
+                {/* 6. Attack Paths */}
+                <div
+                  onClick={() => router.push('/api-security/attack-paths')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                    borderRadius: '7px',
+                    transition: 'background 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <div
+                    style={{
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '7px',
+                      background: '#DCFCE7',
+                      border: '1px solid #BBF7D0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <GitFork size={15} color="#15803D" strokeWidth={2} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div>
+                      <div style={{ fontSize: '17px', fontWeight: 700, color: T.text, lineHeight: 1.1, fontFamily: sans }}>
+                        {loading ? <KavachShimmer width="20px" height="18px" /> : (targetStats.attack_paths || 5)}
+                      </div>
+                      <div style={{ fontSize: '11px', color: T.textSub, marginTop: '2px', fontFamily: sans, whiteSpace: 'nowrap' }}>
+                        Attack Paths
+                      </div>
+                    </div>
+                    <ChevronRight size={13} color="#94A3B8" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. COMPACT SEARCH & FILTERS ROW */}
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '12px',
+                  gap: '8px',
                   flexWrap: 'wrap',
                 }}
               >
-                {/* Search */}
-                <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                {/* Compact Search input */}
+                <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
                   <Search
-                    size={14}
+                    size={13}
                     color="#9CA3AF"
-                    style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                    style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
                   />
                   <input
                     type="text"
@@ -870,12 +927,12 @@ export default function FindingsPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     style={{
                       width: '100%',
-                      height: '38px',
-                      padding: '0 14px 0 34px',
-                      borderRadius: '8px',
+                      height: '34px',
+                      padding: '0 12px 0 30px',
+                      borderRadius: '7px',
                       border: `1px solid ${T.borderInput}`,
                       background: T.surface,
-                      fontSize: '13px',
+                      fontSize: '12.5px',
                       color: T.text,
                       outline: 'none',
                       fontFamily: sans,
@@ -884,23 +941,8 @@ export default function FindingsPage() {
                   />
                 </div>
 
-                {/* 1. Custom Severity Dropdown */}
+                {/* Severity Dropdown */}
                 <div ref={severityRef} style={{ position: 'relative' }}>
-                  <label
-                    style={{
-                      position: 'absolute',
-                      top: '-7px',
-                      left: '10px',
-                      background: T.pageBg,
-                      padding: '0 4px',
-                      fontSize: '10.5px',
-                      color: T.textSub,
-                      fontWeight: 500,
-                      zIndex: 1,
-                    }}
-                  >
-                    Severity
-                  </label>
                   <button
                     type="button"
                     onClick={() => {
@@ -909,30 +951,36 @@ export default function FindingsPage() {
                       setIsStatusOpen(false);
                     }}
                     style={{
-                      height: '38px',
-                      padding: '0 32px 0 14px',
-                      borderRadius: '8px',
+                      height: '34px',
+                      padding: '0 28px 0 10px',
+                      borderRadius: '7px',
                       border: `1px solid ${isSeverityOpen ? T.text : T.borderInput}`,
                       background: T.surface,
-                      fontSize: '13px',
+                      fontSize: '12px',
                       fontWeight: 500,
                       color: T.text,
                       cursor: 'pointer',
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
+                      gap: '5px',
                       fontFamily: sans,
                       outline: 'none',
+                      position: 'relative',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {severityFilter === 'ALL'
-                      ? 'All'
-                      : severityFilter.charAt(0) + severityFilter.slice(1).toLowerCase()}
+                    <span style={{ fontSize: '11px', color: '#64748B' }}>Severity:</span>
+                    <span style={{ fontSize: '12px', color: T.text, fontWeight: 600 }}>
+                      {severityFilter === 'ALL'
+                        ? 'All'
+                        : severityFilter.charAt(0) + severityFilter.slice(1).toLowerCase()}
+                    </span>
                     <ChevronDown
-                      size={13}
+                      size={12}
                       color="#6B7280"
                       style={{
                         position: 'absolute',
-                        right: 11,
+                        right: 8,
                         top: '50%',
                         transform: isSeverityOpen ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
                         transition: 'transform 0.15s ease',
@@ -940,19 +988,18 @@ export default function FindingsPage() {
                     />
                   </button>
 
-                  {/* Popover */}
                   {isSeverityOpen && (
                     <div
                       style={{
                         position: 'absolute',
-                        top: 'calc(100% + 5px)',
+                        top: 'calc(100% + 4px)',
                         left: 0,
                         minWidth: '140px',
                         background: '#FFFFFF',
                         border: `1px solid ${T.borderInput}`,
-                        borderRadius: '10px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
-                        zIndex: 60,
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                        zIndex: 70,
                         padding: '4px',
                       }}
                     >
@@ -967,15 +1014,16 @@ export default function FindingsPage() {
                           key={item.id}
                           onClick={() => {
                             setSeverityFilter(item.id);
+                            setCurrentPage(1);
                             setIsSeverityOpen(false);
                           }}
                           style={{
-                            padding: '7px 12px',
-                            fontSize: '12.5px',
+                            padding: '6px 10px',
+                            fontSize: '12px',
                             fontWeight: severityFilter === item.id ? 600 : 400,
                             color: severityFilter === item.id ? T.text : T.textSub,
                             background: severityFilter === item.id ? '#F8FAFC' : 'transparent',
-                            borderRadius: '6px',
+                            borderRadius: '5px',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -988,30 +1036,15 @@ export default function FindingsPage() {
                           }
                         >
                           <span>{item.label}</span>
-                          {severityFilter === item.id && <Check size={12} color={T.text} strokeWidth={2.5} />}
+                          {severityFilter === item.id && <Check size={11} color={T.text} strokeWidth={2.5} />}
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
 
-                {/* 2. Custom OWASP Category Dropdown */}
+                {/* OWASP Category Dropdown */}
                 <div ref={categoryRef} style={{ position: 'relative' }}>
-                  <label
-                    style={{
-                      position: 'absolute',
-                      top: '-7px',
-                      left: '10px',
-                      background: T.pageBg,
-                      padding: '0 4px',
-                      fontSize: '10.5px',
-                      color: T.textSub,
-                      fontWeight: 500,
-                      zIndex: 1,
-                    }}
-                  >
-                    OWASP Category
-                  </label>
                   <button
                     type="button"
                     onClick={() => {
@@ -1020,28 +1053,34 @@ export default function FindingsPage() {
                       setIsStatusOpen(false);
                     }}
                     style={{
-                      height: '38px',
-                      padding: '0 32px 0 14px',
-                      borderRadius: '8px',
+                      height: '34px',
+                      padding: '0 28px 0 10px',
+                      borderRadius: '7px',
                       border: `1px solid ${isCategoryOpen ? T.text : T.borderInput}`,
                       background: T.surface,
-                      fontSize: '13px',
+                      fontSize: '12px',
                       fontWeight: 500,
                       color: T.text,
                       cursor: 'pointer',
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
+                      gap: '5px',
                       fontFamily: sans,
                       outline: 'none',
+                      position: 'relative',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {categoryFilter === 'ALL' ? 'All' : categoryFilter}
+                    <span style={{ fontSize: '11px', color: '#64748B' }}>Category:</span>
+                    <span style={{ fontSize: '12px', color: T.text, fontWeight: 600 }}>
+                      {categoryFilter === 'ALL' ? 'All' : categoryFilter}
+                    </span>
                     <ChevronDown
-                      size={13}
+                      size={12}
                       color="#6B7280"
                       style={{
                         position: 'absolute',
-                        right: 11,
+                        right: 8,
                         top: '50%',
                         transform: isCategoryOpen ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
                         transition: 'transform 0.15s ease',
@@ -1049,19 +1088,18 @@ export default function FindingsPage() {
                     />
                   </button>
 
-                  {/* Popover */}
                   {isCategoryOpen && (
                     <div
                       style={{
                         position: 'absolute',
-                        top: 'calc(100% + 5px)',
+                        top: 'calc(100% + 4px)',
                         left: 0,
-                        minWidth: '150px',
+                        minWidth: '160px',
                         background: '#FFFFFF',
                         border: `1px solid ${T.borderInput}`,
-                        borderRadius: '10px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
-                        zIndex: 60,
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                        zIndex: 70,
                         padding: '4px',
                       }}
                     >
@@ -1078,15 +1116,16 @@ export default function FindingsPage() {
                           key={item.id}
                           onClick={() => {
                             setCategoryFilter(item.id);
+                            setCurrentPage(1);
                             setIsCategoryOpen(false);
                           }}
                           style={{
-                            padding: '7px 12px',
-                            fontSize: '12.5px',
+                            padding: '6px 10px',
+                            fontSize: '12px',
                             fontWeight: categoryFilter === item.id ? 600 : 400,
                             color: categoryFilter === item.id ? T.text : T.textSub,
                             background: categoryFilter === item.id ? '#F8FAFC' : 'transparent',
-                            borderRadius: '6px',
+                            borderRadius: '5px',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -1099,30 +1138,15 @@ export default function FindingsPage() {
                           }
                         >
                           <span>{item.label}</span>
-                          {categoryFilter === item.id && <Check size={12} color={T.text} strokeWidth={2.5} />}
+                          {categoryFilter === item.id && <Check size={11} color={T.text} strokeWidth={2.5} />}
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
 
-                {/* 3. Custom Multi-Select Status Dropdown */}
+                {/* Status Dropdown */}
                 <div ref={statusRef} style={{ position: 'relative' }}>
-                  <label
-                    style={{
-                      position: 'absolute',
-                      top: '-7px',
-                      left: '10px',
-                      background: T.pageBg,
-                      padding: '0 4px',
-                      fontSize: '10.5px',
-                      color: T.textSub,
-                      fontWeight: 500,
-                      zIndex: 1,
-                    }}
-                  >
-                    Status
-                  </label>
                   <button
                     type="button"
                     onClick={() => {
@@ -1131,32 +1155,38 @@ export default function FindingsPage() {
                       setIsCategoryOpen(false);
                     }}
                     style={{
-                      height: '38px',
-                      padding: '0 32px 0 14px',
-                      borderRadius: '8px',
+                      height: '34px',
+                      padding: '0 28px 0 10px',
+                      borderRadius: '7px',
                       border: `1px solid ${isStatusOpen ? T.text : T.borderInput}`,
                       background: T.surface,
-                      fontSize: '13px',
+                      fontSize: '12px',
                       fontWeight: 500,
                       color: T.text,
                       cursor: 'pointer',
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
+                      gap: '5px',
                       fontFamily: sans,
                       outline: 'none',
+                      position: 'relative',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {statusFilter.includes('ALL')
-                      ? 'All'
-                      : statusFilter.length === 1
-                      ? statusFilter[0].replace('_', ' ')
-                      : `${statusFilter.length} selected`}
+                    <span style={{ fontSize: '11px', color: '#64748B' }}>Status:</span>
+                    <span style={{ fontSize: '12px', color: T.text, fontWeight: 600 }}>
+                      {statusFilter.includes('ALL')
+                        ? 'All'
+                        : statusFilter.length === 1
+                        ? statusFilter[0].replace('_', ' ')
+                        : `${statusFilter.length} selected`}
+                    </span>
                     <ChevronDown
-                      size={13}
+                      size={12}
                       color="#6B7280"
                       style={{
                         position: 'absolute',
-                        right: 11,
+                        right: 8,
                         top: '50%',
                         transform: isStatusOpen ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
                         transition: 'transform 0.15s ease',
@@ -1164,30 +1194,28 @@ export default function FindingsPage() {
                     />
                   </button>
 
-                  {/* Popover matching Reference Screenshots */}
                   {isStatusOpen && (
                     <div
                       style={{
                         position: 'absolute',
-                        top: 'calc(100% + 5px)',
+                        top: 'calc(100% + 4px)',
                         left: 0,
-                        width: '185px',
+                        width: '175px',
                         background: '#FFFFFF',
                         border: `1px solid ${T.borderInput}`,
-                        borderRadius: '10px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
-                        zIndex: 60,
-                        padding: '12px 14px',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                        zIndex: 70,
+                        padding: '10px 12px',
                       }}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '10px' }}>
                         {[
                           { id: 'ALL', label: 'All' },
                           { id: 'OPEN', label: 'Open' },
                           { id: 'IN_PROGRESS', label: 'In Progress' },
                           { id: 'REMEDIATED', label: 'Remediated' },
                           { id: 'RESOLVED', label: 'Resolved' },
-                          { id: 'FALSE_POSITIVE', label: 'False Positive' },
                         ].map((opt) => {
                           const isChecked = statusFilter.includes(opt.id);
                           return (
@@ -1197,7 +1225,7 @@ export default function FindingsPage() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '8px',
-                                fontSize: '13px',
+                                fontSize: '12px',
                                 color: T.text,
                                 cursor: 'pointer',
                                 fontFamily: sans,
@@ -1221,8 +1249,8 @@ export default function FindingsPage() {
                             >
                               <div
                                 style={{
-                                  width: '15px',
-                                  height: '15px',
+                                  width: '14px',
+                                  height: '14px',
                                   borderRadius: '3px',
                                   background: isChecked ? T.btnDark : '#FFFFFF',
                                   border: isChecked ? `1px solid ${T.btnDark}` : `1px solid #CBD5E1`,
@@ -1232,7 +1260,7 @@ export default function FindingsPage() {
                                   flexShrink: 0,
                                 }}
                               >
-                                {isChecked && <Check size={10} color="#FFFFFF" strokeWidth={3} />}
+                                {isChecked && <Check size={9} color="#FFFFFF" strokeWidth={3} />}
                               </div>
                               {opt.label}
                             </label>
@@ -1240,7 +1268,6 @@ export default function FindingsPage() {
                         })}
                       </div>
 
-                      {/* Popover Actions */}
                       <div
                         style={{
                           display: 'flex',
@@ -1252,11 +1279,14 @@ export default function FindingsPage() {
                       >
                         <button
                           type="button"
-                          onClick={() => setStatusFilter(['ALL'])}
+                          onClick={() => {
+                            setStatusFilter(['ALL']);
+                            setCurrentPage(1);
+                          }}
                           style={{
                             background: 'transparent',
                             border: 'none',
-                            fontSize: '12px',
+                            fontSize: '11.5px',
                             color: T.textSub,
                             cursor: 'pointer',
                             fontFamily: sans,
@@ -1267,14 +1297,17 @@ export default function FindingsPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setIsStatusOpen(false)}
+                          onClick={() => {
+                            setCurrentPage(1);
+                            setIsStatusOpen(false);
+                          }}
                           style={{
                             background: T.btnDark,
                             border: 'none',
                             color: '#FFFFFF',
-                            fontSize: '12px',
+                            fontSize: '11.5px',
                             fontWeight: 600,
-                            padding: '4px 12px',
+                            padding: '3px 10px',
                             borderRadius: '5px',
                             cursor: 'pointer',
                             fontFamily: sans,
@@ -1295,48 +1328,49 @@ export default function FindingsPage() {
                     setSeverityFilter('ALL');
                     setCategoryFilter('ALL');
                     setStatusFilter(['ALL']);
+                    setCurrentPage(1);
                   }}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    height: '38px',
-                    padding: '0 12px',
-                    borderRadius: '8px',
+                    gap: '5px',
+                    height: '34px',
+                    padding: '0 10px',
+                    borderRadius: '7px',
                     background: 'transparent',
                     border: 'none',
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: 500,
                     color: T.textSub,
                     cursor: 'pointer',
                     fontFamily: sans,
                   }}
                 >
-                  <RotateCcw size={13} color="#6B7280" />
+                  <RotateCcw size={12} color="#6B7280" />
                   Reset
                 </button>
               </div>
 
-              {/* Bulk Action Bar (when rows are selected) */}
+              {/* 3. BULK ACTION BAR */}
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '6px 4px',
-                  fontSize: '13px',
+                  padding: '4px 2px',
+                  fontSize: '12.5px',
                   fontFamily: sans,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input
                     type="checkbox"
-                    checked={selectedIds.length > 0 && selectedIds.length === filteredFindings.length}
+                    checked={findings.length > 0 && selectedIds.length === findings.length}
                     onChange={toggleSelectAll}
-                    style={{ width: '15px', height: '15px', accentColor: T.btnDark, cursor: 'pointer' }}
+                    style={{ width: '14px', height: '14px', accentColor: T.btnDark, cursor: 'pointer' }}
                   />
                   <span style={{ fontWeight: 600, color: T.text }}>
-                    {filteredFindings.length} findings
+                    {totalCount} findings
                   </span>
                   <span style={{ color: T.textMuted }}>|</span>
                   <span style={{ color: T.textSub }}>
@@ -1346,7 +1380,7 @@ export default function FindingsPage() {
 
                 {/* Bulk Action Buttons */}
                 {selectedIds.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                     {/* Bulk Remediate */}
                     <button
                       type="button"
@@ -1356,19 +1390,19 @@ export default function FindingsPage() {
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 14px',
-                        borderRadius: '7px',
+                        gap: '5px',
+                        padding: '5px 12px',
+                        borderRadius: '6px',
                         background: T.btnDark,
                         border: 'none',
                         color: '#FFFFFF',
-                        fontSize: '12.5px',
+                        fontSize: '12px',
                         fontWeight: 600,
                         cursor: 'pointer',
                         fontFamily: sans,
                       }}
                     >
-                      <Wrench size={12} color="#FFFFFF" />
+                      <Wrench size={11} color="#FFFFFF" />
                       Remediate ({selectedIds.length})
                     </button>
 
@@ -1381,34 +1415,34 @@ export default function FindingsPage() {
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 14px',
-                        borderRadius: '7px',
+                        gap: '5px',
+                        padding: '5px 12px',
+                        borderRadius: '6px',
                         background: '#FFFFFF',
                         border: `1px solid ${T.borderInput}`,
                         color: T.text,
-                        fontSize: '12.5px',
+                        fontSize: '12px',
                         fontWeight: 600,
                         cursor: 'pointer',
                         fontFamily: sans,
                       }}
                     >
-                      <GitFork size={12} color="#15803D" />
+                      <GitFork size={11} color="#15803D" />
                       View Attack Path ({selectedIds.length})
                     </button>
 
-                    {/* Bulk Update Status Popover (Custom - No Native Select) */}
+                    {/* Bulk Update Status */}
                     <div ref={bulkStatusRef} style={{ position: 'relative' }}>
                       <button
                         type="button"
                         onClick={() => setIsBulkStatusOpen((prev) => !prev)}
                         style={{
-                          height: '32px',
-                          padding: '0 26px 0 10px',
-                          borderRadius: '7px',
+                          height: '28px',
+                          padding: '0 24px 0 9px',
+                          borderRadius: '6px',
                           border: `1px solid ${T.borderInput}`,
                           background: T.surface,
-                          fontSize: '12.5px',
+                          fontSize: '12px',
                           fontWeight: 500,
                           color: T.text,
                           cursor: 'pointer',
@@ -1420,11 +1454,11 @@ export default function FindingsPage() {
                       >
                         Update Status
                         <ChevronDown
-                          size={12}
+                          size={11}
                           color="#6B7280"
                           style={{
                             position: 'absolute',
-                            right: 8,
+                            right: 7,
                             top: '50%',
                             transform: isBulkStatusOpen ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
                             transition: 'transform 0.15s ease',
@@ -1438,10 +1472,10 @@ export default function FindingsPage() {
                             position: 'absolute',
                             top: 'calc(100% + 4px)',
                             left: 0,
-                            minWidth: '150px',
+                            minWidth: '145px',
                             background: '#FFFFFF',
                             border: `1px solid ${T.borderInput}`,
-                            borderRadius: '8px',
+                            borderRadius: '7px',
                             boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
                             zIndex: 60,
                             padding: '4px',
@@ -1452,7 +1486,6 @@ export default function FindingsPage() {
                             { id: 'IN_PROGRESS', label: 'Mark as In Progress' },
                             { id: 'REMEDIATED', label: 'Mark as Remediated' },
                             { id: 'RESOLVED', label: 'Mark as Resolved' },
-                            { id: 'FALSE_POSITIVE', label: 'Mark as False Positive' },
                           ].map((item) => (
                             <button
                               key={item.id}
@@ -1460,14 +1493,14 @@ export default function FindingsPage() {
                               onClick={() => handleBulkUpdateStatus(item.id)}
                               style={{
                                 width: '100%',
-                                padding: '6px 10px',
+                                padding: '5px 8px',
                                 background: 'transparent',
                                 border: 'none',
                                 textAlign: 'left',
-                                fontSize: '12px',
+                                fontSize: '11.5px',
                                 color: T.text,
                                 cursor: 'pointer',
-                                borderRadius: '5px',
+                                borderRadius: '4px',
                                 fontFamily: sans,
                               }}
                               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
@@ -1480,97 +1513,127 @@ export default function FindingsPage() {
                       )}
                     </div>
 
-                    {/* Delete (x) Button - Triggers Confirmation Modal */}
+                    {/* Bulk Delete */}
                     <button
                       type="button"
                       onClick={() => setIsDeleteModalOpen(true)}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        borderRadius: '7px',
+                        gap: '5px',
+                        padding: '5px 10px',
+                        borderRadius: '6px',
                         background: '#FEE2E2',
                         border: 'none',
                         color: '#DC2626',
-                        fontSize: '12.5px',
+                        fontSize: '12px',
                         fontWeight: 600,
                         cursor: 'pointer',
                         fontFamily: sans,
                       }}
                     >
-                      <Trash2 size={12} color="#DC2626" />
+                      <Trash2 size={11} color="#DC2626" />
                       Delete ({selectedIds.length})
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* Findings Table Card */}
+              {/* 4. CONTROLLED-HEIGHT TABLE CONTAINER WITH STICKY HEADERS */}
               <div
                 style={{
                   background: T.surface,
                   border: `1px solid ${T.border}`,
-                  borderRadius: '14px',
-                  overflow: 'visible',
+                  borderRadius: '12px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                  maxHeight: '490px',
+                  overflowY: 'auto',
+                  overflowX: 'auto',
+                  position: 'relative',
                 }}
               >
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ borderBottom: `1px solid ${T.borderLight}`, background: '#FFFFFF' }}>
-                      <th style={{ padding: '12px 14px', width: '36px' }}>
+                <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F8FAFC' }}>
+                    <tr style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                      <th style={{ padding: '9px 10px', width: '32px', background: '#F8FAFC' }}>
                         <input
                           type="checkbox"
-                          checked={selectedIds.length > 0 && selectedIds.length === filteredFindings.length}
+                          checked={findings.length > 0 && selectedIds.length === findings.length}
                           onChange={toggleSelectAll}
-                          style={{ width: '15px', height: '15px', accentColor: T.btnDark, cursor: 'pointer' }}
+                          style={{ width: '14px', height: '14px', accentColor: T.btnDark, cursor: 'pointer' }}
                         />
                       </th>
-                      <th style={{ padding: '12px 14px', fontSize: '12.5px', fontWeight: 600, color: T.text, fontFamily: sans }}>Title</th>
-                      <th style={{ padding: '12px 14px', fontSize: '12.5px', fontWeight: 600, color: T.text, fontFamily: sans }}>Severity</th>
-                      <th style={{ padding: '12px 14px', fontSize: '12.5px', fontWeight: 600, color: T.text, fontFamily: sans }}>OWASP Category</th>
-                      <th style={{ padding: '12px 14px', fontSize: '12.5px', fontWeight: 600, color: T.text, fontFamily: sans }}>Affected Endpoint</th>
-                      <th style={{ padding: '12px 14px', fontSize: '12.5px', fontWeight: 600, color: T.text, fontFamily: sans }}>Attack Path</th>
-                      <th style={{ padding: '12px 14px', fontSize: '12.5px', fontWeight: 600, color: T.text, fontFamily: sans }}>Status</th>
-                      <th style={{ padding: '12px 14px', fontSize: '12.5px', fontWeight: 600, color: T.text, fontFamily: sans }}>Actions</th>
+                      <th style={{ padding: '9px 10px', fontSize: '12px', fontWeight: 600, color: '#475569', background: '#F8FAFC', fontFamily: sans }}>Title</th>
+                      <th style={{ padding: '9px 8px', fontSize: '12px', fontWeight: 600, color: '#475569', background: '#F8FAFC', fontFamily: sans, width: '70px' }}>Severity</th>
+                      <th style={{ padding: '9px 8px', fontSize: '12px', fontWeight: 600, color: '#475569', background: '#F8FAFC', fontFamily: sans, width: '75px' }}>OWASP Category</th>
+                      <th style={{ padding: '9px 8px', fontSize: '12px', fontWeight: 600, color: '#475569', background: '#F8FAFC', fontFamily: sans }}>Affected Endpoint</th>
+                      <th style={{ padding: '9px 8px', fontSize: '12px', fontWeight: 600, color: '#475569', background: '#F8FAFC', fontFamily: sans, width: '80px' }}>Attack Path</th>
+                      <th style={{ padding: '9px 8px', fontSize: '12px', fontWeight: 600, color: '#475569', background: '#F8FAFC', fontFamily: sans, width: '75px' }}>Status</th>
+                      <th style={{ padding: '9px 10px', fontSize: '12px', fontWeight: 600, color: '#475569', background: '#F8FAFC', fontFamily: sans, width: '105px', textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredFindings.length === 0 ? (
+                    {loading ? (
+                      Array.from({ length: 6 }).map((_, rIdx) => (
+                        <tr key={rIdx} style={{ borderBottom: '1px solid #F1F5F9', height: '44px' }}>
+                          <td style={{ padding: '9px 10px' }}>
+                            <KavachShimmer width="14px" height="14px" borderRadius="3px" />
+                          </td>
+                          <td style={{ padding: '9px 10px' }}>
+                            <KavachShimmer width="160px" height="14px" />
+                          </td>
+                          <td style={{ padding: '9px 8px' }}>
+                            <KavachShimmer width="55px" height="20px" borderRadius="6px" />
+                          </td>
+                          <td style={{ padding: '9px 8px' }}>
+                            <KavachShimmer width="65px" height="13px" />
+                          </td>
+                          <td style={{ padding: '9px 8px' }}>
+                            <KavachShimmer width="110px" height="13px" />
+                          </td>
+                          <td style={{ padding: '9px 8px' }}>
+                            <KavachShimmer width="75px" height="20px" borderRadius="6px" />
+                          </td>
+                          <td style={{ padding: '9px 8px' }}>
+                            <KavachShimmer width="55px" height="18px" borderRadius="6px" />
+                          </td>
+                          <td style={{ padding: '9px 10px', textAlign: 'right' }}>
+                            <KavachShimmer width="80px" height="26px" borderRadius="6px" style={{ marginLeft: 'auto' }} />
+                          </td>
+                        </tr>
+                      ))
+                    ) : findings.length === 0 ? (
                       <tr>
-                        <td colSpan={8} style={{ padding: '48px 20px', textAlign: 'center', color: T.textSub, fontSize: '13px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                            <Bug size={24} color="#9CA3AF" />
-                            <span>{loading ? 'Loading findings...' : 'No security findings match your current filters.'}</span>
-                            {!loading && (
-                              <button
-                                type="button"
-                                onClick={handleRestoreDefaultFindings}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  marginTop: '8px',
-                                  padding: '7px 14px',
-                                  borderRadius: '6px',
-                                  background: T.btnDark,
-                                  border: 'none',
-                                  color: '#FFFFFF',
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <RotateCcw size={12} color="#FFFFFF" />
-                                Restore 12 Standard Findings
-                              </button>
-                            )}
+                        <td colSpan={8} style={{ padding: '40px 20px', textAlign: 'center', color: T.textSub, fontSize: '13px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <Bug size={22} color="#9CA3AF" />
+                            <span>No security findings match your current filters.</span>
+                            <button
+                              type="button"
+                              onClick={handleRestoreDefaultFindings}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                marginTop: '6px',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                background: T.btnDark,
+                                border: 'none',
+                                color: '#FFFFFF',
+                                fontSize: '11.5px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <RotateCcw size={11} color="#FFFFFF" />
+                              Restore Standard Findings
+                            </button>
                           </div>
                         </td>
                       </tr>
                     ) : (
-                      filteredFindings.map((f, idx) => {
+                      findings.map((f, idx) => {
                         const isSelectedRow = selectedFinding?.id === f.id;
                         const isChecked = selectedIds.includes(f.id);
                         const sev = getSeverityBadge(f.severity);
@@ -1588,10 +1651,12 @@ export default function FindingsPage() {
                             key={f.id || idx}
                             onClick={() => setSelectedFinding(f)}
                             style={{
-                              borderBottom: idx < filteredFindings.length - 1 ? `1px solid ${T.borderLight}` : 'none',
+                              borderBottom: idx < findings.length - 1 ? `1px solid ${T.borderLight}` : 'none',
                               background: isSelectedRow ? '#F8FAFC' : '#FFFFFF',
+                              borderLeft: isSelectedRow ? '3px solid #2563EB' : '3px solid transparent',
                               cursor: 'pointer',
                               transition: 'background 0.12s ease',
+                              height: '44px',
                             }}
                             onMouseEnter={(e) => {
                               if (!isSelectedRow) e.currentTarget.style.backgroundColor = T.surfaceHover;
@@ -1601,21 +1666,21 @@ export default function FindingsPage() {
                             }}
                           >
                             {/* Checkbox */}
-                            <td style={{ padding: '14px 14px' }}>
+                            <td style={{ padding: '8px 10px' }}>
                               <input
                                 type="checkbox"
                                 checked={isChecked}
                                 onChange={(e) => toggleSelectRow(f.id, e as any)}
                                 onClick={(e) => e.stopPropagation()}
-                                style={{ width: '15px', height: '15px', accentColor: T.btnDark, cursor: 'pointer' }}
+                                style={{ width: '14px', height: '14px', accentColor: T.btnDark, cursor: 'pointer' }}
                               />
                             </td>
 
-                            {/* Title (Clean & single line, no wrapping) */}
-                            <td style={{ padding: '14px 14px', maxWidth: '240px' }}>
+                            {/* Title (Clean single line, compact) */}
+                            <td style={{ padding: '8px 10px', maxWidth: '200px' }}>
                               <span
                                 style={{
-                                  fontSize: '13px',
+                                  fontSize: '12.5px',
                                   fontWeight: 600,
                                   color: T.text,
                                   fontFamily: sans,
@@ -1631,46 +1696,59 @@ export default function FindingsPage() {
                             </td>
 
                             {/* Severity Badge */}
-                            <td style={{ padding: '14px 14px' }}>
+                            <td style={{ padding: '8px 8px' }}>
                               <span
                                 style={{
                                   display: 'inline-block',
-                                  padding: '2.5px 9px',
-                                  borderRadius: '6px',
-                                  fontSize: '11.5px',
+                                  padding: '2px 7px',
+                                  borderRadius: '5px',
+                                  fontSize: '11px',
                                   fontWeight: 600,
                                   background: sev.bg,
                                   color: sev.color,
                                   fontFamily: sans,
+                                  whiteSpace: 'nowrap',
                                 }}
                               >
                                 {sev.label}
                               </span>
                             </td>
 
-                            {/* OWASP Category (Concise code e.g. A01:2021) */}
-                            <td style={{ padding: '14px 14px', fontSize: '12.5px', color: T.textSub, fontFamily: sans, whiteSpace: 'nowrap' }}>
+                            {/* OWASP Category */}
+                            <td style={{ padding: '8px 8px', fontSize: '12px', color: '#1E40AF', fontWeight: 500, fontFamily: sans, whiteSpace: 'nowrap' }}>
                               {f.displayOwasp || f.owasp_category || 'A01:2021'}
                             </td>
 
                             {/* Affected Endpoint */}
-                            <td style={{ padding: '14px 14px', minWidth: '160px' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontSize: '12.5px', fontFamily: 'ui-monospace, monospace', color: T.text, fontWeight: 500 }}>
+                            <td style={{ padding: '8px 8px', maxWidth: '150px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                <span 
+                                  style={{ 
+                                    fontSize: '11.5px', 
+                                    fontFamily: 'ui-monospace, monospace', 
+                                    color: T.text, 
+                                    fontWeight: 500,
+                                    display: 'block',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}
+                                  title={epPath}
+                                >
                                   {epPath}
                                 </span>
-                                <span style={{ fontSize: '10.5px', fontWeight: 600, color: T.textMuted }}>
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748B' }}>
                                   {epMethod}
                                 </span>
                               </div>
                             </td>
 
                             {/* Attack Path */}
-                            <td style={{ padding: '14px 14px' }}>
+                            <td style={{ padding: '8px 8px' }}>
                               {(() => {
                                 const ap = getAttackPathData(f);
                                 if (!ap.hasPath) {
-                                  return <span style={{ color: '#9CA3AF', fontSize: '13px' }}>—</span>;
+                                  return <span style={{ color: '#9CA3AF', fontSize: '12px' }}>—</span>;
                                 }
                                 return (
                                   <button
@@ -1682,9 +1760,9 @@ export default function FindingsPage() {
                                     style={{
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '5px',
-                                      padding: '3px 9px',
-                                      borderRadius: '6px',
+                                      gap: '4px',
+                                      padding: '2.5px 7px',
+                                      borderRadius: '5px',
                                       background: '#DCFCE7',
                                       border: '1px solid #BBF7D0',
                                       color: '#15803D',
@@ -1698,7 +1776,7 @@ export default function FindingsPage() {
                                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#BBF7D0')}
                                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#DCFCE7')}
                                   >
-                                    <GitFork size={11} color="#15803D" strokeWidth={2} />
+                                    <GitFork size={10} color="#15803D" strokeWidth={2} />
                                     View Path
                                   </button>
                                 );
@@ -1706,13 +1784,13 @@ export default function FindingsPage() {
                             </td>
 
                             {/* Status Badge */}
-                            <td style={{ padding: '14px 14px' }}>
+                            <td style={{ padding: '8px 8px' }}>
                               <span
                                 style={{
                                   display: 'inline-block',
-                                  padding: '2.5px 9px',
-                                  borderRadius: '6px',
-                                  fontSize: '11.5px',
+                                  padding: '2px 7px',
+                                  borderRadius: '5px',
+                                  fontSize: '11px',
                                   fontWeight: 500,
                                   background: st.bg,
                                   color: st.color,
@@ -1724,13 +1802,13 @@ export default function FindingsPage() {
                               </span>
                             </td>
 
-                            {/* Actions Dropdown Button [ 🔧 Remediate ∨ ] / [ View ∨ ] */}
+                            {/* Actions Dropdown Button [ 🔧 Remediate ∨ ] */}
                             <td
-                              style={{ padding: '14px 14px' }}
+                              style={{ padding: '8px 10px', textAlign: 'right' }}
                               onClick={(e) => e.stopPropagation()}
                               data-row-menu
                             >
-                              <div style={{ position: 'relative', display: 'inline-block' }}>
+                              <div style={{ position: 'relative', display: 'inline-block', textAlign: 'left' }}>
                                 <button
                                   type="button"
                                   onClick={() => setRowMenuFindingId(isRowMenuOpen ? null : f.id)}
@@ -1738,11 +1816,11 @@ export default function FindingsPage() {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '5px',
-                                    padding: '5px 10px',
+                                    padding: '4px 8px',
                                     borderRadius: '6px',
                                     background: T.surface,
                                     border: `1px solid ${T.borderInput}`,
-                                    fontSize: '12px',
+                                    fontSize: '11.5px',
                                     fontWeight: 500,
                                     color: T.text,
                                     cursor: 'pointer',
@@ -1755,13 +1833,13 @@ export default function FindingsPage() {
                                   {f.status === 'RESOLVED' ? (
                                     <>
                                       <span>View</span>
-                                      <ChevronDown size={11} color="#6B7280" />
+                                      <ChevronDown size={10} color="#6B7280" />
                                     </>
                                   ) : (
                                     <>
-                                      <Wrench size={11} color="#475569" strokeWidth={1.8} />
+                                      <Wrench size={10} color="#475569" strokeWidth={1.8} />
                                       <span>Remediate</span>
-                                      <ChevronDown size={11} color="#6B7280" />
+                                      <ChevronDown size={10} color="#6B7280" />
                                     </>
                                   )}
                                 </button>
@@ -1773,11 +1851,11 @@ export default function FindingsPage() {
                                       position: 'absolute',
                                       right: 0,
                                       top: 'calc(100% + 4px)',
-                                      width: '160px',
+                                      width: '150px',
                                       background: '#FFFFFF',
                                       border: `1px solid ${T.borderInput}`,
-                                      borderRadius: '8px',
-                                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+                                      borderRadius: '7px',
+                                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
                                       zIndex: 70,
                                       padding: '4px',
                                     }}
@@ -1787,15 +1865,15 @@ export default function FindingsPage() {
                                       onClick={() => handleRemediate(f)}
                                       style={{
                                         width: '100%',
-                                        padding: '7px 10px',
+                                        padding: '6px 8px',
                                         background: 'transparent',
                                         border: 'none',
                                         textAlign: 'left',
-                                        fontSize: '12px',
+                                        fontSize: '11.5px',
                                         fontWeight: 600,
                                         color: T.text,
                                         cursor: 'pointer',
-                                        borderRadius: '5px',
+                                        borderRadius: '4px',
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '6px',
@@ -1804,15 +1882,43 @@ export default function FindingsPage() {
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <Sparkles size={12} color="#6366F1" />
-                                      Apply Fix
+                                      <Sparkles size={11} color="#6366F1" />
+                                      Remediate Finding
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setRowMenuFindingId(null);
+                                        router.push(`/api-security/attack-paths?findingId=${f.id}`);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '6px 8px',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        textAlign: 'left',
+                                        fontSize: '11.5px',
+                                        fontWeight: 500,
+                                        color: T.text,
+                                        cursor: 'pointer',
+                                        borderRadius: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontFamily: sans,
+                                      }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                                    >
+                                      <GitFork size={11} color="#15803D" />
+                                      View Attack Path
                                     </button>
                                     <div style={{ height: '1px', background: T.borderLight, margin: '3px 0' }} />
                                     {[
-                                      { id: 'OPEN', label: 'Mark as OPEN' },
-                                      { id: 'IN_PROGRESS', label: 'Mark as IN PROGRESS' },
-                                      { id: 'RESOLVED', label: 'Mark as RESOLVED' },
-                                      { id: 'REMEDIATED', label: 'Mark as REMEDIATED' },
+                                      { id: 'OPEN', label: 'Mark as Open' },
+                                      { id: 'IN_PROGRESS', label: 'Mark as In Progress' },
+                                      { id: 'RESOLVED', label: 'Mark as Resolved' },
+                                      { id: 'REMEDIATED', label: 'Mark as Remediated' },
                                     ].map((s) => (
                                       <button
                                         key={s.id}
@@ -1820,14 +1926,14 @@ export default function FindingsPage() {
                                         onClick={() => handleUpdateStatus(f.id, s.id)}
                                         style={{
                                           width: '100%',
-                                          padding: '5px 10px',
+                                          padding: '4px 8px',
                                           background: 'transparent',
                                           border: 'none',
                                           textAlign: 'left',
-                                          fontSize: '11.5px',
+                                          fontSize: '11px',
                                           color: T.textSub,
                                           cursor: 'pointer',
-                                          borderRadius: '5px',
+                                          borderRadius: '4px',
                                           fontFamily: sans,
                                         }}
                                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
@@ -1848,22 +1954,156 @@ export default function FindingsPage() {
                 </table>
               </div>
 
+              {/* 5. SERVER-SIDE PAGINATION CONTROLS BAR */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  background: '#FFFFFF',
+                  border: `1px solid ${T.border}`,
+                  borderRadius: '10px',
+                  fontSize: '12px',
+                  color: T.textSub,
+                  fontFamily: sans,
+                }}
+              >
+                {/* Left: Showing X-Y of Z findings + Page Size */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <span>
+                    Showing <strong style={{ color: T.text }}>{totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> to{' '}
+                    <strong style={{ color: T.text }}>{Math.min(currentPage * pageSize, totalCount)}</strong> of{' '}
+                    <strong style={{ color: T.text }}>{totalCount}</strong> findings
+                  </span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ fontSize: '11.5px', color: '#64748B' }}>Rows per page:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      style={{
+                        padding: '3px 6px',
+                        borderRadius: '5px',
+                        border: `1px solid ${T.borderInput}`,
+                        background: '#FFFFFF',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        color: T.text,
+                        cursor: 'pointer',
+                        outline: 'none',
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Right: Previous / Page Numbers / Next */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1 || loading}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '5px',
+                      border: `1px solid ${T.borderInput}`,
+                      background: '#FFFFFF',
+                      fontSize: '11.5px',
+                      fontWeight: 500,
+                      color: currentPage <= 1 ? '#9CA3AF' : T.text,
+                      cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+                      opacity: currentPage <= 1 ? 0.6 : 1,
+                    }}
+                  >
+                    Previous
+                  </button>
+
+                  {Array.from({ length: totalPages }).map((_, i) => {
+                    const pageNum = i + 1;
+                    if (
+                      totalPages > 6 &&
+                      pageNum !== 1 &&
+                      pageNum !== totalPages &&
+                      Math.abs(pageNum - currentPage) > 1
+                    ) {
+                      if (pageNum === 2 || pageNum === totalPages - 1) {
+                        return <span key={pageNum} style={{ padding: '0 3px', color: '#9CA3AF' }}>…</span>;
+                      }
+                      return null;
+                    }
+
+                    const isActive = pageNum === currentPage;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        disabled={loading}
+                        style={{
+                          minWidth: '28px',
+                          height: '28px',
+                          padding: '0 6px',
+                          borderRadius: '5px',
+                          border: isActive ? `1px solid ${T.btnDark}` : `1px solid ${T.borderInput}`,
+                          background: isActive ? T.btnDark : '#FFFFFF',
+                          color: isActive ? '#FFFFFF' : T.text,
+                          fontSize: '11.5px',
+                          fontWeight: isActive ? 600 : 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.12s ease',
+                        }}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages || loading}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '5px',
+                      border: `1px solid ${T.borderInput}`,
+                      background: '#FFFFFF',
+                      fontSize: '11.5px',
+                      fontWeight: 500,
+                      color: currentPage >= totalPages ? '#9CA3AF' : T.text,
+                      cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+                      opacity: currentPage >= totalPages ? 0.6 : 1,
+                    }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+
             </div>
 
-            {/* ── RIGHT COLUMN: FINDING DETAILS CARD ─────────────────── */}
+            {/* ── RIGHT COLUMN: STICKY FINDING DETAILS PANEL ───────────────── */}
             {selectedFinding ? (
               <div
                 style={{
                   background: T.surface,
                   border: `1px solid ${T.border}`,
                   borderRadius: '14px',
-                  padding: '22px 22px',
+                  padding: '20px 20px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '18px',
+                  gap: '16px',
                   position: 'sticky',
                   top: '16px',
+                  maxHeight: 'calc(100vh - 32px)',
+                  overflowY: 'auto',
                 }}
               >
                 {/* Header: Finding Details + Status Pill */}
@@ -1902,7 +2142,7 @@ export default function FindingsPage() {
                     <h2
                       style={{
                         fontFamily: sans,
-                        fontSize: '16px',
+                        fontSize: '15px',
                         fontWeight: 700,
                         color: T.text,
                         margin: '0 0 4px',
@@ -1932,7 +2172,7 @@ export default function FindingsPage() {
                 </div>
 
                 {/* Badges Strip */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
                   <span
                     style={{
                       display: 'inline-flex',
@@ -2030,7 +2270,7 @@ export default function FindingsPage() {
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '5px',
+                          gap: '3px',
                           overflowX: 'auto',
                           paddingBottom: '2px',
                         }}
@@ -2044,10 +2284,10 @@ export default function FindingsPage() {
                                 style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '4px',
-                                  padding: '3.5px 7.5px',
-                                  borderRadius: '6px',
-                                  fontSize: '11px',
+                                  gap: '3px',
+                                  padding: '2.5px 6px',
+                                  borderRadius: '5px',
+                                  fontSize: '10.5px',
                                   fontWeight: isFinal ? 600 : 500,
                                   background: isFinal ? '#FEE2E2' : '#F8FAFC',
                                   border: `1px solid ${isFinal ? '#FECACA' : '#E2E8F0'}`,
@@ -2058,7 +2298,7 @@ export default function FindingsPage() {
                                 }}
                               >
                                 <IconComp
-                                  size={11}
+                                  size={10}
                                   color={isFinal ? '#DC2626' : '#64748B'}
                                   strokeWidth={2}
                                 />
@@ -2066,7 +2306,7 @@ export default function FindingsPage() {
                               </div>
                               {nIdx < apData.nodes.length - 1 && (
                                 <ChevronRight
-                                  size={10}
+                                  size={9}
                                   color="#94A3B8"
                                   style={{ flexShrink: 0 }}
                                 />
@@ -2142,12 +2382,12 @@ export default function FindingsPage() {
                     onClick={() => router.push(`/api-security/remediation?findingId=${selectedFinding.id}`)}
                     style={{
                       flex: 1,
-                      height: '38px',
+                      height: '36px',
                       borderRadius: '8px',
                       background: T.btnDark,
                       border: 'none',
                       color: '#FFFFFF',
-                      fontSize: '13px',
+                      fontSize: '12.5px',
                       fontWeight: 600,
                       cursor: 'pointer',
                       fontFamily: sans,
@@ -2157,7 +2397,7 @@ export default function FindingsPage() {
                       gap: '7px',
                     }}
                   >
-                    <Wrench size={13} color="#FFFFFF" />
+                    <Wrench size={12} color="#FFFFFF" />
                     Remediate
                   </button>
 
@@ -2166,11 +2406,11 @@ export default function FindingsPage() {
                     onClick={() => router.push(`/api-security/findings/${selectedFinding.id}`)}
                     style={{
                       flex: 1,
-                      height: '38px',
+                      height: '36px',
                       borderRadius: '8px',
                       border: `1px solid ${T.borderInput}`,
                       background: '#FFFFFF',
-                      fontSize: '13px',
+                      fontSize: '12.5px',
                       fontWeight: 500,
                       color: T.text,
                       cursor: 'pointer',
@@ -2185,7 +2425,7 @@ export default function FindingsPage() {
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
                   >
                     View Full Details
-                    <ArrowRight size={13} color="#0F172A" />
+                    <ArrowRight size={12} color="#0F172A" />
                   </button>
                 </div>
               </div>

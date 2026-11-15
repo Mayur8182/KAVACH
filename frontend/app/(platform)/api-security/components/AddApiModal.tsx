@@ -23,7 +23,7 @@ interface AddApiModalProps {
 }
 
 export function AddApiModal({ isOpen, onClose, onSuccess }: AddApiModalProps) {
-  const { refreshApis, refreshOverview, setSelectedApi } = useApiSecurity();
+  const { refreshApis, refreshOverview, setSelectedApi, setIsGithubModalOpen } = useApiSecurity();
 
   const [activeTab, setActiveTab] = useState<'openapi' | 'postman' | 'url' | 'github' | 'cloud'>('openapi');
   const [name, setName] = useState('');
@@ -350,7 +350,7 @@ export function AddApiModal({ isOpen, onClose, onSuccess }: AddApiModalProps) {
                 type="button"
                 onClick={() => {
                   onClose();
-                  window.location.href = '/api-security/discovery';
+                  setIsGithubModalOpen(true);
                 }}
                 style={{
                   display: 'flex',
@@ -358,7 +358,7 @@ export function AddApiModal({ isOpen, onClose, onSuccess }: AddApiModalProps) {
                   gap: '6px',
                   marginTop: '8px',
                   padding: '9px 20px',
-                  backgroundColor: '#2563EB',
+                  backgroundColor: '#0F172A',
                   color: '#FFFFFF',
                   borderRadius: '6px',
                   fontSize: '13px',
@@ -368,7 +368,7 @@ export function AddApiModal({ isOpen, onClose, onSuccess }: AddApiModalProps) {
                 }}
               >
                 <FolderGit2 size={15} />
-                <span>Launch GitHub Discovery Pipeline</span>
+                <span>Connect & Select Repository</span>
               </button>
             </div>
           )}

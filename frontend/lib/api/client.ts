@@ -458,7 +458,11 @@ class ThingApiClient {
       // In browser, route requests through Next.js proxy rewrite to eliminate cross-origin and private network access restrictions
       this.baseUrl = '';
     } else {
-      this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+      const isProd = process.env.NODE_ENV === 'production' || !!process.env.RENDER || !!process.env.VERCEL;
+      this.baseUrl =
+        process.env.BACKEND_URL ||
+        process.env.NEXT_PUBLIC_API_URL ||
+        (isProd ? 'https://kavach-backend-3hdm.onrender.com' : 'http://127.0.0.1:8000');
     }
   }
 
@@ -13787,17 +13791,19 @@ class ThingApiClient {
       });
       return res.data;
     },
-    findings: async (params?: { apiId?: string; category?: string; severity?: string; status?: string; search?: string; limit?: number; offset?: number }): Promise<{ total: number; items: any[] }> => {
+    findings: async (params?: { apiId?: string; category?: string; severity?: string; status?: string; search?: string; limit?: number; offset?: number; page?: number; pageSize?: number }): Promise<{ total: number; page?: number; page_size?: number; pages?: number; stats?: any; items: any[] }> => {
       const q = new URLSearchParams();
       if (params?.apiId) q.set('api_id', params.apiId);
       if (params?.category) q.set('category', params.category);
       if (params?.severity) q.set('severity', params.severity);
       if (params?.status) q.set('status', params.status);
       if (params?.search) q.set('search', params.search);
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.pageSize) q.set('page_size', String(params.pageSize));
       if (params?.limit) q.set('limit', String(params.limit));
       if (params?.offset) q.set('offset', String(params.offset));
       const qs = q.toString() ? `?${q.toString()}` : '';
-      const res = await this.request<{ total: number; items: any[] }>(`/api/v1/api-security/findings${qs}`);
+      const res = await this.request<{ total: number; page?: number; page_size?: number; pages?: number; stats?: any; items: any[] }>(`/api/v1/api-security/findings${qs}`);
       return res.data;
     },
     getFinding: async (findingId: string): Promise<any> => {
@@ -13941,6 +13947,19 @@ class ThingApiClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(repoData || {}),
+        timeoutMs: 180000,
+      });
+      return res.data;
+    },
+    listRepositories: async (): Promise<{ connected: boolean; account_name: string | null; total: number; repositories: any[] }> => {
+      const res = await this.request<{ connected: boolean; account_name: string | null; total: number; repositories: any[] }>('/api/v1/api-security/repositories');
+      return res.data;
+    },
+    connectRepository: async (payload: { token?: string; account_name?: string; repository_id?: string; full_name?: string; name?: string; branch?: string; clone_url?: string; html_url?: string; language?: string }): Promise<any> => {
+      const res = await this.request<any>('/api/v1/api-security/repositories/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
         timeoutMs: 180000,
       });
       return res.data;

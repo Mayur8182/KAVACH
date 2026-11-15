@@ -6,11 +6,12 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import {
   FileText, Download, CheckCircle2, ShieldCheck, X, AlertCircle,
   Eye, ChevronRight, CalendarDays, BarChart3, FileSearch, Share2,
-  Check, ArrowRight, Loader2, Copy, ExternalLink, Shield, Lock,
+  Check, ArrowRight, ArrowLeft, Loader2, Copy, ExternalLink, Shield, Lock,
   ChevronLeft, Maximize2, Minimize2, Mail, Link as LinkIcon, Code,
   FileCode, Terminal, CheckCircle
 } from 'lucide-react';
 import { KavachApiLayout } from '../components/KavachApiLayout';
+import { KavachSkeletonPage } from '../components/KavachSkeleton';
 import { useApiSecurity } from '../context/ApiSecurityContext';
 import { api } from '@/lib/api/client';
 import { toast } from '@/lib/toast';
@@ -267,14 +268,14 @@ export default function ReportsAndCompliancePage() {
     loadData();
   }, [selectedApi?.id]);
 
-  // Dynamic Findings Metrics
-  const totalFindings = findings.length || 12;
-  const criticalCount = findings.filter((f) => (f.severity || '').toUpperCase() === 'CRITICAL').length || 2;
-  const highCount     = findings.filter((f) => (f.severity || '').toUpperCase() === 'HIGH').length || 3;
-  const mediumCount   = findings.filter((f) => (f.severity || '').toUpperCase() === 'MEDIUM').length || 4;
-  const lowCount      = findings.filter((f) => (f.severity || '').toUpperCase() === 'LOW').length || 3;
-  const remediatedCnt = findings.filter((f) => ['REMEDIATED', 'RESOLVED', 'VERIFIED_FIXED'].includes((f.status || '').toUpperCase())).length || 8;
-  const remediationRate = Math.round((remediatedCnt / Math.max(totalFindings, 1)) * 100 * 10) / 10 || 66.7;
+  // Dynamic Findings Metrics derived strictly from real database findings
+  const totalFindings = findings.length;
+  const criticalCount = findings.filter((f) => (f.severity || '').toUpperCase() === 'CRITICAL').length;
+  const highCount     = findings.filter((f) => (f.severity || '').toUpperCase() === 'HIGH').length;
+  const mediumCount   = findings.filter((f) => (f.severity || '').toUpperCase() === 'MEDIUM').length;
+  const lowCount      = findings.filter((f) => (f.severity || '').toUpperCase() === 'LOW').length;
+  const remediatedCnt = findings.filter((f) => ['REMEDIATED', 'RESOLVED', 'VERIFIED_FIXED'].includes((f.status || '').toUpperCase())).length;
+  const remediationRate = totalFindings > 0 ? Math.round((remediatedCnt / totalFindings) * 100 * 10) / 10 : 0;
 
   // Active framework dataset
   const activeFwData = useMemo(() => {
@@ -361,6 +362,20 @@ export default function ReportsAndCompliancePage() {
 
   const filteredEvidence = useMemo(() => {
     return evidence.filter((row: any) => {
+      if (evidenceTab === 'remediation') {
+        const matchesRem = row.evidence_type?.toLowerCase().includes('remediation') || row.evidence_type?.toLowerCase().includes('proof') || row.artifact?.includes('sql') || row.artifact?.includes('exceeded');
+        if (!matchesRem) return false;
+      } else if (evidenceTab === 'logs') {
+        const matchesLogs = row.evidence_type?.toLowerCase().includes('log') || row.artifact?.endsWith('.log');
+        if (!matchesLogs) return false;
+      } else if (evidenceTab === 'verification') {
+        const matchesVer = row.evidence_type?.toLowerCase().includes('trace') || row.evidence_type?.toLowerCase().includes('proof') || row.artifact?.includes('bola');
+        if (!matchesVer) return false;
+      } else if (evidenceTab === 'traceability') {
+        const matchesTrace = row.evidence_type?.toLowerCase().includes('trace') || row.evidence_type?.toLowerCase().includes('request');
+        if (!matchesTrace) return false;
+      }
+
       if (evidenceSeverity !== 'All') {
         const sev = row.severity || (row.finding?.toLowerCase().includes('bola') ? 'Critical' : 'High');
         if (sev.toLowerCase() !== evidenceSeverity.toLowerCase()) return false;
@@ -371,7 +386,7 @@ export default function ReportsAndCompliancePage() {
       }
       return true;
     });
-  }, [evidence, evidenceSeverity, evidenceStatus]);
+  }, [evidence, evidenceTab, evidenceSeverity, evidenceStatus]);
 
   // Open Preview for specific report
   const handleOpenPreview = (rep?: any) => {
@@ -428,6 +443,16 @@ export default function ReportsAndCompliancePage() {
     toast.success('Secure report link copied to clipboard');
     setTimeout(() => setCopiedLink(false), 2000);
   };
+
+  if (isLoading) {
+    return (
+      <KavachApiLayout activeApiId={selectedApi?.id}>
+        <div style={{ maxWidth: '1380px', margin: '0 auto', padding: '24px 36px 64px', fontFamily: sans }}>
+          <KavachSkeletonPage />
+        </div>
+      </KavachApiLayout>
+    );
+  }
 
   return (
     <KavachApiLayout activeApiId={selectedApi?.id}>
@@ -497,6 +522,29 @@ export default function ReportsAndCompliancePage() {
 
             {/* Action Bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => router.push('/api-security')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  background: T.surface,
+                  border: `1px solid ${T.borderInput}`,
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: T.text,
+                  cursor: 'pointer',
+                  fontFamily: sans,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                }}
+              >
+                <ArrowLeft size={13} color="#0F172A" />
+                <span>Back to API Security</span>
+              </button>
+
               <KavachDropdown
                 value={timeRange}
                 onChange={(val) => setTimeRange(val)}

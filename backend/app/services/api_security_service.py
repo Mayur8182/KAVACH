@@ -2313,23 +2313,25 @@ User inquiry: {prompt}
         # 2. Attempt to fetch real repository files from GitHub API (authenticated or public)
         if not file_map and repo_name and "/" in repo_name:
             try:
-                settings = get_settings()
-                gh_token = getattr(settings, "github_token", None) or os.environ.get("GITHUB_TOKEN")
+                gh_token = None
+                try:
+                    from app.models.integration import Integration
+                    integ_stmt = (
+                        select(Integration)
+                        .where(Integration.provider == "github", Integration.is_connected == True)
+                        .order_by(Integration.updated_at.desc())
+                    )
+                    integ_res = await self.db.execute(integ_stmt)
+                    integ = integ_res.scalars().first()
+                    if integ and integ.credentials_json:
+                        c_dict = json.loads(integ.credentials_json)
+                        gh_token = c_dict.get("access_token")
+                except Exception:
+                    pass
+
                 if not gh_token:
-                    try:
-                        from app.models.integration import Integration
-                        integ_stmt = (
-                            select(Integration)
-                            .where(Integration.provider == "github", Integration.is_connected == True)
-                            .order_by(Integration.updated_at.desc())
-                        )
-                        integ_res = await self.db.execute(integ_stmt)
-                        integ = integ_res.scalars().first()
-                        if integ and integ.credentials_json:
-                            c_dict = json.loads(integ.credentials_json)
-                            gh_token = c_dict.get("access_token")
-                    except Exception:
-                        pass
+                    settings = get_settings()
+                    gh_token = getattr(settings, "github_token", None) or os.environ.get("GITHUB_TOKEN")
 
                 import httpx
                 headers = {
@@ -2367,7 +2369,7 @@ User inquiry: {prompt}
                             if any(kw in item["path"].lower() for kw in candidate_keywords)
                             and item.get("type") == "blob"
                             and any(item["path"].endswith(ext) for ext in candidate_exts)
-                        ][:10]
+                        ][:35]
 
                         async def fetch_blob(c_path: str) -> Tuple[str, Optional[str]]:
                             raw_hdrs = {

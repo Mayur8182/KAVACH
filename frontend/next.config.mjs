@@ -125,17 +125,31 @@ const nextConfig = {
     return config;
   },
   async rewrites() {
+    const isProduction =
+      process.env.NODE_ENV === 'production' ||
+      !!process.env.RENDER ||
+      !!process.env.VERCEL;
     const backendPort = process.env.BACKEND_PORT || '8000';
     const localUrl = `http://127.0.0.1:${backendPort}`;
-    let rawUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || localUrl;
-    let backendUrl = rawUrl.trim();
-    // Safety guard: in local dev, always use local backend unless explicitly specified
-    if (backendUrl.includes('kavach-backend-3hdm.onrender.com') || !backendUrl) {
-      backendUrl = localUrl;
+    const productionBackend = 'https://kavach-backend-3hdm.onrender.com';
+
+    let rawUrl = (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '').trim();
+    let backendUrl = rawUrl;
+
+    if (!backendUrl) {
+      backendUrl = isProduction ? productionBackend : localUrl;
+    } else {
+      // In local dev without RENDER/VERCEL, if someone has render backend in .env, they might want local unless forced
+      // BUT in production, if backendUrl points to kavach-backend-3hdm.onrender.com, ALWAYS KEEP IT!
+      if (!isProduction && backendUrl.includes('kavach-backend-3hdm.onrender.com') && !process.env.FORCE_REMOTE_BACKEND) {
+        backendUrl = localUrl;
+      }
     }
+
     if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
-      backendUrl = `http://${backendUrl}`;
+      backendUrl = isProduction ? `https://${backendUrl}` : `http://${backendUrl}`;
     }
+
     try {
       const parsed = new URL(backendUrl);
       if (!parsed.hostname.includes('.') && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
@@ -151,8 +165,10 @@ const nextConfig = {
     } catch {
       backendUrl = backendUrl.replace(/:\d+$/, '').replace(/\/+$/, '');
     }
+
     // Clean trailing slashes or duplicate api prefixes
     backendUrl = backendUrl.replace(/\/+$/, '').replace(/\/api(\/v1)?$/, '');
+
     return [
       {
         source: '/api/:path*',

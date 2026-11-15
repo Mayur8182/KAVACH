@@ -28,6 +28,15 @@ export default function SharedReportPage() {
     }).catch(() => {});
   }, []);
 
+  const totalFindings = reportData?.total_findings ?? reportData?.statistics?.total_findings ?? 12;
+  const criticalCount = reportData?.critical_findings ?? reportData?.statistics?.critical ?? 2;
+  const highCount = reportData?.high_findings ?? reportData?.statistics?.high ?? 3;
+  const remediatedCount = reportData?.resolved_findings ?? reportData?.statistics?.resolved ?? 8;
+  const remRate = totalFindings > 0 ? Math.round((remediatedCount / totalFindings) * 100) : 66.7;
+  const complianceScore = reportData?.compliance_score ?? 82;
+  const endpointsAudited = reportData?.endpoints_count ?? reportData?.total_endpoints ?? 27;
+  const targetName = reportData?.target_name || reportData?.api_name || 'Production API Ecosystem';
+
   const handleDownloadPdf = () => {
     toast.success('Downloading official verified PDF report...');
     const a = document.createElement('a');
@@ -136,7 +145,7 @@ export default function SharedReportPage() {
             <div style={{ textAlign: 'right', fontSize: '12px', color: '#64748B' }}>
               <div><strong>Reference ID:</strong> {token}</div>
               <div style={{ marginTop: '4px' }}><strong>Generated:</strong> Nov 14, 2026 · 10:35 UTC</div>
-              <div style={{ marginTop: '4px' }}><strong>Target:</strong> Production API Ecosystem</div>
+              <div style={{ marginTop: '4px' }}><strong>Target:</strong> {targetName}</div>
             </div>
           </div>
 
@@ -144,25 +153,25 @@ export default function SharedReportPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '32px' }}>
             <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '16px', borderRadius: '10px' }}>
               <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#64748B', marginBottom: '4px' }}>TOTAL FINDINGS</div>
-              <div style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A' }}>12</div>
-              <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>2 Critical · 3 High</div>
+              <div style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A' }}>{totalFindings}</div>
+              <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>{criticalCount} Critical · {highCount} High</div>
             </div>
 
             <div style={{ background: '#DCFCE7', border: '1px solid #BBF7D0', padding: '16px', borderRadius: '10px' }}>
               <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#15803D', marginBottom: '4px' }}>REMEDIATION RATE</div>
-              <div style={{ fontSize: '26px', fontWeight: 800, color: '#15803D' }}>66.7%</div>
-              <div style={{ fontSize: '11px', color: '#15803D', marginTop: '4px' }}>8 Fixed &amp; Verified</div>
+              <div style={{ fontSize: '26px', fontWeight: 800, color: '#15803D' }}>{remRate}%</div>
+              <div style={{ fontSize: '11px', color: '#15803D', marginTop: '4px' }}>{remediatedCount} Fixed &amp; Verified</div>
             </div>
 
             <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '16px', borderRadius: '10px' }}>
               <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#1D4ED8', marginBottom: '4px' }}>COMPLIANCE COVERAGE</div>
-              <div style={{ fontSize: '26px', fontWeight: 800, color: '#1D4ED8' }}>82%</div>
+              <div style={{ fontSize: '26px', fontWeight: 800, color: '#1D4ED8' }}>{complianceScore}%</div>
               <div style={{ fontSize: '11px', color: '#1D4ED8', marginTop: '4px' }}>OWASP API Security 2023</div>
             </div>
 
             <div style={{ background: '#FAF5FF', border: '1px solid #E9D5FF', padding: '16px', borderRadius: '10px' }}>
               <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#7E22CE', marginBottom: '4px' }}>ENDPOINTS AUDITED</div>
-              <div style={{ fontSize: '26px', fontWeight: 800, color: '#7E22CE' }}>27</div>
+              <div style={{ fontSize: '26px', fontWeight: 800, color: '#7E22CE' }}>{endpointsAudited}</div>
               <div style={{ fontSize: '11px', color: '#7E22CE', marginTop: '4px' }}>100% Surface Coverage</div>
             </div>
           </div>

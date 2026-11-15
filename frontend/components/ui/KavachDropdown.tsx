@@ -465,10 +465,10 @@ export function KavachDropdown({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 borderTop: '1px solid #F1F5F9',
-                paddingTop: '6px',
-                marginTop: '4px',
-                paddingRight: '4px',
-                paddingLeft: '4px',
+                paddingTop: '8px',
+                marginTop: '6px',
+                paddingRight: '6px',
+                paddingLeft: '6px',
               }}
             >
               <button
@@ -477,14 +477,15 @@ export function KavachDropdown({
                 style={{
                   background: 'none',
                   border: 'none',
-                  fontSize: '11.5px',
-                  color: '#64748B',
+                  fontSize: '12px',
+                  color: '#475569',
+                  fontWeight: 500,
                   cursor: 'pointer',
-                  padding: '4px 6px',
+                  padding: '4px 8px',
                   borderRadius: '4px',
                 }}
               >
-                Reset All
+                Clear
               </button>
               <button
                 type="button"
@@ -492,12 +493,13 @@ export function KavachDropdown({
                 style={{
                   background: '#0F172A',
                   border: 'none',
-                  fontSize: '11.5px',
+                  fontSize: '12px',
                   color: '#FFFFFF',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  padding: '4px 10px',
+                  padding: '5px 14px',
                   borderRadius: '6px',
+                  boxShadow: '0 1px 3px rgba(15, 23, 42, 0.2)',
                 }}
               >
                 Apply

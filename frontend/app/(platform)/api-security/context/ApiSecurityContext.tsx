@@ -24,6 +24,14 @@ export interface ApiSecurityContextType {
   refreshOverview: (overrideProjectId?: string) => Promise<void>;
   isAddModalOpen: boolean;
   setIsAddModalOpen: (open: boolean) => void;
+  isGithubModalOpen: boolean;
+  setIsGithubModalOpen: (open: boolean) => void;
+  apiRepositories: any[];
+  isLoadingRepos: boolean;
+  githubAccount: string | null;
+  isGithubConnected: boolean;
+  refreshRepositories: () => Promise<void>;
+  selectRepository: (repo: any) => Promise<any>;
   scanMode: ApiScanMode;
   setScanMode: (mode: ApiScanMode) => void;
   syncWithRepository: (repo: any) => void;
@@ -44,6 +52,11 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
     open_findings: 0,
   });
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [isGithubModalOpen, setIsGithubModalOpen] = useState<boolean>(false);
+  const [apiRepositories, setApiRepositories] = useState<any[]>([]);
+  const [isLoadingRepos, setIsLoadingRepos] = useState<boolean>(false);
+  const [githubAccount, setGithubAccount] = useState<string | null>(null);
+  const [isGithubConnected, setIsGithubConnected] = useState<boolean>(false);
 
   const refreshApis = useCallback(async (overrideProjectId?: string) => {
     setIsLoadingApis(true);
@@ -92,6 +105,92 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
     }
   }, [currentProject?.id]);
 
+  const refreshRepositories = useCallback(async () => {
+    setIsLoadingRepos(true);
+    try {
+      const res = await api.apiSecurity.listRepositories();
+      if (res) {
+        setApiRepositories(res.repositories || []);
+        setGithubAccount(res.account_name || null);
+        setIsGithubConnected(Boolean(res.connected));
+      }
+    } catch (err) {
+      console.error('Failed to load repositories for API Security:', err);
+    } finally {
+      setIsLoadingRepos(false);
+    }
+  }, []);
+
+  const selectRepository = useCallback(async (repo: any) => {
+    if (!repo) return;
+    setIsLoadingApis(true);
+    try {
+      let targetToSelect: any = null;
+
+      // 1. Check if an API target already exists with matching id or name
+      if (repo.api_target_id) {
+        targetToSelect = apis.find((a: any) => a.id === repo.api_target_id);
+      }
+      if (!targetToSelect) {
+        const cleanName = (repo.name || '').toLowerCase();
+        targetToSelect = apis.find((a: any) => {
+          const aRepo = (a.repository || '').toLowerCase();
+          const aName = (a.name || '').toLowerCase();
+          return (
+            (aRepo && (aRepo === (repo.full_name || '').toLowerCase() || aRepo === cleanName)) ||
+            (aName && (aName === cleanName || aName === `${cleanName} code inventory`))
+          );
+        });
+      }
+
+      // 2. If target does not exist yet in API Security, connect & discover routes
+      if (!targetToSelect) {
+        const connectRes = await api.apiSecurity.connectRepository({
+          repository_id: String(repo.id),
+          full_name: repo.full_name || repo.name,
+          name: repo.name,
+          branch: repo.default_branch || 'main',
+          clone_url: repo.clone_url,
+          html_url: repo.html_url,
+          language: repo.language,
+        });
+        if (connectRes?.api_target) {
+          targetToSelect = connectRes.api_target;
+        }
+      }
+
+      // 3. Refresh APIs list
+      const res = await api.apiSecurity.apis({ projectId: currentProject?.id || undefined });
+      const items = res?.items || [];
+      setApis(items);
+
+      if (targetToSelect) {
+        const fresh = items.find((a: any) => a.id === targetToSelect.id) || targetToSelect;
+        setSelectedApi(fresh);
+      } else if (items.length > 0) {
+        setSelectedApi(items[0]);
+      }
+
+      // 4. Synchronize with global currentRepository
+      if (repositories && repositories.length > 0) {
+        const matched = repositories.find((r: any) =>
+          r.name?.toLowerCase() === repo.name?.toLowerCase() ||
+          r.full_name?.toLowerCase() === (repo.full_name || '').toLowerCase()
+        );
+        if (matched) setCurrentRepository(matched);
+      }
+
+      await refreshOverview();
+      await refreshRepositories();
+      return targetToSelect;
+    } catch (err) {
+      console.error('Failed to select repository:', err);
+      throw err;
+    } finally {
+      setIsLoadingApis(false);
+    }
+  }, [apis, currentProject?.id, repositories, setCurrentRepository, refreshOverview, refreshRepositories]);
+
   // Synchronize API Target selection with global repository scope
   const handleSetSelectedApi = useCallback((targetApi: any) => {
     setSelectedApi(targetApi);
@@ -126,7 +225,8 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     refreshApis();
     refreshOverview();
-  }, [refreshApis, refreshOverview]);
+    refreshRepositories();
+  }, [refreshApis, refreshOverview, refreshRepositories]);
 
   return (
     <ApiSecurityContext.Provider
@@ -140,6 +240,14 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
         refreshOverview,
         isAddModalOpen,
         setIsAddModalOpen,
+        isGithubModalOpen,
+        setIsGithubModalOpen,
+        apiRepositories,
+        isLoadingRepos,
+        githubAccount,
+        isGithubConnected,
+        refreshRepositories,
+        selectRepository,
         scanMode,
         setScanMode,
         syncWithRepository,

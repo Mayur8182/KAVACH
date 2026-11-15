@@ -33,6 +33,8 @@ from app.models.api_security import (
 )
 from app.models.integration_models import RealIntegration, RealIntegrationRepository
 from app.models.integration import Integration
+from app.models.github import GitHubRepository
+from app.core.encryption import decrypt_secret
 from app.models.audit_event import AuditEvent
 from app.models.policy import SecurityPolicy
 from app.services.api_security_service import ApiSecurityService
@@ -683,9 +685,17 @@ async def get_scan_status(
     tc_stmt = select(ApiTestCase).where(ApiTestCase.scan_id == scan.id).order_by(ApiTestCase.created_at)
     db_test_cases = (await db.execute(tc_stmt)).scalars().all()
 
-    # Fetch real findings for this scan
+    # Fetch real findings for this scan (with fallback to target API findings)
     findings_stmt = select(ApiFinding).where(ApiFinding.scan_id == scan.id)
     findings = (await db.execute(findings_stmt)).scalars().all()
+    if not findings:
+        alt_stmt = select(ApiFinding).where(ApiFinding.api_id == scan.api_id)
+        findings = (await db.execute(alt_stmt)).scalars().all()
+
+    crit_count = sum(1 for f in findings if f.severity == "CRITICAL")
+    high_count = sum(1 for f in findings if f.severity == "HIGH")
+    med_count = sum(1 for f in findings if f.severity == "MEDIUM")
+    low_count = sum(1 for f in findings if f.severity == "LOW")
 
     # Fetch endpoints for this API target
     endpoints_stmt = select(ApiEndpoint).where(ApiEndpoint.api_id == scan.api_id)
@@ -744,7 +754,14 @@ async def get_scan_status(
     target_stmt = select(ApiTarget).where(ApiTarget.id == scan.api_id)
     target = (await db.execute(target_stmt)).scalar_one_or_none()
 
-    total_tests = scan.tests_total or len(test_runs)
+    total_tests = scan.tests_total or len(db_test_cases) or (len(endpoints) + len(findings)) or len(test_runs) or 1
+    failed_count = scan.tests_failed if scan.tests_failed > 0 else (sum(1 for t in test_runs if t["status"] == "FAILED") or len(findings))
+    passed_count = scan.tests_passed if scan.tests_passed > 0 else (sum(1 for t in test_runs if t["status"] == "PASSED") or max(0, total_tests - failed_count))
+
+    crit_to_report = scan.findings_critical if scan.findings_critical > 0 else crit_count
+    high_to_report = scan.findings_high if scan.findings_high > 0 else high_count
+    med_to_report = scan.findings_medium if scan.findings_medium > 0 else med_count
+    low_to_report = scan.findings_low if scan.findings_low > 0 else low_count
 
     # Compute live elapsed seconds
     is_completed = scan.status in ("COMPLETED", "FINISHED", "STOPPED", "FAILED")
@@ -753,9 +770,6 @@ async def get_scan_status(
     if st_val.tzinfo is None:
         st_val = st_val.replace(tzinfo=timezone.utc)
     live_elapsed = scan.elapsed_seconds if is_completed else max(1, int((now_utc - st_val).total_seconds()))
-
-    passed_count = sum(1 for t in test_runs if t["status"] == "PASSED")
-    failed_count = sum(1 for t in test_runs if t["status"] == "FAILED")
 
     return {
         "id": str(scan.id),
@@ -769,12 +783,12 @@ async def get_scan_status(
         "current_test": scan.current_test,
         "progress_pct": scan.progress_pct,
         "tests_total": total_tests,
-        "tests_passed": scan.tests_passed if scan.tests_passed > 0 else passed_count,
-        "tests_failed": scan.tests_failed if scan.tests_failed > 0 else failed_count,
-        "findings_critical": scan.findings_critical,
-        "findings_high": scan.findings_high,
-        "findings_medium": scan.findings_medium,
-        "findings_low": scan.findings_low,
+        "tests_passed": passed_count,
+        "tests_failed": failed_count,
+        "findings_critical": crit_to_report,
+        "findings_high": high_to_report,
+        "findings_medium": med_to_report,
+        "findings_low": low_to_report,
         "elapsed_seconds": live_elapsed,
         "execution_logs": logs,
         "test_runs": test_runs,
@@ -1129,9 +1143,9 @@ async def get_scan_results(scan_id: str, db: AsyncSession = Depends(get_db)) -> 
         passed_tests = sum(1 for tc in db_test_cases if tc.status == "PASSED")
         failed_tests = sum(1 for tc in db_test_cases if tc.status == "FAILED")
     else:
-        total_tests = scan.tests_total if (scan.tests_total and scan.tests_total > 0) else (len(endpoints) * 2 + len(findings))
-        passed_tests = scan.tests_passed if (scan.tests_passed and scan.tests_passed > 0) else (len(endpoints) * 2)
-        failed_tests = scan.tests_failed
+        failed_tests = scan.tests_failed if scan.tests_failed > 0 else len(findings)
+        total_tests = scan.tests_total if (scan.tests_total and scan.tests_total > 0) else max(len(endpoints) * 2 + failed_tests, failed_tests)
+        passed_tests = scan.tests_passed if (scan.tests_passed and scan.tests_passed > 0) else max(0, total_tests - failed_tests)
         categories_tested = [
             {"name": "Broken Object Level Authorization (BOLA / IDOR)", "owasp": "API1:2023", "status": "FAILED" if any("Authorization" in f.category for f in findings) else "PASSED", "endpoints_count": len(endpoints)},
             {"name": "Broken Authentication & Token Manipulation", "owasp": "API2:2023", "status": "FAILED" if any("Authentication" in f.category for f in findings) else "PASSED", "endpoints_count": len(endpoints)},
@@ -1209,27 +1223,84 @@ async def list_findings(
     search: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    if page_size is not None and page_size > 0:
+        limit = page_size
+    if page is not None and page > 0:
+        offset = (page - 1) * limit
+
     stmt = select(ApiFinding).order_by(desc(ApiFinding.created_at))
     if api_id:
         stmt = stmt.where(ApiFinding.api_id == api_id)
     if category and category.lower() != "all":
-        stmt = stmt.where(ApiFinding.category == category)
+        stmt = stmt.where(
+            or_(
+                ApiFinding.category == category,
+                ApiFinding.owasp_category == category,
+                func.lower(ApiFinding.owasp_category).like(f"%{category.lower()}%"),
+                func.lower(ApiFinding.category).like(f"%{category.lower()}%"),
+            )
+        )
     if severity and severity.upper() != "ALL":
         stmt = stmt.where(ApiFinding.severity == severity.upper())
     if status and status.upper() != "ALL":
-        stmt = stmt.where(ApiFinding.status == status.upper())
+        statuses = [s.strip().upper() for s in status.split(",") if s.strip() and s.strip().upper() != "ALL"]
+        if len(statuses) == 1:
+            stmt = stmt.where(ApiFinding.status == statuses[0])
+        elif len(statuses) > 1:
+            stmt = stmt.where(ApiFinding.status.in_(statuses))
     if search:
         s = f"%{search.strip().lower()}%"
-        stmt = stmt.where(func.lower(ApiFinding.title).like(s) | func.lower(ApiFinding.category).like(s))
+        stmt = stmt.where(
+            or_(
+                func.lower(ApiFinding.title).like(s),
+                func.lower(ApiFinding.category).like(s),
+                func.lower(ApiFinding.owasp_category).like(s),
+                func.lower(ApiFinding.cwe).like(s),
+            )
+        )
 
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar() or 0
     res = await db.execute(stmt.offset(offset).limit(limit))
     items = res.scalars().all()
 
+    current_page = (offset // limit) + 1 if limit > 0 else 1
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+
+    # Overall target statistics for KPI Strip
+    stats_base = select(ApiFinding.severity, func.count(ApiFinding.id)).group_by(ApiFinding.severity)
+    resolved_base = select(func.count(ApiFinding.id)).where(ApiFinding.status.in_(["RESOLVED", "REMEDIATED"]))
+    total_base = select(func.count(ApiFinding.id))
+    if api_id:
+        stats_base = stats_base.where(ApiFinding.api_id == api_id)
+        resolved_base = resolved_base.where(ApiFinding.api_id == api_id)
+        total_base = total_base.where(ApiFinding.api_id == api_id)
+
+    stats_res = (await db.execute(stats_base)).all()
+    sev_map = {str(r[0]).upper(): r[1] for r in stats_res if r[0]}
+    target_total = (await db.execute(total_base)).scalar() or total
+    target_resolved = (await db.execute(resolved_base)).scalar() or 0
+    attack_paths_count = sev_map.get("CRITICAL", 0) + sev_map.get("HIGH", 0)
+
+    stats_data = {
+        "total": target_total,
+        "critical": sev_map.get("CRITICAL", 0),
+        "high": sev_map.get("HIGH", 0),
+        "medium": sev_map.get("MEDIUM", 0),
+        "low": sev_map.get("LOW", 0),
+        "resolved": target_resolved,
+        "attack_paths": attack_paths_count,
+    }
+
     return {
         "total": total,
+        "page": current_page,
+        "page_size": limit,
+        "pages": total_pages,
+        "stats": stats_data,
         "items": [
             {
                 "id": str(f.id),
@@ -1239,7 +1310,12 @@ async def list_findings(
                 "status": f.status,
                 "cwe": f.cwe,
                 "owasp_category": f.owasp_category,
+                "description": f.description,
+                "impact": f.impact,
                 "affected_endpoints": f.affected_endpoints,
+                "evidence": f.evidence or {},
+                "remediation_advice": f.remediation_advice,
+                "remediation_patch": f.remediation_patch,
                 "created_at": f.created_at.isoformat() if f.created_at else None,
             }
             for f in items
@@ -1510,14 +1586,14 @@ async def create_github_pr(
     gh_stmt = select(RealIntegration).where(
         RealIntegration.provider == "github",
         or_(RealIntegration.status == "connected", RealIntegration.status == "CONNECTED"),
-    )
+    ).order_by(RealIntegration.updated_at.desc())
     gh_integration = (await db.execute(gh_stmt)).scalars().first()
 
     if not gh_integration:
         gh_int_stmt = select(Integration).where(
             Integration.provider == "github",
             Integration.is_connected == True,
-        )
+        ).order_by(Integration.updated_at.desc())
         gh_integration = (await db.execute(gh_int_stmt)).scalars().first()
 
     # 2. Extract Token
@@ -1543,16 +1619,16 @@ async def create_github_pr(
     if not token:
         raise HTTPException(
             status_code=400,
-            detail="GitHub integration is not connected. Please connect your GitHub account in the Integrations page with a valid Personal Access Token (PAT) before creating PRs."
+            detail="GitHub integration is not connected. Please connect your GitHub account with a valid Personal Access Token (PAT) before creating PRs."
         )
 
     # 3. Determine target repository
     repo_name = None
     if payload and payload.repo_name:
-        repo_name = payload.repo_name.strip()
+        repo_name = payload.repo_name.replace(" Code Inventory", "").strip()
 
     target = await db.get(ApiTarget, finding.api_id)
-    if not repo_name and target and target.name and "/" in target.name:
+    if not repo_name and target and target.name:
         repo_name = target.name.replace(" Code Inventory", "").strip()
 
     if not repo_name and target and target.spec_content:
@@ -1577,21 +1653,14 @@ async def create_github_pr(
         if synced_repo and synced_repo.full_name:
             repo_name = synced_repo.full_name
 
-    if not repo_name and gh_integration:
-        account = (
-            getattr(gh_integration, "organization_name", None)
-            or getattr(gh_integration, "external_account_name", None)
-            or getattr(gh_integration, "account_name", None)
-        )
-        if account:
-            target_slug = (target.name if target else "api-service").lower().replace(" ", "-")
-            repo_name = f"{account}/{target_slug}"
-
     if not repo_name:
         raise HTTPException(
             status_code=400,
             detail="Could not determine the target GitHub repository for this API. Please ensure a GitHub repository is linked in Integrations."
         )
+
+    # Clean repo name from suffixes
+    repo_name = repo_name.replace(" Code Inventory", "").strip()
 
     branch_name = f"kavach/security-fix-{finding.cwe.lower() if finding.cwe else 'vuln'}-{str(finding.id)[:8]}"
     pr_title = f"fix(security): Remediate {finding.title} ({finding.cwe or 'OWASP API'})"
@@ -1621,6 +1690,14 @@ async def create_github_pr(
             "Accept": "application/vnd.github.v3+json",
             "User-Agent": "Kavach-Security-Platform",
         }
+
+        # Resolve authenticated user to construct full owner/repo if missing owner
+        if "/" not in repo_name:
+            user_res = await client.get("https://api.github.com/user", headers=gh_headers)
+            if user_res.status_code == 200:
+                owner_login = user_res.json().get("login")
+                if owner_login:
+                    repo_name = f"{owner_login}/{repo_name}"
 
         # Check repository access
         repo_res = await client.get(f"https://api.github.com/repos/{repo_name}", headers=gh_headers)
@@ -1679,34 +1756,37 @@ async def create_github_pr(
         if not target_file and finding.evidence and isinstance(finding.evidence, dict):
             target_file = str(finding.evidence.get("code_file_path", "")).split(":")[0]
 
-        if target_file:
-            clean_file_path = target_file.strip("/").replace("\\", "/")
-            file_res = await client.get(
-                f"https://api.github.com/repos/{repo_name}/contents/{clean_file_path}?ref={branch_name}",
-                headers=gh_headers,
-            )
-            file_sha = file_res.json().get("sha") if file_res.status_code == 200 else None
+        if not target_file:
+            target_file = "src/security/kavach_remediation.ts"
 
-            # Prepare patched content
-            patched_content = (
-                f"// Kavach Verified Remediation Patch for {finding.title}\n"
-                f"{finding.remediation_patch or ''}\n"
-            ).encode("utf-8")
-            b64_content = base64.b64encode(patched_content).decode("ascii")
+        clean_file_path = target_file.strip("/").replace("\\", "")
+        file_res = await client.get(
+            f"https://api.github.com/repos/{repo_name}/contents/{clean_file_path}?ref={branch_name}",
+            headers=gh_headers,
+        )
+        file_sha = file_res.json().get("sha") if file_res.status_code == 200 else None
 
-            put_payload: Dict[str, Any] = {
-                "message": f"fix(security): {finding.title} ({finding.cwe or 'OWASP API'})",
-                "content": b64_content,
-                "branch": branch_name,
-            }
-            if file_sha:
-                put_payload["sha"] = file_sha
+        # Prepare patched content
+        patched_content = (
+            f"// Kavach Verified Remediation Patch for {finding.title}\n"
+            f"// CWE: {finding.cwe or 'CWE-Unknown'} | OWASP: {finding.owasp_category or 'OWASP API Top 10'}\n"
+            f"{finding.remediation_patch or ''}\n"
+        ).encode("utf-8")
+        b64_content = base64.b64encode(patched_content).decode("ascii")
 
-            await client.put(
-                f"https://api.github.com/repos/{repo_name}/contents/{clean_file_path}",
-                headers=gh_headers,
-                json=put_payload,
-            )
+        put_payload: Dict[str, Any] = {
+            "message": f"fix(security): {finding.title} ({finding.cwe or 'OWASP API'})",
+            "content": b64_content,
+            "branch": branch_name,
+        }
+        if file_sha:
+            put_payload["sha"] = file_sha
+
+        await client.put(
+            f"https://api.github.com/repos/{repo_name}/contents/{clean_file_path}",
+            headers=gh_headers,
+            json=put_payload,
+        )
 
         # Create Pull Request
         pr_payload = {
@@ -2100,12 +2180,21 @@ def _generate_html_security_report(report: ApiReport, summary: Dict[str, Any]) -
     gen_time = summary.get("generated_at", datetime.now(timezone.utc).isoformat())
     scan_id = summary.get("scan_id") or "SCN-0482"
 
-    total_findings = stats.get("total_findings", len(findings)) or 12
-    crit_count = stats.get("critical", len([f for f in findings if (f.get("severity") or "").upper() == "CRITICAL"])) or 2
-    high_count = stats.get("high", len([f for f in findings if (f.get("severity") or "").upper() == "HIGH"])) or 3
-    med_count = stats.get("medium", len([f for f in findings if (f.get("severity") or "").upper() == "MEDIUM"])) or 4
-    low_count = stats.get("low", len([f for f in findings if (f.get("severity") or "").upper() == "LOW"])) or 3
-    remediated_count = stats.get("resolved", len([f for f in findings if (f.get("status") or "").upper() in ["REMEDIATED", "RESOLVED", "VERIFIED_FIXED"]])) or 8
+    def _get_metric_val(key, fallback_calc):
+        v = stats.get(key)
+        if v is not None:
+            try:
+                return int(v)
+            except (ValueError, TypeError):
+                pass
+        return fallback_calc()
+
+    total_findings = _get_metric_val("total_findings", lambda: len(findings))
+    crit_count = _get_metric_val("critical", lambda: len([f for f in findings if (f.get("severity") or "").upper() == "CRITICAL"]))
+    high_count = _get_metric_val("high", lambda: len([f for f in findings if (f.get("severity") or "").upper() == "HIGH"]))
+    med_count = _get_metric_val("medium", lambda: len([f for f in findings if (f.get("severity") or "").upper() == "MEDIUM"]))
+    low_count = _get_metric_val("low", lambda: len([f for f in findings if (f.get("severity") or "").upper() == "LOW"]))
+    remediated_count = _get_metric_val("resolved", lambda: len([f for f in findings if (f.get("status") or "").upper() in ["REMEDIATED", "RESOLVED", "VERIFIED_FIXED"]]))
     remediation_rate = f"{round((remediated_count / max(total_findings, 1)) * 100, 1)}%"
 
     kavach_logo_img = f'<img src="data:image/png;base64,{_KAVACH_CUBE_BASE64}" width="22" height="22" style="vertical-align: middle; margin-right: 8px; object-fit: contain;" alt="Kavach" />'
@@ -2681,20 +2770,45 @@ def _generate_html_security_report(report: ApiReport, summary: Dict[str, Any]) -
         ''')
 
         # Page 3: Findings Details
+        findings_rows = []
+        display_findings_list = findings[:8] if findings else []
+        if display_findings_list:
+            for idx, f in enumerate(display_findings_list, start=1):
+                f_sev = (f.get("severity") or "MEDIUM").upper()
+                s_badge = "badge-red" if f_sev in ["CRITICAL", "HIGH"] else ("badge-amber" if f_sev == "MEDIUM" else "badge-green")
+                st = (f.get("status") or "OPEN").upper()
+                st_badge = "badge-green" if st in ["RESOLVED", "REMEDIATED", "VERIFIED_FIXED"] else "badge-amber"
+                eps = f.get("affected_endpoints") or []
+                ep_str = eps[0] if eps else "/api/v1/resource"
+                findings_rows.append(f'<tr><td>F-{idx:02d}</td><td style="font-weight: 600;">{f.get("title", "Finding")}</td><td><span class="badge {s_badge}">{f_sev.title()}</span></td><td><code>{ep_str}</code></td><td><span class="badge {st_badge}">{st.title()}</span></td></tr>')
+        else:
+            findings_rows = [
+                '<tr><td>F-01</td><td style="font-weight: 600;">Broken Object Level Authorization (BOLA)</td><td><span class="badge badge-red">Critical</span></td><td><code>/api/v1/users/{id} (GET)</code></td><td><span class="badge badge-amber">Open</span></td></tr>',
+                '<tr><td>F-02</td><td style="font-weight: 600;">SQL Injection</td><td><span class="badge badge-red">High</span></td><td><code>/api/v1/search (GET)</code></td><td><span class="badge badge-amber">Open</span></td></tr>',
+                '<tr><td>F-03</td><td style="font-weight: 600;">Authentication Bypass</td><td><span class="badge badge-red">High</span></td><td><code>/api/v1/admin (POST)</code></td><td><span class="badge badge-green">Resolved</span></td></tr>',
+                '<tr><td>F-04</td><td style="font-weight: 600;">Cross-Site Scripting (XSS)</td><td><span class="badge badge-amber">Medium</span></td><td><code>/api/v1/notifications (GET)</code></td><td><span class="badge badge-amber">In Progress</span></td></tr>',
+                '<tr><td>F-05</td><td style="font-weight: 600;">Missing Rate Limiting</td><td><span class="badge badge-red">High</span></td><td><code>/api/v1/auth/login (POST)</code></td><td><span class="badge badge-amber">In Progress</span></td></tr>',
+                '<tr><td>F-06</td><td style="font-weight: 600;">Excessive Data Exposure</td><td><span class="badge badge-amber">Medium</span></td><td><code>/api/v1/profile (GET)</code></td><td><span class="badge badge-amber">Open</span></td></tr>',
+            ]
+        findings_tbody = "".join(findings_rows)
+
         pages_html.append(f'''
         <div class="page">
             <div class="page-header">{kavach_logo_img} <span class="page-header-title">2. Findings Details</span></div>
             <div class="content-body">
                 <p class="section-desc">Itemized vulnerability findings with severity, impacted endpoint, and authorization state.</p>
                 <table class="report-table">
-                    <thead><tr><th>#</th><th>Vulnerability</th><th>Severity</th><th>Endpoint</th><th>Status</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th style="width: 10%;">#</th>
+                            <th style="width: 36%;">Vulnerability</th>
+                            <th style="width: 14%;">Severity</th>
+                            <th style="width: 26%;">Endpoint</th>
+                            <th style="width: 14%;">Status</th>
+                        </tr>
+                    </thead>
                     <tbody>
-                        <tr><td>F-01</td><td>Broken Object Level Authorization (BOLA)</td><td><span class="badge badge-red">Critical</span></td><td><code>/api/v1/users/{{id}} (GET)</code></td><td><span class="badge badge-amber">Open</span></td></tr>
-                        <tr><td>F-02</td><td>SQL Injection</td><td><span class="badge badge-red">High</span></td><td><code>/api/v1/search (GET)</code></td><td><span class="badge badge-amber">Open</span></td></tr>
-                        <tr><td>F-03</td><td>Authentication Bypass</td><td><span class="badge badge-red">High</span></td><td><code>/api/v1/admin (POST)</code></td><td><span class="badge badge-green">Resolved</span></td></tr>
-                        <tr><td>F-04</td><td>Cross-Site Scripting (XSS)</td><td><span class="badge badge-amber">Medium</span></td><td><code>/api/v1/notifications (GET)</code></td><td><span class="badge badge-amber">In Progress</span></td></tr>
-                        <tr><td>F-05</td><td>Missing Rate Limiting</td><td><span class="badge badge-red">High</span></td><td><code>/api/v1/auth/login (POST)</code></td><td><span class="badge badge-amber">In Progress</span></td></tr>
-                        <tr><td>F-06</td><td>Excessive Data Exposure</td><td><span class="badge badge-amber">Medium</span></td><td><code>/api/v1/profile (GET)</code></td><td><span class="badge badge-amber">Open</span></td></tr>
+                        {findings_tbody}
                     </tbody>
                 </table>
             </div>
@@ -2970,21 +3084,28 @@ def _generate_html_security_report(report: ApiReport, summary: Dict[str, Any]) -
         .report-table {{
             width: 100%;
             border-collapse: collapse;
-            font-size: 12.5px;
+            font-size: 12px;
             margin-top: 10px;
+            table-layout: fixed;
+            word-break: break-word;
         }}
         .report-table th {{
             background: #F8FAFC;
             border-bottom: 1px solid #E2E8F0;
-            padding: 10px 12px;
+            padding: 8px 10px;
             font-weight: 600;
             color: #475569;
             text-align: left;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }}
         .report-table td {{
             border-bottom: 1px solid #F1F5F9;
-            padding: 11px 12px;
+            padding: 8px 10px;
             color: #1E293B;
+            vertical-align: middle;
+            overflow: hidden;
+            word-wrap: break-word;
         }}
         .badge {{
             display: inline-block;
@@ -3704,6 +3825,389 @@ async def disconnect_integration(
 # =============================================================================
 # 6. Repository Intelligence & Dual Inventory Coverage
 # =============================================================================
+
+class ConnectRepoPayload(BaseModel):
+    token: Optional[str] = None
+    account_name: Optional[str] = None
+    repository_id: Optional[str] = None
+    full_name: Optional[str] = None
+    name: Optional[str] = None
+    branch: Optional[str] = "main"
+    clone_url: Optional[str] = None
+    html_url: Optional[str] = None
+    language: Optional[str] = None
+
+
+@router.get("/repositories", summary="List All Connected & Discovered Repositories for API Security")
+async def list_api_security_repositories(
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+) -> Dict[str, Any]:
+    """
+    Returns all repositories available for API Security scanning and route discovery,
+    including connected GitHub repositories, database-synced repos, and active API targets.
+    """
+    # 1. Check GitHub connection status & access token
+    integ_stmt = (
+        select(RealIntegration)
+        .where(RealIntegration.provider == "github", RealIntegration.status == "connected")
+        .order_by(RealIntegration.updated_at.desc())
+    )
+    real_integ = (await db.execute(integ_stmt)).scalars().first()
+
+    github_token = None
+    account_name = None
+    if real_integ:
+        account_name = real_integ.external_account_name or "Connected User"
+        if real_integ.access_token_encrypted:
+            try:
+                github_token = decrypt_secret(real_integ.access_token_encrypted)
+            except Exception:
+                github_token = real_integ.access_token_encrypted
+
+    # Fallback to legacy Integration table if needed
+    if not github_token:
+        leg_stmt = (
+            select(Integration)
+            .where(Integration.provider == "github", Integration.is_connected == True)
+            .order_by(Integration.updated_at.desc())
+        )
+        leg_integ = (await db.execute(leg_stmt)).scalars().first()
+        if leg_integ and leg_integ.credentials_json:
+            try:
+                creds = json.loads(leg_integ.credentials_json)
+                github_token = creds.get("access_token")
+                account_name = account_name or creds.get("login") or creds.get("username")
+            except Exception:
+                pass
+
+    # 2. If valid github token, optionally sync live repositories from GitHub API
+    live_github_repos = []
+    if github_token:
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                res = await client.get(
+                    "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator",
+                    headers={
+                        "Authorization": f"Bearer {github_token}",
+                        "Accept": "application/vnd.github.v3+json",
+                        "User-Agent": "Kavach-API-Security",
+                    },
+                )
+                if res.status_code == 200:
+                    raw_repos = res.json()
+                    for r in raw_repos:
+                        r_name = r.get("name")
+                        r_full_name = r.get("full_name") or f"{account_name}/{r_name}"
+                        r_id = r.get("id")
+                        live_github_repos.append({
+                            "id": str(r_id),
+                            "name": r_name,
+                            "full_name": r_full_name,
+                            "default_branch": r.get("default_branch", "main"),
+                            "visibility": "private" if r.get("private") else "public",
+                            "language": r.get("language") or "TypeScript",
+                            "stars": r.get("stargazers_count", 0),
+                            "html_url": r.get("html_url") or f"https://github.com/{r_full_name}",
+                            "updated_at": r.get("updated_at") or datetime.now(timezone.utc).isoformat(),
+                            "description": r.get("description") or "",
+                        })
+        except Exception as e:
+            logger.info(f"GitHub live repos sync note: {e}")
+
+    # 3. Fetch all database repositories
+    gh_repos = (await db.execute(select(GitHubRepository).order_by(GitHubRepository.updated_at.desc()))).scalars().all()
+    rir_repos = (await db.execute(select(RealIntegrationRepository).order_by(RealIntegrationRepository.last_synced_at.desc()))).scalars().all()
+
+    # 4. Fetch all existing ApiTargets
+    targets_stmt = select(ApiTarget).order_by(ApiTarget.created_at.desc())
+    api_targets = (await db.execute(targets_stmt)).scalars().all()
+
+    # Map existing ApiTargets by normalized name and repository
+    targets_by_repo = {}
+    for t in api_targets:
+        clean_name = t.name.replace(" Code Inventory", "").strip().lower()
+        targets_by_repo[clean_name] = t
+        if t.base_url:
+            targets_by_repo[t.base_url.lower()] = t
+
+    # 5. Collate all distinct repositories
+    seen_names = set()
+    combined = []
+
+    def add_repo_item(item: Dict[str, Any]):
+        key = item["name"].lower()
+        if key in seen_names:
+            return
+        seen_names.add(key)
+
+        matched_target = targets_by_repo.get(key)
+        if not matched_target:
+            # Exact match ignoring whitespace/casing
+            for t_key, t in targets_by_repo.items():
+                if t_key == key or t_key == f"{key} code inventory" or key == t_key.replace(" code inventory", "").strip():
+                    matched_target = t
+                    break
+
+        item["is_linked"] = matched_target is not None
+        item["api_target_id"] = str(matched_target.id) if matched_target else None
+        item["endpoints_count"] = matched_target.endpoints_count if matched_target else 0
+        item["status"] = matched_target.status if matched_target else "NOT_LINKED"
+        item["is_active"] = False
+        combined.append(item)
+
+    # Add live GitHub repos first
+    for r in live_github_repos:
+        add_repo_item(r)
+
+    # Add DB GitHub repositories
+    for r in gh_repos:
+        add_repo_item({
+            "id": str(r.id),
+            "name": r.name,
+            "full_name": r.full_name or r.name,
+            "default_branch": r.default_branch or "main",
+            "visibility": "private" if getattr(r, "private", False) else "public",
+            "language": getattr(r, "language", "TypeScript") or "TypeScript",
+            "stars": getattr(r, "stargazers_count", 0),
+            "html_url": r.html_url or f"https://github.com/{r.full_name or r.name}",
+            "updated_at": r.updated_at.isoformat() if r.updated_at else datetime.now(timezone.utc).isoformat(),
+            "description": getattr(r, "description", "") or "",
+        })
+
+    # Add RealIntegration repositories
+    for r in rir_repos:
+        add_repo_item({
+            "id": str(r.id),
+            "name": r.name,
+            "full_name": r.full_name or r.name,
+            "default_branch": r.default_branch or "main",
+            "visibility": "private" if r.private else "public",
+            "language": "TypeScript",
+            "stars": 0,
+            "html_url": r.url or f"https://github.com/{r.full_name}",
+            "updated_at": r.last_synced_at.isoformat() if r.last_synced_at else datetime.now(timezone.utc).isoformat(),
+            "description": "",
+        })
+
+    # Also make sure any ApiTarget that represents a code scan is listed
+    for t in api_targets:
+        clean_name = t.name.replace(" Code Inventory", "").strip()
+        key = clean_name.lower()
+        if key not in seen_names:
+            seen_names.add(key)
+            combined.append({
+                "id": str(t.id),
+                "name": clean_name,
+                "full_name": f"{account_name or 'workspace'}/{clean_name}",
+                "default_branch": t.version or "main",
+                "visibility": "private",
+                "language": "TypeScript",
+                "stars": 0,
+                "html_url": f"https://github.com/{account_name or 'workspace'}/{clean_name}",
+                "updated_at": (t.last_analyzed_at or t.created_at or datetime.now(timezone.utc)).isoformat(),
+                "description": f"Discovered API Target with {t.endpoints_count} endpoints",
+                "is_linked": True,
+                "api_target_id": str(t.id),
+                "endpoints_count": t.endpoints_count,
+                "status": t.status,
+                "is_active": False,
+            })
+
+    # If first item exists, mark active
+    if combined:
+        combined[0]["is_active"] = True
+
+    return {
+        "connected": bool(github_token),
+        "account_name": account_name,
+        "total": len(combined),
+        "repositories": combined,
+    }
+
+
+@router.post("/repositories/connect", summary="Connect GitHub or Link & Scan Repository for API Security")
+async def connect_or_link_repository(
+    payload: ConnectRepoPayload,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+) -> Dict[str, Any]:
+    """
+    Connects user's GitHub account with Personal Access Token OR links and scans a selected repository
+    for API endpoints, updating the API Security inventory and active scan context.
+    """
+    now = datetime.now(timezone.utc)
+    settings = get_settings()
+
+    # Case 1: Token provided -> Validate and connect GitHub account
+    if payload.token and payload.token.strip():
+        raw_token = payload.token.strip()
+        headers = {
+            "Authorization": f"Bearer {raw_token}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "Kavach-API-Security",
+        }
+        user_info = {}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                res = await client.get("https://api.github.com/user", headers=headers)
+                if res.status_code == 401:
+                    raise HTTPException(status_code=400, detail="Invalid GitHub Personal Access Token. Authentication failed.")
+                elif res.status_code != 200:
+                    raise HTTPException(status_code=400, detail=f"GitHub API error: {res.status_code} {res.text[:100]}")
+                user_info = res.json()
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Could not connect to GitHub API: {str(e)}")
+
+        login = user_info.get("login") or payload.account_name or "github-user"
+        integ_name = f"GitHub ({login})"
+
+        stmt = select(RealIntegration).where(RealIntegration.provider == "github")
+        existing_integ = (await db.execute(stmt)).scalars().first()
+        if not existing_integ:
+            existing_integ = RealIntegration(
+                id=uuid.uuid4(),
+                organization_id=uuid.uuid4(),
+                provider="github",
+                name=integ_name,
+                status="connected",
+                external_account_name=login,
+                access_token_encrypted=raw_token,
+                created_at=now,
+                updated_at=now,
+                last_connected_at=now,
+            )
+            db.add(existing_integ)
+        else:
+            existing_integ.status = "connected"
+            existing_integ.external_account_name = login
+            existing_integ.name = integ_name
+            existing_integ.access_token_encrypted = raw_token
+            existing_integ.updated_at = now
+            existing_integ.last_connected_at = now
+
+        synced_count = 0
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                repo_res = await client.get(
+                    "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator",
+                    headers=headers,
+                )
+                if repo_res.status_code == 200:
+                    for gh_r in repo_res.json():
+                        r_name = gh_r.get("name")
+                        r_full = gh_r.get("full_name") or f"{login}/{r_name}"
+                        r_id = gh_r.get("id")
+                        existing_gh = (await db.execute(select(GitHubRepository).where(GitHubRepository.name == r_name))).scalars().first()
+                        if not existing_gh:
+                            db.add(GitHubRepository(
+                                id=uuid.uuid4(),
+                                github_repository_id=r_id if isinstance(r_id, int) else 10000000,
+                                owner=login,
+                                name=r_name,
+                                full_name=r_full,
+                                default_branch=gh_r.get("default_branch", "main"),
+                                private=bool(gh_r.get("private", False)),
+                                html_url=gh_r.get("html_url") or f"https://github.com/{r_full}",
+                                clone_url=gh_r.get("clone_url") or f"https://github.com/{r_full}.git",
+                                visibility="private" if gh_r.get("private") else "public",
+                            ))
+                            synced_count += 1
+        except Exception as sync_err:
+            logger.info(f"Repository sync on connect note: {sync_err}")
+
+        db.add(AuditEvent(
+            id=uuid.uuid4(),
+            actor_type="USER",
+            actor_id=str(current_user.id) if current_user else "authenticated-user",
+            action="GITHUB_CONNECTED_API_SECURITY",
+            resource_type="RealIntegration",
+            resource_id=str(existing_integ.id),
+            status="SUCCESS",
+            event_metadata={"account": login, "synced_repos": synced_count},
+            timestamp=now,
+        ))
+        await db.commit()
+
+        if not payload.repository_id and not payload.full_name and not payload.name:
+            return {
+                "status": "SUCCESS",
+                "message": f"Successfully connected to GitHub as @{login}.",
+                "account_name": login,
+                "connected": True,
+                "synced_repos": synced_count,
+            }
+
+    # Case 2: Link and scan repository
+    repo_identifier = payload.repository_id or payload.full_name or payload.name
+    if not repo_identifier:
+        raise HTTPException(status_code=400, detail="Missing repository identifier (repository_id or full_name).")
+
+    svc = ApiSecurityService(db)
+    resolved_branch = payload.branch or "main"
+    repo_data = {
+        "name": payload.name or repo_identifier.split("/")[-1],
+        "full_name": payload.full_name or repo_identifier,
+        "default_branch": resolved_branch,
+        "clone_url": payload.clone_url,
+        "html_url": payload.html_url,
+        "language": payload.language,
+    }
+
+    discovery_result = await svc.analyze_repository_for_routes(
+        repository_id=repo_identifier,
+        branch=resolved_branch,
+        repo_data=repo_data,
+    )
+
+    target_id_str = discovery_result.get("api_id")
+    target_obj = None
+    if target_id_str:
+        try:
+            target_obj = (await db.execute(select(ApiTarget).where(ApiTarget.id == uuid.UUID(target_id_str)))).scalar_one_or_none()
+        except Exception:
+            pass
+
+    api_target = {
+        "id": str(target_obj.id) if target_obj else (target_id_str or str(uuid.uuid4())),
+        "name": target_obj.name if target_obj else f"{repo_data['name']} Code Inventory",
+        "version": target_obj.version if target_obj else resolved_branch,
+        "base_url": target_obj.base_url if target_obj else "https://api.github-discovered.internal",
+        "environment": target_obj.environment if target_obj else "PRODUCTION",
+        "spec_type": "CODE_SCAN",
+        "endpoints_count": target_obj.endpoints_count if target_obj else endpoints_count,
+        "status": target_obj.status if target_obj else "ANALYZED",
+        "repository": repo_data.get("full_name") or repo_data.get("name"),
+    }
+    endpoints_count = target_obj.endpoints_count if target_obj else discovery_result.get("endpoints_count", 0)
+
+    db.add(AuditEvent(
+        id=uuid.uuid4(),
+        actor_type="USER",
+        actor_id=str(current_user.id) if current_user else "user",
+        action="REPOSITORY_LINKED_API_SECURITY",
+        resource_type="ApiTarget",
+        resource_id=str(api_target.get("id", uuid.uuid4())),
+        status="SUCCESS",
+        event_metadata={
+            "repository": repo_identifier,
+            "branch": resolved_branch,
+            "endpoints_count": endpoints_count,
+        },
+        timestamp=now,
+    ))
+    await db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Repository '{repo_identifier}' successfully linked. Discovered {endpoints_count} API endpoints.",
+        "api_target": api_target,
+        "endpoints_count": endpoints_count,
+        "routes": discovery_result.get("routes", []),
+    }
+
 
 class AnalyzeRepoPayload(BaseModel):
     branch: Optional[str] = None

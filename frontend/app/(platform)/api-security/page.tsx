@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, TrendingUp, CalendarDays, Lock, Play, ShieldAlert, CheckCircle, RefreshCw } from 'lucide-react';
 import { KavachApiLayout } from './components/KavachApiLayout';
+import { KavachSkeletonPage } from './components/KavachSkeleton';
+import { useApiSecurity } from './context/ApiSecurityContext';
 import { api } from '@/lib/api/client';
 
 // ── Design tokens — warm ivory ───────────────────────────────────────
@@ -47,6 +49,7 @@ function formatRelativeTime(dateStr?: string | null) {
 
 export default function ApiSecurityDashboard() {
   const router = useRouter();
+  const { setIsGithubModalOpen, selectedApi } = useApiSecurity();
 
   // Live Database States
   const [overview, setOverview]     = useState<any>(null);
@@ -146,14 +149,7 @@ export default function ApiSecurityDashboard() {
         };
       });
     }
-
-    // Default fallback from verified scan
-    return [
-      { path: '/api/v1/applications',      method: 'GET',  mBg: '#EFF6FF', mColor: '#1D4ED8', auth: 'Public',    rDot: '#EF4444', risk: 'High',   findings: 2, fBg: '#FEF2F2', fColor: '#DC2626' },
-      { path: '/api/v1/applications/{id}', method: 'GET',  mBg: '#EFF6FF', mColor: '#1D4ED8', auth: 'Public',    rDot: '#F59E0B', risk: 'Medium', findings: 1, fBg: '#FEF9C3', fColor: '#A16207' },
-      { path: '/api/v1/auth/login',        method: 'POST', mBg: '#FEF2F2', mColor: '#DC2626', auth: 'Public',    rDot: '#EF4444', risk: 'High',   findings: 3, fBg: '#FEF2F2', fColor: '#DC2626' },
-      { path: '/api/v1/users',             method: 'GET',  mBg: '#EFF6FF', mColor: '#1D4ED8', auth: 'Protected', rDot: '#10B981', risk: 'Low',    findings: 0, fBg: '#F3F4F6', fColor: '#6B7280' },
-    ];
+    return [];
   }, [endpoints, findings]);
 
   // Real Findings Rows mapped from database
@@ -176,14 +172,18 @@ export default function ApiSecurityDashboard() {
         };
       });
     }
-
-    return [
-      { id: '1', title: 'Broken Object Level Authorization (BOLA)', dot: '#EF4444', sev: 'Critical', sBg: '#FEF2F2', sColor: '#B91C1C' },
-      { id: '2', title: 'Missing Rate Limiting on Login',           dot: '#F97316', sev: 'High',     sBg: '#FFF7ED', sColor: '#C2410C' },
-      { id: '3', title: 'SQL Injection in Search Route',            dot: '#F97316', sev: 'High',     sBg: '#FFF7ED', sColor: '#C2410C' },
-      { id: '4', title: 'Excessive Data Exposure on Profile',       dot: '#F59E0B', sev: 'Medium',   sBg: '#FFFBEB', sColor: '#92400E' },
-    ];
+    return [];
   }, [findings]);
+
+  if (isLoading) {
+    return (
+      <KavachApiLayout>
+        <div style={{ padding: '40px 40px 48px' }}>
+          <KavachSkeletonPage />
+        </div>
+      </KavachApiLayout>
+    );
+  }
 
   return (
     <KavachApiLayout>
@@ -243,7 +243,8 @@ export default function ApiSecurityDashboard() {
 
               {/* Secondary CTA */}
               <button
-                onClick={() => router.push('/repositories')}
+                type="button"
+                onClick={() => setIsGithubModalOpen(true)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: '8px',
                   padding: '10px 20px', borderRadius: '8px',
@@ -256,7 +257,8 @@ export default function ApiSecurityDashboard() {
                 }}
               >
                 <GithubIcon />
-                Connect Repository
+                <span>{selectedApi ? `Repository: ${(selectedApi.name || selectedApi.repository || 'JOB-FINDER-NEW').replace(' Code Inventory', '')}` : 'Connect Repository'}</span>
+                <span style={{ fontSize: '11px', color: '#64748B', backgroundColor: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>Change</span>
               </button>
             </div>
           </div>
@@ -390,7 +392,14 @@ export default function ApiSecurityDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {inventoryRows.map((row, i) => (
+                {inventoryRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '32px 20px', textAlign: 'center', color: T.textMuted, fontSize: '13px' }}>
+                      No endpoints discovered yet. Connect a repository to discover routes.
+                    </td>
+                  </tr>
+                ) : (
+                  inventoryRows.map((row, i) => (
                   <tr
                     key={i}
                     style={{ borderBottom: i < inventoryRows.length - 1 ? `1px solid ${T.borderLight}` : 'none' }}
@@ -437,7 +446,7 @@ export default function ApiSecurityDashboard() {
                       </span>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
@@ -460,32 +469,38 @@ export default function ApiSecurityDashboard() {
 
             {/* findings list */}
             <div style={{ borderTop: `1px solid ${T.borderLight}` }}>
-              {findingsRows.map((f, i) => (
-                <div
-                  key={f.id || i}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '14px 22px',
-                    borderBottom: i < findingsRows.length - 1 ? `1px solid ${T.borderLight}` : 'none',
-                    gap: '12px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: f.dot, flexShrink: 0, display: 'inline-block' }} />
-                    <span style={{ fontSize: '13px', fontWeight: 500, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {f.title}
+              {findingsRows.length === 0 ? (
+                <div style={{ padding: '32px 22px', textAlign: 'center', color: T.textMuted, fontSize: '13px' }}>
+                  No vulnerabilities detected. All discovered endpoints are secure.
+                </div>
+              ) : (
+                findingsRows.map((f, i) => (
+                  <div
+                    key={f.id || i}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '14px 22px',
+                      borderBottom: i < findingsRows.length - 1 ? `1px solid ${T.borderLight}` : 'none',
+                      gap: '12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: f.dot, flexShrink: 0, display: 'inline-block' }} />
+                      <span style={{ fontSize: '13px', fontWeight: 500, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {f.title}
+                      </span>
+                    </div>
+                    <span style={{
+                      flexShrink: 0,
+                      padding: '3px 11px', borderRadius: '6px',
+                      fontSize: '11.5px', fontWeight: 600,
+                      background: f.sBg, color: f.sColor,
+                    }}>
+                      {f.sev}
                     </span>
                   </div>
-                  <span style={{
-                    flexShrink: 0,
-                    padding: '3px 11px', borderRadius: '6px',
-                    fontSize: '11.5px', fontWeight: 600,
-                    background: f.sBg, color: f.sColor,
-                  }}>
-                    {f.sev}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

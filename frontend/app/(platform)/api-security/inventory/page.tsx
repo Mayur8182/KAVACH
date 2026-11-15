@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import {
   Layers, Search, Shield, ShieldAlert, Lock, Unlock,
   ExternalLink, RefreshCw, Zap, Globe, FolderGit2,
-  ChevronRight, ArrowRight, Play, CheckCircle2, ChevronDown
+  ChevronRight, ArrowRight, ArrowLeft, Play, CheckCircle2, ChevronDown
 } from 'lucide-react';
 import { KavachApiLayout } from '../components/KavachApiLayout';
+import { KavachShimmer } from '../components/KavachSkeleton';
 import { useApiSecurity } from '../context/ApiSecurityContext';
 import { api } from '@/lib/api/client';
 import { toast } from '@/lib/toast';
@@ -42,7 +43,7 @@ const T = {
 
 export default function ApiInventoryPage() {
   const router = useRouter();
-  const { apis, selectedApi, refreshApis } = useApiSecurity();
+  const { apis, selectedApi, refreshApis, setIsGithubModalOpen } = useApiSecurity();
 
   // State
   const [endpoints,     setEndpoints]     = useState<any[]>([]);
@@ -66,7 +67,7 @@ export default function ApiInventoryPage() {
           protocol: selectedProtocol !== 'ALL' ? selectedProtocol : undefined,
           search: searchTerm || undefined,
         }),
-        api.apiSecurity.findings({ limit: 100 }).catch(() => ({ items: [] })),
+        api.apiSecurity.findings({ apiId: selectedApi?.id, limit: 100 }).catch(() => ({ items: [] })),
       ]);
       setEndpoints(res?.items || []);
       setFindings(findRes?.items || []);
@@ -216,6 +217,53 @@ export default function ApiInventoryPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <button
                 type="button"
+                onClick={() => router.push('/api-security')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  background: T.surface,
+                  border: `1px solid ${T.borderInput}`,
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: T.text,
+                  cursor: 'pointer',
+                  fontFamily: sans,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                }}
+              >
+                <ArrowLeft size={13} color="#0F172A" />
+                <span>Back to API Security</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsGithubModalOpen(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  background: T.surface,
+                  border: `1px solid ${T.borderInput}`,
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: T.text,
+                  cursor: 'pointer',
+                  fontFamily: sans,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                }}
+              >
+                <FolderGit2 size={13} color="#0F172A" />
+                <span>{selectedApi ? `Repo: ${(selectedApi.name || selectedApi.repository || 'JOB-FINDER-NEW').replace(' Code Inventory', '')}` : 'Connect Repository'}</span>
+                <span style={{ fontSize: '11px', color: '#64748B', backgroundColor: '#F1F5F9', padding: '1px 5px', borderRadius: '4px' }}>Change</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={fetchEndpoints}
                 disabled={isLoading}
                 style={{
@@ -310,10 +358,10 @@ export default function ApiInventoryPage() {
                 Total APIs & Services
               </div>
               <div style={{ fontFamily: serif, fontSize: '30px', fontWeight: 700, color: T.text, lineHeight: 1 }}>
-                {apis.length || 1}
+                {apis.length}
               </div>
               <div style={{ fontSize: '12px', color: T.textSub, marginTop: '8px' }}>
-                Active: {selectedApi?.name || 'JOB-FINDER-NEW Code Inventory'}
+                Active: {selectedApi?.name || 'Default API Inventory'}
               </div>
             </div>
 
@@ -331,10 +379,14 @@ export default function ApiInventoryPage() {
                 Total Endpoints
               </div>
               <div style={{ fontFamily: serif, fontSize: '30px', fontWeight: 700, color: T.text, lineHeight: 1 }}>
-                {endpoints.length || 27}
+                {isLoading ? <KavachShimmer width="48px" height="28px" /> : endpoints.length}
               </div>
               <div style={{ fontSize: '12px', color: T.textSub, marginTop: '8px' }}>
-                {protectedCount || 5} Protected • {publicCount || 22} Public
+                {isLoading ? (
+                  <KavachShimmer width="130px" height="14px" />
+                ) : (
+                  `${protectedCount} Protected • ${publicCount} Public`
+                )}
               </div>
             </div>
 
@@ -352,7 +404,7 @@ export default function ApiInventoryPage() {
                 High / Critical Exposure
               </div>
               <div style={{ fontFamily: serif, fontSize: '30px', fontWeight: 700, color: '#B91C1C', lineHeight: 1 }}>
-                {highRiskCount || 18}
+                {isLoading ? <KavachShimmer width="40px" height="28px" /> : highRiskCount}
               </div>
               <div style={{ fontSize: '12px', color: T.textSub, marginTop: '8px' }}>
                 BOLA, Auth Bypass & Injection risks
@@ -373,7 +425,7 @@ export default function ApiInventoryPage() {
                 Multi-Protocol Coverage
               </div>
               <div style={{ fontFamily: serif, fontSize: '30px', fontWeight: 700, color: '#15803D', lineHeight: 1 }}>
-                {protocolsCount}
+                {isLoading ? <KavachShimmer width="30px" height="28px" /> : protocolsCount}
               </div>
               <div style={{ fontSize: '12px', color: T.textSub, marginTop: '8px' }}>
                 REST, GraphQL, WebSockets, gRPC
@@ -533,7 +585,31 @@ export default function ApiInventoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEndpoints.length === 0 ? (
+                  {isLoading ? (
+                    Array.from({ length: 6 }).map((_, rIdx) => (
+                      <tr key={rIdx} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                        <td style={{ padding: '16px 20px' }}>
+                          <KavachShimmer width="200px" height="15px" style={{ marginBottom: '4px' }} />
+                          <KavachShimmer width="130px" height="11px" />
+                        </td>
+                        <td style={{ padding: '16px 16px' }}>
+                          <KavachShimmer width="48px" height="20px" borderRadius="4px" />
+                        </td>
+                        <td style={{ padding: '16px 16px' }}>
+                          <KavachShimmer width="65px" height="20px" borderRadius="12px" />
+                        </td>
+                        <td style={{ padding: '16px 16px' }}>
+                          <KavachShimmer width="55px" height="20px" borderRadius="12px" />
+                        </td>
+                        <td style={{ padding: '16px 16px' }}>
+                          <KavachShimmer width="35px" height="18px" borderRadius="10px" />
+                        </td>
+                        <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                          <KavachShimmer width="80px" height="28px" borderRadius="6px" />
+                        </td>
+                      </tr>
+                    ))
+                  ) : filteredEndpoints.length === 0 ? (
                     <tr>
                       <td colSpan={6} style={{ padding: '36px 20px', textAlign: 'center', color: T.textSub }}>
                         No endpoints match the selected filters.

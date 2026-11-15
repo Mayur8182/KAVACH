@@ -47,6 +47,7 @@ import {
   GitFork, Sliders, Sparkles, Link2, Globe, Shield,
 } from 'lucide-react';
 import { KavachApiLayout } from '../components/KavachApiLayout';
+import { KavachSkeletonPage } from '../components/KavachSkeleton';
 import { useApiSecurity } from '../context/ApiSecurityContext';
 import { api } from '@/lib/api/client';
 import { toast } from '@/lib/toast';
@@ -218,6 +219,24 @@ export default function AttackPathsPage() {
     if (!detail?.steps || detail.steps.length === 0) return null;
     return detail.steps.find((s: any) => s.step === activeStepNum) || detail.steps[0];
   }, [detail, activeStepNum]);
+
+  if (loading) {
+    return (
+      <KavachApiLayout activeApiId={selectedApi?.id}>
+        <div
+          style={{
+            width: '100%',
+            maxWidth: '1280px',
+            margin: '0 auto',
+            paddingBottom: '60px',
+            fontFamily: sans,
+          }}
+        >
+          <KavachSkeletonPage />
+        </div>
+      </KavachApiLayout>
+    );
+  }
 
   return (
     <KavachApiLayout activeApiId={selectedApi?.id}>
@@ -1477,21 +1496,26 @@ export default function AttackPathsPage() {
                       'User Table (PostgreSQL)',
                       'Authorization Token Claims',
                       'Tenant Session Store',
-                    ]).map((asset: string, aIdx: number) => (
-                      <div
-                        key={aIdx}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          color: T.textSub,
-                          fontFamily: asset.includes('/') ? 'ui-monospace, monospace' : sans,
-                        }}
-                      >
-                        <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#94A3B8' }} />
-                        <span>{asset}</span>
-                      </div>
-                    ))}
+                    ]).map((rawAsset: any, aIdx: number) => {
+                      const assetStr = typeof rawAsset === 'string' 
+                        ? rawAsset 
+                        : (rawAsset?.name || rawAsset?.path || rawAsset?.title || String(rawAsset));
+                      return (
+                        <div
+                          key={aIdx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: T.textSub,
+                            fontFamily: assetStr.includes('/') ? 'ui-monospace, monospace' : sans,
+                          }}
+                        >
+                          <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#94A3B8' }} />
+                          <span>{assetStr}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

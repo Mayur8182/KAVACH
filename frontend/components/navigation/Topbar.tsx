@@ -417,14 +417,19 @@ export const Topbar: React.FC<TopbarProps> = ({
     governance: 'All Frameworks',
   });
 
-  const isCodeOrWorkspace = activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace';
+  const isApiSecurity = activeWorkspace.id === 'api-security' || pathname.startsWith('/api-security');
+  const isCodeOrWorkspace = activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace' || isApiSecurity;
 
   const currentScope = isCodeOrWorkspace
-    ? (currentRepository ? currentRepository.name : 'All Repositories')
+    ? (currentRepository ? currentRepository.name : (isApiSecurity ? 'JOB-FINDER-NEW' : 'All Repositories'))
     : (selectedScopes[activeWorkspace.id] || activeWorkspace.defaultScope);
 
   const availableScopes = isCodeOrWorkspace
-    ? Array.from(new Set(['All Repositories', ...repositories.map((r) => r.name)]))
+    ? Array.from(new Set([
+        ...(isApiSecurity ? ['JOB-FINDER-NEW'] : ['All Repositories']),
+        ...repositories.map((r) => r.name),
+        ...(activeWorkspace.scopes || [])
+      ]))
     : activeWorkspace.scopes;
 
   const filteredProjects = projects.filter((p) =>
@@ -468,6 +473,20 @@ export const Topbar: React.FC<TopbarProps> = ({
             const codeWs = ALL_WORKSPACES.find(w => w.id === 'code');
             if (codeWs) {
               codeWs.scopes = Array.from(new Set([...codeWs.scopes, ...names]));
+            }
+          }
+        })
+        .catch(() => { });
+    }
+
+    if (typeof api?.apiSecurity?.listRepositories === 'function') {
+      api.apiSecurity.listRepositories()
+        .then((res: any) => {
+          if (res?.repositories?.length) {
+            const names = res.repositories.map((r: any) => r.name);
+            const apiWs = ALL_WORKSPACES.find(w => w.id === 'api-security');
+            if (apiWs) {
+              apiWs.scopes = Array.from(new Set(['JOB-FINDER-NEW', ...names]));
             }
           }
         })
@@ -524,7 +543,7 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   const handleSelectScope = (scope: string) => {
     setSelectedScopes((prev) => ({ ...prev, [activeWorkspace.id]: scope }));
-    if (activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace') {
+    if (activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace' || isApiSecurity) {
       if (scope === 'All Repositories') {
         setCurrentRepository(null);
       } else {
@@ -1105,8 +1124,8 @@ export const Topbar: React.FC<TopbarProps> = ({
             )}
           </div>
 
-          {/* Dynamic Scope Dropdown (matches active workspace product) — hidden on API Security */}
-          <div ref={repoRef} className="kavach-hide-tablet-mobile" style={{ position: 'relative', display: pathname.startsWith('/api-security') ? 'none' : undefined }}>
+          {/* Dynamic Scope Dropdown (matches active workspace product) */}
+          <div ref={repoRef} className="kavach-hide-tablet-mobile" style={{ position: 'relative' }}>
             <button
               onClick={() => setIsRepoDropdownOpen(!isRepoDropdownOpen)}
               style={{
@@ -1158,7 +1177,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                   position: 'absolute',
                   top: 'calc(100% + 6px)',
                   left: 0,
-                  width: '290px',
+                  width: '300px',
                   maxWidth: 'calc(100vw - 20px)',
                   backgroundColor: '#ffffff',
                   borderRadius: '10px',
@@ -1166,44 +1185,83 @@ export const Topbar: React.FC<TopbarProps> = ({
                   boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
                   zIndex: 50,
                   padding: '6px',
+                  display: 'flex',
+                  flexDirection: 'column',
                 }}
               >
                 <div style={{ padding: '6px 10px', fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase' }}>
-                  {activeWorkspace.scopeLabel} Scope
+                  {isApiSecurity ? 'API Target Repository' : `${activeWorkspace.scopeLabel} Scope`}
                 </div>
-                {availableScopes.map((scope) => {
-                  const isSelected = currentScope === scope;
-                  const isAll = scope === 'All Repositories';
-                  return (
+
+                <div style={{ flex: 1, overflowY: 'auto', maxHeight: '260px' }}>
+                  {availableScopes.map((scope) => {
+                    const isSelected = currentScope === scope;
+                    const isAll = scope === 'All Repositories';
+                    return (
+                      <button
+                        key={scope}
+                        onClick={() => handleSelectScope(scope)}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 10px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: isSelected ? '#F1F5F9' : 'transparent',
+                          color: '#0F172A',
+                          fontSize: '13px',
+                          fontWeight: isSelected ? 600 : 400,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                          {isCodeOrWorkspace && !isAll ? (
+                            <FolderGit2 size={13} color={isSelected ? '#0F172A' : '#64748B'} style={{ flexShrink: 0 }} />
+                          ) : null}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{scope}</span>
+                        </div>
+                        {isSelected && <Check size={14} color="#0F172A" style={{ flexShrink: 0 }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {isApiSecurity && (
+                  <div style={{ borderTop: '1px solid #E2E8F0', marginTop: '6px', paddingTop: '6px', flexShrink: 0 }}>
                     <button
-                      key={scope}
-                      onClick={() => handleSelectScope(scope)}
+                      type="button"
+                      onClick={() => {
+                        setIsRepoDropdownOpen(false);
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('kavach:open-github-modal'));
+                        }
+                      }}
                       style={{
                         width: '100%',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
+                        gap: '8px',
                         padding: '8px 10px',
                         borderRadius: '6px',
                         border: 'none',
-                        backgroundColor: isSelected ? '#F1F5F9' : 'transparent',
+                        backgroundColor: 'transparent',
                         color: '#0F172A',
-                        fontSize: '13px',
-                        fontWeight: isSelected ? 600 : 400,
+                        fontSize: '12.5px',
+                        fontWeight: 600,
                         cursor: 'pointer',
                         textAlign: 'left',
                       }}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
-                        {isCodeOrWorkspace && !isAll ? (
-                          <FolderGit2 size={13} color={isSelected ? '#0F172A' : '#64748B'} style={{ flexShrink: 0 }} />
-                        ) : null}
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{scope}</span>
-                      </div>
-                      {isSelected && <Check size={14} color="#0F172A" style={{ flexShrink: 0 }} />}
+                      <GithubIcon size={14} color="#0F172A" />
+                      <span>+ Connect / Change GitHub Repo</span>
                     </button>
-                  );
-                })}
+                  </div>
+                )}
               </div>
             )}
           </div>

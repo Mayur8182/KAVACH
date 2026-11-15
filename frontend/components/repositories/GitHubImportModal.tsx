@@ -63,7 +63,13 @@ export const GitHubImportModal: React.FC<GitHubImportModalProps> = ({
     setLoading(true);
     setError(null);
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '' : 'http://127.0.0.1:8000');
+    const baseUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      (typeof window !== 'undefined'
+        ? ''
+        : process.env.NODE_ENV === 'production'
+        ? 'https://kavach-backend-3hdm.onrender.com'
+        : 'http://127.0.0.1:8000');
     fetch(`${baseUrl}/api/v1/repositories/discover`)
       .then((res) => res.json())
       .then((data) => {
@@ -153,7 +159,13 @@ export const GitHubImportModal: React.FC<GitHubImportModalProps> = ({
     };
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '' : 'http://127.0.0.1:8000');
+      const baseUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      (typeof window !== 'undefined'
+        ? ''
+        : process.env.NODE_ENV === 'production'
+        ? 'https://kavach-backend-3hdm.onrender.com'
+        : 'http://127.0.0.1:8000');
       const token = getAuthToken() || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
       const res = await fetch(`${baseUrl}/api/v1/repositories/import`, {
         method: 'POST',

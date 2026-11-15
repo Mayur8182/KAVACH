@@ -135,6 +135,78 @@ export const EnterpriseFooter: React.FC = () => {
                 API & TELEMETRY OPERATIONAL
               </span>
             </div>
+
+            {/* Official Social Links */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+              <a
+                href="https://www.linkedin.com/company/kavach-security/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Kavach on LinkedIn"
+                title="Kavach on LinkedIn"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '6px',
+                  backgroundColor: '#FFFFFF',
+                  color: '#52525B',
+                  border: '1px solid #E4E4E7',
+                  transition: 'all 150ms ease',
+                  textDecoration: 'none',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0A66C2';
+                  e.currentTarget.style.color = '#FFFFFF';
+                  e.currentTarget.style.borderColor = '#0A66C2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.color = '#52525B';
+                  e.currentTarget.style.borderColor = '#E4E4E7';
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.6 1.6 0 0 0 1.6-1.6 1.6 1.6 0 0 0-1.6-1.6 1.6 1.6 0 0 0-1.6 1.6c0 .88.72 1.6 1.6 1.6m1.4 9.74v-8.37H5.06v8.37h2.8z" />
+                </svg>
+              </a>
+              <a
+                href="https://x.com/Kavach_Secure"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Kavach on X"
+                title="Kavach on X"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '6px',
+                  backgroundColor: '#FFFFFF',
+                  color: '#52525B',
+                  border: '1px solid #E4E4E7',
+                  transition: 'all 150ms ease',
+                  textDecoration: 'none',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#09090B';
+                  e.currentTarget.style.color = '#FFFFFF';
+                  e.currentTarget.style.borderColor = '#09090B';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.color = '#52525B';
+                  e.currentTarget.style.borderColor = '#E4E4E7';
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+              </a>
+            </div>
           </div>
 
           {/* Col 2: Workspaces */}
@@ -266,6 +338,28 @@ export const EnterpriseFooter: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <a
+              href="https://www.linkedin.com/company/kavach-security/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#71717A', textDecoration: 'none', transition: 'color 150ms' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#0A66C2')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#71717A')}
+            >
+              LinkedIn
+            </a>
+            <span>&bull;</span>
+            <a
+              href="https://x.com/Kavach_Secure"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#71717A', textDecoration: 'none', transition: 'color 150ms' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#09090B')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#71717A')}
+            >
+              X (Twitter)
+            </a>
+            <span>&bull;</span>
             <span>SLSA Provenance: Validated</span>
             <span>&bull;</span>
             <span>Kernel Defense: eBPF Active</span>

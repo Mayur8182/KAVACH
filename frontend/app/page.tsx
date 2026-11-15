@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -29,6 +29,20 @@ import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
 import { KavachLogo, KavachMark } from '@/components/common/KavachLogo';
 import { ProductShowcase } from '@/components/landing/ProductShowcase';
 import { KavachSecurityPipelineFlow } from '@/components/pipeline/KavachSecurityPipelineFlow';
+import { KavachHeroSkeleton } from '@/components/landing/KavachHeroSkeleton';
+
+// Official SVG Icons for Social Profiles
+const LinkedinIcon: React.FC<{ size?: number; className?: string }> = ({ size = 15, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.6 1.6 0 0 0 1.6-1.6 1.6 1.6 0 0 0-1.6-1.6 1.6 1.6 0 0 0-1.6 1.6c0 .88.72 1.6 1.6 1.6m1.4 9.74v-8.37H5.06v8.37h2.8z" />
+  </svg>
+);
+
+const XIcon: React.FC<{ size?: number; className?: string }> = ({ size = 13, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
 
 // Lazy-loaded modals & drawers
 const SearchModal = dynamic(
@@ -183,11 +197,16 @@ const SOLUTIONS = [
 
 export default function KavachHomePage() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [expertOpen, setExpertOpen] = useState(false);
   const [heroRepoInput, setHeroRepoInput] = useState('');
   const [showFixedCode, setShowFixedCode] = useState(false);
   const [copiedPatch, setCopiedPatch] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Form UX: Handle frictionless single-input repository scan submit
   const handleHeroScanSubmit = (e: React.FormEvent) => {
@@ -232,8 +251,11 @@ const result = await db.query(query, [userId]);`;
         {/* ========================================================= */}
         {/* SECTION 1: ABOVE THE FOLD HERO & LEAD CAPTURE             */}
         {/* ========================================================= */}
-        <section
-          className="kavach-home-hero"
+        {!mounted ? (
+          <KavachHeroSkeleton />
+        ) : (
+          <section
+            className="kavach-home-hero"
           style={{
             maxWidth: '1380px',
             margin: '0 auto',
@@ -432,6 +454,7 @@ const result = await db.query(query, [userId]);`;
             </div>
           </div>
         </section>
+        )}
 
         {/* ========================================================= */}
         {/* TRUST BADGES & METRICS BAR (Rule #2 Trust Signals)        */}
@@ -844,6 +867,29 @@ const result = await db.query(query, [userId]);`;
                   +91 8780378086
                 </a>
               </div>
+              {/* Official Social Links */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+                <a
+                  href="https://www.linkedin.com/company/kavach-security/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer-social-btn"
+                  title="Kavach on LinkedIn"
+                  aria-label="Kavach on LinkedIn"
+                >
+                  <LinkedinIcon size={15} />
+                </a>
+                <a
+                  href="https://x.com/Kavach_Secure"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer-social-btn"
+                  title="Kavach on X"
+                  aria-label="Kavach on X"
+                >
+                  <XIcon size={13} />
+                </a>
+              </div>
             </div>
 
             {/* Col 2: Workspaces */}
@@ -880,10 +926,30 @@ const result = await db.query(query, [userId]);`;
             </div>
           </div>
 
-          {/* Bottom Copyright */}
+          {/* Bottom Copyright & Social Sublinks */}
           <div className="footer-bottom-bar">
             <span>© 2026 Kavach Inc. All rights reserved. Deterministic DevSecOps &amp; AI Defense.</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
+              <a
+                href="https://www.linkedin.com/company/kavach-security/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-sublink"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              >
+                <LinkedinIcon size={13} />
+                <span>LinkedIn</span>
+              </a>
+              <a
+                href="https://x.com/Kavach_Secure"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-sublink"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              >
+                <XIcon size={12} />
+                <span>X (Twitter)</span>
+              </a>
               <Link href="/privacy" className="footer-sublink">Privacy</Link>
               <Link href="/terms" className="footer-sublink">Terms</Link>
               <Link href="/contact" className="footer-sublink">Support</Link>
@@ -897,608 +963,6 @@ const result = await db.query(query, [userId]);`;
       {expertOpen && (
         <BookDemoModal isOpen={expertOpen} onClose={() => setExpertOpen(false)} />
       )}
-
-      {/* Responsive Breakpoint CSS */}
-      <style jsx global>{`
-        .kavach-home-hero {
-          position: relative;
-          isolation: isolate;
-          display: grid;
-          grid-template-columns: minmax(0, 1.15fr) minmax(380px, 0.95fr);
-          align-items: center;
-          gap: clamp(36px, 6vw, 84px);
-        }
-        .kavach-home-eyebrow {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          color: #2563EB;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          margin-bottom: 16px;
-        }
-        .kavach-pulse-dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          background: #10B981;
-          box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
-          animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.3); opacity: 0.6; }
-        }
-        .kavach-home-hero h1 {
-          margin: 0 0 16px 0;
-          color: #0F172A;
-          font-size: clamp(36px, 5.2vw, 56px);
-          line-height: 1.08;
-          letter-spacing: -0.04em;
-          font-weight: 800;
-        }
-        .kavach-home-hero h1 em {
-          color: #2563EB;
-          font-style: normal;
-        }
-        .kavach-home-hero p {
-          max-width: 560px;
-          color: #475569;
-          font-size: 16px;
-          line-height: 1.65;
-          margin: 0 0 24px 0;
-        }
-        .kavach-hero-form {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          max-width: 580px;
-          margin-bottom: 12px;
-          flex-wrap: wrap;
-        }
-        .kavach-hero-input-wrap {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex: 1;
-          min-width: 260px;
-          background: #FFFFFF;
-          border: 1.5px solid #CBD5E1;
-          border-radius: 8px;
-          padding: 10px 14px;
-          transition: border-color 0.15s, box-shadow 0.15s;
-        }
-        .kavach-hero-input-wrap:focus-within {
-          border-color: #2563EB;
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-        }
-        .kavach-hero-input {
-          border: none;
-          background: transparent;
-          font-size: 13.5px;
-          color: #0F172A;
-          width: 100%;
-          outline: none;
-          font-family: inherit;
-        }
-        .kavach-hero-input::placeholder {
-          color: #94A3B8;
-        }
-        .kavach-hero-submit-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 11px 20px;
-          background: #0F172A;
-          color: #FFFFFF;
-          border: none;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background-color 0.15s, transform 0.1s;
-          white-space: nowrap;
-        }
-        .kavach-hero-submit-btn:hover {
-          background: #1E293B;
-          transform: translateY(-1px);
-        }
-        .kavach-hero-guarantee {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 11.5px;
-          color: #64748B;
-          margin-bottom: 24px;
-          flex-wrap: wrap;
-        }
-        .guarantee-item {
-          display: flex;
-          align-items: center;
-          gap: 5px;
-          font-weight: 500;
-        }
-        .kavach-hero-guarantee .dot {
-          color: #CBD5E1;
-        }
-        .kavach-home-actions {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
-        .kavach-action-primary {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 18px;
-          background: #2563EB;
-          color: #FFFFFF;
-          border-radius: 7px;
-          font-size: 13px;
-          font-weight: 600;
-          text-decoration: none;
-          transition: background-color 0.15s;
-        }
-        .kavach-action-primary:hover {
-          background: #1D4ED8;
-        }
-        .kavach-action-secondary {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 18px;
-          background: #FFFFFF;
-          color: #334155;
-          border: 1px solid #CBD5E1;
-          border-radius: 7px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background-color 0.15s, border-color 0.15s;
-        }
-        .kavach-action-secondary:hover {
-          background: #F8FAFC;
-          border-color: #94A3B8;
-        }
-
-        /* Right Terminal Card */
-        .kavach-home-preview {
-          border: 1px solid #E2E8F0;
-          border-radius: 14px;
-          padding: 0 18px 16px;
-          box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
-          background: #FFFFFF;
-        }
-        .kavach-preview-top {
-          height: 46px;
-          display: flex;
-          align-items: center;
-          justifyContent: space-between;
-          border-bottom: 1px solid #F1F5F9;
-        }
-        .kavach-status-chip {
-          font-size: 9.5px;
-          font-weight: 700;
-          letter-spacing: 0.06em;
-          color: #2563EB;
-          background: #EFF6FF;
-          padding: 3px 8px;
-          border-radius: 99px;
-          border: 1px solid #BFDBFE;
-        }
-        .kavach-preview-file {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin: 14px 0 10px;
-          font-size: 12px;
-          color: #334155;
-          font-weight: 600;
-        }
-        .kavach-preview-file small {
-          margin-left: auto;
-          color: #94A3B8;
-          font-weight: 500;
-        }
-        .kavach-preview-code {
-          padding: 8px 12px;
-          border-radius: 6px;
-          background: #F8FAFC;
-          color: #334155;
-          font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-          overflow-x: auto;
-          white-space: nowrap;
-        }
-        .kavach-preview-code span {
-          color: #94A3B8;
-          margin-right: 14px;
-        }
-        .kavach-preview-code.issue {
-          color: #B91C1C;
-          background: #FEF2F2;
-          margin-top: 4px;
-          border-left: 3px solid #EF4444;
-        }
-        .kavach-preview-code.fixed-line {
-          color: #065F46;
-          background: #ECFDF5;
-          margin-top: 4px;
-          border-left: 3px solid #10B981;
-        }
-        .kavach-preview-evidence {
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          border: 1px solid #FDE68A;
-          background: #FFFBEB;
-          color: #92400E;
-          padding: 12px;
-          border-radius: 8px;
-          margin-top: 14px;
-        }
-        .kavach-preview-evidence.patch {
-          border-color: #A7F3D0;
-          background: #ECFDF5;
-          color: #065F46;
-        }
-        .kavach-preview-evidence span {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
-        .kavach-preview-evidence b {
-          font-size: 11px;
-        }
-        .kavach-preview-evidence small {
-          font-size: 10px;
-          color: #78350F;
-        }
-        .kavach-preview-evidence.patch small {
-          color: #047857;
-        }
-        .kavach-preview-review {
-          border-top: 1px solid #F1F5F9;
-          margin-top: 14px;
-          padding-top: 12px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .kavach-preview-review > div {
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          background: #E2E8F0;
-          color: #1E293B;
-          display: grid;
-          place-items: center;
-          font-size: 10px;
-          font-weight: 700;
-        }
-        .kavach-preview-review > span:nth-child(2) {
-          display: grid;
-          gap: 2px;
-        }
-        .kavach-preview-review b {
-          font-size: 11px;
-          color: #0F172A;
-        }
-        .kavach-preview-review small {
-          font-size: 10px;
-          color: #64748B;
-        }
-        .kavach-preview-status {
-          margin-left: auto;
-          padding: 4px 8px;
-          background: #ECFDF5;
-          color: #065F46;
-          border-radius: 99px;
-          font-size: 10px;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-
-        /* Trust & Metrics Card */
-        .kavach-trust-metrics-card {
-          background: #FFFFFF;
-          border: 1px solid #E2E8F0;
-          border-radius: 12px;
-          padding: 24px 32px;
-          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-        .kavach-stats-row {
-          display: flex;
-          align-items: center;
-          justifyContent: space-between;
-          flex-wrap: wrap;
-          gap: 20px;
-        }
-        .stat-box {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-        .stat-val {
-          font-size: clamp(26px, 3.2vw, 34px);
-          font-weight: 800;
-          color: #0F172A;
-          letter-spacing: -0.03em;
-          line-height: 1;
-        }
-        .stat-lbl {
-          font-size: 12px;
-          font-weight: 600;
-          color: #64748B;
-        }
-        .stat-divider {
-          width: 1px;
-          height: 36px;
-          background: #E2E8F0;
-        }
-        .kavach-badges-row {
-          border-top: 1px solid #F1F5F9;
-          padding-top: 16px;
-          display: flex;
-          align-items: center;
-          justifyContent: space-between;
-          flex-wrap: wrap;
-          gap: 14px;
-        }
-        .badges-label {
-          font-size: 10.5px;
-          font-family: monospace;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          color: #94A3B8;
-        }
-        .badges-list {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-        .badge-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 5px 10px;
-          background: #F8FAFC;
-          border: 1px solid #E2E8F0;
-          border-radius: 6px;
-          font-size: 11.5px;
-          font-weight: 600;
-          color: #334155;
-        }
-
-        /* Section Tags */
-        .kavach-section-tag {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 10.5px;
-          font-family: monospace;
-          font-weight: 700;
-          letter-spacing: 0.12em;
-          color: #2563EB;
-        }
-
-        /* Comparison Grid */
-        .kavach-comparison-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 24px;
-        }
-        .comparison-col {
-          background: #FFFFFF;
-          border-radius: 12px;
-          padding: 28px;
-          border: 1px solid #E2E8F0;
-        }
-        .comparison-col.traditional {
-          border-color: #FECACA;
-          background: #FFFBFB;
-        }
-        .comparison-col.kavach {
-          border-color: #A7F3D0;
-          background: #F8FFF9;
-          box-shadow: 0 4px 20px rgba(16, 185, 129, 0.08);
-        }
-        .col-header {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 20px;
-          padding-bottom: 14px;
-          border-bottom: 1px solid #E2E8F0;
-        }
-        .col-header h3 {
-          font-size: 17px;
-          font-weight: 700;
-          color: #0F172A;
-          margin: 0;
-        }
-        .comparison-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-        }
-        .comparison-list li {
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          font-size: 13.5px;
-          line-height: 1.5;
-          color: #334155;
-        }
-        .comparison-list .cross {
-          color: #EF4444;
-          font-weight: 800;
-          font-size: 14px;
-        }
-        .comparison-list .check {
-          color: #10B981;
-          font-weight: 800;
-          font-size: 14px;
-        }
-
-        /* High-Converting CTA Banner */
-        .kavach-conversion-banner {
-          background: #0F172A;
-          color: #FFFFFF;
-          border-radius: 16px;
-          padding: clamp(36px, 5vw, 56px) clamp(24px, 5vw, 56px);
-          display: flex;
-          align-items: center;
-          justifyContent: space-between;
-          flex-wrap: wrap;
-          gap: 32px;
-          box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
-        }
-        .banner-tag {
-          display: block;
-          font-size: 11px;
-          font-family: monospace;
-          font-weight: 700;
-          letter-spacing: 0.12em;
-          color: #60A5FA;
-          margin-bottom: 12px;
-        }
-        .banner-title {
-          font-size: clamp(26px, 3.8vw, 36px);
-          font-weight: 800;
-          color: #FFFFFF;
-          margin: 0 0 10px 0;
-          letter-spacing: -0.025em;
-          line-height: 1.18;
-        }
-        .banner-subtitle {
-          font-size: 14.5px;
-          color: #94A3B8;
-          margin: 0;
-          max-width: 540px;
-          line-height: 1.55;
-        }
-        .banner-actions {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          flex-wrap: wrap;
-        }
-        .banner-primary-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 13px 24px;
-          background: #2563EB;
-          color: #FFFFFF;
-          border-radius: 8px;
-          font-size: 13.5px;
-          font-weight: 600;
-          text-decoration: none;
-          transition: background-color 0.15s, transform 0.1s;
-        }
-        .banner-primary-btn:hover {
-          background: #1D4ED8;
-          transform: translateY(-1px);
-        }
-        .banner-secondary-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 13px 22px;
-          background: transparent;
-          color: #F8FAFC;
-          border: 1px solid #475569;
-          border-radius: 8px;
-          font-size: 13.5px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: border-color 0.15s, background-color 0.15s;
-        }
-        .banner-secondary-btn:hover {
-          border-color: #94A3B8;
-          background: rgba(255, 255, 255, 0.05);
-        }
-
-        /* Footer */
-        .footer-col-header {
-          font-size: 10px;
-          font-family: monospace;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          color: #94A3B8;
-          margin-bottom: 4px;
-        }
-        .footer-link {
-          font-size: 13px;
-          color: #475569;
-          text-decoration: none;
-          transition: color 0.15s;
-        }
-        .footer-link:hover {
-          color: #0F172A;
-        }
-        .live-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: #10B981;
-          box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
-        }
-        .footer-bottom-bar {
-          padding-top: 24px;
-          border-top: 1px solid #F1F5F9;
-          display: flex;
-          align-items: center;
-          justifyContent: space-between;
-          flex-wrap: wrap;
-          gap: 16px;
-          font-size: 12px;
-          color: #94A3B8;
-        }
-        .footer-sublink {
-          color: #94A3B8;
-          text-decoration: none;
-        }
-        .footer-sublink:hover {
-          color: #0F172A;
-        }
-
-        @media (max-width: 980px) {
-          .kavach-home-hero {
-            grid-template-columns: 1fr;
-            gap: 36px;
-          }
-          .kavach-comparison-grid {
-            grid-template-columns: 1fr;
-          }
-          .stat-divider {
-            display: none;
-          }
-        }
-        @media (max-width: 768px) {
-          .footer-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 32px !important;
-          }
-        }
-        @media (max-width: 520px) {
-          .footer-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

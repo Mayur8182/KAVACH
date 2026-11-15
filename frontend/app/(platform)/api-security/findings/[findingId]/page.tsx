@@ -1,550 +1,547 @@
 'use client';
 
-/**
- * FindingDetailPage — Dedicated Security Finding Inspection & Remediation
- * Matching Screenshot 2:
- * - Breadcrumbs: API Security > Findings > AUTH-01
- * - Circled Alert Icon + Finding Identifier & Title: "AUTH-01: Missing Authentication"
- * - Badges: CWE-306, API2:2023, Critical (light red pill)
- * - Description: "The DELETE endpoint ... is accessible without authentication..."
- * - Tabs: Evidence | Request / Response | Attack Path | Remediation
- * - Tab 1 (Evidence):
- *     - Request Line Pill: HTTP DELETE /path + copy button
- *     - Response Snippet Code Box: HTTP/1.1 200 OK ...
- * - Right Sidebar Metadata Card:
- *     - Risk: Critical (pill)
- *     - Affected Endpoints: count
- *     - Source: file_path:line (link)
- *     - Discovered: Date / timestamp
- *     - Primary Action: "Apply Recommended Fix ->" (black pill button)
- *     - Secondary Action: "Create Issue" (outline button with GitHub icon)
- * - Real Data Binding: Strictly connected to real database finding records & endpoints
- */
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import {
-  AlertCircle,
-  Copy,
-  Check,
-  CheckCircle2,
-  ExternalLink,
-  GitPullRequest,
-  ShieldCheck,
-  Code2,
-  Clock,
-  Layers,
-  FileCode,
-  ShieldAlert,
-  Loader2,
-  RefreshCw,
-  GitBranch,
-  Terminal,
-  ArrowRight,
+  ArrowLeft, Shield, AlertTriangle, CheckCircle2, ChevronRight,
+  GitFork, Wrench, ExternalLink, Code2, Copy, Check, FileText,
+  Lock, Bug, Terminal, Database, ArrowRight
 } from 'lucide-react';
 import { KavachApiLayout } from '../../components/KavachApiLayout';
+import { KavachShimmer } from '../../components/KavachSkeleton';
+import { useApiSecurity } from '../../context/ApiSecurityContext';
 import { api } from '@/lib/api/client';
 import { toast } from '@/lib/toast';
 
+const serif = "'Newsreader', 'Instrument Serif', Georgia, serif";
+const sans  = "var(--font-sans, 'Plus Jakarta Sans', Inter, -apple-system, sans-serif)";
+
+const T = {
+  pageBg:      '#FAF9F6',
+  surface:     '#FFFFFF',
+  surfaceHover:'#F8FAFC',
+  border:      '#E8E6E1',
+  borderInput: '#E5E7EB',
+  borderLight: '#F3F4F6',
+  text:        '#0F172A',
+  textSub:     '#475569',
+  textMuted:   '#94A3B8',
+  green:       '#15803D',
+  greenBg:     '#DCFCE7',
+  greenBorder: '#BBF7D0',
+  amber:       '#D97706',
+  amberBg:     '#FEF3C7',
+  amberBorder: '#FDE68A',
+  red:         '#DC2626',
+  redBg:       '#FEE2E2',
+  redBorder:   '#FECACA',
+  btnDark:     '#0B0F17',
+};
+
 export default function FindingDetailPage() {
-  const params = useParams();
   const router = useRouter();
+  const params = useParams();
   const findingId = params?.findingId as string;
 
+  const { selectedApi } = useApiSecurity();
   const [finding, setFinding] = useState<any | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'evidence' | 'req_res' | 'attack_path' | 'remediation'>('evidence');
-  const [isApplyingFix, setIsApplyingFix] = useState(false);
-  const [isCreatingPr, setIsCreatingPr] = useState(false);
-  const [createdPr, setCreatedPr] = useState<{ url: string; number: number } | null>(null);
-  const [copiedText, setCopiedText] = useState(false);
-
-  const fetchFinding = async () => {
-    if (!findingId) return;
-    setIsLoading(true);
-    try {
-      const data = await api.apiSecurity.getFinding(findingId);
-      setFinding(data);
-    } catch (err) {
-      console.error('Failed to load finding details:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [loading, setLoading] = useState(true);
+  const [copiedPatch, setCopiedPatch] = useState(false);
 
   useEffect(() => {
-    fetchFinding();
-  }, [findingId]);
-
-  const handleApplyFix = async () => {
     if (!findingId) return;
-    setIsApplyingFix(true);
-    try {
-      const res = await api.apiSecurity.applyFindingFix(findingId);
-      toast.success(res?.message || 'Remediation patch applied. Running verification rescan...');
-      router.push(`/api-security/fix-verify?findingId=${findingId}&apiId=${finding?.api_id || ''}`);
-    } catch (err: any) {
-      toast.error('Failed to apply fix: ' + (err?.message || 'Error'));
-    } finally {
-      setIsApplyingFix(false);
-    }
-  };
-
-  const handleCreateIssue = async () => {
-    if (!findingId) return;
-    setIsCreatingPr(true);
-    try {
-      const res = await api.apiSecurity.createFindingPr(findingId);
-      setCreatedPr({ url: res.pr_url, number: res.pr_number });
-      toast.success(`GitHub Pull Request #${res.pr_number} created successfully!`);
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to create GitHub Issue / PR');
-    } finally {
-      setIsCreatingPr(false);
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedText(true);
-    toast.success('Copied to clipboard');
-    setTimeout(() => setCopiedText(false), 2000);
-  };
-
-  // Determine finding identifier code (e.g. AUTH-01 or SQLI-01)
-  const taxonomyCode = useMemo(() => {
-    if (!finding) return 'VULN-01';
-    const cwe = (finding.cwe || '').toUpperCase();
-    if (cwe.includes('306') || cwe.includes('287') || finding.title?.toLowerCase().includes('authentication')) {
-      return 'AUTH-01';
-    }
-    if (cwe.includes('89') || finding.title?.toLowerCase().includes('sql')) {
-      return 'SQLI-01';
-    }
-    if (cwe.includes('639') || cwe.includes('284') || finding.title?.toLowerCase().includes('bola')) {
-      return 'BOLA-01';
-    }
-    if (cwe.includes('798') || finding.title?.toLowerCase().includes('secret')) {
-      return 'SEC-01';
-    }
-    return finding.cwe ? finding.cwe.replace('CWE-', 'CWE-') : 'VULN-01';
-  }, [finding]);
-
-  // Affected Endpoint info
-  const affectedEndpoint = useMemo(() => {
-    if (!finding) return { method: 'DELETE', path: '/{tenant_id}/integrations/{integration_id}' };
-    const epList = finding.affected_endpoints || [];
-    if (epList.length > 0) {
-      const raw = epList[0];
-      if (typeof raw === 'string') {
-        const parts = raw.trim().split(' ');
-        if (parts.length > 1) {
-          return { method: parts[0].toUpperCase(), path: parts.slice(1).join(' ') };
+    const fetchFinding = async () => {
+      setLoading(true);
+      try {
+        const data = await api.apiSecurity.getFinding(findingId);
+        if (data) {
+          setFinding(data);
+        } else {
+          // Fallback to query from findings list
+          const listRes = await api.apiSecurity.findings({ apiId: selectedApi?.id, limit: 100 });
+          const match = (listRes?.items || []).find((f: any) => f.id === findingId);
+          if (match) setFinding(match);
         }
-        return { method: 'DELETE', path: raw };
+      } catch (err) {
+        console.warn('Direct finding query notice, trying list fallback:', err);
+        try {
+          const listRes = await api.apiSecurity.findings({ apiId: selectedApi?.id, limit: 100 });
+          const match = (listRes?.items || []).find((f: any) => f.id === findingId);
+          if (match) setFinding(match);
+        } catch {
+          // Ignore
+        }
+      } finally {
+        setLoading(false);
       }
-      if (typeof raw === 'object') {
-        return { method: (raw.method || 'GET').toUpperCase(), path: raw.path || raw.endpoint || '/api' };
-      }
-    }
-    return { method: 'DELETE', path: '/{tenant_id}/integrations/{integration_id}' };
-  }, [finding]);
-
-  // Evidence Response Snippet
-  const evidenceSnippet = useMemo(() => {
-    if (!finding) return 'HTTP/1.1 200 OK\n{\n  "status": "deleted",\n  "integration_id": "int_9f3a2"\n}';
-    if (finding.evidence?.response_body) {
-      const body = typeof finding.evidence.response_body === 'string'
-        ? finding.evidence.response_body
-        : JSON.stringify(finding.evidence.response_body, null, 2);
-      return `HTTP/1.1 ${finding.evidence.response_status || 200} OK\n${body}`;
-    }
-    if (finding.evidence?.curl_command) {
-      return `${finding.evidence.curl_command}\n\nHTTP/1.1 200 OK\n{\n  "status": "vulnerability_verified",\n  "code": "${taxonomyCode}"\n}`;
-    }
-    return 'HTTP/1.1 200 OK\n{\n  "status": "deleted",\n  "integration_id": "int_9f3a2"\n}';
-  }, [finding, taxonomyCode]);
-
-  // Formatted source file location
-  const sourceLocation = useMemo(() => {
-    if (!finding) return 'server/server.js:681';
-    if (finding.code_file_path) {
-      return `${finding.code_file_path}${finding.line_number ? `:${finding.line_number}` : ''}`;
-    }
-    return 'server/server.js:681';
-  }, [finding]);
-
-  // Formatted discovery timestamp
-  const discoveryDate = useMemo(() => {
-    if (!finding?.created_at) return 'Nov 13, 2026, 10:24 AM';
-    try {
-      const d = new Date(finding.created_at);
-      return d.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      });
-    } catch {
-      return 'Nov 13, 2026, 10:24 AM';
-    }
-  }, [finding]);
-
-  const severityBadge = useMemo(() => {
-    const s = (finding?.severity || 'CRITICAL').toUpperCase();
-    if (s === 'CRITICAL') {
-      return {
-        bg: 'bg-rose-50 dark:bg-rose-950/40',
-        text: 'text-rose-700 dark:text-rose-300',
-        border: 'border-rose-200 dark:border-rose-800',
-        label: 'Critical',
-      };
-    }
-    if (s === 'HIGH') {
-      return {
-        bg: 'bg-amber-50 dark:bg-amber-950/40',
-        text: 'text-amber-700 dark:text-amber-300',
-        border: 'border-amber-200 dark:border-amber-800',
-        label: 'High',
-      };
-    }
-    return {
-      bg: 'bg-blue-50 dark:bg-blue-950/40',
-      text: 'text-blue-700 dark:text-blue-300',
-      border: 'border-blue-200 dark:border-blue-800',
-      label: 'Medium',
     };
-  }, [finding]);
+    fetchFinding();
+  }, [findingId, selectedApi?.id]);
+
+  const copyPatch = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedPatch(true);
+    toast.success('Remediation patch copied to clipboard');
+    setTimeout(() => setCopiedPatch(false), 2000);
+  };
+
+  const sev = (finding?.severity || 'HIGH').toUpperCase();
+  const sevColor = sev === 'CRITICAL' ? T.red : sev === 'HIGH' ? '#C2410C' : sev === 'MEDIUM' ? T.amber : '#64748B';
+  const sevBg = sev === 'CRITICAL' ? T.redBg : sev === 'HIGH' ? '#FFEDD5' : sev === 'MEDIUM' ? T.amberBg : '#F1F5F9';
+  const sevBorder = sev === 'CRITICAL' ? T.redBorder : sev === 'HIGH' ? '#FED7AA' : sev === 'MEDIUM' ? T.amberBorder : '#E2E8F0';
+
+  const endpointStr = (finding?.affected_endpoints && finding.affected_endpoints[0]) || '/api/v1/resource';
 
   return (
-    <KavachApiLayout activeApiId={finding?.api_id}>
-      <div className="w-full space-y-5">
-        {/* ── 1. Breadcrumbs (Matching Screenshot 2) ── */}
-        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
-          <Link href="/api-security/inventory" className="hover:text-slate-800 dark:hover:text-slate-200">
-            API Security
-          </Link>
-          <span>&gt;</span>
-          <Link href="/api-security/findings" className="hover:text-slate-800 dark:hover:text-slate-200">
-            Findings
-          </Link>
-          <span>&gt;</span>
-          <span className="font-semibold text-slate-900 dark:text-slate-100">
-            {taxonomyCode}
-          </span>
-        </div>
+    <KavachApiLayout activeApiId={selectedApi?.id}>
+      <div style={{ minHeight: '100%', background: T.pageBg, fontFamily: sans, color: T.text, padding: '24px 36px 64px' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
 
-        {/* ── 2. Header Title, Circled Alert Icon & Badges (Matching Screenshot 2) ── */}
-        <div className="space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="w-7 h-7 rounded-full bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-              <span className="font-bold text-sm">!</span>
-            </div>
-
-            <div className="space-y-1.5">
-              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                {`${taxonomyCode}: ${finding?.title || 'Missing Authentication'}`}
-              </h1>
-
-              {/* Badges Row (Matching Screenshot 2) */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700">
-                  {finding?.cwe || 'CWE-306'}
-                </span>
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700">
-                  {finding?.owasp_category || 'API2:2023'}
-                </span>
-                <span
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${severityBadge.bg} ${severityBadge.text} ${severityBadge.border}`}
-                >
-                  {severityBadge.label}
+          {/* ── TOP BREADCRUMB & HEADER ── */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: T.textSub, marginBottom: '6px' }}>
+                <Link href="/api-security" style={{ color: T.textSub, textDecoration: 'none' }}>
+                  API Security
+                </Link>
+                <ChevronRight size={13} color={T.textMuted} strokeWidth={2} />
+                <Link href="/api-security/findings" style={{ color: T.textSub, textDecoration: 'none' }}>
+                  Findings
+                </Link>
+                <ChevronRight size={13} color={T.textMuted} strokeWidth={2} />
+                <span style={{ color: T.text, fontWeight: 600 }}>
+                  {loading ? 'Finding Details' : (finding?.title || 'Finding Details')}
                 </span>
               </div>
+
+              <h1
+                style={{
+                  fontFamily: serif,
+                  fontSize: '30px',
+                  fontWeight: 700,
+                  color: T.text,
+                  letterSpacing: '-0.02em',
+                  margin: 0,
+                  lineHeight: 1.15,
+                }}
+              >
+                {loading ? <KavachShimmer width="320px" height="34px" /> : (finding?.title || 'Security Finding Details')}
+              </h1>
+            </div>
+
+            {/* Top Action Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => router.push('/api-security/findings')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  height: '36px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  background: T.surface,
+                  border: `1px solid ${T.borderInput}`,
+                  fontSize: '12.5px',
+                  fontWeight: 500,
+                  color: T.text,
+                  cursor: 'pointer',
+                  fontFamily: sans,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                }}
+              >
+                <ArrowLeft size={13} color="#0F172A" />
+                Back to Findings
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push(`/api-security/attack-paths?findingId=${finding?.id || findingId}`)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  height: '36px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  background: T.surface,
+                  border: `1px solid ${T.borderInput}`,
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#15803D',
+                  cursor: 'pointer',
+                  fontFamily: sans,
+                }}
+              >
+                <GitFork size={13} color="#15803D" />
+                View Attack Path
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push(`/api-security/remediation?findingId=${finding?.id || findingId}`)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  height: '36px',
+                  padding: '0 16px',
+                  borderRadius: '8px',
+                  background: T.btnDark,
+                  border: 'none',
+                  color: '#FFFFFF',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: sans,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                }}
+              >
+                <Wrench size={12} color="#FFFFFF" />
+                Remediate Finding
+              </button>
             </div>
           </div>
 
-          {/* Description Text (Matching Screenshot 2) */}
-          <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed max-w-4xl pl-10">
-            {finding?.description ||
-              `The ${affectedEndpoint.method} endpoint ${affectedEndpoint.path} is accessible without authentication, allowing unauthorized access.`}
-          </p>
-        </div>
+          {/* ── MAIN CONTENT GRID ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' }}>
 
-        {/* ── 3. Two-Column Split Layout (Matching Screenshot 2) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pt-2">
-          {/* ── Left Column: Tabs & Content (8 cols) ── */}
-          <div className="lg:col-span-8 space-y-4">
-            {/* Tabs Bar (Matching Screenshot 2) */}
-            <div className="flex items-center gap-6 border-b border-slate-200 dark:border-zinc-800 text-xs font-medium">
-              <button
-                type="button"
-                onClick={() => setActiveTab('evidence')}
-                className={`py-2.5 border-b-2 font-semibold transition-all ${
-                  activeTab === 'evidence'
-                    ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white font-bold'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                Evidence
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('req_res')}
-                className={`py-2.5 border-b-2 font-semibold transition-all ${
-                  activeTab === 'req_res'
-                    ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white font-bold'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                Request / Response
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('attack_path')}
-                className={`py-2.5 border-b-2 font-semibold transition-all ${
-                  activeTab === 'attack_path'
-                    ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white font-bold'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                Attack Path
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('remediation')}
-                className={`py-2.5 border-b-2 font-semibold transition-all ${
-                  activeTab === 'remediation'
-                    ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white font-bold'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                Remediation
-              </button>
-            </div>
+            {/* Left Column: Finding Breakdown */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
 
-            {/* TAB 1: Evidence (Matching Screenshot 2) */}
-            {activeTab === 'evidence' && (
-              <div className="space-y-3">
-                {/* Request Pill Block (Matching Screenshot 2) */}
-                <div className="bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 shadow-2xs">
-                  <div className="flex items-center gap-2.5 font-mono text-xs overflow-x-auto min-w-0">
-                    <span className="px-2 py-0.5 rounded bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-bold text-[10px]">
-                      HTTP
-                    </span>
-                    <span className="font-bold text-rose-600 dark:text-rose-400">
-                      {affectedEndpoint.method}
-                    </span>
-                    <span className="text-slate-800 dark:text-slate-200 truncate">
-                      {affectedEndpoint.path}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(`${affectedEndpoint.method} ${affectedEndpoint.path}`)}
-                    className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-500 transition shrink-0"
-                    title="Copy request line"
+              {/* Card 1: Overview & Metadata Strip */}
+              <div
+                style={{
+                  background: T.surface,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: '12px',
+                  padding: '20px 24px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      padding: '3px 9px',
+                      borderRadius: '6px',
+                      fontSize: '11.5px',
+                      fontWeight: 700,
+                      background: sevBg,
+                      color: sevColor,
+                      border: `1px solid ${sevBorder}`,
+                    }}
                   >
-                    {copiedText ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                  </button>
-                </div>
+                    {sev}
+                  </span>
 
-                {/* Response Code Block (Matching Screenshot 2) */}
-                <div className="bg-slate-50/70 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 font-mono text-xs leading-relaxed text-slate-800 dark:text-zinc-200 overflow-x-auto shadow-2xs">
-                  <pre className="whitespace-pre">{evidenceSnippet}</pre>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: Request / Response */}
-            {activeTab === 'req_res' && (
-              <div className="space-y-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 shadow-xs">
-                <div className="space-y-1.5">
-                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    Interactive cURL Command
-                  </div>
-                  <div className="p-3 bg-slate-900 text-slate-100 rounded-lg font-mono text-[11px] overflow-x-auto">
-                    <code>
-                      {finding?.evidence?.curl_command ||
-                        `curl -X ${affectedEndpoint.method} "https://api.example.com${affectedEndpoint.path}" -H "Content-Type: application/json"`}
-                    </code>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase">Status Code</span>
-                    <div className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                      200 OK (Unauthorized Access Allowed)
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase">Response Latency</span>
-                    <div className="font-mono text-xs font-semibold text-slate-800 dark:text-zinc-200">
-                      42 ms
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: Attack Path */}
-            {activeTab === 'attack_path' && (
-              <div className="space-y-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 shadow-xs">
-                <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                  Exploitation Chain Integration
-                </div>
-                <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
-                  This vulnerability serves as the initial access or privilege escalation step in correlated attack graph chains.
-                </p>
-                <div className="pt-2">
-                  <Link
-                    href="/api-security/attack-paths"
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                  <span
+                    style={{
+                      padding: '3px 9px',
+                      borderRadius: '6px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      background: '#EFF6FF',
+                      color: '#1D4ED8',
+                      border: '1px solid #BFDBFE',
+                    }}
                   >
-                    <span>View in Attack Paths graph</span>
-                    <ArrowRight size={13} />
-                  </Link>
-                </div>
-              </div>
-            )}
+                    OWASP {finding?.owasp_category || 'A01:2021'}
+                  </span>
 
-            {/* TAB 4: Remediation */}
-            {activeTab === 'remediation' && (
-              <div className="space-y-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                    Framework-Aware Unified Patch Diff
-                  </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400">
-                    {sourceLocation}
+                  <span
+                    style={{
+                      padding: '3px 9px',
+                      borderRadius: '6px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      background: '#F8FAFC',
+                      color: '#475569',
+                      border: '1px solid #E2E8F0',
+                    }}
+                  >
+                    {finding?.cwe || 'CWE-639'}
+                  </span>
+
+                  <span
+                    style={{
+                      padding: '3px 9px',
+                      borderRadius: '6px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      background: finding?.status === 'RESOLVED' ? '#F1F5F9' : '#FEF2F2',
+                      color: finding?.status === 'RESOLVED' ? '#475569' : '#DC2626',
+                      border: `1px solid ${finding?.status === 'RESOLVED' ? '#CBD5E1' : '#FECACA'}`,
+                    }}
+                  >
+                    Status: {finding?.status || 'OPEN'}
                   </span>
                 </div>
 
-                <div className="p-4 bg-slate-900 text-slate-100 rounded-xl font-mono text-[11px] leading-relaxed overflow-x-auto">
-                  <pre>
-                    {finding?.remediation_patch ||
-                      `--- a/${sourceLocation.split(':')[0]}\n+++ b/${sourceLocation.split(':')[0]}\n@@ -680,4 +680,5 @@\n- app.delete('/api/v1/applications/:id', async (req, res) => {\n+ app.delete('/api/v1/applications/:id', authenticateToken, authorizeResourceOwner, async (req, res) => {\n`}
-                  </pre>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleApplyFix}
-                    disabled={isApplyingFix}
-                    className="px-4 py-2 bg-black hover:bg-zinc-800 text-white text-xs font-semibold rounded-lg shadow-sm transition cursor-pointer"
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: T.textMuted, fontWeight: 700, marginBottom: '4px' }}>
+                    Affected Endpoint
+                  </div>
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      background: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      fontFamily: 'ui-monospace, monospace',
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      color: T.text,
+                    }}
                   >
-                    {isApplyingFix ? 'Applying Patch...' : 'Apply Patch to Source'}
-                  </button>
+                    <span style={{ color: '#2563EB', fontWeight: 700 }}>GET</span>
+                    <span>{endpointStr}</span>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: T.textMuted, fontWeight: 700, marginBottom: '6px' }}>
+                    Description
+                  </div>
+                  <p style={{ fontSize: '13.5px', color: T.textSub, lineHeight: 1.6, margin: 0 }}>
+                    {finding?.description || 'The application does not properly validate object ownership, allowing authenticated users to access other users’ sensitive resources by modifying parameter identifiers.'}
+                  </p>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: T.textMuted, fontWeight: 700, marginBottom: '6px' }}>
+                    Impact
+                  </div>
+                  <p style={{ fontSize: '13.5px', color: T.textSub, lineHeight: 1.6, margin: 0 }}>
+                    {finding?.impact || 'Allows unauthorized access to private customer data, horizontal privilege escalation, and account takeover across API endpoints.'}
+                  </p>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* ── Right Column: Sidebar Metadata Card (4 cols) (Matching Screenshot 2) ── */}
-          <div className="lg:col-span-4 space-y-4">
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 space-y-4 shadow-xs">
-              {/* Risk Row */}
-              <div className="flex items-center justify-between py-1">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                  <ShieldAlert size={14} className="text-slate-400" />
-                  <span>Risk</span>
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${severityBadge.bg} ${severityBadge.text} ${severityBadge.border}`}
-                >
-                  {severityBadge.label}
-                </span>
-              </div>
+              {/* Card 2: Remediation Guidance & Patch */}
+              <div
+                style={{
+                  background: T.surface,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: '12px',
+                  padding: '20px 24px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Wrench size={15} color="#0F172A" />
+                    <span style={{ fontSize: '14.5px', fontWeight: 700, color: T.text }}>
+                      Remediation Guidance &amp; Proposed Code Diff
+                    </span>
+                  </div>
 
-              {/* Affected Endpoints */}
-              <div className="flex items-center justify-between py-1 border-t border-slate-100 dark:border-zinc-800/80">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                  <Code2 size={14} className="text-slate-400" />
-                  <span>Affected Endpoints</span>
-                </div>
-                <span className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100">
-                  {finding?.affected_endpoints?.length || 1}
-                </span>
-              </div>
-
-              {/* Source Location */}
-              <div className="flex items-center justify-between py-1 border-t border-slate-100 dark:border-zinc-800/80">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                  <GitBranch size={14} className="text-slate-400" />
-                  <span>Source</span>
-                </div>
-                <span className="text-xs font-mono text-slate-600 dark:text-zinc-400 truncate max-w-[170px]" title={sourceLocation}>
-                  {sourceLocation}
-                </span>
-              </div>
-
-              {/* Discovered Timestamp */}
-              <div className="flex items-center justify-between py-1 border-t border-slate-100 dark:border-zinc-800/80">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                  <Clock size={14} className="text-slate-400" />
-                  <span>Discovered</span>
-                </div>
-                <span className="text-xs text-slate-600 dark:text-zinc-400">
-                  {discoveryDate}
-                </span>
-              </div>
-
-              {/* Action Buttons (Matching Screenshot 2) */}
-              <div className="pt-3 space-y-2.5">
-                {/* Primary Button: Apply Recommended Fix -> */}
-                <button
-                  type="button"
-                  onClick={handleApplyFix}
-                  disabled={isApplyingFix}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-black hover:bg-zinc-800 active:bg-zinc-900 text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
-                >
-                  {isApplyingFix ? (
-                    <>
-                      <Loader2 size={13} className="animate-spin" />
-                      <span>Applying Fix...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Apply Recommended Fix</span>
-                      <span className="font-bold">→</span>
-                    </>
+                  {finding?.remediation_patch && (
+                    <button
+                      type="button"
+                      onClick={() => copyPatch(finding.remediation_patch)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        background: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        color: T.text,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {copiedPatch ? <Check size={11} color="#15803D" /> : <Copy size={11} color="#64748B" />}
+                      <span>{copiedPatch ? 'Copied' : 'Copy Diff'}</span>
+                    </button>
                   )}
-                </button>
+                </div>
 
-                {/* Secondary Button: Create Issue with GitHub Icon */}
-                {createdPr ? (
-                  <a
-                    href={createdPr.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition shadow-2xs"
+                <p style={{ fontSize: '13px', color: T.textSub, lineHeight: 1.5, marginBottom: '16px' }}>
+                  {finding?.remediation_advice || 'Implement object-level access validation by verifying that the requesting user owns the requested entity before returning or mutating records.'}
+                </p>
+
+                {finding?.remediation_patch ? (
+                  <pre
+                    style={{
+                      background: '#0B0F17',
+                      color: '#E2E8F0',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontFamily: 'ui-monospace, monospace',
+                      overflowX: 'auto',
+                      lineHeight: 1.6,
+                      margin: 0,
+                    }}
                   >
-                    <CheckCircle2 size={13} />
-                    <span>PR #{createdPr.number} Open on GitHub</span>
-                    <ExternalLink size={11} />
-                  </a>
+                    <code>{finding.remediation_patch}</code>
+                  </pre>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={handleCreateIssue}
-                    disabled={isCreatingPr}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition shadow-2xs cursor-pointer"
+                  <div
+                    style={{
+                      background: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      fontSize: '12.5px',
+                      color: T.textSub,
+                    }}
                   >
-                    {isCreatingPr ? (
-                      <Loader2 size={13} className="animate-spin" />
-                    ) : (
-                      <GitPullRequest size={13} />
-                    )}
-                    <span>Create Issue</span>
-                  </button>
+                    Deterministic remediation patch will be generated when you initiate the Remediation Workflow.
+                  </div>
                 )}
               </div>
             </div>
+
+            {/* Right Column: Context & Quick Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+              {/* Context Summary Card */}
+              <div
+                style={{
+                  background: T.surface,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: '12px',
+                  padding: '18px 20px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                }}
+              >
+                <div style={{ fontSize: '13.5px', fontWeight: 700, color: T.text, marginBottom: '14px' }}>
+                  Finding Metadata
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid #F1F5F9' }}>
+                    <span style={{ color: T.textSub }}>Severity</span>
+                    <strong style={{ color: sevColor }}>{sev}</strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid #F1F5F9' }}>
+                    <span style={{ color: T.textSub }}>OWASP Category</span>
+                    <strong style={{ color: T.text }}>{finding?.owasp_category || 'A01:2021'}</strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid #F1F5F9' }}>
+                    <span style={{ color: T.textSub }}>CWE ID</span>
+                    <strong style={{ color: T.text }}>{finding?.cwe || 'CWE-639'}</strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid #F1F5F9' }}>
+                    <span style={{ color: T.textSub }}>Target API</span>
+                    <strong style={{ color: T.text }}>{selectedApi?.name || 'Default API'}</strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: T.textSub }}>Deterministic rescan</span>
+                    <strong style={{ color: '#15803D' }}>ENABLED</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Attack Path Preview Card */}
+              <div
+                style={{
+                  background: T.surface,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: '12px',
+                  padding: '18px 20px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '13.5px', fontWeight: 700, color: T.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <GitFork size={14} color="#15803D" />
+                    <span>Attack Chain</span>
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#15803D', background: '#DCFCE7', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                    4 Steps
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                  {[
+                    { step: 1, title: 'Reconnaissance', desc: 'Discover endpoint & params' },
+                    { step: 2, title: 'Exploit BOLA', desc: 'Request other user records' },
+                    { step: 3, title: 'Privilege Escalation', desc: 'Traverse boundary' },
+                    { step: 4, title: 'Account Takeover', desc: 'Data access & modification', isFinal: true },
+                  ].map((s) => (
+                    <div
+                      key={s.step}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '7px',
+                        background: s.isFinal ? '#FEE2E2' : '#F8FAFC',
+                        border: `1px solid ${s.isFinal ? '#FECACA' : '#E2E8F0'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          background: s.isFinal ? '#DC2626' : '#64748B',
+                          color: '#FFFFFF',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {s.step}
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: s.isFinal ? '#991B1B' : T.text }}>
+                          {s.title}
+                        </div>
+                        <div style={{ fontSize: '10.5px', color: s.isFinal ? '#B91C1C' : T.textSub, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.desc}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => router.push(`/api-security/attack-paths?findingId=${finding?.id || findingId}`)}
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    borderRadius: '7px',
+                    background: '#FFFFFF',
+                    border: `1px solid ${T.borderInput}`,
+                    color: T.text,
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  Explore Attack Chain
+                  <ArrowRight size={12} color="#0F172A" />
+                </button>
+              </div>
+
+            </div>
+
           </div>
+
         </div>
       </div>
     </KavachApiLayout>

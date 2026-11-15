@@ -451,11 +451,21 @@ class CodeApiSecurityEngine:
                     "description": f"The state-changing API endpoint '{r['method']} {r['path']}' is exposed without authentication middleware.",
                     "impact": "Unauthenticated attackers can invoke sensitive functionality, create or mutate application data.",
                     "root_cause": "Route registered without authentication middleware barrier.",
+                    "changes": [
+                        f"Attach authentication middleware/dependency to {r['method']} {r['path']}",
+                        "Extract and cryptographically verify Bearer token from Authorization header",
+                        "Return 401 Unauthorized when credentials are absent or invalid",
+                    ],
                     "evidence": {
                         "code_file_path": f"{rel_path}:{r['line_number']}",
                         "line_number": r["line_number"],
                         "vulnerable_snippet": r["source_snippet"],
                         "root_cause": "No auth middleware attached to state-changing route definition.",
+                        "changes": [
+                            f"Attach authentication middleware/dependency to {r['method']} {r['path']}",
+                            "Extract and cryptographically verify Bearer token from Authorization header",
+                            "Return 401 Unauthorized when credentials are absent or invalid",
+                        ],
                         "reproducible_curl": f"curl -X {r['method']} https://api.kavach.local{r['raw_path']}",
                     },
                     "remediation_advice": "Attach an authentication middleware (e.g. `current_user = Depends(...)` or `authenticateToken`) before the route handler.",
@@ -482,11 +492,19 @@ class CodeApiSecurityEngine:
                     "description": "Password validation enforces a minimal character threshold (< 8 chars) without complexity requirements.",
                     "impact": "Facilitates credential stuffing and dictionary attacks against user accounts.",
                     "root_cause": "Insufficient password length and complexity checks in validation handler.",
+                    "changes": [
+                        "Enforce minimum password length of 8+ characters",
+                        "Validate character diversity: uppercase, lowercase, numbers, and symbols",
+                    ],
                     "evidence": {
                         "code_file_path": f"{rel_path}:{idx + 1}",
                         "line_number": idx + 1,
                         "vulnerable_snippet": line.strip(),
                         "root_cause": "Validation allows passwords shorter than 8 characters.",
+                        "changes": [
+                            "Enforce minimum password length of 8+ characters",
+                            "Validate character diversity: uppercase, lowercase, numbers, and symbols",
+                        ],
                     },
                     "remediation_advice": "Enforce minimum 8 characters with upper, lower, numeric, and symbol requirements.",
                     "remediation_patch": None,
@@ -522,15 +540,68 @@ class CodeApiSecurityEngine:
                     "description": "JWT token is parsed without verifying its cryptographic signature (`jwt.decode` or `algorithms: ['none']`).",
                     "impact": "Attackers can forge arbitrary JWT payloads claiming any user ID or admin role without knowledge of the secret key.",
                     "root_cause": "Missing signature verification on incoming JSON Web Tokens.",
+                    "changes": [
+                        "Replace jwt.decode() with cryptographically enforced jwt.verify()",
+                        "Explicitly whitelist allowed cryptographic signature algorithms (['HS256'])",
+                        "Reject unsigned tokens and tokens with 'none' algorithm header",
+                    ],
                     "evidence": {
                         "code_file_path": f"{rel_path}:{idx + 1}",
                         "line_number": idx + 1,
                         "vulnerable_snippet": line.strip(),
                         "root_cause": "Insecure JWT decoding omitting cryptographic verification.",
+                        "changes": [
+                            "Replace jwt.decode() with cryptographically enforced jwt.verify()",
+                            "Explicitly whitelist allowed cryptographic signature algorithms (['HS256'])",
+                            "Reject unsigned tokens and tokens with 'none' algorithm header",
+                        ],
                     },
                     "remediation_advice": "Always use cryptographic signature verification (`jwt.decode(..., algorithms=['HS256'])` in Python, `jwt.verify(...)` in JS).",
                     "remediation_patch": patch,
                 })
+
+        # AUTH-05: Authentication Bypass Backdoor / Debug Flag in Production Handler
+        for idx, line in enumerate(lines):
+            if any(k in line for k in ["bypassAuth", "skipAuth", "debugAuth", "disableAuth"]) and ("===" in line or "==" in line or "is True" in line or "bool(" in line):
+                if "KAVACH-SECURITY-FIX" not in line:
+                    patch = self._synthesize_auth_bypass_patch(rel_path, lines, idx)
+                    findings.append({
+                        "id": str(uuid.uuid4()),
+                        "taxonomy_id": "AUTH-05",
+                        "title": "AUTH-05: Authentication Bypass Backdoor / Debug Flag in Production Handler",
+                        "category": "Authentication",
+                        "owasp_category": "API2:2023 Broken Authentication",
+                        "cwe": "CWE-288",
+                        "severity": "CRITICAL",
+                        "status": "OPEN",
+                        "file_path": f"{rel_path}:{idx + 1}",
+                        "raw_file_path": rel_path,
+                        "line_number": idx + 1,
+                        "target_endpoint": "/auth/login",
+                        "http_method": "POST",
+                        "description": "An authentication bypass debug parameter (`bypassAuth` / `skipAuth`) allows unauthenticated callers to gain administrative sessions without credentials.",
+                        "impact": "Complete authentication bypass enabling arbitrary unauthenticated account takeover.",
+                        "root_cause": "Conditional authentication bypass flag checked in production login handler.",
+                        "changes": [
+                            "Remove debug authentication bypass parameters from request payload schema",
+                            "Strictly enforce cryptographic credential verification for all logins",
+                            "Return HTTP 400 Bad Request if unauthorized debug parameters are submitted",
+                        ],
+                        "evidence": {
+                            "code_file_path": f"{rel_path}:{idx + 1}",
+                            "line_number": idx + 1,
+                            "vulnerable_snippet": line.strip(),
+                            "root_cause": "Conditional bypass parameter allows bypassing credential check.",
+                            "changes": [
+                                "Remove debug authentication bypass parameters from request payload schema",
+                                "Strictly enforce cryptographic credential verification for all logins",
+                                "Return HTTP 400 Bad Request if unauthorized debug parameters are submitted",
+                            ],
+                        },
+                        "remediation_advice": "Eliminate debug bypass flags from production code and require full cryptographic verification.",
+                        "remediation_patch": patch,
+                    })
+                    break
 
         # AUTH-06: Hardcoded Credentials
         for idx, line in enumerate(lines):
@@ -554,11 +625,21 @@ class CodeApiSecurityEngine:
                         "description": "User password is validated against a static hardcoded string inside source code.",
                         "impact": "Static credentials can be extracted by anyone with codebase access or decompilation tools.",
                         "root_cause": "Hardcoded credential comparison instead of cryptographic password hash lookup.",
+                        "changes": [
+                            "Remove plaintext hardcoded credential comparison",
+                            "Perform constant-time cryptographic password verification with bcrypt.compare()",
+                            "Validate credentials against hashed password stored in the database",
+                        ],
                         "evidence": {
                             "code_file_path": f"{rel_path}:{idx + 1}",
                             "line_number": idx + 1,
                             "vulnerable_snippet": line.strip(),
                             "root_cause": "Static string comparison for password check.",
+                            "changes": [
+                                "Remove plaintext hardcoded credential comparison",
+                                "Perform constant-time cryptographic password verification with bcrypt.compare()",
+                                "Validate credentials against hashed password stored in the database",
+                            ],
                         },
                         "remediation_advice": "Retrieve hashed password from database and verify using bcrypt or argon2.",
                         "remediation_patch": patch,
@@ -692,11 +773,21 @@ class CodeApiSecurityEngine:
                     "description": f"Endpoint '{r['method']} {r['path']}' queries records by identifier without validating that the authenticated user owns the resource.",
                     "impact": "Attackers can tamper with ID parameters to exfiltrate or modify arbitrary accounts and private records.",
                     "root_cause": "Missing assertion verifying req.user.id owns target object identifier prior to database query.",
+                    "changes": [
+                        "Extract target resource identifier from request path parameters",
+                        "Assert authenticated user ownership (req.user.id === targetId) or admin privilege",
+                        "Return HTTP 403 Forbidden when unauthorized callers attempt cross-tenant resource access",
+                    ],
                     "evidence": {
                         "code_file_path": f"{rel_path}:{vuln_line_num}",
                         "line_number": vuln_line_num,
                         "vulnerable_snippet": vuln_snippet,
                         "root_cause": "Unchecked object ID lookup from client parameters.",
+                        "changes": [
+                            "Extract target resource identifier from request path parameters",
+                            "Assert authenticated user ownership (req.user.id === targetId) or admin privilege",
+                            "Return HTTP 403 Forbidden when unauthorized callers attempt cross-tenant resource access",
+                        ],
                         "reproducible_curl": f"curl -H 'Authorization: Bearer <attacker_token>' https://api.kavach.local{r['raw_path'].replace(':id', '9999')}",
                     },
                     "remediation_advice": "Assert that `req.user.id` matches the record owner or the user has administrative privileges.",
@@ -844,11 +935,21 @@ class CodeApiSecurityEngine:
                     "description": "SQL query is dynamically assembled using unescaped string interpolation with user parameters instead of parameterized placeholders.",
                     "impact": "Attackers can bypass authentication, dump database tables, or modify database records.",
                     "root_cause": "Unsanitized user-controlled string formatted directly into SQL query syntax.",
+                    "changes": [
+                        "Replace dynamic template string / string concatenation with parameterized prepared query ($1 placeholders)",
+                        "Pass bound parameter values array directly to database query driver",
+                        "Add validation to check returned record existence and return 404 if missing",
+                    ],
                     "evidence": {
                         "code_file_path": f"{rel_path}:{idx + 1}",
                         "line_number": idx + 1,
                         "vulnerable_snippet": line.strip(),
                         "root_cause": "Template literal `${userId}` inside SQL query.",
+                        "changes": [
+                            "Replace dynamic template string / string concatenation with parameterized prepared query ($1 placeholders)",
+                            "Pass bound parameter values array directly to database query driver",
+                            "Add validation to check returned record existence and return 404 if missing",
+                        ],
                         "reproducible_curl": "curl https://api.kavach.local/user/%27%20OR%20%271%27=%271",
                     },
                     "remediation_advice": "Use parameterized queries or prepared statements (e.g. `SELECT * FROM users WHERE id = $1`) to bind values securely.",
@@ -877,11 +978,21 @@ class CodeApiSecurityEngine:
                     "description": "SQL query is constructed using a Python f-string inserting user-supplied parameters directly into the SQL string.",
                     "impact": "Database extraction, arbitrary data modification, or SQL command injection.",
                     "root_cause": "Python f-string interpolation into raw SQL query cursor.",
+                    "changes": [
+                        "Replace Python f-string dynamic query formatting with %s parameter placeholders",
+                        "Pass bound parameters tuple to cursor / db.execute()",
+                        "Ensure database driver executes parameterized statement preventing SQL injection",
+                    ],
                     "evidence": {
                         "code_file_path": f"{rel_path}:{idx + 1}",
                         "line_number": idx + 1,
                         "vulnerable_snippet": line.strip(),
                         "root_cause": "f\"SELECT * FROM users WHERE id = {user_id}\"",
+                        "changes": [
+                            "Replace Python f-string dynamic query formatting with %s parameter placeholders",
+                            "Pass bound parameters tuple to cursor / db.execute()",
+                            "Ensure database driver executes parameterized statement preventing SQL injection",
+                        ],
                         "reproducible_curl": "curl 'https://api.kavach.local/user?id=1%20OR%201=1'",
                     },
                     "remediation_advice": "Pass parameters as a tuple argument to `cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))`.",
@@ -1014,11 +1125,23 @@ class CodeApiSecurityEngine:
                     "description": "User-supplied file name or relative path is passed directly to `path.join()` without path resolution or root boundary checks.",
                     "impact": "Attackers can supply `../../etc/passwd` to read arbitrary system files.",
                     "root_cause": "Lack of safe path resolution and boundary containment check.",
+                    "changes": [
+                        "Extract safe file basename using path.basename(userFile)",
+                        "Resolve canonical target path against base directory",
+                        "Verify directory containment with path.relative() to reject directory traversal",
+                        "Return HTTP 403 Forbidden on path traversal attempts",
+                    ],
                     "evidence": {
                         "code_file_path": f"{rel_path}:{idx + 1}",
                         "line_number": idx + 1,
                         "vulnerable_snippet": line.strip(),
                         "root_cause": "path.join called with unsanitized filename.",
+                        "changes": [
+                            "Extract safe file basename using path.basename(userFile)",
+                            "Resolve canonical target path against base directory",
+                            "Verify directory containment with path.relative() to reject directory traversal",
+                            "Return HTTP 403 Forbidden on path traversal attempts",
+                        ],
                     },
                     "remediation_advice": "Sanitize the filename with `path.basename()` and verify `filePath.startsWith(baseDirectory)`.",
                     "remediation_patch": patch,
@@ -1200,11 +1323,21 @@ class CodeApiSecurityEngine:
                     "description": f"The sensitive endpoint '{r['method']} {r['path']}' lacks rate-limiting middleware, allowing brute-force or resource exhaustion.",
                     "impact": "Credential stuffing attacks, automated account lockout, or denial of service.",
                     "root_cause": "No rate limiting middleware attached to route definition.",
+                    "changes": [
+                        f"Attach rate-limiting middleware to {r['method']} {r['path']}",
+                        "Configure sliding window limit (100 requests per 15 minutes per IP)",
+                        "Return HTTP 429 Too Many Requests with standard Retry-After header",
+                    ],
                     "evidence": {
                         "code_file_path": f"{rel_path}:{r['line_number']}",
                         "line_number": r["line_number"],
                         "vulnerable_snippet": vuln_snippet,
                         "root_cause": "Absence of limiter middleware in route parameters.",
+                        "changes": [
+                            f"Attach rate-limiting middleware to {r['method']} {r['path']}",
+                            "Configure sliding window limit (100 requests per 15 minutes per IP)",
+                            "Return HTTP 429 Too Many Requests with standard Retry-After header",
+                        ],
                     },
                     "remediation_advice": "Register rate limiting middleware (e.g. `express-rate-limit`) to restrict requests per IP/user.",
                     "remediation_patch": patch,
@@ -1930,7 +2063,15 @@ class CodeApiSecurityEngine:
 
         # CRYPTO-04: Insecure PRNG (Math.random() for security tokens)
         for idx, line in enumerate(lines):
-            if ("Math.random()" in line or "random.random()" in line) and any(k in line.lower() for k in ["token", "secret", "reset", "otp", "key"]):
+            # Skip frontend UI components (e.g. React key={Math.random()}, avatar color generator)
+            if any(ui_kw in rel_path.lower() for ui_kw in [".tsx", ".jsx", "component", "pages", "app/(", "components/"]) or "<" in line or "key=" in line:
+                continue
+
+            # Check if this line or enclosing context represents security-sensitive token/reset/session/pin/key generation
+            surrounding = "\n".join(lines[max(0, idx - 6) : min(len(lines), idx + 3)]).lower()
+            is_security_context = any(k in surrounding for k in ["token", "secret", "reset", "otp", "session", "pin", "password", "auth", "nonce", "code"])
+
+            if ("Math.random()" in line or "random.random()" in line) and is_security_context:
                 if "KAVACH-SECURITY-FIX" not in line:
                     patch = self._synthesize_prng_patch(rel_path, lines, idx)
                     findings.append({
@@ -1947,14 +2088,24 @@ class CodeApiSecurityEngine:
                         "line_number": idx + 1,
                         "target_endpoint": "/auth/token",
                         "http_method": "POST",
-                        "description": "Security tokens, OTPs, or reset keys are generated using non-cryptographic PRNGs (`Math.random()` or `random.random()`).",
-                        "impact": "Token predictability allows attackers to predict future tokens and hijack user accounts.",
-                        "root_cause": "Using predictable pseudo-random generator for security-sensitive tokens.",
+                        "description": "Security tokens, session IDs, or password reset codes are generated using non-cryptographic PRNGs (`Math.random()`).",
+                        "impact": "Predictable pseudo-random outputs allow attackers to reconstruct session tokens or brute-force reset codes.",
+                        "root_cause": "Using non-cryptographic pseudo-random generator for security-sensitive tokens.",
+                        "changes": [
+                            "Replace non-cryptographic Math.random() with cryptographically secure crypto.randomBytes / crypto.randomInt",
+                            "Ensure entropy generation meets security standards (>= 128-bit)",
+                            "Eliminate predictable pseudo-random sequences for session and reset tokens",
+                        ],
                         "evidence": {
                             "code_file_path": f"{rel_path}:{idx + 1}",
                             "line_number": idx + 1,
                             "vulnerable_snippet": line.strip(),
-                            "root_cause": "Math.random() utilized for token generation.",
+                            "root_cause": "Math.random() utilized for security-sensitive identifier generation.",
+                            "changes": [
+                                "Replace non-cryptographic Math.random() with cryptographically secure crypto.randomBytes / crypto.randomInt",
+                                "Ensure entropy generation meets security standards (>= 128-bit)",
+                                "Eliminate predictable pseudo-random sequences for session and reset tokens",
+                            ],
                         },
                         "remediation_advice": "Use `crypto.randomBytes()` in Node.js or `secrets.token_hex()` in Python.",
                         "remediation_patch": patch,
@@ -2150,6 +2301,9 @@ class CodeApiSecurityEngine:
             (re.compile(r"""['"]sk_live_[0-9a-zA-Z]{24,}['"]"""), "Stripe Live Secret Key"),
             (re.compile(r"""['"]ghp_[0-9a-zA-Z]{36}['"]"""), "GitHub Personal Access Token"),
             (re.compile(r"""jwt\.sign\(.*['"](?:secret|my-secret-key|test-secret|123456)['"]"""), "Hardcoded Weak JWT Secret"),
+            (re.compile(r"""['"]postgres(?:ql)?:\/\/[^:]+:[^@]+@[^'"]+['"]"""), "PostgreSQL Database Connection URI"),
+            (re.compile(r"""['"]mongodb(?:\+srv)?:\/\/[^:]+:[^@]+@[^'"]+['"]"""), "MongoDB Database Connection URI"),
+            (re.compile(r"""['"]mysql:\/\/[^:]+:[^@]+@[^'"]+['"]"""), "MySQL Database Connection URI"),
         ]
 
         for idx, line in enumerate(lines):
@@ -2175,11 +2329,21 @@ class CodeApiSecurityEngine:
                         "description": f"A production secret key ({label}) is hardcoded in application source code instead of being injected via environment variables.",
                         "impact": "Anyone with repository access or source code history can impersonate the service or access external APIs.",
                         "root_cause": "Static secret string placed inside codebase.",
+                        "changes": [
+                            f"Extract hardcoded {label} into environment variable",
+                            "Load secret safely at runtime via process.env or os.environ",
+                            "Add assertion to ensure secret variable is populated on application startup",
+                        ],
                         "evidence": {
                             "code_file_path": f"{rel_path}:{idx + 1}",
                             "line_number": idx + 1,
                             "vulnerable_snippet": line.strip()[:100],
                             "root_cause": f"Hardcoded credential matching {label} pattern.",
+                            "changes": [
+                                f"Extract hardcoded {label} into environment variable",
+                                "Load secret safely at runtime via process.env or os.environ",
+                                "Add assertion to ensure secret variable is populated on application startup",
+                            ],
                         },
                         "remediation_advice": "Store secrets in an external secrets manager (AWS Secrets Manager, Vault) and reference via `process.env`.",
                         "remediation_patch": patch,
@@ -2325,6 +2489,34 @@ class CodeApiSecurityEngine:
                     f"{indent}const queryParams = {params_array};",
                 ]
             mod[line_idx : line_idx + 1] = replacement
+
+            # Replace subsequent simulated database query logic if present
+            for j in range(line_idx + 1, min(len(mod), line_idx + 10)):
+                if any(k in mod[j] for k in ["// Simulated DB query", "console.log('Executing query:'", "res.json({ id: userId, query: sqlQuery })"]):
+                    sim_indent = mod[j][: len(mod[j]) - len(mod[j].lstrip())] or indent
+                    sim_start = j
+                    sim_end = j + 1
+                    while sim_end < min(len(mod), j + 5) and any(k in mod[sim_end] for k in ["console.log", "res.json"]):
+                        sim_end += 1
+                    real_exec = [
+                        f"{sim_indent}// [KAVACH-SECURITY-FIX] Parameterized query execution through database client",
+                        f"{sim_indent}const result = await db.query(sqlQuery, queryParams);",
+                        f"{sim_indent}if (!result.rows || result.rows.length === 0) {{",
+                        f"{sim_indent}  return res.status(404).json({{ error: 'User not found' }});",
+                        f"{sim_indent}}}",
+                        f"{sim_indent}res.json(result.rows[0]);",
+                    ]
+                    mod[sim_start:sim_end] = real_exec
+                    break
+
+            # Add database import if missing
+            file_str = "\n".join(lines)
+            if "import { db }" not in file_str and "const db " not in file_str and "const { db }" not in file_str:
+                for i, l in enumerate(mod):
+                    if l.startswith("import ") or (l.startswith("const ") and "require(" in l):
+                        mod.insert(i + 1, "import { db } from '../config/database';")
+                        break
+
         elif "+" in line and any(k in line.upper() for k in ["SELECT", "INSERT", "UPDATE", "DELETE"]):
             replacement = [
                 f"{indent}// [KAVACH-SECURITY-FIX] Parameterized prepared query preventing SQL Injection",
@@ -2352,20 +2544,18 @@ class CodeApiSecurityEngine:
             parameterized_sql = re.sub(r"\{[^}]+\}", "%s", parameterized_sql)
             params_tuple = f"({vars_found[0]},)" if len(vars_found) == 1 else f"({', '.join(vars_found)})"
 
-            if "=" in line:
-                var_assign = line.split("=", 1)[0].strip()
-                replacement = [
-                    f"{indent}# [KAVACH-SECURITY-FIX] Parameterized query preventing SQL Injection",
-                    f"{indent}{var_assign} = {parameterized_sql.strip()}",
-                    f"{indent}params = {params_tuple}",
-                ]
-            else:
-                replacement = [
-                    f"{indent}# [KAVACH-SECURITY-FIX] Parameterized query preventing SQL Injection",
-                    f"{indent}query = {parameterized_sql.strip()}",
-                    f"{indent}cursor = db.execute(query, {params_tuple})",
-                ]
-            mod[line_idx : line_idx + 1] = replacement
+            sql_statement = parameterized_sql.strip()
+            replacement = [
+                f"{indent}# [KAVACH-SECURITY-FIX] Parameterized query preventing SQL Injection",
+                f"{indent}{sql_statement}",
+                f"{indent}cursor = db.execute(query, {params_tuple})",
+            ]
+            replace_count = 1
+            if line_idx + 1 < len(lines) and "db.execute" in lines[line_idx + 1]:
+                replace_count = 2
+            elif line_idx + 2 < len(lines) and "db.execute" in lines[line_idx + 2]:
+                replace_count = 3
+            mod[line_idx : line_idx + replace_count] = replacement
         else:
             mod[line_idx] = f"{indent}# [KAVACH-SECURITY-FIX] Parameterized query preventing SQL Injection\n{indent}query = 'SELECT * FROM users WHERE id = %s'\n{indent}cursor = db.execute(query, (user_id,))"
 
@@ -2384,21 +2574,22 @@ class CodeApiSecurityEngine:
         if env["language"] == "python":
             py_indent = indent if indent.strip() == "" else "    "
             safe_path_block = [
-                f"{py_indent}# [KAVACH-SECURITY-FIX] Sanitize input to prevent Path Traversal",
-                f"{py_indent}safe_file_name = os.path.basename(user_file)",
+                f"{py_indent}# [KAVACH-SECURITY-FIX] Strictly enforce path containment to prevent directory traversal",
                 f"{py_indent}base_dir = os.path.abspath('/var/data/documents')",
+                f"{py_indent}safe_file_name = os.path.basename(str(user_file or ''))",
                 f"{py_indent}file_path = os.path.abspath(os.path.join(base_dir, safe_file_name))",
-                f"{py_indent}if not file_path.startswith(base_dir):",
-                f"{py_indent}    raise HTTPException(status_code=403, detail='Invalid file path')",
+                f"{py_indent}if os.path.commonpath([base_dir, file_path]) != base_dir:",
+                f"{py_indent}    raise HTTPException(status_code=403, detail='Forbidden: Path traversal attempt detected')",
             ]
         else:
             safe_path_block = [
-                f"{indent}// [KAVACH-SECURITY-FIX] Sanitize input to prevent Path Traversal",
-                f"{indent}const safeFileName = path.basename(userFile);",
-                f"{indent}const baseDir = '/var/data/documents';",
-                f"{indent}const filePath = path.join(baseDir, safeFileName);",
-                f"{indent}if (!filePath.startsWith(baseDir)) {{",
-                f"{indent}  return res.status(403).json({{ error: 'Invalid file path' }});",
+                f"{indent}// [KAVACH-SECURITY-FIX] Strictly enforce path containment to prevent directory traversal",
+                f"{indent}const baseDir = path.resolve('/var/data/documents');",
+                f"{indent}const safeFileName = path.basename(String(userFile || ''));",
+                f"{indent}const filePath = path.resolve(baseDir, safeFileName);",
+                f"{indent}const rel = path.relative(baseDir, filePath);",
+                f"{indent}if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {{",
+                f"{indent}  return res.status(403).json({{ error: 'Forbidden: Path traversal attempt detected' }});",
                 f"{indent}}}",
             ]
         mod[line_idx : line_idx + 1] = safe_path_block
@@ -2415,18 +2606,45 @@ class CodeApiSecurityEngine:
         line = lines[line_idx] if line_idx < len(lines) else ""
         indent = line[: len(line) - len(line.lstrip())] or "  "
 
-        if env["language"] == "python":
-            py_indent = indent if indent.strip() == "" else "    "
+        if "bypassAuth" in line:
+            end_idx = line_idx + 1
+            for j in range(line_idx + 1, min(len(lines), line_idx + 12)):
+                if "}" in lines[j]:
+                    end_idx = j + 1
+                    break
             replacement = [
-                f"{py_indent}# [KAVACH-SECURITY-FIX] Strictly enforce cryptographic JWT signature validation",
-                f"{py_indent}data = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])",
+                f"{indent}// [KAVACH-SECURITY-FIX] Reject unauthorized debug bypass parameter in production",
+                f"{indent}if (bypassAuth !== undefined) {{",
+                f"{indent}  return res.status(400).json({{ error: 'Unauthorized: Debug bypass parameters are strictly forbidden' }});",
+                f"{indent}}}",
             ]
+            mod[line_idx : end_idx] = replacement
+        elif "jwt.decode" in line:
+            if env["language"] == "python":
+                py_indent = indent if indent.strip() == "" else "    "
+                replacement = [
+                    f"{py_indent}# [KAVACH-SECURITY-FIX] Strictly enforce cryptographic JWT signature validation",
+                    f"{py_indent}data = jwt.decode(token, settings.jwt_secret, algorithms=['HS256'])",
+                ]
+            else:
+                replacement = [
+                    f"{indent}// [KAVACH-SECURITY-FIX] Enforce strict cryptographic JWT signature verification",
+                    f"{indent}const secret = process.env.JWT_SECRET || FALLBACK_SECRET;",
+                    f"{indent}const decoded = jwt.verify(token, secret, {{ algorithms: ['HS256'] }}) as DecodedToken;",
+                ]
             mod[line_idx : line_idx + 1] = replacement
         else:
-            replacement = [
-                f"{indent}// [KAVACH-SECURITY-FIX] Enforce strict cryptographic JWT signature verification",
-                f"{indent}const verified = jwt.verify(token, process.env.JWT_SECRET, {{ algorithms: ['HS256'] }});",
-            ]
+            if env["language"] == "python":
+                py_indent = indent if indent.strip() == "" else "    "
+                replacement = [
+                    f"{py_indent}# [KAVACH-SECURITY-FIX] Strictly enforce cryptographic JWT signature validation",
+                    f"{py_indent}data = jwt.decode(token, settings.jwt_secret, algorithms=['HS256'])",
+                ]
+            else:
+                replacement = [
+                    f"{indent}// [KAVACH-SECURITY-FIX] Enforce strict cryptographic JWT signature verification",
+                    f"{indent}const verified = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret', {{ algorithms: ['HS256'] }});",
+                ]
             mod[line_idx : line_idx + 1] = replacement
 
         diff = difflib.unified_diff(
@@ -2450,9 +2668,9 @@ class CodeApiSecurityEngine:
             ]
         else:
             replacement = [
-                f"{indent}// [KAVACH-SECURITY-FIX] Secure password verification using database hash",
+                f"{indent}// [KAVACH-SECURITY-FIX] Secure password verification against database hash",
                 f"{indent}const bcrypt = require('bcrypt');",
-                f"{indent}const isMatch = await bcrypt.compare(password, userRecord.passwordHash);",
+                f"{indent}const isMatch = await bcrypt.compare(password, typeof userRecord !== 'undefined' ? userRecord.passwordHash : '');",
             ]
         mod[line_idx : line_idx + 1] = replacement
 
@@ -2512,9 +2730,27 @@ class CodeApiSecurityEngine:
 
         if env["language"] == "python":
             py_indent = indent if indent.strip() == "" else "    "
-            mod[line_idx] = f"{py_indent}# [KAVACH-SECURITY-FIX] Cryptographically secure random token generation\n{py_indent}import secrets\n{py_indent}token = secrets.token_hex(32)"
+            mod[line_idx] = f"{py_indent}# [KAVACH-SECURITY-FIX] Cryptographically secure random token generation\n{py_indent}import secrets\n{py_indent}return secrets.token_hex(32)"
         else:
-            mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Cryptographically secure random token generation\n{indent}const token = require('crypto').randomBytes(32).toString('hex');"
+            if "Math.floor" in line and "900000" in line:
+                replacement = [
+                    f"{indent}// [KAVACH-SECURITY-FIX] Cryptographically secure 6-digit PIN generator",
+                    f"{indent}const crypto = require('crypto');",
+                    f"{indent}return crypto.randomInt(100000, 1000000).toString();",
+                ]
+            elif "sess_" in line or "Math.random().toString(36)" in line:
+                replacement = [
+                    f"{indent}// [KAVACH-SECURITY-FIX] Cryptographically secure random session identifier",
+                    f"{indent}const crypto = require('crypto');",
+                    f"{indent}return 'sess_' + crypto.randomBytes(16).toString('hex');",
+                ]
+            else:
+                replacement = [
+                    f"{indent}// [KAVACH-SECURITY-FIX] Cryptographically secure random token generation",
+                    f"{indent}const crypto = require('crypto');",
+                    f"{indent}return crypto.randomBytes(32).toString('hex');",
+                ]
+            mod[line_idx : line_idx + 1] = replacement
 
         diff = difflib.unified_diff(
             orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""
@@ -2528,11 +2764,27 @@ class CodeApiSecurityEngine:
         line = lines[line_idx] if line_idx < len(lines) else ""
         indent = line[: len(line) - len(line.lstrip())] or "  "
 
+        # Detect the exact variable identifier being declared
+        var_name = "SECRET_KEY"
+        m = re.search(r"(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=", line)
+        if not m:
+            m = re.search(r"([A-Za-z0-9_]+)\s*=", line)
+        if m:
+            var_name = m.group(1).strip()
+
+        env_var_name = var_name
+        if "STRIPE" in var_name.upper():
+            env_var_name = "STRIPE_SECRET_KEY"
+        elif "DB" in var_name.upper() or "DATABASE" in var_name.upper():
+            env_var_name = "DATABASE_URL"
+        elif "JWT" in var_name.upper():
+            env_var_name = "JWT_SECRET"
+
         if env["language"] == "python":
             py_indent = indent if indent.strip() == "" else "    "
-            mod[line_idx] = f"{py_indent}# [KAVACH-SECURITY-FIX] Load secret from environment\n{py_indent}secret_key = os.environ.get('API_SECRET_KEY', '')"
+            mod[line_idx] = f"{py_indent}# [KAVACH-SECURITY-FIX] Load secret securely from environment configuration\n{py_indent}{var_name} = os.environ.get('{env_var_name}', '')\n{py_indent}if not {var_name}:\n{py_indent}    raise RuntimeError('CRITICAL: {env_var_name} environment variable is required')"
         else:
-            mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Load secret from secure environment configuration\n{indent}const secretKey = process.env.API_SECRET_KEY || '';"
+            mod[line_idx] = f"{indent}// [KAVACH-SECURITY-FIX] Load secret securely from environment configuration\n{indent}const {var_name} = process.env.{env_var_name} || '';\n{indent}if (!{var_name}) {{\n{indent}  throw new Error('CRITICAL: {env_var_name} environment variable is required');\n{indent}}}"
 
         diff = difflib.unified_diff(
             orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm=""

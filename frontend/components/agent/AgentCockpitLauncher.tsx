@@ -115,7 +115,13 @@ export function AgentCockpitLauncher() {
       };
       setResult({ ...liveState });
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '' : 'http://127.0.0.1:8000');
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        (typeof window !== 'undefined'
+          ? ''
+          : process.env.NODE_ENV === 'production'
+          ? 'https://kavach-backend-3hdm.onrender.com'
+          : 'http://127.0.0.1:8000');
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
       const response = await fetch(`${apiUrl}/api/v1/agent/run/stream`, {

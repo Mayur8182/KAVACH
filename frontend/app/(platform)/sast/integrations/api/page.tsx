@@ -476,9 +476,7 @@ export default function ApiIntegrationPage() {
           </div>
 
           <a
-            href="http://127.0.0.1:8000/docs"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/docs"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: '#2563EB', textDecoration: 'none' }}
           >
             View Full Documentation
