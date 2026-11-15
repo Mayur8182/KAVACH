@@ -30,6 +30,7 @@ import { KavachLogo, KavachMark } from '@/components/common/KavachLogo';
 import { ProductShowcase } from '@/components/landing/ProductShowcase';
 import { KavachSecurityPipelineFlow } from '@/components/pipeline/KavachSecurityPipelineFlow';
 import { KavachHeroSkeleton } from '@/components/landing/KavachHeroSkeleton';
+import '@/styles/kavach-home.css';
 
 // Official SVG Icons for Social Profiles
 const LinkedinIcon: React.FC<{ size?: number; className?: string }> = ({ size = 15, className }) => (

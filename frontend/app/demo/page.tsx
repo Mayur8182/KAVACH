@@ -52,6 +52,7 @@ import {
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
 import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
 import { api } from '@/lib/api/client';
+import { trackDemoRequest } from '@/lib/analytics/gtag';
 
 type TabMode =
   | 'book'
@@ -208,6 +209,7 @@ export default function DemoPage() {
         notes: bookNotes.trim() || undefined,
       });
       setBookSuccess(res);
+      trackDemoRequest({ method: 'book_demo', primary_focus: bookFocus });
     } catch (err: any) {
       setBookError(err?.message || 'Failed to confirm booking.');
     } finally {
@@ -238,6 +240,7 @@ export default function DemoPage() {
         notes: reqNotes.trim() || undefined,
       });
       setReqSuccess(res);
+      trackDemoRequest({ method: 'request_demo', team_size: reqTeamSize, primary_focus: reqFocus });
     } catch (err: any) {
       setReqError(err?.message || 'Failed to submit demo request.');
     } finally {

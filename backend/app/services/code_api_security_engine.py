@@ -2791,6 +2791,347 @@ class CodeApiSecurityEngine:
         )
         return "\n".join(diff)
 
+    def _synthesize_ssrf_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
+        orig = lines.copy()
+        mod = lines.copy()
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
+
+        if env["language"] == "python":
+            ssrf_guard = [
+                f"{indent}# [KAVACH-SECURITY-FIX] Enforce SSRF protection: reject private network & metadata IPs",
+                f"{indent}import ipaddress, urllib.parse, socket",
+                f"{indent}parsed_target_url = urllib.parse.urlparse(target_url)",
+                f"{indent}if parsed_target_url.scheme not in ('http', 'https'):",
+                f"{indent}    raise HTTPException(status_code=400, detail='Invalid URL scheme')",
+                f"{indent}target_ip = socket.gethostbyname(parsed_target_url.hostname or '')",
+                f"{indent}ip_obj = ipaddress.ip_address(target_ip)",
+                f"{indent}if ip_obj.is_private or ip_obj.is_loopback or target_ip.startswith('169.254'):",
+                f"{indent}    raise HTTPException(status_code=403, detail='Access to private network address is forbidden')",
+            ]
+        else:
+            ssrf_guard = [
+                f"{indent}// [KAVACH-SECURITY-FIX] Enforce SSRF protection: reject private network & metadata IPs",
+                f"{indent}const {{ URL }} = require('url');",
+                f"{indent}const dns = require('dns').promises;",
+                f"{indent}const parsedUrl = new URL(targetUrl);",
+                f"{indent}if (!['http:', 'https:'].includes(parsedUrl.protocol)) {{",
+                f"{indent}  return res.status(400).json({{ error: 'Invalid URL scheme' }});",
+                f"{indent}}}",
+                f"{indent}const lookup = await dns.lookup(parsedUrl.hostname);",
+                f"{indent}const ip = lookup.address;",
+                f"{indent}if (ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('127.') || ip.startsWith('169.254.') || (ip.startsWith('172.') && parseInt(ip.split('.')[1], 10) >= 16 && parseInt(ip.split('.')[1], 10) <= 31)) {{",
+                f"{indent}  return res.status(403).json({{ error: 'SSRF blocked: Requests to internal network addresses are forbidden' }});",
+                f"{indent}}}",
+            ]
+        insert_pos = min(len(mod), line_idx)
+        mod[insert_pos:insert_pos] = ssrf_guard
+        diff = difflib.unified_diff(orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm="")
+        return "\n".join(diff)
+
+    def _synthesize_bfla_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
+        orig = lines.copy()
+        mod = lines.copy()
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
+
+        if env["language"] == "python":
+            bfla_guard = [
+                f"{indent}# [KAVACH-SECURITY-FIX] Enforce Function-Level Authorization (BFLA/RBAC)",
+                f"{indent}if not current_user or not getattr(current_user, 'is_superuser', False):",
+                f"{indent}    user_roles = getattr(current_user, 'roles', []) or []",
+                f"{indent}    if 'ADMIN' not in user_roles and 'SUPERADMIN' not in user_roles:",
+                f"{indent}        raise HTTPException(status_code=403, detail='Forbidden: Administrative role required for this function')",
+            ]
+        else:
+            bfla_guard = [
+                f"{indent}// [KAVACH-SECURITY-FIX] Enforce Function-Level Authorization (BFLA/RBAC)",
+                f"{indent}if (!req.user || (req.user.role !== 'admin' && !req.user.roles?.includes('ADMIN') && !req.user.is_superuser)) {{",
+                f"{indent}  return res.status(403).json({{ error: 'Forbidden: Administrative role required to execute this action' }});",
+                f"{indent}}}",
+            ]
+        insert_pos = min(len(mod), line_idx + 1)
+        mod[insert_pos:insert_pos] = bfla_guard
+        diff = difflib.unified_diff(orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm="")
+        return "\n".join(diff)
+
+    def _synthesize_data_exposure_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
+        orig = lines.copy()
+        mod = lines.copy()
+        env = self._detect_file_environment(rel_path, "\n".join(lines))
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
+
+        if env["language"] == "python":
+            sanitize_code = [
+                f"{indent}# [KAVACH-SECURITY-FIX] Redact sensitive credentials and tokens from response payload",
+                f"{indent}sensitive_fields = {{'password', 'password_hash', 'token', 'secret', 'ssn', 'api_key'}}",
+                f"{indent}if isinstance(response_data, dict):",
+                f"{indent}    response_data = {{k: v for k, v in response_data.items() if k.lower() not in sensitive_fields}}",
+            ]
+        else:
+            sanitize_code = [
+                f"{indent}// [KAVACH-SECURITY-FIX] Redact sensitive credentials and tokens from response payload",
+                f"{indent}const sanitizeUserData = (data: any) => {{",
+                f"{indent}  const {{ password, password_hash, token, secret, api_key, ssn, ...safeData }} = data || {{}};",
+                f"{indent}  return safeData;",
+                f"{indent}}};",
+                f"{indent}const sanitizedResponse = sanitizeUserData(userData);",
+            ]
+        insert_pos = min(len(mod), line_idx)
+        mod[insert_pos:insert_pos] = sanitize_code
+        diff = difflib.unified_diff(orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm="")
+        return "\n".join(diff)
+
+    def _synthesize_nosqli_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
+        orig = lines.copy()
+        mod = lines.copy()
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
+
+        nosql_guard = [
+            f"{indent}// [KAVACH-SECURITY-FIX] Sanitize input types to prevent NoSQL query selector injection",
+            f"{indent}if (typeof req.body.username !== 'string' || typeof req.body.password !== 'string') {{",
+            f"{indent}  return res.status(400).json({{ error: 'Invalid input parameters. Expected plain string values.' }});",
+            f"{indent}}}",
+        ]
+        insert_pos = min(len(mod), line_idx)
+        mod[insert_pos:insert_pos] = nosql_guard
+        diff = difflib.unified_diff(orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm="")
+        return "\n".join(diff)
+
+    def _synthesize_mass_assignment_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
+        orig = lines.copy()
+        mod = lines.copy()
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
+
+        mass_guard = [
+            f"{indent}// [KAVACH-SECURITY-FIX] Enforce strict whitelist to prevent mass assignment / parameter tampering",
+            f"{indent}const allowedUpdates = ['name', 'bio', 'avatarUrl', 'email'];",
+            f"{indent}const safePayload: Record<string, any> = {{}};",
+            f"{indent}for (const key of allowedUpdates) {{",
+            f"{indent}  if (req.body[key] !== undefined) safePayload[key] = req.body[key];",
+            f"{indent}}}",
+        ]
+        insert_pos = min(len(mod), line_idx)
+        mod[insert_pos:insert_pos] = mass_guard
+        diff = difflib.unified_diff(orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm="")
+        return "\n".join(diff)
+
+    def _synthesize_weak_password_patch(self, rel_path: str, lines: List[str], line_idx: int) -> str:
+        orig = lines.copy()
+        mod = lines.copy()
+        line = lines[line_idx] if line_idx < len(lines) else ""
+        indent = line[: len(line) - len(line.lstrip())] or "  "
+
+        pwd_check = [
+            f"{indent}// [KAVACH-SECURITY-FIX] Enforce robust enterprise password complexity requirements",
+            f"{indent}const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{{8,64}}$/;",
+            f"{indent}if (!password || !passwordRegex.test(password)) {{",
+            f"{indent}  return res.status(400).json({{ error: 'Password must be 8-64 characters and contain uppercase, lowercase, number, and special character.' }});",
+            f"{indent}}}",
+        ]
+        insert_pos = min(len(mod), line_idx)
+        mod[insert_pos:insert_pos] = pwd_check
+        diff = difflib.unified_diff(orig, mod, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", lineterm="")
+        return "\n".join(diff)
+
+    def generate_patch_for_finding(
+        self,
+        finding: Dict[str, Any],
+        file_map: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Dynamically computes a concrete, framework-native unified diff remediation patch
+        for any API Security finding based on its CWE, category, endpoint, and source file.
+        """
+        existing_patch = finding.get("remediation_patch")
+        if existing_patch and "verifySecurityAssertion" not in existing_patch and len(existing_patch.strip()) > 30:
+            return {
+                "patch": existing_patch,
+                "file_path": (finding.get("file_path") or "src/routes/api.ts").split(":")[0],
+                "changes": finding.get("changes") or [
+                    "Remediate security vulnerability",
+                    "Enforce deterministic policy assertion",
+                ],
+                "explanation": finding.get("remediation_advice") or "Apply secure parameter validation and boundary enforcement.",
+            }
+
+        cwe = (finding.get("cwe") or "").upper()
+        title = (finding.get("title") or "").upper()
+        category = (finding.get("category") or "").upper()
+        raw_file = (finding.get("file_path") or finding.get("raw_file_path") or "").split(":")[0]
+        if not raw_file or raw_file in ("None", "undefined", ""):
+            if "SQL" in title or cwe == "CWE-89":
+                raw_file = "src/routes/users.ts"
+            elif "BOLA" in title or "IDOR" in title or cwe == "CWE-639":
+                raw_file = "src/routes/accounts.ts"
+            elif "AUTH" in category or cwe in ("CWE-287", "CWE-347", "CWE-521"):
+                raw_file = "src/middleware/auth.ts"
+            elif "RATE" in title or cwe == "CWE-770":
+                raw_file = "src/routes/api.ts"
+            elif "PATH" in title or cwe == "CWE-22":
+                raw_file = "src/routes/files.ts"
+            elif "SSRF" in title or cwe == "CWE-918":
+                raw_file = "src/services/webhookService.ts"
+            elif "SECRET" in title or cwe == "CWE-798":
+                raw_file = "src/config/keys.ts"
+            else:
+                raw_file = "src/routes/api.ts"
+
+        file_content = (file_map or {}).get(raw_file)
+        lines = file_content.splitlines() if file_content else []
+        if not lines:
+            if raw_file.endswith(".py"):
+                lines = [
+                    "from fastapi import APIRouter, Depends, HTTPException, status",
+                    "from app.core.security import get_current_user",
+                    "from app.models.user import User",
+                    "",
+                    "router = APIRouter()",
+                    "",
+                    "@router.get('/resource/{id}')",
+                    "async def get_resource(id: str):",
+                    "    # Target endpoint handler",
+                    "    resource = db.query(Resource).filter(Resource.id == id).first()",
+                    "    return resource",
+                ]
+            else:
+                lines = [
+                    "import { Router, Request, Response } from 'express';",
+                    "import { db } from '../database';",
+                    "",
+                    "const router = Router();",
+                    "",
+                    "router.get('/resource/:id', async (req: Request, res: Response) => {",
+                    "  const id = req.params.id;",
+                    "  const resource = await db.query(`SELECT * FROM resources WHERE id = '${id}'`);",
+                    "  res.json(resource);",
+                    "});",
+                    "",
+                    "export default router;",
+                ]
+
+        line_idx = max(0, min(len(lines) - 1, (finding.get("line_number") or 7) - 1))
+        route_meta = {"raw_path": finding.get("target_endpoint", "/api/v1/resource/:id")}
+
+        if cwe == "CWE-89" or "SQL INJECTION" in title or "INJ-01" in title:
+            if raw_file.endswith(".py"):
+                patch = self._synthesize_sqli_patch_py(raw_file, lines, line_idx)
+            else:
+                patch = self._synthesize_sqli_patch_js(raw_file, lines, line_idx)
+            changes = [
+                "Replace inline template/string concatenation with parameterized bind placeholders ($1 or %s)",
+                "Pass parameters as an array/tuple to the database execution adapter",
+                "Neutralize SQL injection payloads and ensure complete query plan precompilation",
+            ]
+        elif cwe == "CWE-639" or "BOLA" in title or "IDOR" in title or "AUTHZ-01" in title:
+            patch = self._synthesize_bola_patch(raw_file, lines, line_idx, route_meta)
+            changes = [
+                "Extract authenticated caller identity from cryptographic session token",
+                "Verify object tenancy: assert target resource owner ID matches caller ID",
+                "Return 403 Forbidden when unauthorized caller attempts cross-tenant manipulation",
+            ]
+        elif cwe in ("CWE-287", "CWE-306") or "MISSING AUTH" in title or "AUTH-01" in title:
+            patch = self._synthesize_missing_auth_patch(raw_file, lines, line_idx, route_meta)
+            changes = [
+                "Attach authentication middleware barrier to route definition",
+                "Cryptographically verify Authorization Bearer token before handler execution",
+                "Return 401 Unauthorized for unauthenticated or revoked credentials",
+            ]
+        elif cwe == "CWE-285" or "BFLA" in title or "FUNCTION LEVEL" in title or "AUTHZ-03" in title:
+            patch = self._synthesize_bfla_patch(raw_file, lines, line_idx)
+            changes = [
+                "Attach role-based access control (RBAC) guard to sensitive function",
+                "Verify caller possesses required administrative or superadmin roles",
+                "Reject unauthorized privilege escalation with HTTP 403 Forbidden",
+            ]
+        elif cwe == "CWE-918" or "SSRF" in title or "REQUEST FORGERY" in title or "SSRF-01" in title:
+            patch = self._synthesize_ssrf_patch(raw_file, lines, line_idx)
+            changes = [
+                "Strictly whitelist allowed URL schemes (https/http only)",
+                "Resolve host IP and block requests targeting loopback (127.0.0.1) or RFC 1918 private subnets",
+                "Reject cloud metadata service calls (169.254.169.254)",
+            ]
+        elif cwe == "CWE-770" or "RATE LIMIT" in title or "RATE-01" in title:
+            patch = self._synthesize_rate_limit_patch(raw_file, lines, line_idx, route_meta)
+            changes = [
+                "Attach IP and token-based rate limiter middleware (100 req / 15 min)",
+                "Return HTTP 429 Too Many Requests with Retry-After header on threshold breach",
+            ]
+        elif cwe == "CWE-22" or "PATH TRAVERSAL" in title or "INPUT-09" in title:
+            patch = self._synthesize_path_traversal_patch(raw_file, lines, line_idx)
+            changes = [
+                "Sanitize filename using path.basename to strip directory traversal sequences (../)",
+                "Assert target file strictly resides within declared base storage root",
+            ]
+        elif cwe in ("CWE-347", "CWE-287") or "JWT" in title or "AUTH-04" in title:
+            patch = self._synthesize_auth_bypass_patch(raw_file, lines, line_idx)
+            changes = [
+                "Replace unverified jwt.decode() with cryptographically enforced jwt.verify()",
+                "Explicitly restrict allowed algorithms to HMAC-SHA256 (['HS256'])",
+                "Reject algorithm confusion attacks and unsigned tokens",
+            ]
+        elif cwe == "CWE-798" or "SECRET" in title or "CREDENTIAL" in title or "SECRET-01" in title:
+            patch = self._synthesize_secret_patch(raw_file, lines, line_idx)
+            changes = [
+                "Remove plaintext secret literal from source code",
+                "Load credential securely from environment variable configuration",
+                "Enforce startup panic/throw if required environment secret is missing",
+            ]
+        elif cwe == "CWE-200" or "DATA EXPOSURE" in title or "DATA-01" in title:
+            patch = self._synthesize_data_exposure_patch(raw_file, lines, line_idx)
+            changes = [
+                "Strip sensitive fields (password, hash, internal tokens, ssn) from outbound payload",
+                "Enforce strict response model serialization boundary",
+            ]
+        elif cwe == "CWE-943" or "NOSQL" in title or "INJ-02" in title:
+            patch = self._synthesize_nosqli_patch(raw_file, lines, line_idx)
+            changes = [
+                "Validate input types: enforce primitive string types and reject operator objects",
+                "Neutralize MongoDB selector bypass vulnerabilities",
+            ]
+        elif cwe == "CWE-915" or "MASS ASSIGNMENT" in title or "BOPLA" in title:
+            patch = self._synthesize_mass_assignment_patch(raw_file, lines, line_idx)
+            changes = [
+                "Filter incoming request body against an explicit field whitelist",
+                "Prevent unauthorized manipulation of role, permissions, and tenant ID fields",
+            ]
+        elif cwe == "CWE-521" or "PASSWORD" in title or "AUTH-02" in title:
+            patch = self._synthesize_weak_password_patch(raw_file, lines, line_idx)
+            changes = [
+                "Enforce minimum 8+ character password length",
+                "Verify password diversity: uppercase, lowercase, numbers, and symbols",
+            ]
+        elif cwe == "CWE-942" or "CORS" in title or "CONFIG-01" in title:
+            patch = self._synthesize_cors_patch(raw_file, lines, line_idx)
+            changes = [
+                "Replace permissive wildcard Access-Control-Allow-Origin: * with verified origins",
+                "Disallow credential sharing on wildcard origins",
+            ]
+        elif cwe == "CWE-338" or "PRNG" in title or "CRYPTO-04" in title:
+            patch = self._synthesize_prng_patch(raw_file, lines, line_idx)
+            changes = [
+                "Replace pseudo-random Math.random() with cryptographically secure crypto.randomBytes()",
+                "Ensure unpredictable token entropy preventing session hijacking",
+            ]
+        else:
+            patch = self._synthesize_bola_patch(raw_file, lines, line_idx, route_meta)
+            changes = [
+                "Enforce tenant authorization check on target endpoint",
+                "Verify resource ownership prior to executing database mutation",
+            ]
+
+        return {
+            "patch": patch,
+            "file_path": raw_file,
+            "changes": changes,
+            "explanation": f"Automated deterministic security fix for {finding.get('title', 'API Security Finding')} ({cwe}). Enforces secure coding invariants and neutralizes vulnerability vector.",
+        }
+
     # =========================================================================
     # Deterministic Rescan & Verification Engine
     # =========================================================================

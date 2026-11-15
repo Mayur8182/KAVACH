@@ -30,6 +30,7 @@ import {
 import { KavachHeader } from '@/components/navigation/SecuLayerHeader';
 import { SalesSubNav } from '@/components/sales/SalesSubNav';
 import { api } from '@/lib/api/client';
+import { trackDemoRequest } from '@/lib/analytics/gtag';
 
 export default function RequestDemoPage() {
   const [firstName, setFirstName] = useState('');
@@ -72,6 +73,7 @@ export default function RequestDemoPage() {
         notes: additionalNotes.trim() || undefined,
       });
       setSuccessData(res);
+      trackDemoRequest({ method: 'enterprise_intake', team_size: companySize, primary_focus: useCase });
     } catch (err: any) {
       setError(err?.message || 'Failed to submit demo request. Please check inputs.');
     } finally {

@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { ShieldCheck, AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { setAuthToken } from '@/lib/auth/token';
+import { trackLogin } from '@/lib/analytics/gtag';
 
 function GoogleCallbackContent() {
   const router = useRouter();
@@ -40,6 +41,7 @@ function GoogleCallbackContent() {
         const res = await api.auth.googleCallback({ code, state: state || undefined });
         if (res.access_token) {
           setAuthToken(res.access_token);
+          trackLogin({ method: 'google' });
           setStatusText(`Welcome, ${res.user?.name || res.email || 'Developer'}! Resolving workspace entitlements...`);
           try {
             const ent = await api.entitlements.getMe();

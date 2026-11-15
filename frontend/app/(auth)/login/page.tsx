@@ -28,6 +28,7 @@ import { setAuthToken } from '@/lib/auth/token';
 import { KavachHeader } from '@/components/navigation/SecuLayerHeader';
 import { toast } from '@/lib/toast';
 import { KavachLogo, KavachMark } from '@/components/common/KavachLogo';
+import { trackLogin } from '@/lib/analytics/gtag';
 
 const GithubIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -178,6 +179,7 @@ export default function LoginPage() {
       const res = await api.auth.login(fd);
       if (res?.access_token) {
         setAuthToken(res.access_token);
+        trackLogin({ method: 'credentials' });
         toast.success('Signed in successfully', {
           description: 'Welcome back to Kavach Control Plane.',
         });

@@ -835,8 +835,12 @@ async def stop_scan(scan_id: str, db: AsyncSession = Depends(get_db)) -> Dict[st
 
 
 @router.get("/scans/{scan_id}/results", summary="Get Scan Results Dashboard")
-async def get_scan_results(scan_id: str, db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
-    scan = await _resolve_scan(scan_id, db)
+async def get_scan_results(
+    scan_id: str,
+    api_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    scan = await _resolve_scan(scan_id, db, api_id_raw=api_id)
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
 
@@ -856,6 +860,18 @@ async def get_scan_results(scan_id: str, db: AsyncSession = Depends(get_db)) -> 
             for tc in failed_tcs:
                 cwe_val = (tc.evidence or {}).get("cwe") or ("CWE-639" if "Authorization" in tc.category else "CWE-287" if "Authentication" in tc.category else "CWE-770" if "Rate" in tc.category else "CWE-89" if "Injection" in tc.category else "CWE-200")
                 owasp_val = (tc.evidence or {}).get("owasp") or tc.category
+                clean_target_path = tc.endpoint_path.strip('/').replace('/', '_') or 'api'
+                synth_patch = code_api_security_engine.generate_patch_for_finding({
+                    "cwe": cwe_val,
+                    "owasp_category": owasp_val,
+                    "category": tc.category,
+                    "title": tc.name or f"{tc.category} Vulnerability",
+                    "endpoint": tc.endpoint_path,
+                    "target_endpoint": tc.endpoint_path,
+                    "http_method": tc.http_method,
+                    "file_path": f"src/routes/{clean_target_path}.ts",
+                })
+                remediation_patch_val = synth_patch.get("patch") or f"--- a/{clean_target_path}.ts\n+++ b/{clean_target_path}.ts\n@@ -10,3 +10,4 @@\n+// Enforce authorization policy\n+// [KAVACH-SECURITY-FIX] Enforce access control assertion\n"
                 f = ApiFinding(
                     id=uuid.uuid4(),
                     scan_id=scan.id,
@@ -872,7 +888,7 @@ async def get_scan_results(scan_id: str, db: AsyncSession = Depends(get_db)) -> 
                     affected_endpoints=[tc.endpoint_path],
                     evidence=tc.evidence or {},
                     remediation_advice=tc.remediation_guidance or "Implement strict authentication and authorization validation.",
-                    remediation_patch=f"--- a/{tc.endpoint_path.strip('/')}.ts\n+++ b/{tc.endpoint_path.strip('/')}.ts\n@@ -10,3 +10,4 @@\n+// Enforce authorization policy\n+verifySecurityAssertion(req, res);\n",
+                    remediation_patch=remediation_patch_val,
                     created_at=datetime.now(timezone.utc),
                 )
                 db.add(f)
@@ -1366,6 +1382,55 @@ async def update_finding_status(
     finding.status = payload.status.upper()
     await db.commit()
     return {"status": "SUCCESS", "message": f"Finding status updated to {finding.status}"}
+
+
+@router.post("/findings/{finding_id}/generate-fix", summary="Generate Concrete Framework Remediation Patch")
+async def generate_finding_fix(
+    finding_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    try:
+        f_id = uuid.UUID(str(finding_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid finding ID format")
+
+    stmt = select(ApiFinding).where(ApiFinding.id == f_id)
+    finding = (await db.execute(stmt)).scalar_one_or_none()
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+
+    aff = finding.affected_endpoints or []
+    ep = aff[0] if aff else "/api"
+    raw_file = "src/routes/api.ts"
+    if isinstance(finding.evidence, dict):
+        raw_file = finding.evidence.get("code_file_path") or finding.evidence.get("file_path") or raw_file
+
+    patch_res = code_api_security_engine.generate_patch_for_finding({
+        "id": str(finding.id),
+        "title": finding.title,
+        "cwe": finding.cwe,
+        "owasp_category": finding.owasp_category,
+        "category": finding.category,
+        "endpoint": ep,
+        "target_endpoint": ep,
+        "file_path": raw_file,
+        "remediation_advice": finding.remediation_advice,
+        "remediation_patch": finding.remediation_patch,
+    })
+
+    if patch_res.get("patch"):
+        finding.remediation_patch = patch_res["patch"]
+        await db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "finding_id": str(finding.id),
+        "patch": patch_res.get("patch") or finding.remediation_patch,
+        "file_path": patch_res.get("file_path") or raw_file,
+        "changes": patch_res.get("changes") or ["Apply secure input validation and boundary enforcement"],
+        "explanation": patch_res.get("explanation") or finding.remediation_advice,
+        "verification_test": patch_res.get("verification_test"),
+    }
 
 
 @router.post("/findings/{finding_id}/apply-fix", summary="Apply Automated Remediation Patch")
@@ -3628,15 +3693,28 @@ async def download_report(
 @router.get("/reports/{report_id}", summary="Get Single Security Report Details")
 async def get_report_details(
     report_id: str,
+    api_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    try:
-        r_id = uuid.UUID(str(report_id))
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="Invalid report ID format")
+    report = None
+    if report_id in ("compliance", "evidence", "executive", "technical", "latest", "summary"):
+        rep_stmt = select(ApiReport).order_by(desc(ApiReport.generated_at))
+        if api_id:
+            try:
+                rep_stmt = rep_stmt.where(ApiReport.api_id == uuid.UUID(str(api_id)))
+            except Exception:
+                pass
+        report = (await db.execute(rep_stmt)).scalars().first()
+        if not report:
+            report = (await db.execute(select(ApiReport).order_by(desc(ApiReport.generated_at)))).scalars().first()
+    else:
+        try:
+            r_id = uuid.UUID(str(report_id))
+            stmt = select(ApiReport).where(ApiReport.id == r_id)
+            report = (await db.execute(stmt)).scalar_one_or_none()
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Invalid report ID format")
 
-    stmt = select(ApiReport).where(ApiReport.id == r_id)
-    report = (await db.execute(stmt)).scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
@@ -4170,6 +4248,7 @@ async def connect_or_link_repository(
         except Exception:
             pass
 
+    endpoints_count = target_obj.endpoints_count if target_obj else discovery_result.get("endpoints_count", 0)
     api_target = {
         "id": str(target_obj.id) if target_obj else (target_id_str or str(uuid.uuid4())),
         "name": target_obj.name if target_obj else f"{repo_data['name']} Code Inventory",
@@ -4177,11 +4256,10 @@ async def connect_or_link_repository(
         "base_url": target_obj.base_url if target_obj else "https://api.github-discovered.internal",
         "environment": target_obj.environment if target_obj else "PRODUCTION",
         "spec_type": "CODE_SCAN",
-        "endpoints_count": target_obj.endpoints_count if target_obj else endpoints_count,
+        "endpoints_count": endpoints_count,
         "status": target_obj.status if target_obj else "ANALYZED",
         "repository": repo_data.get("full_name") or repo_data.get("name"),
     }
-    endpoints_count = target_obj.endpoints_count if target_obj else discovery_result.get("endpoints_count", 0)
 
     db.add(AuditEvent(
         id=uuid.uuid4(),

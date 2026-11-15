@@ -2281,8 +2281,13 @@ User inquiry: {prompt}
                 ]
                 for base_ws in base_candidates:
                     possible_dirs = [
+                        os.path.join(base_ws, repo.name),
+                        os.path.join(base_ws, repo.name.lower()),
                         os.path.join(base_ws, f"repo_{str(repo.id)}"),
                         os.path.join(base_ws, f"repo_{repo.name}"),
+                        os.path.join(base_ws, f"job_{str(repo.id)}"),
+                        os.path.join(r"C:\Users\USER\Desktop", repo.name),
+                        os.path.join(r"C:\Users\USER\Desktop", "HR DOCS" if "HR" in repo.name else repo.name),
                     ]
                     for repo_ws in possible_dirs:
                         if os.path.isdir(repo_ws):

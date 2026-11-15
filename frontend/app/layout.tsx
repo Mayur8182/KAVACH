@@ -5,6 +5,7 @@ import 'goey-toast/styles.css';
 import { CookieConsentBanner } from '@/components/common/CookieConsentBanner';
 import { AgentationDevTool } from '@/components/dev/AgentationDevTool';
 import { ToastProvider } from '@/components/providers/ToastProvider';
+import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kavachsecurity.me';
 
@@ -157,6 +158,7 @@ export default function RootLayout({
           Skip to main content
         </a>
         <ToastProvider />
+        <GoogleAnalytics />
         {children}
         <CookieConsentBanner />
         <AgentationDevTool />

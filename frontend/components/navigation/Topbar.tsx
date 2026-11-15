@@ -421,12 +421,12 @@ export const Topbar: React.FC<TopbarProps> = ({
   const isCodeOrWorkspace = activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace' || isApiSecurity;
 
   const currentScope = isCodeOrWorkspace
-    ? (currentRepository ? currentRepository.name : (isApiSecurity ? 'JOB-FINDER-NEW' : 'All Repositories'))
+    ? (currentRepository ? currentRepository.name : (isApiSecurity ? (selectedScopes['api-security'] || 'Select Repository') : 'All Repositories'))
     : (selectedScopes[activeWorkspace.id] || activeWorkspace.defaultScope);
 
   const availableScopes = isCodeOrWorkspace
     ? Array.from(new Set([
-        ...(isApiSecurity ? ['JOB-FINDER-NEW'] : ['All Repositories']),
+        ...(isApiSecurity ? [] : ['All Repositories']),
         ...repositories.map((r) => r.name),
         ...(activeWorkspace.scopes || [])
       ]))
@@ -486,12 +486,20 @@ export const Topbar: React.FC<TopbarProps> = ({
             const names = res.repositories.map((r: any) => r.name);
             const apiWs = ALL_WORKSPACES.find(w => w.id === 'api-security');
             if (apiWs) {
-              apiWs.scopes = Array.from(new Set(['JOB-FINDER-NEW', ...names]));
+              apiWs.scopes = Array.from(new Set(names));
             }
           }
         })
         .catch(() => { });
     }
+
+    const handleTargetChanged = (e: any) => {
+      const repoName = e.detail?.repoName;
+      if (repoName) {
+        setSelectedScopes((prev) => ({ ...prev, 'api-security': repoName }));
+      }
+    };
+    window.addEventListener('kavach:api-target-changed', handleTargetChanged);
 
     // Global keyboard listener for ⌘K / Ctrl+K
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -544,14 +552,17 @@ export const Topbar: React.FC<TopbarProps> = ({
   const handleSelectScope = (scope: string) => {
     setSelectedScopes((prev) => ({ ...prev, [activeWorkspace.id]: scope }));
     if (activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace' || isApiSecurity) {
-      if (scope === 'All Repositories') {
+      if (scope === 'All Repositories' || scope === 'Select Repository') {
         setCurrentRepository(null);
       } else {
-        const found = repositories.find((r) => r.name === scope || r.id === scope);
+        const found = repositories.find((r) => r.name === scope || r.id === scope || r.full_name === scope);
         if (found) {
           setCurrentRepository(found);
         } else {
           setCurrentRepository({ id: scope, name: scope });
+        }
+        if (isApiSecurity && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('kavach:switch-repository', { detail: { name: scope } }));
         }
       }
     }

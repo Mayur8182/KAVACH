@@ -7,6 +7,7 @@ import { ArrowRight, TrendingUp, CalendarDays, Lock, Play, ShieldAlert, CheckCir
 import { KavachApiLayout } from './components/KavachApiLayout';
 import { KavachSkeletonPage } from './components/KavachSkeleton';
 import { useApiSecurity } from './context/ApiSecurityContext';
+import { useScope } from '@/context/ScopeContext';
 import { api } from '@/lib/api/client';
 
 // ── Design tokens — warm ivory ───────────────────────────────────────
@@ -50,6 +51,7 @@ function formatRelativeTime(dateStr?: string | null) {
 export default function ApiSecurityDashboard() {
   const router = useRouter();
   const { setIsGithubModalOpen, selectedApi } = useApiSecurity();
+  const { currentRepository } = useScope();
 
   // Live Database States
   const [overview, setOverview]     = useState<any>(null);
@@ -257,7 +259,7 @@ export default function ApiSecurityDashboard() {
                 }}
               >
                 <GithubIcon />
-                <span>{selectedApi ? `Repository: ${(selectedApi.name || selectedApi.repository || 'JOB-FINDER-NEW').replace(' Code Inventory', '')}` : 'Connect Repository'}</span>
+                <span>{selectedApi ? `Repository: ${(selectedApi.name || selectedApi.repository || currentRepository?.name || 'Active Target').replace(' Code Inventory', '')}` : 'Connect Repository'}</span>
                 <span style={{ fontSize: '11px', color: '#64748B', backgroundColor: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>Change</span>
               </button>
             </div>

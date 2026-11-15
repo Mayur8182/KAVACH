@@ -27,6 +27,7 @@ import { setAuthToken } from '@/lib/auth/token';
 import { KavachHeader } from '@/components/navigation/SecuLayerHeader';
 import { KavachMark } from '@/components/common/KavachLogo';
 import { toast } from '@/lib/toast';
+import { trackSignUp, trackLogin } from '@/lib/analytics/gtag';
 
 const GithubIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -126,6 +127,8 @@ export default function SignupPage() {
 
       if (loginRes?.access_token) {
         setAuthToken(loginRes.access_token);
+        trackSignUp({ method: 'credentials' });
+        trackLogin({ method: 'credentials' });
         toast.success('Account created successfully', {
           description: 'Welcome to Kavach. Opening project workspace setup...',
         });

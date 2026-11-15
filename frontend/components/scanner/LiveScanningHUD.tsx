@@ -20,6 +20,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
+import { trackStartScan, trackScanCompleted } from '@/lib/analytics/gtag';
 
 export interface ScanFindingSummary {
   critical: number;
@@ -124,6 +125,13 @@ export const LiveScanningHUD: React.FC<LiveScanningHUDProps> = ({
           } else {
             const scanJob = await api.code.triggerRepositoryScan(repositoryId, branch || 'main').catch(() => null);
             targetJobId = scanJob?.id || scanJob?.scan_job_id || null;
+            if (targetJobId) {
+              trackStartScan({
+                scan_type: 'unified_security_scan',
+                repository: repositoryName,
+                branch: branch || 'main',
+              });
+            }
           }
 
           if (isMounted && targetJobId) {
@@ -186,6 +194,13 @@ export const LiveScanningHUD: React.FC<LiveScanningHUDProps> = ({
               }
 
               setFindingsSummary(finalSummary);
+              trackScanCompleted({
+                scan_type: 'unified_security_scan',
+                findings_total: finalSummary.total,
+                critical_count: finalSummary.critical,
+                high_count: finalSummary.high,
+                duration_seconds: jobData.elapsed_seconds,
+              });
               setLogs((prev) => [
                 ...prev,
                 `[COMPLETED] Scan pipeline executed successfully. ${finalSummary.total} findings persisted to database.`,

@@ -22,6 +22,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api/client';
 import { useScope } from '@/context/ScopeContext';
+import { trackStartScan, trackScanCompleted, trackGitHubConnect } from '@/lib/analytics/gtag';
 import {
   FolderGit2,
   GitPullRequest,
@@ -351,6 +352,13 @@ export default function CodeOverviewPage() {
           if (jobData.status === 'RUNNING' || jobData.status === 'QUEUED') {
             setTimeout(poll, 1200);
           } else {
+            if (jobData.status === 'COMPLETED') {
+              trackScanCompleted({
+                scan_type: 'sast_repository',
+                findings_total: jobData.findings_count,
+                duration_seconds: jobData.elapsed_seconds,
+              });
+            }
             loadData(true);
             refreshRepositories?.();
           }
@@ -470,6 +478,12 @@ export default function CodeOverviewPage() {
       const repoId = res?.repository_id || res?.id;
       const jobId = res?.scan_job_id;
       if (repoId && jobId) {
+        trackGitHubConnect({ context: 'repository_connect' });
+        trackStartScan({
+          scan_type: 'initial_repository_scan',
+          repository: repoUrl,
+          branch: defaultBranch.trim() || 'main',
+        });
         setActiveJobs((prev) => ({
           ...prev,
           [repoId]: {
@@ -507,6 +521,10 @@ export default function CodeOverviewPage() {
       const res = await api.code.triggerRepositoryScan(repoId);
       const jobId = res?.id || res?.scan_job_id;
       if (jobId) {
+        trackStartScan({
+          scan_type: 'manual_repository_scan',
+          repository: repoId,
+        });
         setActiveJobs((prev) => ({
           ...prev,
           [repoId]: {

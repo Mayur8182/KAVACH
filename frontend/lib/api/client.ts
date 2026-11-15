@@ -13970,6 +13970,13 @@ class ThingApiClient {
       });
       return res.data;
     },
+    generateFindingFix: async (findingId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/findings/${encodeURIComponent(findingId)}/generate-fix`, {
+        method: 'POST',
+        timeoutMs: 60000,
+      });
+      return res.data;
+    },
     applyFindingFix: async (findingId: string): Promise<any> => {
       const res = await this.request<any>(`/api/v1/api-security/findings/${encodeURIComponent(findingId)}/apply-fix`, {
         method: 'POST',

@@ -57,12 +57,30 @@ function ScanDetailsContent() {
   const scanId = !rawScanId || rawScanId === 'undefined' ? 'latest' : rawScanId;
   const initialTab = searchParams.get('tab') || 'overview';
 
-  const { currentProject } = useScope();
+  const { currentProject, currentRepository, setCurrentRepository, repositories } = useScope();
 
   // State
   const [scan, setScan] = useState<any | null>(null);
   const [resultsData, setResultsData] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState<string>(initialTab);
+
+  useEffect(() => {
+    const rawName = scan?.api_name || resultsData?.scan?.api_name;
+    if (rawName && typeof window !== 'undefined') {
+      const cleanName = rawName.replace(' Code Inventory', '').trim();
+      window.dispatchEvent(new CustomEvent('kavach:api-target-changed', { detail: { repoName: cleanName } }));
+      if (repositories && repositories.length > 0) {
+        const found = repositories.find((r: any) =>
+          r.name?.toLowerCase() === cleanName.toLowerCase() ||
+          r.full_name?.toLowerCase() === cleanName.toLowerCase() ||
+          r.full_name?.toLowerCase().endsWith('/' + cleanName.toLowerCase())
+        );
+        if (found && (!currentRepository || currentRepository.id !== found.id)) {
+          setCurrentRepository(found);
+        }
+      }
+    }
+  }, [scan?.api_name, resultsData?.scan?.api_name, repositories, currentRepository, setCurrentRepository]);
   const [isStopping, setIsStopping] = useState(false);
   const [showStopModal, setShowStopModal] = useState(false);
   const [showRerunModal, setShowRerunModal] = useState(false);

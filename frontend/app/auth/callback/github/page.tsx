@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { setAuthToken } from '@/lib/auth/token';
+import { trackGitHubConnect, trackLogin } from '@/lib/analytics/gtag';
 
 const GithubIcon = ({ size = 24 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -64,6 +65,8 @@ function GitHubCallbackContent() {
         const res = await api.auth.githubCallback({ code, state: state || undefined, redirect_uri: redirectUri });
         if (res.access_token) {
           setAuthToken(res.access_token);
+          trackGitHubConnect({ context: 'oauth_callback' });
+          trackLogin({ method: 'github' });
 
           try {
             const ent = await api.entitlements.getMe();

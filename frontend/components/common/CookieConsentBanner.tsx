@@ -31,7 +31,8 @@ export const CookieConsentBanner: React.FC = () => {
 
   const handleAcceptAll = () => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ essential: true, analytics: false, timestamp: new Date().toISOString() }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ essential: true, analytics: true, timestamp: new Date().toISOString() }));
+      window.dispatchEvent(new CustomEvent('cookie_consent_changed', { detail: { analytics: true } }));
     } catch {
       // Ignore
     }
@@ -41,6 +42,7 @@ export const CookieConsentBanner: React.FC = () => {
   const handleDeclineOptional = () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ essential: true, analytics: false, timestamp: new Date().toISOString() }));
+      window.dispatchEvent(new CustomEvent('cookie_consent_changed', { detail: { analytics: false } }));
     } catch {
       // Ignore
     }

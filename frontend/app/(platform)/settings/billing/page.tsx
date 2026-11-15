@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { useScope } from '@/context/ScopeContext';
+import { trackBeginCheckout } from '@/lib/analytics/gtag';
 
 export default function BillingSettingsPage() {
   const { currentOrg } = useScope();
@@ -124,6 +125,12 @@ export default function BillingSettingsPage() {
           <div style={{ display: 'flex', gap: '10px' }}>
             <Link
               href="/pricing"
+              onClick={() => {
+                trackBeginCheckout({
+                  plan_name: 'Tier Change Request',
+                  billing_cycle: 'annual',
+                });
+              }}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',

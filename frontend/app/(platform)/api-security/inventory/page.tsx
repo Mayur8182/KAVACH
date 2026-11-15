@@ -11,6 +11,7 @@ import {
 import { KavachApiLayout } from '../components/KavachApiLayout';
 import { KavachShimmer } from '../components/KavachSkeleton';
 import { useApiSecurity } from '../context/ApiSecurityContext';
+import { useScope } from '@/context/ScopeContext';
 import { api } from '@/lib/api/client';
 import { toast } from '@/lib/toast';
 import { KavachDropdown } from '@/components/ui/KavachDropdown';
@@ -44,6 +45,7 @@ const T = {
 export default function ApiInventoryPage() {
   const router = useRouter();
   const { apis, selectedApi, refreshApis, setIsGithubModalOpen } = useApiSecurity();
+  const { currentRepository } = useScope();
 
   // State
   const [endpoints,     setEndpoints]     = useState<any[]>([]);
@@ -258,7 +260,7 @@ export default function ApiInventoryPage() {
                 }}
               >
                 <FolderGit2 size={13} color="#0F172A" />
-                <span>{selectedApi ? `Repo: ${(selectedApi.name || selectedApi.repository || 'JOB-FINDER-NEW').replace(' Code Inventory', '')}` : 'Connect Repository'}</span>
+                <span>{selectedApi ? `Repo: ${(selectedApi.name || selectedApi.repository || currentRepository?.name || 'Active Target').replace(' Code Inventory', '')}` : 'Connect Repository'}</span>
                 <span style={{ fontSize: '11px', color: '#64748B', backgroundColor: '#F1F5F9', padding: '1px 5px', borderRadius: '4px' }}>Change</span>
               </button>
 

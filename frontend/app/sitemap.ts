@@ -1,42 +1,268 @@
-import { MetadataRoute } from 'next';
+import type { MetadataRoute } from 'next';
 
 /**
- * Authoritative Canonical XML Sitemap Generator
- * Strictly conforms to:
- * - SEO Rule 4: Accurate, verified public URLs only.
- * - Zero private platform routes exposed in sitemap.
+ * Production-ready XML Sitemap for Kavach Security Control Plane
+ * Production Domain: https://kavachsecurity.me
+ *
+ * Rules & Exclusions:
+ * - Excludes private platform workspaces: /(platform)/*, /code/*, /cloud/*, /attack/*, /qa/*, /settings/*, etc.
+ * - Excludes authentication-only routes: /login, /signup, /mfa, /verify-email, /logout, /reset-password, /forgot-password, /auth/*
+ * - Excludes private onboarding and internal portals: /onboarding/*, /projects/create, /sales/contract, /sales/proposal, etc.
+ * - Excludes API routes: /api/*, /health, /healthz
+ * - Includes only canonical, publicly accessible marketing, product, and legal pages
  */
-export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kavachsecurity.me';
-  const currentDate = new Date().toISOString();
 
-  const publicRoutes = [
-    { path: '', priority: 1.0, changeFrequency: 'daily' as const },
-    { path: '/products', priority: 0.9, changeFrequency: 'weekly' as const },
-    { path: '/products/code', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/products/cloud', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/products/attack', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/products/protect', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/products/agent', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/products/data', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/products/graph', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/solutions', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/pricing', priority: 0.9, changeFrequency: 'weekly' as const },
-    { path: '/docs', priority: 0.9, changeFrequency: 'daily' as const },
-    { path: '/enterprise', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/governance', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/demo', priority: 0.7, changeFrequency: 'weekly' as const },
-    { path: '/poc', priority: 0.7, changeFrequency: 'weekly' as const },
-    { path: '/resources', priority: 0.7, changeFrequency: 'weekly' as const },
-    { path: '/contact', priority: 0.7, changeFrequency: 'monthly' as const },
-    { path: '/privacy', priority: 0.5, changeFrequency: 'monthly' as const },
-    { path: '/terms', priority: 0.5, changeFrequency: 'monthly' as const },
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kavachsecurity.me';
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  // Use stable ISO timestamp reflecting platform release
+  const lastModified = new Date();
+
+  const publicRoutes: MetadataRoute.Sitemap = [
+    // -------------------------------------------------------------------------
+    // Core Marketing & Conversion Landing
+    // -------------------------------------------------------------------------
+    {
+      url: `${baseUrl}`,
+      lastModified,
+      changeFrequency: 'daily',
+      priority: 1.0,
+    },
+    {
+      url: `${baseUrl}/pricing`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/enterprise`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/demo`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/solutions`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/platform`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/contact`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/poc`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/docs`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/resources`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.75,
+    },
+
+    // -------------------------------------------------------------------------
+    // Sales & Lead Generation Pages
+    // -------------------------------------------------------------------------
+    {
+      url: `${baseUrl}/sales`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/sales/book-demo`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/sales/request-demo`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/sales/contact`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/sales/security-expert`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/sales/enterprise-inquiry`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/sales/guided-demo`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+
+    // -------------------------------------------------------------------------
+    // Products Suite
+    // -------------------------------------------------------------------------
+    {
+      url: `${baseUrl}/products`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/products/code`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/codebase-scanning`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/secret-scanning`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/container-security`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/iac-security`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/cloud`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/api-security`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/attack`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/protect`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/data`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/agent`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/products/graph`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.75,
+    },
+    {
+      url: `${baseUrl}/products/intelligence`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.75,
+    },
+    {
+      url: `${baseUrl}/products/soc`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.75,
+    },
+    {
+      url: `${baseUrl}/products/supply-chain`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.75,
+    },
+    {
+      url: `${baseUrl}/products/vulnerability-management`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.75,
+    },
+
+    // -------------------------------------------------------------------------
+    // Legal & Trust
+    // -------------------------------------------------------------------------
+    {
+      url: `${baseUrl}/privacy`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/terms`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/cookies`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/legal`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
   ];
 
-  return publicRoutes.map((route) => ({
-    url: `${baseUrl}${route.path}`,
-    lastModified: currentDate,
-    changeFrequency: route.changeFrequency,
-    priority: route.priority,
-  }));
+  return publicRoutes;
 }

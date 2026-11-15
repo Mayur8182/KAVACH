@@ -39,6 +39,23 @@ export interface ApiSecurityContextType {
 
 const ApiSecurityContext = createContext<ApiSecurityContextType | undefined>(undefined);
 
+const matchRepoAndApi = (repo: any, apiTarget: any) => {
+  if (!repo || !apiTarget) return false;
+  const rName = (repo.name || '').trim().toLowerCase();
+  const rFull = (repo.full_name || '').trim().toLowerCase();
+  const aRepo = (apiTarget.repository || '').trim().toLowerCase();
+  const aName = (apiTarget.name || '').trim().toLowerCase();
+  const aCleanName = aName.replace(' code inventory', '').trim();
+
+  return (
+    (aRepo && (aRepo === rFull || aRepo === rName || aRepo.endsWith('/' + rName))) ||
+    aCleanName === rName ||
+    aName === rName ||
+    aName.startsWith(rName + ' ') ||
+    (rName && aName.includes(rName))
+  );
+};
+
 export function ApiSecurityProvider({ children }: { children: React.ReactNode }) {
   const { currentProject, currentRepository, setCurrentRepository, repositories } = useScope();
   const [apis, setApis] = useState<any[]>([]);
@@ -61,8 +78,7 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
   const refreshApis = useCallback(async (overrideProjectId?: string) => {
     setIsLoadingApis(true);
     try {
-      const projId = overrideProjectId !== undefined ? overrideProjectId : currentProject?.id;
-      const res = await api.apiSecurity.apis({ projectId: projId || undefined });
+      const res = await api.apiSecurity.apis({ limit: 100 });
       const items = res?.items || [];
       setApis(items);
 
@@ -70,11 +86,7 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
         setSelectedApi((prevSelected: any) => {
           // If currentRepository matches an API target, prefer that one
           if (currentRepository) {
-            const matched = items.find(
-              (a: any) =>
-                (a.repository && (a.repository === currentRepository.full_name || a.repository === currentRepository.name)) ||
-                (a.name && (a.name.toLowerCase() === currentRepository.name.toLowerCase()))
-            );
+            const matched = items.find((a: any) => matchRepoAndApi(currentRepository, a));
             if (matched) return matched;
           }
           // If previous selection is still valid in items, keep it
@@ -91,19 +103,18 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
     } finally {
       setIsLoadingApis(false);
     }
-  }, [currentProject?.id, currentRepository]);
+  }, [currentRepository]);
 
   const refreshOverview = useCallback(async (overrideProjectId?: string) => {
     try {
-      const projId = overrideProjectId !== undefined ? overrideProjectId : currentProject?.id;
-      const res = await api.apiSecurity.overview(projId || undefined);
+      const res = await api.apiSecurity.overview();
       if (res) {
         setOverviewMetrics(res);
       }
     } catch (err) {
       console.error('Failed to load overview:', err);
     }
-  }, [currentProject?.id]);
+  }, []);
 
   const refreshRepositories = useCallback(async () => {
     setIsLoadingRepos(true);
@@ -132,21 +143,13 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
         targetToSelect = apis.find((a: any) => a.id === repo.api_target_id);
       }
       if (!targetToSelect) {
-        const cleanName = (repo.name || '').toLowerCase();
-        targetToSelect = apis.find((a: any) => {
-          const aRepo = (a.repository || '').toLowerCase();
-          const aName = (a.name || '').toLowerCase();
-          return (
-            (aRepo && (aRepo === (repo.full_name || '').toLowerCase() || aRepo === cleanName)) ||
-            (aName && (aName === cleanName || aName === `${cleanName} code inventory`))
-          );
-        });
+        targetToSelect = apis.find((a: any) => matchRepoAndApi(repo, a));
       }
 
       // 2. If target does not exist yet in API Security, connect & discover routes
       if (!targetToSelect) {
         const connectRes = await api.apiSecurity.connectRepository({
-          repository_id: String(repo.id),
+          repository_id: String(repo.id || repo.name),
           full_name: repo.full_name || repo.name,
           name: repo.name,
           branch: repo.default_branch || 'main',
@@ -160,7 +163,7 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
       }
 
       // 3. Refresh APIs list
-      const res = await api.apiSecurity.apis({ projectId: currentProject?.id || undefined });
+      const res = await api.apiSecurity.apis({ limit: 100 });
       const items = res?.items || [];
       setApis(items);
 
@@ -180,6 +183,12 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
         if (matched) setCurrentRepository(matched);
       }
 
+      // 5. Notify Topbar to update active scope
+      if (typeof window !== 'undefined') {
+        const repoDisplayName = repo.name || (targetToSelect?.name ? targetToSelect.name.replace(' Code Inventory', '') : 'Active Target');
+        window.dispatchEvent(new CustomEvent('kavach:api-target-changed', { detail: { repoName: repoDisplayName } }));
+      }
+
       await refreshOverview();
       await refreshRepositories();
       return targetToSelect;
@@ -189,19 +198,21 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
     } finally {
       setIsLoadingApis(false);
     }
-  }, [apis, currentProject?.id, repositories, setCurrentRepository, refreshOverview, refreshRepositories]);
+  }, [apis, repositories, setCurrentRepository, refreshOverview, refreshRepositories]);
 
   // Synchronize API Target selection with global repository scope
   const handleSetSelectedApi = useCallback((targetApi: any) => {
     setSelectedApi(targetApi);
-    if (targetApi && repositories && repositories.length > 0) {
-      const matchingRepo = repositories.find(
-        (r: any) =>
-          (targetApi.repository && (r.full_name === targetApi.repository || r.name === targetApi.repository)) ||
-          (targetApi.name && r.name && r.name.toLowerCase() === targetApi.name.toLowerCase())
-      );
-      if (matchingRepo && (!currentRepository || currentRepository.id !== matchingRepo.id)) {
-        setCurrentRepository(matchingRepo);
+    if (targetApi) {
+      const cleanName = (targetApi.name || '').replace(' Code Inventory', '').trim();
+      if (repositories && repositories.length > 0) {
+        const matchingRepo = repositories.find((r: any) => matchRepoAndApi(r, targetApi));
+        if (matchingRepo && (!currentRepository || currentRepository.id !== matchingRepo.id)) {
+          setCurrentRepository(matchingRepo);
+        }
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kavach:api-target-changed', { detail: { repoName: cleanName } }));
       }
     }
   }, [repositories, currentRepository, setCurrentRepository]);
@@ -210,17 +221,29 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
   const syncWithRepository = useCallback((repo: any) => {
     if (!repo) return;
     setApis((currentApis: any[]) => {
-      const matched = currentApis.find(
-        (a: any) =>
-          (a.repository && (a.repository === repo.full_name || a.repository === repo.name)) ||
-          (a.name && a.name.toLowerCase() === repo.name.toLowerCase())
-      );
+      const matched = currentApis.find((a: any) => matchRepoAndApi(repo, a));
       if (matched) {
         setSelectedApi(matched);
+        if (typeof window !== 'undefined') {
+          const cleanName = (matched.name || repo.name || '').replace(' Code Inventory', '').trim();
+          window.dispatchEvent(new CustomEvent('kavach:api-target-changed', { detail: { repoName: cleanName } }));
+        }
       }
       return currentApis;
     });
   }, []);
+
+  // Listen to external repository switches
+  useEffect(() => {
+    const handleSwitch = (e: any) => {
+      const repoName = e.detail?.name;
+      if (!repoName) return;
+      const targetRepo = apiRepositories.find((r: any) => r.name === repoName || r.full_name === repoName) || { name: repoName };
+      selectRepository(targetRepo).catch(() => {});
+    };
+    window.addEventListener('kavach:switch-repository', handleSwitch);
+    return () => window.removeEventListener('kavach:switch-repository', handleSwitch);
+  }, [apiRepositories, selectRepository]);
 
   useEffect(() => {
     refreshApis();

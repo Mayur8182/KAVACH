@@ -119,3 +119,5 @@ services:
         value: https://kavach-backend-3hdm.onrender.com
       - key: NEXT_PUBLIC_API_URL
         value: https://kavach-backend-3hdm.onrender.com
+      - key: NEXT_PUBLIC_GA_ID
+        value: G-FKNM7K5XNC

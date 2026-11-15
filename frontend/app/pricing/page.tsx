@@ -6,7 +6,7 @@
  * Transparent tiered pricing for Code Security, Cloud CSPM, and Runtime Invariants.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -31,6 +31,7 @@ import {
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
 import { SearchModal } from '@/components/common/SearchModal';
 import { TalkToExpertModal } from '@/components/common/TalkToExpertModal';
+import { trackPricingView, trackBeginCheckout, trackDemoRequest } from '@/lib/analytics/gtag';
 
 export default function PricingPage() {
   const router = useRouter();
@@ -44,7 +45,12 @@ export default function PricingPage() {
     setOpenFaq(openFaq === index ? null : index);
   };
 
+  useEffect(() => {
+    trackPricingView({ billing_cycle: billingCycle, source: 'pricing_page' });
+  }, [billingCycle]);
+
   const handleContactSales = (planName: string) => {
+    trackDemoRequest({ method: 'pricing_enterprise_cta', plan: planName });
     setSelectedPlanForModal(planName);
     setExpertOpen(true);
   };
@@ -334,6 +340,15 @@ export default function PricingPage() {
                 ) : (
                   <Link
                     href={p.ctaHref || '/signup'}
+                    onClick={() => {
+                      if (p.priceMonthly > 0 || p.priceAnnual > 0) {
+                        trackBeginCheckout({
+                          plan_name: p.name,
+                          price: typeof p.priceAnnual === 'number' ? (billingCycle === 'annual' ? p.priceAnnual : p.priceMonthly) : 0,
+                          billing_cycle: billingCycle,
+                        });
+                      }
+                    }}
                     style={{
                       width: '100%',
                       padding: '11px',
