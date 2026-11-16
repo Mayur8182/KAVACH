@@ -221,80 +221,122 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Pricing Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '64px', alignItems: 'stretch' }}>
-          {plans.map((p) => {
+        {/* Pricing Cards Grid with Staggered Cascading Animation */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          @keyframes pricingCardFadeUp {
+            0% {
+              opacity: 0;
+              transform: translateY(32px) scale(0.98);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+          .pricing-card-hover {
+            transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+          }
+          .pricing-card-hover:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.12) !important;
+            border-color: #0F172A !important;
+          }
+        ` }} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '22px', marginBottom: '64px', alignItems: 'stretch' }}>
+          {plans.map((p, index) => {
             const isCustom = typeof p.priceAnnual === 'string';
             const price = isCustom ? 'Custom' : billingCycle === 'annual' ? p.priceAnnual : p.priceMonthly;
 
             return (
               <div
                 key={p.name}
+                className="pricing-card-hover"
                 style={{
                   backgroundColor: '#FFFFFF',
-                  borderRadius: '16px',
-                  border: p.highlighted ? '2px solid #09090B' : '1px solid #E4E4E7',
-                  boxShadow: p.highlighted ? '0 12px 28px -6px rgba(0, 0, 0, 0.10)' : '0 1px 3px rgba(0,0,0,0.04)',
-                  padding: '32px 24px',
+                  borderRadius: '18px',
+                  border: p.highlighted ? '2px solid #09090B' : '1px solid #E2E8F0',
+                  boxShadow: p.highlighted ? '0 16px 36px -8px rgba(0, 0, 0, 0.12)' : '0 2px 6px rgba(0,0,0,0.03)',
+                  padding: '36px 26px',
                   display: 'flex',
                   flexDirection: 'column',
                   position: 'relative',
+                  opacity: 0,
+                  animation: `pricingCardFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) ${index * 130}ms forwards`,
+                  boxSizing: 'border-box',
                 }}
               >
                 {p.badge && (
                   <div
                     style={{
                       position: 'absolute',
-                      top: '-12px',
+                      top: '-13px',
                       left: '50%',
                       transform: 'translateX(-50%)',
                       backgroundColor: '#09090B',
                       color: '#FFFFFF',
                       fontSize: '11px',
                       fontWeight: 700,
-                      padding: '3px 14px',
-                      borderRadius: '12px',
+                      padding: '4px 16px',
+                      borderRadius: '20px',
                       textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
+                      letterSpacing: '0.06em',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                   >
                     {p.badge}
                   </div>
                 )}
 
-                <div style={{ marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 6px' }}>{p.name}</h2>
-                  <p style={{ fontSize: '12px', color: '#64748B', margin: 0, minHeight: '36px', lineHeight: 1.4 }}>
+                <div style={{ marginBottom: '22px' }}>
+                  <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
+                    {p.name}
+                  </h2>
+                  <p style={{ fontSize: '13px', color: '#64748B', margin: 0, minHeight: '38px', lineHeight: 1.5 }}>
                     {p.tagline}
                   </p>
                 </div>
 
-                <div style={{ marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #F1F5F9' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                    <span style={{ fontSize: '36px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.03em' }}>
+                <div style={{ marginBottom: '24px', paddingBottom: '22px', borderBottom: '1px solid #F1F5F9' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                    <span style={{ fontSize: '38px', fontWeight: 850, color: '#0F172A', letterSpacing: '-0.035em' }}>
                       {typeof price === 'number' ? `$${price}` : price}
                     </span>
                     {typeof price === 'number' && (
-                      <span style={{ fontSize: '13px', color: '#64748B' }}>
+                      <span style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 500 }}>
                         / seat / month
                       </span>
                     )}
                   </div>
                   {typeof price === 'number' && billingCycle === 'annual' && price > 0 && (
-                    <div style={{ fontSize: '11px', color: '#047857', marginTop: '4px', fontWeight: 600 }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: '#047857', marginTop: '6px', fontWeight: 600, backgroundColor: '#ECFDF5', padding: '2px 8px', borderRadius: '6px' }}>
                       Billed annually (Save ${(((p.priceMonthly as number) - (p.priceAnnual as number)) * 12)}/seat/yr)
                     </div>
                   )}
                 </div>
 
-                <div style={{ flex: 1, marginBottom: '28px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '14px' }}>
+                <div style={{ flex: 1, marginBottom: '30px' }}>
+                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '16px' }}>
                     What&apos;s Included:
                   </div>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {p.features.map((f) => (
-                      <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                        <Check size={16} color={p.highlighted ? '#09090B' : '#047857'} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13.5px', color: '#334155', lineHeight: 1.45 }}>
+                        <div
+                          style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            backgroundColor: p.highlighted ? '#F1F5F9' : '#ECFDF5',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            marginTop: '2px',
+                          }}
+                        >
+                          <Check size={12} color={p.highlighted ? '#09090B' : '#059669'} strokeWidth={2.8} />
+                        </div>
                         <span>{f}</span>
                       </li>
                     ))}

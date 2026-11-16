@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { RotateCcw, Home, Info, AlertTriangle } from 'lucide-react';
+import { KavachLogo } from '@/components/common/KavachLogo';
 
 export default function ErrorBoundary({
   error,
@@ -39,20 +40,10 @@ export default function ErrorBoundary({
         <header className="flex items-center">
           <Link
             href="/"
-            className="inline-flex items-center gap-2.5 text-slate-900 hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-slate-400/40 rounded-lg"
+            className="inline-flex items-center hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-slate-400/40 rounded-lg"
             title="Kavach Home"
           >
-            <img
-              src="/kavach-shield.png"
-              alt="Kavach"
-              className="w-6 h-auto object-contain flex-shrink-0"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = '/kavach-cube.png';
-              }}
-            />
-            <span className="text-xl sm:text-[22px] font-bold tracking-tight text-slate-950 font-sans">
-              kavach
-            </span>
+            <KavachLogo size={28} showText={true} />
           </Link>
         </header>
 

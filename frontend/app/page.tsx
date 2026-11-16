@@ -665,45 +665,6 @@ export default function KavachHomePage() {
             </div>
           </div>
         </section>
-
-        {/* ========================================================= */}
-        {/* SECTION 6: HIGH-CONVERTING CONVERSION CTA BANNER           */}
-        {/* ========================================================= */}
-        <section
-          style={{
-            maxWidth: '1380px',
-            margin: '0 auto 64px',
-            padding: '0 clamp(16px, 3vw, 24px)',
-            width: '100%',
-            boxSizing: 'border-box',
-          }}
-        >
-          <div className="kavach-conversion-banner">
-            <div>
-              <span className="banner-tag">INSTANT DEPLOYMENT · ZERO FRICTION</span>
-              <h2 className="banner-title">
-                Ready to secure your entire SDLC<br />in under 60 seconds?
-              </h2>
-              <p className="banner-subtitle">
-                Connect your GitHub repository free. Get verifiable vulnerability proof and automated pull request fixes today.
-              </p>
-            </div>
-
-            <div className="banner-actions">
-              <Link href="/onboarding" className="banner-primary-btn">
-                <span>Start Free Repository Scan</span>
-                <ArrowRight size={14} />
-              </Link>
-              <button
-                type="button"
-                onClick={() => setExpertOpen(true)}
-                className="banner-secondary-btn"
-              >
-                <span>Schedule Enterprise Briefing</span>
-              </button>
-            </div>
-          </div>
-        </section>
       </main>
 
       {/* ========================================================= */}

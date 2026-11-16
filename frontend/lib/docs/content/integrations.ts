@@ -209,19 +209,19 @@ jobs:
         id: 'issue-docker-socket',
         heading: '1. Docker Socket Permission Denied',
         content:
-          '**Symptom:** `docker: Got permission denied while trying to connect to the Docker daemon socket`.\n**Cause:** The current user lacks membership in the `docker` group.\n**Remediation:** Add your user to the docker group and restart your terminal session:\n`sudo usermod -aG docker $USER && newgrp docker`',
+          '**Symptom:** `docker: Got permission denied while trying to connect to the Docker daemon socket`\n**Cause:** The current user lacks membership in the `docker` system group.\n**Remediation:** Add your user to the docker group and restart your terminal session:\n`sudo usermod -aG docker $USER && newgrp docker`',
       },
       {
         id: 'issue-opa-compile',
         heading: '2. OPA Rego Rule Compilation Error',
         content:
-          '**Symptom:** `error: 1 error occurred: policy.rego:12: rego_unsafe_var_error: var msg is unsafe`.\n**Cause:** A variable in a Rego `deny[msg]` rule is referenced without being assigned within the same rule body.\n**Remediation:** Ensure all output variables are explicitly bound:\n`deny[msg] { input.risk > 8; msg := "Risk exceeds threshold" }`',
+          '**Symptom:** `error: 1 error occurred: policy.rego:12: rego_unsafe_var_error: var msg is unsafe`\n**Cause:** A variable in a Rego `deny[msg]` rule is referenced without being assigned within the same rule body.\n**Remediation:** Ensure all output variables are explicitly bound:\n`deny[msg] { input.risk > 8; msg := "Risk exceeds threshold" }`',
       },
       {
         id: 'issue-mcp-timeout',
         heading: '3. MCP Gateway Connection Timeout',
         content:
-          '**Symptom:** AI client reports: `Error: MCP connection closed unexpectedly`.\n**Cause:** Network proxy or firewall blocking Server-Sent Events (SSE) streaming connections.\n**Remediation:** Ensure HTTP proxy allows chunked transfer encoding and disables response buffering for `/mcp` endpoints.',
+          '**Symptom:** AI client reports: `Error: MCP connection closed unexpectedly`\n**Cause:** Network proxy or firewall blocking Server-Sent Events (SSE) streaming connections.\n**Remediation:** Ensure HTTP proxy allows chunked transfer encoding and disables response buffering for `/mcp` endpoints.',
       },
     ],
   },

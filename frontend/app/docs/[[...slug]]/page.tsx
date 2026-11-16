@@ -38,6 +38,70 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   'platform-integrations': Layers,
 };
 
+// Formats content by parsing markdown-like **bold** and `code` without literal asterisks
+const renderFormattedContent = (content: string) => {
+  if (!content) return null;
+  const lines = content.split('\n');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {lines.map((line, lineIdx) => {
+        if (!line.trim()) return null;
+        const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+
+        return (
+          <p
+            key={lineIdx}
+            style={{
+              fontSize: '14.5px',
+              color: '#334155',
+              lineHeight: 1.7,
+              margin: 0,
+            }}
+          >
+            {parts.map((part, partIdx) => {
+              if (part.startsWith('**') && part.endsWith('**')) {
+                const boldText = part.slice(2, -2);
+                return (
+                  <strong
+                    key={partIdx}
+                    style={{
+                      fontWeight: 650,
+                      color: '#0F172A',
+                    }}
+                  >
+                    {boldText}
+                  </strong>
+                );
+              }
+              if (part.startsWith('`') && part.endsWith('`')) {
+                const codeText = part.slice(1, -1);
+                return (
+                  <code
+                    key={partIdx}
+                    style={{
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      backgroundColor: '#F1F5F9',
+                      border: '1px solid #E2E8F0',
+                      fontSize: '13px',
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
+                      color: '#0F172A',
+                    }}
+                  >
+                    {codeText}
+                  </code>
+                );
+              }
+              return part;
+            })}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
 export default function DocsPage() {
   const pathname = usePathname();
   const currentDoc = useMemo(() => getDocByPath(pathname || '/docs'), [pathname]);
@@ -175,20 +239,20 @@ export default function DocsPage() {
           className="docs-sidebar"
         >
           {/* Documentation Search Bar */}
-          <div style={{ position: 'relative', marginBottom: '24px' }}>
+          <div style={{ position: 'relative', marginBottom: '14px' }}>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '8px 12px',
+                gap: '6px',
+                padding: '5px 10px',
                 backgroundColor: '#FAFAFA',
                 border: '1px solid #E4E4E7',
-                borderRadius: '10px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                borderRadius: '8px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
               }}
             >
-              <Search size={15} color="#71717A" />
+              <Search size={13} color="#71717A" />
               <input
                 id="docs-search-input"
                 type="text"
@@ -199,7 +263,7 @@ export default function DocsPage() {
                   width: '100%',
                   border: 'none',
                   outline: 'none',
-                  fontSize: '13px',
+                  fontSize: '12px',
                   backgroundColor: 'transparent',
                   color: '#0F172A',
                 }}
@@ -210,18 +274,19 @@ export default function DocsPage() {
                   onClick={() => setSearchQuery('')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                 >
-                  <X size={14} color="#71717A" />
+                  <X size={13} color="#71717A" />
                 </button>
               ) : (
                 <kbd
                   style={{
-                    fontSize: '10.5px',
+                    fontSize: '9.5px',
                     fontFamily: 'monospace',
-                    padding: '2px 5px',
-                    borderRadius: '4px',
+                    padding: '1px 4px',
+                    borderRadius: '3px',
                     backgroundColor: '#F4F4F5',
                     color: '#71717A',
                     border: '1px solid #E4E4E7',
+                    lineHeight: 1.2,
                   }}
                 >
                   Ctrl K
@@ -492,15 +557,8 @@ export default function DocsPage() {
                 >
                   {sub.heading}
                 </h2>
-                <div
-                  style={{
-                    fontSize: '14.5px',
-                    color: '#334155',
-                    lineHeight: 1.7,
-                    whiteSpace: 'pre-line',
-                  }}
-                >
-                  {sub.content}
+                <div style={{ margin: '0 0 4px' }}>
+                  {renderFormattedContent(sub.content)}
                 </div>
 
                 {/* Callout / Alert */}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   BookOpen,
@@ -14,6 +14,11 @@ import {
   Cpu,
   Layers,
   Sparkles,
+  X,
+  Copy,
+  Check,
+  ShieldCheck,
+  Lock,
 } from 'lucide-react';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
 import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
@@ -28,6 +33,11 @@ interface ResourceItem {
   badge: string;
   linkText: string;
   linkHref: string;
+  fullContent?: {
+    abstract: string;
+    sections: { heading: string; body: string; code?: string }[];
+    doiOrRef?: string;
+  };
 }
 
 const RESOURCES_DATA: ResourceItem[] = [
@@ -102,6 +112,34 @@ const RESOURCES_DATA: ResourceItem[] = [
 export default function ResourcesPage() {
   const [activeCategory, setActiveCategory] = useState<'all' | 'whitepapers' | 'advisories' | 'benchmarks' | 'guides'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedResource, setSelectedResource] = useState<ResourceItem | null>(null);
+  const [copiedCitation, setCopiedCitation] = useState(false);
+
+  // Close modal on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedResource(null);
+      }
+    };
+    if (selectedResource) {
+      document.body.style.overflow = 'hidden';
+      window.addEventListener('keydown', handleKeyDown);
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedResource]);
+
+  const handleCopyCitation = (item: ResourceItem) => {
+    const citation = `Kavach Security Research. "${item.title}". Published ${item.date}. Available at: https://kavachsecurity.me/resources#${item.id}`;
+    navigator.clipboard.writeText(citation);
+    setCopiedCitation(true);
+    setTimeout(() => setCopiedCitation(false), 2000);
+  };
 
   const filteredResources = RESOURCES_DATA.filter((item) => {
     const matchesCategory = activeCategory === 'all' || item.category === activeCategory;
@@ -194,18 +232,20 @@ export default function ResourcesPage() {
           {filteredResources.map((item) => (
             <div
               key={item.id}
+              onClick={() => setSelectedResource(item)}
               style={{
                 backgroundColor: '#FFFFFF',
                 border: '1px solid #E2E8F0',
-                borderRadius: '10px',
+                borderRadius: '12px',
                 padding: '24px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                cursor: 'pointer',
               }}
-              className="hover:border-stone-400"
+              className="hover:border-stone-400 hover:shadow-md hover:-translate-y-0.5"
             >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -225,26 +265,263 @@ export default function ResourcesPage() {
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '16px', borderTop: '1px solid #F1F5F9' }}>
                 <span style={{ fontSize: '12px', color: '#94A3B8' }}>{item.date}</span>
-                <Link
-                  href={item.linkHref}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedResource(item);
+                  }}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px',
+                    gap: '6px',
                     fontSize: '13px',
                     fontWeight: 600,
                     color: '#3F3A33',
-                    textDecoration: 'none',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
                   }}
                 >
                   <span>{item.linkText}</span>
                   <ArrowRight size={13} />
-                </Link>
+                </button>
               </div>
             </div>
           ))}
         </div>
       </section>
+
+      {/* Interactive Resource Reader Modal (Pop-up viewer) */}
+      {selectedResource && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setSelectedResource(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.2s ease-out',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '720px',
+              width: '100%',
+              maxHeight: '88vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #E2E8F0',
+              overflow: 'hidden',
+              animation: 'slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '24px 28px',
+                borderBottom: '1px solid #F1F5F9',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: '16px',
+                backgroundColor: '#FAFAFA',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: '#F5F1E8',
+                      color: '#3F3A33',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {selectedResource.badge}
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#64748B' }}>
+                    {selectedResource.readTime} • Published {selectedResource.date}
+                  </span>
+                </div>
+                <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: 0, lineHeight: 1.35 }}>
+                  {selectedResource.title}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedResource(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748B',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+                className="hover:bg-slate-200 transition-colors"
+                title="Close viewer (Esc)"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body: Scrollable Document View */}
+            <div
+              style={{
+                padding: '28px',
+                overflowY: 'auto',
+                fontSize: '14.5px',
+                lineHeight: 1.7,
+                color: '#334155',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+              }}
+            >
+              {/* Executive Summary / Abstract Box */}
+              <div
+                style={{
+                  padding: '16px 20px',
+                  borderRadius: '10px',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  borderLeft: '4px solid #3F3A33',
+                }}
+              >
+                <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#0F172A', marginBottom: '6px', letterSpacing: '0.04em' }}>
+                  Executive Abstract
+                </div>
+                <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: 1.6 }}>
+                  {selectedResource.description}
+                </p>
+              </div>
+
+              {/* Technical Breakdown Sections */}
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: '0 0 8px' }}>
+                  1. Core Architecture & Deterministic Thesis
+                </h3>
+                <p style={{ margin: '0 0 12px' }}>
+                  Security systems cannot delegate authoritative decisions (e.g. merge approval, secrets issuance, branch promotion) to non-deterministic probabilistic models. Under Kavach, every proposal generated by an LLM is intercepted and proven through deterministic Policy Engines (OPA / Rego) and validated compiler AST graphs.
+                </p>
+
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    backgroundColor: '#0F172A',
+                    color: '#F8FAFC',
+                    fontFamily: 'monospace',
+                    fontSize: '12.5px',
+                    lineHeight: 1.6,
+                    margin: '12px 0 16px',
+                  }}
+                >
+                  <code>
+                    package kavach.authz<br />
+                    default allow = false<br /><br />
+                    allow &#123;<br />
+                    &nbsp;&nbsp;input.risk_score &lt;= 3<br />
+                    &nbsp;&nbsp;input.policy == &quot;ALLOW&quot;<br />
+                    &nbsp;&nbsp;count(input.vulnerabilities) == 0<br />
+                    &#125;
+                  </code>
+                </div>
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: '0 0 8px' }}>
+                  2. Verifiable Evidence & Implementation
+                </h3>
+                <p style={{ margin: 0 }}>
+                  This research asset provides production-ready rulesets, verified CI/CD merge gates, and threat heuristics deployed across active enterprise repositories. Every action is cryptographically anchored in the immutable audit ledger.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div
+              style={{
+                padding: '16px 28px',
+                borderTop: '1px solid #F1F5F9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#FAFAFA',
+                flexWrap: 'wrap',
+                gap: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => handleCopyCitation(selectedResource)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #CBD5E1',
+                    color: '#334155',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {copiedCitation ? <Check size={14} color="#10B981" /> : <Copy size={14} />}
+                  <span>{copiedCitation ? 'Citation Copied!' : 'Copy Citation'}</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Link
+                  href={selectedResource.linkHref}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    backgroundColor: '#3F3A33',
+                    color: '#FFFFFF',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <span>Open Full Resource</span>
+                  <ExternalLink size={13} />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <EnterpriseFooter />
     </div>
   );
