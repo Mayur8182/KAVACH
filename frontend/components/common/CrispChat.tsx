@@ -97,9 +97,9 @@ export function CrispChat(): React.ReactElement | null {
 
     return () => {
       try {
-        Crisp.chat.offChatOpened(handleChatOpened);
-        Crisp.chat.offChatClosed(handleChatClosed);
-        Crisp.message.offMessageReceived(handleMessageReceived);
+        Crisp.chat.offChatOpened();
+        Crisp.chat.offChatClosed();
+        Crisp.message.offMessageReceived();
       } catch {
         // Cleanup fallback
       }
