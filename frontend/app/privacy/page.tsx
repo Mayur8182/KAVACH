@@ -35,7 +35,7 @@ export default function PrivacyPage() {
             Privacy Policy & Data Protection
           </h1>
           <p style={{ margin: 0, fontSize: '14px', color: '#64748B' }}>
-            Last revised: October 2026 • Policy Version: 2026.4 • Statutory Framework: GDPR, CCPA/CPRA, SOC 2 Type II
+            Last revised: November 2026 • Policy Version: 2026.5 • Statutory Framework: GDPR, UK GDPR, CCPA/CPRA, India DPDP Act 2023 • Architecture Aligned with SOC 2 &amp; ISO 27001 Readiness
           </p>
         </div>
 
@@ -92,13 +92,55 @@ export default function PrivacyPage() {
             </ul>
           </section>
 
-          {/* Section 3: Data Deletion & Rectification Rights (GDPR / CCPA) */}
+          {/* Section 3: Data Retention Schedule & Erasure Rights */}
           <section>
             <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 12px', color: '#0F172A' }}>
-              3. Data Deletion (Right to Erasure) & Correction (Right to Rectification)
+              3. Data Retention Schedule &amp; Erasure Rights (GDPR / CCPA / DPDP)
             </h2>
             <p>
-              Under GDPR Articles 16 &amp; 17 and California Consumer Privacy Act (CCPA/CPRA), you have the right to inspect, correct, export, or permanently delete your personal information and organization data:
+              To eliminate ambiguity, Kavach publishes a strict category-by-category data retention schedule:
+            </p>
+            <div style={{ overflowX: 'auto', margin: '14px 0' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', border: '1px solid #E4E4E7' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#F4F4F5', textAlign: 'left', color: '#09090B' }}>
+                    <th style={{ padding: '10px 14px', borderBottom: '1px solid #E4E4E7' }}>Data Category</th>
+                    <th style={{ padding: '10px 14px', borderBottom: '1px solid #E4E4E7' }}>Storage Medium</th>
+                    <th style={{ padding: '10px 14px', borderBottom: '1px solid #E4E4E7' }}>Retention Duration</th>
+                    <th style={{ padding: '10px 14px', borderBottom: '1px solid #E4E4E7' }}>Purge Mechanism</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, color: '#09090B' }}>Source Code Repositories</td>
+                    <td style={{ padding: '10px 14px', color: '#52525B' }}>Isolated Ephemeral Container / tmpfs</td>
+                    <td style={{ padding: '10px 14px', color: '#047857', fontWeight: 600 }}>0 Days (Immediate)</td>
+                    <td style={{ padding: '10px 14px', color: '#52525B' }}>Container destroyed immediately on scan completion</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, color: '#09090B' }}>Vulnerability Findings &amp; AST Snippets</td>
+                    <td style={{ padding: '10px 14px', color: '#52525B' }}>PostgreSQL (AES-256 encrypted)</td>
+                    <td style={{ padding: '10px 14px', color: '#52525B' }}>Active subscription life or custom team policy</td>
+                    <td style={{ padding: '10px 14px', color: '#52525B' }}>Purgeable on-demand or upon project deletion</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, color: '#09090B' }}>LLM Inference Payloads</td>
+                    <td style={{ padding: '10px 14px', color: '#52525B' }}>In-flight TLS 1.3 memory buffers</td>
+                    <td style={{ padding: '10px 14px', color: '#047857', fontWeight: 600 }}>0 Days (Zero-Data-Retention)</td>
+                    <td style={{ padding: '10px 14px', color: '#52525B' }}>Enterprise API zero-retention contract; never stored</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, color: '#09090B' }}>Account Deletion / DSAR Purge</td>
+                    <td style={{ padding: '10px 14px', color: '#52525B' }}>Primary database &amp; encrypted backups</td>
+                    <td style={{ padding: '10px 14px', color: '#52525B' }}>Max 30 calendar days</td>
+                    <td style={{ padding: '10px 14px', color: '#52525B' }}>Cryptographic key rotation and table row deletion</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p>
+              Under GDPR Articles 16 &amp; 17, California Consumer Privacy Act (CCPA/CPRA), and DPDP Act 2023, you have the right to inspect, correct, export, or permanently delete your personal information and organization data:
             </p>
             <div style={{ border: '1px solid #E4E4E7', borderRadius: '8px', padding: '16px 20px', backgroundColor: '#FAFAFA', marginTop: '10px' }}>
               <div style={{ fontWeight: 700, color: '#09090B', marginBottom: '6px' }}>How to Request Data Deletion or Account Erasure:</div>
@@ -195,15 +237,16 @@ export default function PrivacyPage() {
           {/* Section 9: Data Protection Officer Contact */}
           <section>
             <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 12px', color: '#0F172A' }}>
-              9. Data Protection Officer (DPO) Contact
+              9. Data Protection Officer &amp; Privacy Grievance Redressal
             </h2>
             <p>
-              For privacy audits, Data Processing Agreements (DPA), Standard Contractual Clauses (SCC), or GDPR inquiries:
+              In accordance with GDPR Article 37 and India&apos;s Digital Personal Data Protection (DPDP) Act 2023, you may contact our designated Data Protection &amp; Grievance Officer for privacy audits, Data Processing Agreements (DPA), Standard Contractual Clauses (SCC), or data rights fulfillment:
               <br /><br />
-              <strong>Kavach Security &amp; Privacy Office</strong><br />
-              Attn: Data Protection Officer<br />
+              <strong>Kavach Security Privacy &amp; Data Protection Office</strong><br />
+              Attn: Data Protection &amp; Grievance Officer<br />
               Email: <a href="mailto:privacy@kavachsecurity.me" style={{ color: '#09090B', fontWeight: 600 }}>privacy@kavachsecurity.me</a><br />
-              Legal Address: Anand, Gujarat, India, 388120
+              Location &amp; Jurisdiction: Ahmedabad, Gujarat, India<br />
+              Response SLA: Formal acknowledgment within 48 business hours; full request completion within 30 calendar days.
             </p>
           </section>
         </div>

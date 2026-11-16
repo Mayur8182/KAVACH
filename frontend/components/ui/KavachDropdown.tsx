@@ -180,119 +180,128 @@ export function KavachDropdown({
     }
   };
 
-  return (
-    <div
-      ref={dropdownRef}
-      className={`kavach-dropdown-wrapper ${className}`}
-      style={{
-        position: 'relative',
-        display: fullWidth ? 'block' : 'inline-block',
-        width: fullWidth ? '100%' : (width || 'auto'),
-        minWidth: fullWidth ? '100%' : minWidth,
-        fontFamily: sans,
-        ...style,
-      }}
-    >
-      {label && (
-        <label
-          htmlFor={dropdownId}
-          style={{
-            display: 'block',
-            fontSize: '12px',
-            fontWeight: 500,
-            color: '#4B5563',
-            marginBottom: '4px',
-          }}
-        >
-          {label}
-        </label>
-      )}
+    const isFull = fullWidth || width === '100%';
+    const effectiveMinWidth = isFull ? '0px' : minWidth;
 
-      {/* Trigger Button */}
-      <button
-        id={dropdownId}
-        type="button"
-        role="combobox"
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        aria-label={ariaLabel || label || placeholder}
-        disabled={disabled}
-        onClick={() => !disabled && setIsOpen((prev) => !prev)}
-        onKeyDown={handleKeyDown}
+    return (
+      <div
+        ref={dropdownRef}
+        className={`kavach-dropdown-wrapper ${className}`}
         style={{
-          width: '100%',
-          height: sizeStyles.height,
-          padding: sizeStyles.padding,
-          borderRadius: '8px',
-          border: isOpen ? '1px solid #0F172A' : '1px solid #E5E7EB',
-          background: disabled ? '#F3F4F6' : '#FFFFFF',
-          fontSize: sizeStyles.fontSize,
-          fontWeight: 500,
-          color: disabled ? '#9CA3AF' : '#0F172A',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '8px',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          boxShadow: isOpen
-            ? '0 0 0 2px rgba(15, 23, 42, 0.08)'
-            : '0 1px 2px rgba(0, 0, 0, 0.03)',
-          transition: 'all 0.15s ease',
-          outline: 'none',
-          userSelect: 'none',
+          position: 'relative',
+          display: isFull ? 'block' : 'inline-block',
+          width: isFull ? '100%' : (width || 'auto'),
+          minWidth: effectiveMinWidth,
+          boxSizing: 'border-box',
+          fontFamily: sans,
+          ...style,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-          {icon && (
-            <span style={{ display: 'inline-flex', flexShrink: 0, color: '#64748B' }}>
-              {icon}
-            </span>
-          )}
-          <span
+        {label && (
+          <label
+            htmlFor={dropdownId}
             style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              color: (multiple ? values.length === 0 : !value) ? '#9CA3AF' : '#0F172A',
+              display: 'block',
+              fontSize: '12px',
+              fontWeight: 500,
+              color: '#4B5563',
+              marginBottom: '4px',
             }}
           >
-            {selectedDisplay}
-          </span>
-        </div>
+            {label}
+          </label>
+        )}
 
-        <ChevronDown
-          size={14}
-          color="#64748B"
+        {/* Trigger Button */}
+        <button
+          id={dropdownId}
+          type="button"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-label={ariaLabel || label || placeholder}
+          disabled={disabled}
+          onClick={() => !disabled && setIsOpen((prev) => !prev)}
+          onKeyDown={handleKeyDown}
           style={{
-            flexShrink: 0,
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-          }}
-        />
-      </button>
-
-      {/* Floating Menu Popover */}
-      {isOpen && (
-        <div
-          ref={listboxRef}
-          role="listbox"
-          aria-multiselectable={multiple}
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 5px)',
-            [align]: 0,
-            minWidth: '100%',
-            width: 'max-content',
-            maxWidth: '360px',
-            background: '#FFFFFF',
-            border: '1px solid #E5E7EB',
-            borderRadius: '12px',
-            boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.12), 0 6px 12px -4px rgba(0, 0, 0, 0.06)',
-            zIndex: 100,
-            padding: '6px',
-            animation: 'fadeInScale 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+            width: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
+            height: sizeStyles.height,
+            padding: sizeStyles.padding,
+            borderRadius: '8px',
+            border: isOpen ? '1px solid #0F172A' : '1px solid #E5E7EB',
+            background: disabled ? '#F3F4F6' : '#FFFFFF',
+            fontSize: sizeStyles.fontSize,
+            fontWeight: 500,
+            color: disabled ? '#9CA3AF' : '#0F172A',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            boxShadow: isOpen
+              ? '0 0 0 2px rgba(15, 23, 42, 0.08)'
+              : '0 1px 2px rgba(0, 0, 0, 0.03)',
+            transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+            outline: 'none',
+            userSelect: 'none',
           }}
         >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', minWidth: 0, flex: 1 }}>
+            {icon && (
+              <span style={{ display: 'inline-flex', flexShrink: 0, color: '#64748B' }}>
+                {icon}
+              </span>
+            )}
+            <span
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0,
+                flex: 1,
+                textAlign: 'left',
+                color: (multiple ? values.length === 0 : !value) ? '#9CA3AF' : '#0F172A',
+              }}
+            >
+              {selectedDisplay}
+            </span>
+          </div>
+
+          <ChevronDown
+            size={14}
+            color="#64748B"
+            style={{
+              flexShrink: 0,
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          />
+        </button>
+
+        {/* Floating Menu Popover */}
+        {isOpen && (
+          <div
+            ref={listboxRef}
+            role="listbox"
+            aria-multiselectable={multiple}
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 5px)',
+              [align]: 0,
+              minWidth: '100%',
+              maxWidth: '360px',
+              background: '#FFFFFF',
+              border: '1px solid #E5E7EB',
+              borderRadius: '12px',
+              boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.12), 0 6px 12px -4px rgba(0, 0, 0, 0.06)',
+              zIndex: 100,
+              padding: '6px',
+              boxSizing: 'border-box',
+              animation: 'fadeInScale 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
           {/* Optional Search Input */}
           {searchable && (
             <div style={{ padding: '4px', marginBottom: '4px', position: 'relative' }}>

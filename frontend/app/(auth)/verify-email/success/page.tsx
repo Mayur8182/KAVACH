@@ -62,7 +62,10 @@ function VerifySuccessContent() {
   useEffect(() => {
     if (!verified || verifying || isPaused) return;
     if (countdown <= 0) {
-      router.push('/onboarding');
+      const hasProject = typeof window !== 'undefined' && Boolean(
+        localStorage.getItem('secu_active_project_id') || localStorage.getItem('secu_active_repo')
+      );
+      router.push(hasProject ? '/overview' : '/onboarding');
       return;
     }
     const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);

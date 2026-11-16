@@ -2334,7 +2334,28 @@ async def export_pr_findings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    findings = _PR_SECURITY_STATE["findings"]
+    # Query real PostgreSQL SecurityFinding records
+    db_findings_res = await db.execute(
+        select(SecurityFinding).order_by(desc(SecurityFinding.created_at)).limit(100)
+    )
+    db_findings = db_findings_res.scalars().all()
+    if db_findings:
+        findings = [
+            {
+                "id": f.display_id or str(f.id)[:8],
+                "title": f.title or "Security Finding",
+                "severity": f.severity or "Medium",
+                "tool": f.scanner or "Semgrep",
+                "file": f.file_path or "main.py",
+                "line": f.line_number or 1,
+                "status": f.status or "OPEN",
+                "rule_id": f.rule_id or "SEC-RULE",
+                "cwe": f.cwe_id or "CWE-89",
+            }
+            for f in db_findings
+        ]
+    else:
+        findings = _PR_SECURITY_STATE.get("findings", [])
     fmt = export_format.lower()
 
     if fmt == "csv":

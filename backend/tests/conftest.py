@@ -5,7 +5,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import get_db
+from app.core.database import get_db, set_session_factory
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models import Base
@@ -62,11 +62,13 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    set_session_factory(TestingSessionLocal)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
 
+    set_session_factory(None)
     app.dependency_overrides.clear()
 
 

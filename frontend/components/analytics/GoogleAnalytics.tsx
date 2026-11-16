@@ -12,12 +12,21 @@ import { GA_MEASUREMENT_ID, pageview, updateConsent } from '@/lib/analytics/gtag
 function GoogleAnalyticsNavigation() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isInitialMount = useRef(true);
   const lastTrackedUrl = useRef<string | null>(null);
 
   useEffect(() => {
     if (!pathname) return;
     const search = searchParams?.toString();
     const currentUrl = search ? `${pathname}?${search}` : pathname;
+
+    // The initial hard pageview is handled by the primary Google tag initialization.
+    // Skip initial mount so we never dispatch a duplicate pageview event on initial load.
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      lastTrackedUrl.current = currentUrl;
+      return;
+    }
 
     // Prevent duplicate pageview calls on re-renders for the same path
     if (lastTrackedUrl.current === currentUrl) return;
@@ -69,10 +78,6 @@ export function GoogleAnalytics() {
   return (
     <>
       <Script
-        strategy="afterInteractive"
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-      />
-      <Script
         id="google-analytics-init"
         strategy="afterInteractive"
         dangerouslySetInnerHTML={{
@@ -107,11 +112,14 @@ export function GoogleAnalytics() {
             }
 
             gtag('config', '${GA_MEASUREMENT_ID}', {
-              send_page_view: false,
-              cookie_flags: 'SameSite=None;Secure'
+              send_page_view: false
             });
           `,
         }}
+      />
+      <Script
+        strategy="afterInteractive"
+        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
       />
       <Suspense fallback={null}>
         <GoogleAnalyticsNavigation />

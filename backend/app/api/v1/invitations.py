@@ -201,18 +201,41 @@ async def create_invitation(
         "invite_url": invite_url,
     })
 
-    # Send real email invitation via configured Gmail SMTP
+    # Send real email invitation via Centralized Notification Service using approved template
     try:
-        await email_service.send_invitation_email(
+        from app.services.notification_service import notification_service
+        inviter_display = getattr(current_user, "name", None) or current_user.email
+        expires_str = invitation.expires_at.strftime("%b %d, %Y") if invitation.expires_at else "7 days"
+        await notification_service.dispatch(
+            template_id="workspace_team_invitation",
             recipient_email=invitation.email,
-            role=invitation.role,
-            invite_url=invite_url,
-            inviter_name=getattr(current_user, "name", None) or current_user.email,
-            inviter_email=current_user.email,
-            message=invitation.message,
+            context={
+                "inviter_name": inviter_display,
+                "workspace_name": "Kavach Security Workspace",
+                "assigned_role": invitation.role.upper(),
+                "expires_at": expires_str,
+                "accept_invitation_url": invite_url,
+            },
+            workspace_id=str(target_org_id) if target_org_id else None,
+            project_id=str(target_project_id) if target_project_id else None,
+            sync_delivery=False,
         )
-    except Exception:
-        pass
+    except Exception as invite_err:
+        import logging
+        logging.getLogger("secure-control-plane.email").warning(
+            f"Failed to dispatch team invitation notification: {invite_err}"
+        )
+        try:
+            await email_service.send_invitation_email(
+                recipient_email=invitation.email,
+                role=invitation.role,
+                invite_url=invite_url,
+                inviter_name=getattr(current_user, "name", None) or current_user.email,
+                inviter_email=current_user.email,
+                message=invitation.message,
+            )
+        except Exception:
+            pass
 
     resp = InvitationResponse(
         id=invitation.id,

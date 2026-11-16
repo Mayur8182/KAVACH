@@ -54,34 +54,15 @@ export const LiveRunWorkspace: React.FC<LiveRunWorkspaceProps> = ({
   >('Execution Graph');
   const [activeGenerativeWidget, setActiveGenerativeWidget] = useState<GenerativeUIWidgetData | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState('sast');
-  const [currentFile, setCurrentFile] = useState('src/auth/session.ts');
+  const [currentFile, setCurrentFile] = useState<string>('');
   const [fileContent, setFileContent] = useState<string>('');
-  const [highlightedLineStart, setHighlightedLineStart] = useState<number>(6);
-  const [highlightedLineEnd, setHighlightedLineEnd] = useState<number>(6);
-  const [activeFinding, setActiveFinding] = useState<FindingOverlay | null>({
-    id: 'F-001',
-    ruleId: 'CWE-89',
-    title: 'SQL Injection',
-    description: 'User input (email) is directly interpolated into a SQL query, which can allow SQL injection.',
-    severity: 'Critical',
-    agent: 'SAST',
-    line: 42,
-  });
-  const [selectedFindingId, setSelectedFindingId] = useState<string>('F-001');
+  const [highlightedLineStart, setHighlightedLineStart] = useState<number>(0);
+  const [highlightedLineEnd, setHighlightedLineEnd] = useState<number>(0);
+  const [activeFinding, setActiveFinding] = useState<FindingOverlay | null>(null);
+  const [selectedFindingId, setSelectedFindingId] = useState<string>('');
 
   // Execution Logs & Activity
-  const [logs, setLogs] = useState<LogItem[]>([
-    { id: 'l1', timestamp: '14:02:18', type: 'success', message: 'Repository cloned (1.2s)', agent: 'SCM' },
-    { id: 'l2', timestamp: '14:03:02', type: 'success', message: 'Indexed 1,284 files', agent: 'SAST' },
-    { id: 'l3', timestamp: '14:03:41', type: 'success', message: 'AST parsing started', agent: 'SAST' },
-    { id: 'l4', timestamp: '14:04:07', type: 'running', message: 'Analyzing src/auth/session.ts ...', agent: 'SAST' },
-    { id: 'l5', timestamp: '14:04:08', type: 'info', message: 'Building control flow graph', agent: 'SAST' },
-    { id: 'l6', timestamp: '14:04:10', type: 'info', message: 'Running taint analysis', agent: 'SAST' },
-    { id: 'l7', timestamp: '14:04:12', type: 'alert', message: 'SQL Injection (CWE-89) detected', agent: 'SAST' },
-    { id: 'l8', timestamp: '14:04:15', type: 'info', message: 'Continuing analysis ...', agent: 'SAST' },
-    { id: 'l9', timestamp: '14:04:27', type: 'running', message: 'Analyzing src/routes/checkout.ts ...', agent: 'SAST' },
-    { id: 'l10', timestamp: '14:04:31', type: 'success', message: 'Completed 342 / 1,284 files (26%)', agent: 'SAST' },
-  ]);
+  const [logs, setLogs] = useState<LogItem[]>([]);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileItem[]>([]);
   const [toolCalls, setToolCalls] = useState<ToolExecutionItem[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -282,9 +263,9 @@ export const LiveRunWorkspace: React.FC<LiveRunWorkspaceProps> = ({
         setFileContent(data.content);
         return;
       }
-      setFileContent(`// Workspace file: ${filePath}\n// File content could not be retrieved from repository mirror.`);
+      setFileContent(`// Workspace file: ${filePath}\n// Content could not be retrieved from workspace repository mirror.`);
     } catch {
-      setFileContent(`// Workspace file: ${filePath}\n// Unable to load file from repository workspace.`);
+      setFileContent(`// Workspace file: ${filePath}\n// File not present in repository workspace mirror for this run.`);
     }
   }, [runId]);
 
@@ -318,24 +299,29 @@ export const LiveRunWorkspace: React.FC<LiveRunWorkspaceProps> = ({
         }
 
         if (data.findings && data.findings.length > 0) {
-          const first = data.findings[0];
-          setSelectedFindingId(first.id);
-          const fLine = first.lineNumber || first.lineStart || 6;
+          const firstWithFile = data.findings.find((f: any) => f.filePath) || data.findings[0];
+          setSelectedFindingId(firstWithFile.id);
+          const fLine = firstWithFile.lineNumber || firstWithFile.lineStart || 1;
           setActiveFinding({
-            id: first.id,
-            ruleId: first.ruleId || 'CWE-89',
-            title: first.title || 'SQL Injection',
-            description: first.description || 'Vulnerability detected in source code.',
-            severity: first.severity || 'Critical',
-            agent: first.agent || 'SAST',
+            id: firstWithFile.id,
+            ruleId: firstWithFile.ruleId || 'SECURITY-01',
+            title: firstWithFile.title || 'Security Finding',
+            description: firstWithFile.description || 'Vulnerability detected in source code.',
+            severity: firstWithFile.severity || 'Medium',
+            agent: firstWithFile.agent || 'SAST',
             line: fLine,
           });
-          setHighlightedLineStart(fLine);
-          setHighlightedLineEnd(fLine);
-          if (first.filePath) {
-            setCurrentFile(first.filePath);
-            loadFileContent(first.filePath);
+          setHighlightedLineStart(firstWithFile.lineStart || fLine);
+          setHighlightedLineEnd(firstWithFile.lineEnd || fLine);
+          if (firstWithFile.filePath) {
+            setCurrentFile(firstWithFile.filePath);
+            loadFileContent(firstWithFile.filePath);
           }
+        } else {
+          setActiveFinding(null);
+          setSelectedFindingId('');
+          setHighlightedLineStart(0);
+          setHighlightedLineEnd(0);
         }
       }
     } catch (err: any) {
@@ -385,11 +371,25 @@ export const LiveRunWorkspace: React.FC<LiveRunWorkspaceProps> = ({
             status: 'analyzed' as const,
           }))
         );
+        setCurrentFile((prev) => {
+          if (prev) return prev;
+          const candidate =
+            data.files.find((f: string) => f.toLowerCase() === 'deployment.md') ||
+            data.files.find((f: string) => f.toLowerCase() === 'readme.md') ||
+            data.files.find((f: string) => f.toLowerCase().includes('dockerfile')) ||
+            data.files.find((f: string) => f.toLowerCase() === 'package.json') ||
+            data.files[0];
+          if (candidate) {
+            loadFileContent(candidate);
+            return candidate;
+          }
+          return '';
+        });
       }
     } catch {
       // fallback
     }
-  }, [runId]);
+  }, [runId, loadFileContent]);
 
   // Load real tool calls
   const loadToolCalls = useCallback(async () => {
@@ -410,7 +410,9 @@ export const LiveRunWorkspace: React.FC<LiveRunWorkspaceProps> = ({
     loadExecutionEvents();
     loadWorkspaceFiles();
     loadToolCalls();
-    loadFileContent(currentFile);
+    if (currentFile) {
+      loadFileContent(currentFile);
+    }
 
     // WebSocket event stream
     let ws: WebSocket | null = null;
@@ -492,12 +494,30 @@ export const LiveRunWorkspace: React.FC<LiveRunWorkspaceProps> = ({
     return [];
   }, [runData]);
 
+  // Synchronize finding count badges on inspected files
+  useEffect(() => {
+    if (findingsList.length > 0 && workspaceFiles.length > 0) {
+      const counts: Record<string, number> = {};
+      findingsList.forEach((f) => {
+        const p = f.location?.split(':')[0];
+        if (p) counts[p] = (counts[p] || 0) + 1;
+      });
+      setWorkspaceFiles((prev) =>
+        prev.map((item) => ({
+          ...item,
+          findingsCount: counts[item.path] || 0,
+        }))
+      );
+    }
+  }, [findingsList]);
+
   const activeRepo = runData?.repository || repositoryName;
   const activeBranch = runData?.branch || branchName;
   const activeCommit = runData?.commit || 'e211770';
   const runDisplayNumber = runData?.runNumber || runId.slice(0, 8).toUpperCase();
 
   const formatElapsed = (secs: number) => {
+    if (runData?.elapsed) return runData.elapsed;
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
@@ -707,8 +727,8 @@ export const LiveRunWorkspace: React.FC<LiveRunWorkspaceProps> = ({
           'Execution Graph',
           'Execution Map',
           'Agents (12)',
-          `Files (${workspaceFiles.length > 0 ? workspaceFiles.length : '1,284'})`,
-          `Findings (${findingsList.length > 0 ? findingsList.length : '24'})`,
+          `Files (${workspaceFiles.length})`,
+          `Findings (${findingsList.length})`,
           'Artifacts',
           'Timeline',
         ].map((tab) => {
@@ -729,8 +749,8 @@ export const LiveRunWorkspace: React.FC<LiveRunWorkspaceProps> = ({
                 if (tab.startsWith('Execution Graph')) setActiveViewTab('Execution Graph');
                 else if (tab.startsWith('Execution Map')) setActiveViewTab('Execution Map');
                 else if (tab.startsWith('Agents')) setActiveViewTab('Agents (12)');
-                else if (tab.startsWith('Files')) setActiveViewTab('Files (1,284)');
-                else if (tab.startsWith('Findings')) setActiveViewTab('Findings (24)');
+                else if (tab.startsWith('Files')) setActiveViewTab(`Files (${workspaceFiles.length})` as any);
+                else if (tab.startsWith('Findings')) setActiveViewTab(`Findings (${findingsList.length})` as any);
                 else if (tab.startsWith('Artifacts')) setActiveViewTab('Artifacts');
                 else if (tab.startsWith('Timeline')) setActiveViewTab('Timeline');
               }}

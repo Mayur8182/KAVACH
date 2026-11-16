@@ -620,6 +620,8 @@ export default function RemediationPage() {
   const [isCreatingPr,      setIsCreatingPr]      = useState(false);
   const [createdPrNumber,   setCreatedPrNumber]   = useState<string>('#1');
   const [createdPrUrl,      setCreatedPrUrl]      = useState<string | null>(null);
+  const [prErrorDetails,    setPrErrorDetails]    = useState<any>(null);
+  const [customPat,         setCustomPat]         = useState<string>('');
 
   // Load Real Findings from Backend (100+ findings support)
   const loadFindings = async () => {
@@ -806,20 +808,24 @@ export default function RemediationPage() {
       setVerifyProgress(100);
       setVerifyPhase('done');
       setIsVerifying(false);
-      const errMsg = err?.detail || err?.message || 'Deterministic re-scan failed: Vulnerability boundary still active.';
-      toast.error(errMsg);
+      const errMsg = err?.detail?.message || err?.detail || err?.message || 'Deterministic re-scan failed: Vulnerability boundary still active.';
+      toast.error(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg));
     }
   };
 
   // Step 5: Create Pull Request
-  const handleExecuteCreatePr = async () => {
+  const handleExecuteCreatePr = async (patOverride?: string) => {
     if (!activeFinding) return;
     setIsCreatingPr(true);
+    setPrErrorDetails(null);
     try {
       const targetRepo = selectedApi?.repository || (selectedApi?.name ? selectedApi.name.replace(' Code Inventory', '') : (currentRepository?.name || 'repository'));
       const res = await api.apiSecurity.createFindingPr(activeFinding.id, {
         repo_name: targetRepo,
         branch: targetBranch,
+        title: prTitle,
+        body: prDescription,
+        github_pat: patOverride || (customPat.trim() ? customPat.trim() : undefined),
       });
       const prNum = res?.pr_number ? `#${res.pr_number}` : '#1';
       setCreatedPrNumber(prNum);
@@ -831,11 +837,32 @@ export default function RemediationPage() {
       setFindings((prev) =>
         prev.map((f) => (f.id === activeFinding.id ? { ...f, status: 'REMEDIATED' } : f))
       );
+      setPrErrorDetails(null);
       setCurrentStep(6);
     } catch (err: any) {
       console.error('Failed to create PR:', err);
-      const errMsg = err?.detail || err?.message || 'Failed to create Pull Request on GitHub. Verify your repository permissions.';
-      toast.error(errMsg);
+      let details: any = null;
+      if (err?.detail && typeof err.detail === 'object') {
+        details = err.detail;
+      } else {
+        const raw = String(err?.detail || err?.message || '');
+        if (raw.includes('GITHUB_APP_NOT_INSTALLED') || raw.includes('Resource not accessible') || raw.includes('403')) {
+          details = {
+            error_type: 'GITHUB_APP_NOT_INSTALLED',
+            message: `The GitHub App 'Kavach Security' is not installed on repository '${selectedApi?.repository || (currentRepository?.name || 'Mayur8182/RentalHub')}', or lacks write permissions. Install the App or retry with a Personal Access Token (PAT).`,
+            install_url: 'https://github.com/apps/kavach-security/installations/new',
+            repo_name: selectedApi?.repository || (currentRepository?.name || 'Mayur8182/RentalHub'),
+            branch_name: targetBranch,
+          };
+        }
+      }
+      if (details) {
+        setPrErrorDetails(details);
+        toast.error(details.message || 'GitHub permissions error occurred.');
+      } else {
+        const errMsg = err?.detail || err?.message || 'Failed to create Pull Request on GitHub. Verify repository permissions.';
+        toast.error(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg));
+      }
     } finally {
       setIsCreatingPr(false);
     }
@@ -1721,6 +1748,155 @@ export default function RemediationPage() {
                 </div>
               </div>
 
+              {/* GitHub App & PAT Diagnostics Banner */}
+              {prErrorDetails && (
+                <div
+                  style={{
+                    background: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    borderRadius: '10px',
+                    padding: '16px 18px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <AlertCircle size={18} color="#2563EB" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#1E3A8A' }}>
+                        GitHub App Installation or Personal Access Token (PAT) Required
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#1E40AF', marginTop: '3px', lineHeight: 1.5 }}>
+                        GitHub returned <strong>Resource not accessible by integration</strong>. This happens when the GitHub App &apos;Kavach Security&apos; has not yet been installed on your repository ({prErrorDetails.repo_name || 'Mayur8182/RentalHub'}), or if using a User token without write permissions.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                    <a
+                      href={prErrorDetails.install_url || 'https://github.com/apps/kavach-security/installations/new'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: '#2563EB',
+                        color: '#FFFFFF',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <ExternalLink size={13} />
+                      Install Kavach App on GitHub
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cmds = prErrorDetails.git_commands || `git checkout -b ${targetBranch}\ngit apply security-fix.patch\ngit commit -am "fix(security): Remediate finding"\ngit push origin ${targetBranch}`;
+                        navigator.clipboard.writeText(cmds);
+                        toast.success('Copied Git CLI commands to clipboard!');
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: '#FFFFFF',
+                        border: '1px solid #BFDBFE',
+                        color: '#1E40AF',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Copy size={13} />
+                      Copy Git CLI Commands
+                    </button>
+
+                    {activeFinding?.remediation_patch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const blob = new Blob([activeFinding.remediation_patch], { type: 'text/plain;charset=utf-8' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `kavach-security-fix-${activeFinding.id.slice(0, 8)}.patch`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                          toast.success('Downloaded unified diff .patch file!');
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 14px',
+                          background: '#FFFFFF',
+                          border: '1px solid #BFDBFE',
+                          color: '#1E40AF',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Code2 size={13} />
+                        Download .patch
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ marginTop: '8px', borderTop: '1px solid #DBEAFE', paddingTop: '10px' }}>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#1E3A8A', marginBottom: '4px' }}>
+                      Or authenticate directly with a Personal Access Token (PAT):
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="password"
+                        placeholder="ghp_... (with repo scope)"
+                        value={customPat}
+                        onChange={(e) => setCustomPat(e.target.value)}
+                        style={{
+                          flex: 1,
+                          height: '34px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #93C5FD',
+                          fontSize: '12px',
+                          fontFamily: sans,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={!customPat.trim() || isCreatingPr}
+                        onClick={() => handleExecuteCreatePr(customPat.trim())}
+                        style={{
+                          padding: '0 14px',
+                          height: '34px',
+                          background: customPat.trim() ? '#1D4ED8' : '#94A3B8',
+                          color: '#FFFFFF',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: customPat.trim() && !isCreatingPr ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        Retry PR with PAT
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Bottom Actions */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <button
@@ -1861,6 +2037,155 @@ export default function RemediationPage() {
                 </div>
               </div>
 
+              {/* GitHub App & PAT Diagnostics Banner */}
+              {prErrorDetails && (
+                <div
+                  style={{
+                    background: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    borderRadius: '10px',
+                    padding: '16px 18px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <AlertCircle size={18} color="#2563EB" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#1E3A8A' }}>
+                        GitHub App Installation or Personal Access Token (PAT) Required
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#1E40AF', marginTop: '3px', lineHeight: 1.5 }}>
+                        GitHub returned <strong>Resource not accessible by integration</strong>. This happens when the GitHub App &apos;Kavach Security&apos; has not yet been installed on your repository ({prErrorDetails.repo_name || 'Mayur8182/RentalHub'}), or if using a User token without write permissions.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                    <a
+                      href={prErrorDetails.install_url || 'https://github.com/apps/kavach-security/installations/new'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: '#2563EB',
+                        color: '#FFFFFF',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <ExternalLink size={13} />
+                      Install Kavach App on GitHub
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cmds = prErrorDetails.git_commands || `git checkout -b ${targetBranch}\ngit apply security-fix.patch\ngit commit -am "fix(security): Remediate finding"\ngit push origin ${targetBranch}`;
+                        navigator.clipboard.writeText(cmds);
+                        toast.success('Copied Git CLI commands to clipboard!');
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: '#FFFFFF',
+                        border: '1px solid #BFDBFE',
+                        color: '#1E40AF',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Copy size={13} />
+                      Copy Git CLI Commands
+                    </button>
+
+                    {activeFinding?.remediation_patch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const blob = new Blob([activeFinding.remediation_patch], { type: 'text/plain;charset=utf-8' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `kavach-security-fix-${activeFinding.id.slice(0, 8)}.patch`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                          toast.success('Downloaded unified diff .patch file!');
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 14px',
+                          background: '#FFFFFF',
+                          border: '1px solid #BFDBFE',
+                          color: '#1E40AF',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Code2 size={13} />
+                        Download .patch
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ marginTop: '8px', borderTop: '1px solid #DBEAFE', paddingTop: '10px' }}>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#1E3A8A', marginBottom: '4px' }}>
+                      Or authenticate directly with a Personal Access Token (PAT):
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="password"
+                        placeholder="ghp_... (with repo scope)"
+                        value={customPat}
+                        onChange={(e) => setCustomPat(e.target.value)}
+                        style={{
+                          flex: 1,
+                          height: '34px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #93C5FD',
+                          fontSize: '12px',
+                          fontFamily: sans,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={!customPat.trim() || isCreatingPr}
+                        onClick={() => handleExecuteCreatePr(customPat.trim())}
+                        style={{
+                          padding: '0 14px',
+                          height: '34px',
+                          background: customPat.trim() ? '#1D4ED8' : '#94A3B8',
+                          color: '#FFFFFF',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: customPat.trim() && !isCreatingPr ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        Retry PR with PAT
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Bottom Actions */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <button
@@ -1999,6 +2324,155 @@ export default function RemediationPage() {
                   />
                 </div>
               </div>
+
+              {/* GitHub App & PAT Diagnostics Banner */}
+              {prErrorDetails && (
+                <div
+                  style={{
+                    background: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    borderRadius: '10px',
+                    padding: '16px 18px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <AlertCircle size={18} color="#2563EB" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#1E3A8A' }}>
+                        GitHub App Installation or Personal Access Token (PAT) Required
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#1E40AF', marginTop: '3px', lineHeight: 1.5 }}>
+                        GitHub returned <strong>Resource not accessible by integration</strong>. This happens when the GitHub App &apos;Kavach Security&apos; has not yet been installed on your repository ({prErrorDetails.repo_name || 'Mayur8182/RentalHub'}), or if using a User token without write permissions.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                    <a
+                      href={prErrorDetails.install_url || 'https://github.com/apps/kavach-security/installations/new'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: '#2563EB',
+                        color: '#FFFFFF',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <ExternalLink size={13} />
+                      Install Kavach App on GitHub
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cmds = prErrorDetails.git_commands || `git checkout -b ${targetBranch}\ngit apply security-fix.patch\ngit commit -am "fix(security): Remediate finding"\ngit push origin ${targetBranch}`;
+                        navigator.clipboard.writeText(cmds);
+                        toast.success('Copied Git CLI commands to clipboard!');
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: '#FFFFFF',
+                        border: '1px solid #BFDBFE',
+                        color: '#1E40AF',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Copy size={13} />
+                      Copy Git CLI Commands
+                    </button>
+
+                    {activeFinding?.remediation_patch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const blob = new Blob([activeFinding.remediation_patch], { type: 'text/plain;charset=utf-8' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `kavach-security-fix-${activeFinding.id.slice(0, 8)}.patch`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                          toast.success('Downloaded unified diff .patch file!');
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 14px',
+                          background: '#FFFFFF',
+                          border: '1px solid #BFDBFE',
+                          color: '#1E40AF',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Code2 size={13} />
+                        Download .patch
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ marginTop: '8px', borderTop: '1px solid #DBEAFE', paddingTop: '10px' }}>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#1E3A8A', marginBottom: '4px' }}>
+                      Or authenticate directly with a Personal Access Token (PAT):
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="password"
+                        placeholder="ghp_... (with repo scope)"
+                        value={customPat}
+                        onChange={(e) => setCustomPat(e.target.value)}
+                        style={{
+                          flex: 1,
+                          height: '34px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #93C5FD',
+                          fontSize: '12px',
+                          fontFamily: sans,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={!customPat.trim() || isCreatingPr}
+                        onClick={() => handleExecuteCreatePr(customPat.trim())}
+                        style={{
+                          padding: '0 14px',
+                          height: '34px',
+                          background: customPat.trim() ? '#1D4ED8' : '#94A3B8',
+                          color: '#FFFFFF',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: customPat.trim() && !isCreatingPr ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        Retry PR with PAT
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Bottom Actions */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

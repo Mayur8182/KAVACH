@@ -550,12 +550,23 @@ async def get_run_file_content(
     wm = GitHubWorkspaceManager()
     clean_path = file_path.replace("\\", "/").lstrip("/")
 
-    # 1. Check isolated job workspace
-    workspace_dir = wm._get_job_workspace_path(scan.id)
-    target_abs = os.path.abspath(os.path.join(workspace_dir, clean_path))
-    if target_abs.startswith(os.path.abspath(workspace_dir)) and os.path.isfile(target_abs):
-        with open(target_abs, "r", encoding="utf-8", errors="replace") as f:
-            return {"file": clean_path, "content": f.read()}
+    # 1. Check isolated job workspace and repository mirror caches
+    candidate_dirs = [
+        wm._get_job_workspace_path(scan.id),
+        os.path.abspath(os.path.join(wm.base_dir, f"job_{getattr(scan.id, 'hex', str(scan.id))}")),
+    ]
+    if scan.target_path:
+        repo_name = scan.target_path.split("/")[-1]
+        candidate_dirs.append(os.path.abspath(os.path.join(wm.base_dir, repo_name)))
+        candidate_dirs.append(os.path.abspath(os.path.join("backend/scratch/github_workspaces", repo_name)))
+        candidate_dirs.append(os.path.abspath(os.path.join("scratch/github_workspaces", repo_name)))
+
+    for workspace_dir in candidate_dirs:
+        if os.path.isdir(workspace_dir):
+            target_abs = os.path.abspath(os.path.join(workspace_dir, clean_path))
+            if target_abs.startswith(os.path.abspath(workspace_dir)) and os.path.isfile(target_abs):
+                with open(target_abs, "r", encoding="utf-8", errors="replace") as f:
+                    return {"file": clean_path, "content": f.read()}
 
     # 2. Check if finding exists in database for this scan with code snippet
     finding_stmt = (

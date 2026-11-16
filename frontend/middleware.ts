@@ -24,7 +24,6 @@ export function middleware(request: NextRequest) {
     '/policies',
     '/integrations',
     '/audit-logs',
-    '/security',
     '/cloud',
     '/kubernetes',
     '/ci-cd',

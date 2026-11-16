@@ -1033,3 +1033,59 @@ async def generate_cloud_report(
         actor_email=current_user.email,
     )
 
+
+@router.get(
+    "/reports/{report_id}/download",
+    summary="Download Signed Cloud Posture Audit or Remediation Certificate (PDF, Markdown, JSON)",
+)
+async def download_cloud_report(
+    report_id: str,
+    format: Optional[str] = Query("PDF", description="PDF, MARKDOWN, or JSON"),
+    project_id: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.reporting_engine import ReportingEngineService
+    from fastapi.responses import Response, PlainTextResponse
+    from datetime import datetime, timezone
+    import json
+
+    svc = ReportingEngineService(db, current_user)
+    # Determine if this is a remediation certificate or posture audit
+    is_cert = "CERT" in report_id.upper() or "REMEDIATION" in report_id.upper()
+    canonical_id = "KAV-RPT-08" if is_cert else "KAV-RPT-07"
+
+    proj_uuid = await _resolve_project_id(db, project_id, current_user.id)
+    report_data = await svc.aggregate_report_data(
+        report_id=canonical_id,
+        project_id=str(proj_uuid),
+        timeframe="30d",
+    )
+    fmt = (format or "PDF").upper().strip()
+    safe_name = f"cloud_report_{report_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+
+    if fmt == "PDF":
+        pdf_bytes = svc.generate_pdf(report_data)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.pdf"'},
+        )
+    elif fmt in ("MD", "MARKDOWN"):
+        meta = report_data["metadata"]
+        md_content = f"# {meta['title']}\n\n**Report ID:** {meta['report_id']}\n**Project:** {meta['project_or_assessment_name']}\n**Generated:** {meta['generated_at_utc']}\n\n## Key Measures\n"
+        for m in report_data.get("key_measures", []):
+            md_content += f"- **{m['measure']}:** {m['value']} ({m['source']})\n"
+        md_content += f"\n## Provenance\n- Hash: `{report_data['provenance']['canonical_payload_hash']}`\n- Verification: {report_data['provenance']['signature_verification']}\n"
+        return PlainTextResponse(
+            content=md_content,
+            media_type="text/markdown",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.md"'},
+        )
+    else:
+        return Response(
+            content=json.dumps(report_data, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.json"'},
+        )
+

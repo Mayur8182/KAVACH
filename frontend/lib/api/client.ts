@@ -905,7 +905,18 @@ class ThingApiClient {
       email?: string;
     }> => {
       const targetEmail = typeof payload === 'string' ? payload : payload?.email;
-      return this.auth.devInstantVerify(targetEmail);
+      const res = await this.request<{
+        status: string;
+        message: string;
+        verified: boolean;
+        expired: boolean;
+        email?: string;
+      }>('/api/v1/auth/verify-email/dev-instant', {
+        method: 'POST',
+        body: JSON.stringify({ email: targetEmail }),
+        skipAuth: true,
+      });
+      return res.data;
     },
     checkEmailStatus: async (email: string): Promise<{
       status: string;
@@ -926,9 +937,21 @@ class ThingApiClient {
       });
       return res.data;
     },
-    getGithubAuthUrl: async (redirectUri?: string): Promise<{ url: string; client_id: string; redirect_uri: string; state: string }> => {
-      const q = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
-      const res = await this.request<any>(`/api/v1/auth/github/url${q}`, {
+    getGithubAuthUrl: async (
+      paramsOrRedirect?: any
+    ): Promise<{ url: string; client_id: string; redirect_uri: string; state: string }> => {
+      let qs = '';
+      if (typeof paramsOrRedirect === 'string') {
+        qs = `?return_url=${encodeURIComponent(paramsOrRedirect)}`;
+      } else if (paramsOrRedirect) {
+        const q = new URLSearchParams();
+        if (paramsOrRedirect.return_url) q.append('return_url', paramsOrRedirect.return_url);
+        if (paramsOrRedirect.redirect_uri) q.append('return_url', paramsOrRedirect.redirect_uri);
+        if (paramsOrRedirect.project_id) q.append('project_id', paramsOrRedirect.project_id);
+        if (paramsOrRedirect.workspace_id) q.append('workspace_id', paramsOrRedirect.workspace_id);
+        qs = q.toString() ? `?${q.toString()}` : '';
+      }
+      const res = await this.request<any>(`/api/v1/auth/github/url${qs}`, {
         skipAuth: true,
       });
       return res.data;
@@ -939,6 +962,7 @@ class ThingApiClient {
       user: any;
       github_login?: string;
       avatar_url?: string;
+      is_new_user?: boolean;
     }> => {
       const res = await this.request<any>('/api/v1/auth/github/callback', {
         method: 'POST',
@@ -949,18 +973,43 @@ class ThingApiClient {
       });
       return res.data;
     },
-    getGoogleAuthUrl: async (): Promise<{ url: string; client_id: string; redirect_uri: string; state: string }> => {
-      const res = await this.request<any>('/api/v1/auth/google/url', {
+    getGoogleAuthUrl: async (redirect_uri?: string): Promise<{ url: string; client_id: string; redirect_uri: string; state: string }> => {
+      const endpoint = redirect_uri ? `/api/v1/auth/google/url?redirect_uri=${encodeURIComponent(redirect_uri)}` : '/api/v1/auth/google/url';
+      const res = await this.request<any>(endpoint, {
         skipAuth: true,
       });
       return res.data;
     },
-    googleCallback: async (payload: { code: string; state?: string }): Promise<{
+    getGoogleConfig: async (): Promise<{ client_id: string; one_tap_enabled: boolean }> => {
+      const res = await this.request<any>('/api/v1/auth/google/config', {
+        skipAuth: true,
+      });
+      return res.data;
+    },
+    googleOneTap: async (payload: { credential: string; g_csrf_token?: string }): Promise<{
       access_token: string;
       token_type: string;
       user: any;
       email?: string;
       picture?: string;
+      is_new_user?: boolean;
+    }> => {
+      const res = await this.request<any>('/api/v1/auth/google/one-tap', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        skipAuth: true,
+        timeoutMs: 45000,
+        retries: 0,
+      });
+      return res.data;
+    },
+    googleCallback: async (payload: { code: string; state?: string; redirect_uri?: string }): Promise<{
+      access_token: string;
+      token_type: string;
+      user: any;
+      email?: string;
+      picture?: string;
+      is_new_user?: boolean;
     }> => {
       const res = await this.request<any>('/api/v1/auth/google/callback', {
         method: 'POST',
@@ -1621,6 +1670,32 @@ class ThingApiClient {
       return res.data;
     },
 
+    getSlackStatus: async (projectId?: string | null): Promise<{ connected: boolean; workspace_name?: string; channel?: string; message?: string }> => {
+      const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const res = await this.request<any>(`/api/v1/integrations/slack/status${q}`);
+      return res.data;
+    },
+
+    getSlackAuthUrl: async (redirectUri?: string): Promise<{ configured: boolean; url: string | null; workspace_name?: string }> => {
+      const q = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
+      const res = await this.request<any>(`/api/v1/integrations/slack/authorize${q}`);
+      return res.data;
+    },
+
+    getSlackChannels: async (): Promise<{ channels: Array<{ id: string; name: string; is_default: boolean; description?: string }>; total: number }> => {
+      const res = await this.request<any>('/api/v1/integrations/slack/channels');
+      return res.data;
+    },
+
+    connectSlack: async (payload: { workspace_name?: string; channel: string; project_id?: string; webhook_url?: string }): Promise<{ success: boolean; connected: boolean; message?: string }> => {
+      const res = await this.request<any>('/api/v1/integrations/slack/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+
     updateRepoSelection: async (provider: string, selectedIds: string[]): Promise<any> => {
       const res = await this.request<any>(`/api/v1/integrations/${encodeURIComponent(provider)}/repositories/select`, {
         method: 'POST',
@@ -2187,6 +2262,22 @@ class ThingApiClient {
       const res = await this.request<any>(`/api/v1/projects/${encodeURIComponent(projectId)}/github/status`);
       return res.data;
     },
+    getStatus: async (workspaceId?: string, projectId?: string): Promise<any> => {
+      const q = new URLSearchParams();
+      if (workspaceId) q.set('workspace_id', workspaceId);
+      if (projectId) q.set('project_id', projectId);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      const res = await this.request<any>(`/api/v1/integrations/github/status${qs}`);
+      return res.data;
+    },
+    getRepositories: async (workspaceId?: string, projectId?: string): Promise<any[]> => {
+      const q = new URLSearchParams();
+      if (workspaceId) q.set('workspace_id', workspaceId);
+      if (projectId) q.set('project_id', projectId);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      const res = await this.request<any[]>(`/api/v1/integrations/github/repositories${qs}`);
+      return res.data || [];
+    },
     verifyProjectInstallation: async (projectId: string, installationId: number): Promise<any[]> => {
       const res = await this.request<any[]>(`/api/v1/projects/${encodeURIComponent(projectId)}/github/verify`, {
         method: 'POST',
@@ -2212,6 +2303,124 @@ class ThingApiClient {
       const res = await this.request<any>(`/api/v1/projects/${encodeURIComponent(projectId)}/github/repositories`, {
         method: 'POST',
         body: JSON.stringify(repository),
+      });
+      return res.data;
+    },
+    getInstallUrl: async (params?: {
+      project_id?: string;
+      workspace_id?: string;
+      redirect_url?: string;
+    }): Promise<{
+      install_url: string;
+      url: string;
+      state: string;
+      app_id: string;
+      app_slug: string;
+    }> => {
+      const res = await this.request<any>('/api/v1/integrations/github/install-url', {
+        method: 'POST',
+        body: JSON.stringify(params || {}),
+      });
+      return res.data;
+    },
+    getIntegrationStatus: async (params?: {
+      workspace_id?: string;
+      project_id?: string;
+    }): Promise<{
+      configured: boolean;
+      connected: boolean;
+      app_id: string;
+      app_slug: string;
+      client_id: string;
+      installations_count: number;
+      repositories_count: number;
+      primary_account?: string | null;
+      status: string;
+      message?: string | null;
+      installations: Array<{
+        id: string;
+        github_installation_id: number;
+        account_login: string;
+        account_type: string;
+        repository_selection: string;
+        status: string;
+        repositories_count: number;
+        created_at: string;
+      }>;
+    }> => {
+      const q = new URLSearchParams();
+      if (params?.workspace_id) q.set('workspace_id', params.workspace_id);
+      if (params?.project_id) q.set('project_id', params.project_id);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      const res = await this.request<any>(`/api/v1/integrations/github/status${qs}`);
+      return res.data;
+    },
+    listInstallations: async (params?: {
+      workspace_id?: string;
+      project_id?: string;
+    }): Promise<{
+      installations: Array<any>;
+      total: number;
+    }> => {
+      const q = new URLSearchParams();
+      if (params?.workspace_id) q.set('workspace_id', params.workspace_id);
+      if (params?.project_id) q.set('project_id', params.project_id);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      const res = await this.request<any>(`/api/v1/integrations/github/installations${qs}`);
+      return res.data;
+    },
+    listAccessibleRepositories: async (params?: {
+      workspace_id?: string;
+      project_id?: string;
+      installation_id?: number;
+    }): Promise<any[]> => {
+      const q = new URLSearchParams();
+      if (params?.workspace_id) q.set('workspace_id', params.workspace_id);
+      if (params?.project_id) q.set('project_id', params.project_id);
+      if (params?.installation_id) q.set('installation_id', String(params.installation_id));
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      const res = await this.request<any[]>(`/api/v1/integrations/github/repositories${qs}`);
+      return res.data || [];
+    },
+    listInstallationRepositories: async (installationId: number): Promise<any[]> => {
+      const res = await this.request<any[]>(`/api/v1/integrations/github/installations/${installationId}/repositories`);
+      return res.data || [];
+    },
+    syncInstallation: async (installationId: number, params?: {
+      workspace_id?: string;
+      project_id?: string;
+    }): Promise<any[]> => {
+      const q = new URLSearchParams();
+      if (params?.workspace_id) q.set('workspace_id', params.workspace_id);
+      if (params?.project_id) q.set('project_id', params.project_id);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      const res = await this.request<any[]>(`/api/v1/integrations/github/installations/${installationId}/sync${qs}`, {
+        method: 'POST',
+      });
+      return res.data || [];
+    },
+    disconnectInstallation: async (installationId: number): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/integrations/github/installations/${installationId}`, {
+        method: 'DELETE',
+      });
+      return res.data;
+    },
+    selectRepository: async (repositoryId: string, projectId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/integrations/github/repositories/${encodeURIComponent(repositoryId)}/select`, {
+        method: 'POST',
+        body: JSON.stringify({ project_id: projectId }),
+      });
+      return res.data;
+    },
+    scanRepository: async (repositoryId: string, payload?: {
+      ref?: string;
+      branch?: string;
+      commit_sha?: string;
+      event_type?: string;
+    }): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/integrations/github/repositories/${encodeURIComponent(repositoryId)}/scan`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
       });
       return res.data;
     },
@@ -11400,49 +11609,6 @@ class ThingApiClient {
       name: string;
       email: string;
       company: string;
-      job_title?: string;
-      phone?: string;
-      team_size?: string;
-      cloud_provider?: string;
-      deployment_target?: string;
-      primary_focus?: string;
-      current_tooling?: string;
-      notes?: string;
-    }): Promise<any> => {
-      const res = await this.request<any>('/api/v1/sales/request-demo', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      return res.data;
-    },
-
-    contactSales: async (payload: {
-      name: string;
-      email: string;
-      company: string;
-      phone?: string;
-      team_size?: string;
-      deployment_target?: string;
-      message: string;
-    }): Promise<any> => {
-      const res = await this.request<any>('/api/v1/sales/contact-sales', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      return res.data;
-    },
-
-    enterpriseInquiry: async (payload: {
-      name: string;
-      email: string;
-      company: string;
-      team_size?: string;
-      compliance_frameworks?: string[];
-      deployment_target?: string;
-      estimated_developer_seats?: number;
-      hsm_agent_signing_required?: boolean;
-      custom_sla_required?: boolean;
-      requirements_overview: string;
     }): Promise<any> => {
       const res = await this.request<any>('/api/v1/sales/enterprise-inquiry', {
         method: 'POST',
@@ -13912,26 +14078,7 @@ class ThingApiClient {
       });
       return res.data;
     },
-    listIntegrations: async (): Promise<{ items: any[] }> => {
-      const res = await this.request<{ items: any[] }>('/api/v1/api-security/integrations');
-      return res.data;
-    },
-    connectIntegration: async (payload: { provider: string; token?: string; account_name?: string; instance_url?: string; webhook_url?: string; api_token?: string; channel?: string; secret?: string }): Promise<any> => {
-      const res = await this.request<any>('/api/v1/api-security/integrations/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      return res.data;
-    },
-    disconnectIntegration: async (payload: { provider: string }): Promise<any> => {
-      const res = await this.request<any>('/api/v1/api-security/integrations/disconnect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      return res.data;
-    },
+
     scanCode: async (payload: { files: Record<string, string>; name?: string; project_id?: string | null; branch?: string }): Promise<any> => {
       const res = await this.request<any>('/api/v1/api-security/code/scan', {
         method: 'POST',
@@ -13977,6 +14124,26 @@ class ThingApiClient {
       });
       return res.data;
     },
+    startAutofix: async (findingId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/findings/${encodeURIComponent(findingId)}/autofix/start`, {
+        method: 'POST',
+        timeoutMs: 90000,
+      });
+      return res.data;
+    },
+    getAutofixStatus: async (findingId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/findings/${encodeURIComponent(findingId)}/autofix/status`, {
+        timeoutMs: 30000,
+      });
+      return res.data;
+    },
+    resolveAutofix: async (findingId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/findings/${encodeURIComponent(findingId)}/autofix/resolve`, {
+        method: 'POST',
+        timeoutMs: 30000,
+      });
+      return res.data;
+    },
     applyFindingFix: async (findingId: string): Promise<any> => {
       const res = await this.request<any>(`/api/v1/api-security/findings/${encodeURIComponent(findingId)}/apply-fix`, {
         method: 'POST',
@@ -13991,12 +14158,22 @@ class ThingApiClient {
       });
       return res.data;
     },
-    createFindingPr: async (findingId: string, payload?: { repo_name?: string; branch?: string }): Promise<any> => {
+    createFindingPr: async (findingId: string, payload?: { repo_name?: string; branch?: string; title?: string; body?: string; github_pat?: string }): Promise<any> => {
       const res = await this.request<any>(`/api/v1/api-security/findings/${encodeURIComponent(findingId)}/create-pr`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload || {}),
         timeoutMs: 90000,
+      });
+      return res.data;
+    },
+    getRepositoryIntelligence: async (repoName: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/repositories/${encodeURIComponent(repoName)}/intelligence`);
+      return res.data;
+    },
+    refineScanFindings: async (scanId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/scans/${encodeURIComponent(scanId)}/refine`, {
+        method: 'POST',
       });
       return res.data;
     },
@@ -14072,6 +14249,55 @@ class ThingApiClient {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ policies, api_id: apiId }),
       });
+      return res.data;
+    },
+    listIntegrations: async (): Promise<{ total: number; items: any[] }> => {
+      const res = await this.request<{ total: number; items: any[] }>('/api/v1/api-security/integrations');
+      return res.data;
+    },
+    connectIntegration: async (payload: {
+      provider: string;
+      token?: string;
+      api_token?: string;
+      account_name?: string;
+      instance_url?: string;
+      webhook_url?: string;
+      workspace_id?: string;
+      client_id?: string;
+      client_secret?: string;
+      channel?: string;
+      secret?: string;
+      auto_sync?: boolean;
+    }): Promise<any> => {
+      const res = await this.request<any>('/api/v1/api-security/integrations/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+    disconnectIntegration: async (provider: string): Promise<any> => {
+      const res = await this.request<any>('/api/v1/api-security/integrations/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider }),
+      });
+      return res.data;
+    },
+    syncIntegration: async (provider: string, apiId?: string): Promise<any> => {
+      const q = apiId ? `?api_id=${encodeURIComponent(apiId)}` : '';
+      const res = await this.request<any>(`/api/v1/api-security/integrations/${encodeURIComponent(provider)}/sync${q}`, {
+        method: 'POST',
+      });
+      return res.data;
+    },
+    testIntegration: async (provider: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/api-security/integrations/${encodeURIComponent(provider)}/test`);
+      return res.data;
+    },
+    exportSarif: async (apiId?: string): Promise<any> => {
+      const q = apiId ? `?api_id=${encodeURIComponent(apiId)}` : '';
+      const res = await this.request<any>(`/api/v1/api-security/integrations/export/sarif${q}`);
       return res.data;
     },
   };

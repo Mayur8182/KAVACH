@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FolderGit2, GitBranch, Calendar, ChevronDown } from 'lucide-react';
+import { FolderGit2, GitBranch, Calendar, ChevronDown, Download } from 'lucide-react';
 import { api } from '@/lib/api/client';
 
 interface DependencyReportsSubnavProps {
@@ -145,6 +145,57 @@ export const DependencyReportsSubnav: React.FC<DependencyReportsSubnavProps> = (
               ))}
             </select>
             <ChevronDown size={12} color="#94A3B8" />
+          </div>
+
+          {/* Export SCA Report Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              onClick={() => {
+                const rep = selectedRepo !== 'all' ? selectedRepo : '';
+                const br = selectedBranch !== 'all' ? selectedBranch : 'main';
+                window.open(`/api/v1/dependency-reports/export?format=PDF&repository=${rep}&branch=${br}&timeframe=${selectedTimeframe}`, '_blank');
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#0F172A',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '7px 14px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              title="Download SCA & Supply Chain Risk Audit (PDF)"
+            >
+              <Download size={13} color="#FFFFFF" />
+              <span>Export SCA (PDF)</span>
+            </button>
+            <button
+              onClick={() => {
+                const rep = selectedRepo !== 'all' ? selectedRepo : '';
+                const br = selectedBranch !== 'all' ? selectedBranch : 'main';
+                window.open(`/api/v1/dependency-reports/export?format=CSV&repository=${rep}&branch=${br}&timeframe=${selectedTimeframe}`, '_blank');
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                backgroundColor: '#FFFFFF',
+                color: '#334155',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                padding: '7px 12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              title="Download CSV findings"
+            >
+              <span>CSV</span>
+            </button>
           </div>
         </div>
       </div>

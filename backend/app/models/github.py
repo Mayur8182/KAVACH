@@ -25,10 +25,26 @@ class GitHubInstallation(Base, TimestampMixin):
         primary_key=True,
         default=uuid.uuid4,
     )
+    workspace_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
+    connected_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
     project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("projects.id", ondelete="SET NULL"),
         index=True,
+        nullable=True,
+    )
+    app_id: Mapped[Optional[str]] = mapped_column(
+        String(50),
         nullable=True,
     )
     github_installation_id: Mapped[int] = mapped_column(
@@ -72,6 +88,22 @@ class GitHubInstallation(Base, TimestampMixin):
         DateTime(timezone=True),
         nullable=True,
     )
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    @property
+    def github_account_type(self) -> str:
+        return self.account_type
+
+    @property
+    def installation_status(self) -> str:
+        return self.status
+
+    @property
+    def permissions_metadata(self) -> Optional[Dict[str, Any]]:
+        return self.permissions
 
     # Relationships
     project: Mapped[Optional["Project"]] = relationship("Project")

@@ -21,6 +21,7 @@ import {
   FolderGit2,
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
+import { trackGitHubConnect } from '@/lib/analytics/gtag';
 import { useApiSecurity } from '../context/ApiSecurityContext';
 
 // GitHub icon SVG
@@ -102,12 +103,15 @@ export function ApiSecurityGithubModal({ isOpen, onClose, onSuccess }: ApiSecuri
     }
   }, [apiRepositories, selectedApi, selectedRepo]);
 
+  const isRepoPrivate = (r: any) => Boolean(r.private === true || String(r.visibility || '').toLowerCase() === 'private');
+  const isRepoPublic = (r: any) => !isRepoPrivate(r);
+
   // Counts for tabs
   const tabCounts = useMemo(() => {
-    const total = apiRepositories.length || 64;
-    const linked = apiRepositories.filter((r: any) => Boolean(r.is_linked)).length || 12;
-    const priv = apiRepositories.filter((r: any) => Boolean(r.visibility === 'private' || r.private)).length || 18;
-    const pub = apiRepositories.filter((r: any) => Boolean(r.visibility === 'public' || !r.private)).length || 46;
+    const total = apiRepositories.length;
+    const linked = apiRepositories.filter((r: any) => Boolean(r.is_linked)).length;
+    const priv = apiRepositories.filter(isRepoPrivate).length;
+    const pub = apiRepositories.filter(isRepoPublic).length;
     return { total, linked, priv, pub };
   }, [apiRepositories]);
 
@@ -123,17 +127,17 @@ export function ApiSecurityGithubModal({ isOpen, onClose, onSuccess }: ApiSecuri
       if (!matchSearch) return false;
 
       if (filterType === 'linked' && !repo.is_linked) return false;
-      if (filterType === 'private' && !(repo.visibility === 'private' || repo.private)) return false;
-      if (filterType === 'public' && (repo.visibility === 'private' || repo.private)) return false;
+      if (filterType === 'private' && !isRepoPrivate(repo)) return false;
+      if (filterType === 'public' && !isRepoPublic(repo)) return false;
 
       if (selectedLanguage !== 'All' && (repo.language || '').toLowerCase() !== selectedLanguage.toLowerCase()) {
         return false;
       }
 
-      if (selectedVisibility === 'Public' && (repo.visibility === 'private' || repo.private)) {
+      if (selectedVisibility === 'Public' && !isRepoPublic(repo)) {
         return false;
       }
-      if (selectedVisibility === 'Private' && !(repo.visibility === 'private' || repo.private)) {
+      if (selectedVisibility === 'Private' && !isRepoPrivate(repo)) {
         return false;
       }
 
@@ -157,6 +161,7 @@ export function ApiSecurityGithubModal({ isOpen, onClose, onSuccess }: ApiSecuri
       const res = await api.apiSecurity.connectRepository({
         token: tokenInput.trim(),
       });
+      trackGitHubConnect({ context: 'api_security_pat' });
       setStatusMessage({
         type: 'success',
         text: `Connected to GitHub successfully as @${res.account_name || 'user'}. Synchronized ${res.synced_repos || 0} repositories.`,
@@ -183,6 +188,7 @@ export function ApiSecurityGithubModal({ isOpen, onClose, onSuccess }: ApiSecuri
         ...selectedRepo,
         default_branch: selectedBranch || selectedRepo.default_branch || 'main',
       });
+      trackGitHubConnect({ context: 'api_security_repo_linked' });
 
       setStatusMessage({
         type: 'success',
@@ -334,27 +340,48 @@ export function ApiSecurityGithubModal({ isOpen, onClose, onSuccess }: ApiSecuri
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#0F172A' }}>
-                    @{githubAccount || 'Mayur8182'}
+                    {isGithubConnected && githubAccount ? `@${githubAccount}` : 'GitHub Account'}
                   </span>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '2px 8px',
-                      borderRadius: '9999px',
-                      backgroundColor: '#DCFCE7',
-                      color: '#15803D',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      border: '1px solid #BBF7D0',
-                    }}
-                  >
-                    <Check size={11} strokeWidth={3} /> Connected &amp; Verified
-                  </span>
+                  {isGithubConnected ? (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        backgroundColor: '#DCFCE7',
+                        color: '#15803D',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        border: '1px solid #BBF7D0',
+                      }}
+                    >
+                      <Check size={11} strokeWidth={3} /> Connected &amp; Verified
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        backgroundColor: '#F1F5F9',
+                        color: '#64748B',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        border: '1px solid #E2E8F0',
+                      }}
+                    >
+                      Not Connected
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
-                  {tabCounts.total} repositories &nbsp;·&nbsp; Last synced 2 minutes ago
+                  {isGithubConnected
+                    ? `${tabCounts.total} repositories · Synchronized`
+                    : 'Connect a Personal Access Token or link a repo to discover API endpoints'}
                 </div>
               </div>
             </div>
@@ -522,7 +549,10 @@ export function ApiSecurityGithubModal({ isOpen, onClose, onSuccess }: ApiSecuri
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setFilterType(tab.id as any)}
+                onClick={() => {
+                  setFilterType(tab.id as any);
+                  setSelectedVisibility('All');
+                }}
                 style={{
                   padding: '10px 0',
                   background: 'transparent',

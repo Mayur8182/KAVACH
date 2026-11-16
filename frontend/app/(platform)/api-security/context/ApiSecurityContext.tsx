@@ -89,6 +89,12 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
             const matched = items.find((a: any) => matchRepoAndApi(currentRepository, a));
             if (matched) return matched;
           }
+          // If savedApiId in localStorage matches, restore it
+          const savedApiId = typeof window !== 'undefined' ? localStorage.getItem('secu_active_api_id') : null;
+          if (savedApiId) {
+            const saved = items.find((a: any) => a.id === savedApiId);
+            if (saved) return saved;
+          }
           // If previous selection is still valid in items, keep it
           if (prevSelected && items.some((i: any) => i.id === prevSelected.id)) {
             return prevSelected;
@@ -137,39 +143,66 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
     setIsLoadingApis(true);
     try {
       let targetToSelect: any = null;
+      let currentItems = apis;
 
-      // 1. Check if an API target already exists with matching id or name
+      // 1. Check if an API target already exists with matching id or name in current state
       if (repo.api_target_id) {
-        targetToSelect = apis.find((a: any) => a.id === repo.api_target_id);
+        targetToSelect = currentItems.find((a: any) => a.id === repo.api_target_id);
       }
       if (!targetToSelect) {
-        targetToSelect = apis.find((a: any) => matchRepoAndApi(repo, a));
+        targetToSelect = currentItems.find((a: any) => matchRepoAndApi(repo, a));
       }
 
-      // 2. If target does not exist yet in API Security, connect & discover routes
+      // If not found in local state, fetch fresh APIs from backend before attempting connect
       if (!targetToSelect) {
-        const connectRes = await api.apiSecurity.connectRepository({
-          repository_id: String(repo.id || repo.name),
-          full_name: repo.full_name || repo.name,
-          name: repo.name,
-          branch: repo.default_branch || 'main',
-          clone_url: repo.clone_url,
-          html_url: repo.html_url,
-          language: repo.language,
-        });
-        if (connectRes?.api_target) {
-          targetToSelect = connectRes.api_target;
+        try {
+          const freshRes = await api.apiSecurity.apis({ limit: 100 });
+          currentItems = freshRes?.items || [];
+          setApis(currentItems);
+          if (repo.api_target_id) {
+            targetToSelect = currentItems.find((a: any) => a.id === repo.api_target_id);
+          }
+          if (!targetToSelect) {
+            targetToSelect = currentItems.find((a: any) => matchRepoAndApi(repo, a));
+          }
+        } catch (fetchErr) {
+          console.warn('Could not fetch fresh API list:', fetchErr);
         }
       }
 
-      // 3. Refresh APIs list
-      const res = await api.apiSecurity.apis({ limit: 100 });
-      const items = res?.items || [];
+      // 2. Only if target does not exist yet in API Security, connect & discover routes
+      if (!targetToSelect) {
+        try {
+          const connectRes = await api.apiSecurity.connectRepository({
+            repository_id: String(repo.id || repo.name),
+            full_name: repo.full_name || repo.name,
+            name: repo.name,
+            branch: repo.default_branch || 'main',
+            clone_url: repo.clone_url,
+            html_url: repo.html_url,
+            language: repo.language,
+          });
+          if (connectRes?.api_target) {
+            targetToSelect = connectRes.api_target;
+          }
+        } catch (connErr) {
+          console.warn('connectRepository attempt note:', connErr);
+        }
+      }
+
+      // 3. Refresh APIs list to keep in sync
+      const res = await api.apiSecurity.apis({ limit: 100 }).catch(() => ({ items: currentItems }));
+      const items = res?.items || currentItems;
       setApis(items);
 
       if (targetToSelect) {
         const fresh = items.find((a: any) => a.id === targetToSelect.id) || targetToSelect;
         setSelectedApi(fresh);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('secu_active_api_id', fresh.id);
+          const cleanName = (fresh.name || repo.name || '').replace(' Code Inventory', '').trim();
+          localStorage.setItem('secu_active_repo', cleanName);
+        }
       } else if (items.length > 0) {
         setSelectedApi(items[0]);
       }
@@ -181,6 +214,8 @@ export function ApiSecurityProvider({ children }: { children: React.ReactNode })
           r.full_name?.toLowerCase() === (repo.full_name || '').toLowerCase()
         );
         if (matched) setCurrentRepository(matched);
+      } else if (repo.name) {
+        setCurrentRepository({ id: repo.id || repo.name, name: repo.name, full_name: repo.full_name });
       }
 
       // 5. Notify Topbar to update active scope

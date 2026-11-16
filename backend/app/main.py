@@ -25,6 +25,7 @@ from app.core.task_worker import start_task_worker, stop_task_worker, reconcile_
 from app.core.rate_limit import RateLimitingMiddleware
 from app.core.idempotency import IdempotencyMiddleware
 
+# Settings initialized with environment
 settings = get_settings()
 logger = setup_logging(
     service_name="secure-control-plane-backend",
@@ -43,6 +44,10 @@ async def _run_startup_migrations() -> None:
     
     # List of (table, column, type) tuples that must exist
     required_columns = [
+        ("users", "github_user_id", "VARCHAR(100)"),
+        ("users", "google_user_id", "VARCHAR(100)"),
+        ("users", "avatar_url", "VARCHAR(500)"),
+        ("users", "auth_provider", "VARCHAR(50) DEFAULT 'oauth'"),
         ("github_security_jobs", "job_number", "VARCHAR(50)"),
         ("github_security_jobs", "job_name", "VARCHAR(100)"),
         ("github_security_jobs", "job_type", "VARCHAR(50)"),
@@ -148,6 +153,10 @@ async def _run_startup_migrations() -> None:
         ("workspaces", "default_branch", "VARCHAR(100) DEFAULT 'main'"),
         ("projects", "workspace_id", "VARCHAR(36)"),
         ("projects", "organization_id", "VARCHAR(36)"),
+        ("github_installations", "workspace_id", "VARCHAR(36)"),
+        ("github_installations", "connected_by_user_id", "VARCHAR(36)"),
+        ("github_installations", "app_id", "VARCHAR(50)"),
+        ("github_installations", "last_synced_at", "TIMESTAMP"),
         ("github_repositories", "workspace_id", "VARCHAR(36)"),
         ("audit_events", "workspace_id", "VARCHAR(36)"),
         ("container_registries", "registry_type", "VARCHAR(50) DEFAULT 'Cloud'"),
@@ -333,11 +342,16 @@ def create_application() -> FastAPI:
     app.add_middleware(IdempotencyMiddleware)
     app.add_middleware(RateLimitingMiddleware)
 
-    # Configure CORS (permits localhost, Render preview/production subdomains, and custom domains)
+    # Configure CORS: In development, strictly allow explicitly configured local origins without production domain dependencies
+    if settings.app_env == "production":
+        origin_regex = r"^https?://([a-zA-Z0-9-]+\.)*(onrender\.com|kavachsecurity\.me)(:[0-9]+)?$"
+    else:
+        origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$"
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_origin_regex=r"^https?://([a-zA-Z0-9-]+\.)*(localhost|127\.0\.0\.1|onrender\.com|kavachsecurity\.me)(:[0-9]+)?$",
+        allow_origin_regex=origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -391,7 +405,31 @@ def create_application() -> FastAPI:
             },
         }
 
-# Include versioned API routers (/api/v1/...)
+    # Root-level GitHub App OAuth & Webhook Callbacks (as configured in GitHub App)
+    from app.api.v1.github import github_installation_callback, receive_github_webhook_standard
+    app.add_api_route(
+        "/integrations/github/callback",
+        github_installation_callback,
+        methods=["GET"],
+        include_in_schema=True,
+        tags=["GitHub Integration Root Callbacks"],
+    )
+    app.add_api_route(
+        "/webhooks/github",
+        receive_github_webhook_standard,
+        methods=["POST"],
+        include_in_schema=True,
+        tags=["GitHub Webhook Root"],
+    )
+    app.add_api_route(
+        "/integrations/github/webhooks",
+        receive_github_webhook_standard,
+        methods=["POST"],
+        include_in_schema=True,
+        tags=["GitHub Webhook Root"],
+    )
+
+    # Include versioned API routers (/api/v1/...)
     app.include_router(main_router, prefix="/api")
 
     return app

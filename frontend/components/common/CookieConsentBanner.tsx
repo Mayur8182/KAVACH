@@ -49,6 +49,10 @@ export const CookieConsentBanner: React.FC = () => {
     setIsVisible(false);
   };
 
+  const handleDismiss = () => {
+    setIsVisible(false);
+  };
+
   if (!isVisible) return null;
 
   return (
@@ -102,7 +106,7 @@ export const CookieConsentBanner: React.FC = () => {
 
         <button
           type="button"
-          onClick={handleDeclineOptional}
+          onClick={handleDismiss}
           aria-label="Dismiss cookie notice"
           style={{
             color: '#94A3B8',

@@ -26,8 +26,14 @@ import {
   Terminal,
   FileCode2,
   Sparkles,
+  MessageSquare,
+  Mail,
+  Calendar,
+  Users,
 } from 'lucide-react';
 import { SearchModal } from '@/components/common/SearchModal';
+import { BookDemoModal } from '@/components/common/BookDemoModal';
+import { FeedbackModal } from '@/components/common/FeedbackModal';
 import { KavachMark, KavachLogo } from '@/components/common/KavachLogo';
 import { api } from '@/lib/api/client';
 import type { UserProfile } from '@/types/api/auth';
@@ -58,9 +64,32 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
+  const [bookDemoOpen, setBookDemoOpen] = useState(false);
   const [currentHash, setCurrentHash] = useState('');
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    const handleOpenBookDemo = () => {
+      if (onOpenExpert) {
+        onOpenExpert();
+      } else {
+        setBookDemoOpen(true);
+      }
+    };
+    window.addEventListener('kavach:open-book-demo', handleOpenBookDemo);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('book-demo') === 'true') {
+        if (onOpenExpert) {
+          onOpenExpert();
+        } else {
+          setBookDemoOpen(true);
+        }
+      }
+    }
+    return () => window.removeEventListener('kavach:open-book-demo', handleOpenBookDemo);
+  }, [onOpenExpert]);
 
   useEffect(() => {
     const token = getAuthToken();
@@ -107,16 +136,12 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
     }
 
     if (user && !user.is_superuser) {
-      if (user.is_verified === false) {
-        toast.warning('Verification Required', {
-          description: 'Please verify your email address before accessing the Console.',
-        });
-        router.push(`/verify-email?email=${encodeURIComponent(user.email)}`);
-        return;
-      }
-      if (user.onboarding_completed === false) {
+      const hasExistingProject = typeof window !== 'undefined' && Boolean(
+        localStorage.getItem('secu_active_project_id') || localStorage.getItem('secu_active_repo')
+      );
+      if (user.onboarding_completed === false && !hasExistingProject) {
         toast.warning('Setup Incomplete', {
-          description: 'Please finish setting up your workspace to access the Console.',
+          description: 'Please finish setting up your project workspace to access the Console.',
         });
         router.push(`/onboarding?email=${encodeURIComponent(user.email)}`);
         return;
@@ -180,9 +205,29 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
     }, 180);
   };
 
+  // Company hover dropdown state & timeout
+  const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
+  const [mobileCompanyOpen, setMobileCompanyOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const companyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnterCompany = () => {
+    if (companyTimeoutRef.current) {
+      clearTimeout(companyTimeoutRef.current);
+    }
+    setIsCompanyDropdownOpen(true);
+  };
+
+  const handleMouseLeaveCompany = () => {
+    companyTimeoutRef.current = setTimeout(() => {
+      setIsCompanyDropdownOpen(false);
+    }, 180);
+  };
+
   useEffect(() => {
     return () => {
       if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
+      if (companyTimeoutRef.current) clearTimeout(companyTimeoutRef.current);
     };
   }, []);
 
@@ -320,15 +365,20 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
     setIsLoggedIn(!!getAuthToken());
   }, [pathname]);
 
-  const navLinks: Array<{ label: string; href: string; hasDropdown?: boolean; external?: boolean }> = [
-    { label: 'Platform', href: '/platform' },
+  const navLinks: Array<{
+    label: string;
+    href: string;
+    hasDropdown?: boolean;
+    hasCompanyDropdown?: boolean;
+    external?: boolean;
+    isModalAction?: boolean;
+  }> = [
     { label: 'Products', href: '/products', hasDropdown: true },
     { label: 'Solutions', href: '/solutions' },
     { label: 'Pricing', href: '/pricing' },
     { label: 'Resources', href: '/resources' },
-    { label: 'Demo', href: '/demo' },
     { label: 'Docs', href: '/docs' },
-    { label: 'Company', href: '/contact' },
+    { label: 'Company', href: '/contact', hasCompanyDropdown: true },
   ];
 
   const isActive = (href: string) => {
@@ -346,7 +396,8 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
   };
 
   return (
-    <header
+    <>
+      <header
       style={{
         position: 'sticky',
         top: 0,
@@ -435,213 +486,342 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                     )}
                   </Link>
 
-                  {/* Mega Menu Dropdown */}
+                  {/* Products Dropdown (Complete suite of Kavach Security Products) */}
                   {isProductsDropdownOpen && (
                     <div
                       style={{
                         position: 'absolute',
                         top: '100%',
-                        left: '-260px',
-                        width: '840px',
+                        left: '-20px',
+                        width: '280px',
+                        maxHeight: '480px',
+                        overflowY: 'auto',
                         backgroundColor: '#FFFFFF',
                         borderRadius: '16px',
-                        border: '1px solid #CBD5E1',
-                        boxShadow: '0 20px 35px -5px rgba(15, 23, 42, 0.15), 0 10px 15px -3px rgba(15, 23, 42, 0.08)',
-                        padding: '24px 28px',
+                        border: '1px solid #E2E8F0',
+                        boxShadow:
+                          '0 20px 35px -5px rgba(15, 23, 42, 0.12), 0 10px 15px -3px rgba(15, 23, 42, 0.06)',
+                        padding: '12px',
                         zIndex: 100,
                         animation: 'fadeInSlide 0.18s ease-out forwards',
                       }}
                     >
-                      {/* Top Header inside Dropdown */}
+                      {/* Dropdown Header with Icon */}
                       <div
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
+                          gap: '8px',
+                          padding: '4px 8px 10px 8px',
                           borderBottom: '1px solid #F1F5F9',
-                          paddingBottom: '14px',
-                          marginBottom: '20px',
+                          marginBottom: '6px',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span
+                        <ShieldAlert size={16} color="#09090B" />
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#09090B' }}>Products</span>
+                      </div>
+
+                      {/* Clean Vertical Products List */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {[
+                          { title: 'SAST & Code Security', href: '/code' },
+                          { title: 'Secret Detection & Leaks', href: '/code/secrets' },
+                          { title: 'SCA & Software Supply Chain', href: '/code/dependencies' },
+                          { title: 'Container Security & Defense', href: '/protect/containers' },
+                          { title: 'Cloud Security & CSPM', href: '/cloud' },
+                          { title: 'IaC (Infrastructure as Code)', href: '/cloud/iac' },
+                          { title: 'Universal API Security (OWASP)', href: '/api-security' },
+                          { title: 'Model Security (AI / ML)', href: '/protect/models' },
+                          { title: 'AI Agent Governance & MCP', href: '/agent' },
+                          { title: 'Autonomous Sandbox AutoFix', href: '/remediation' },
+                          { title: 'Kavach MCP Server', href: '/protect/mcp' },
+                        ].map((prod) => (
+                          <Link
+                            key={prod.title}
+                            href={prod.href}
+                            onClick={() => setIsProductsDropdownOpen(false)}
                             style={{
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              letterSpacing: '0.06em',
-                              textTransform: 'uppercase',
-                              color: '#2563EB',
-                              backgroundColor: '#EFF6FF',
-                              padding: '3px 8px',
-                              borderRadius: '12px',
-                              border: '1px solid #BFDBFE',
+                              display: 'block',
+                              padding: '7px 10px',
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                              fontWeight: 500,
+                              color: '#334155',
+                              textDecoration: 'none',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F8FAFC';
+                              e.currentTarget.style.color = '#09090B';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.color = '#334155';
                             }}
                           >
-                            Kavach Platform
-                          </span>
-                          <span style={{ fontSize: '13px', color: '#64748B' }}>
-                            Unified security for development, cloud and autonomous runtimes
-                          </span>
-                        </div>
+                            {prod.title}
+                          </Link>
+                        ))}
+                      </div>
+
+                      {/* Dropdown Footer Link */}
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          paddingTop: '6px',
+                          borderTop: '1px solid #F1F5F9',
+                        }}
+                      >
                         <Link
                           href="/products"
                           onClick={() => setIsProductsDropdownOpen(false)}
                           style={{
-                            fontSize: '12px',
+                            display: 'block',
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            fontSize: '12.5px',
                             fontWeight: 600,
-                            color: '#2563EB',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
+                            color: '#09090B',
+                            textDecoration: 'none',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F8FAFC';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
                           }}
                         >
-                          View all products <ArrowRight size={13} />
+                          View all products →
                         </Link>
                       </div>
+                    </div>
+                  )}
+                </div>
+              );
+            }
 
-                      {/* 3-Column Categories Grid */}
-                      <div
+            // Handle Company with hover dropdown
+            if (link.hasCompanyDropdown) {
+              return (
+                <div
+                  key={link.label}
+                  onMouseEnter={handleMouseEnterCompany}
+                  onMouseLeave={handleMouseLeaveCompany}
+                  style={{ position: 'relative', padding: '16px 0' }}
+                >
+                  <Link
+                    href={link.href}
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: active ? 600 : 500,
+                      color: active ? '#0F172A' : '#475569',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      position: 'relative',
+                      padding: '6px 0',
+                      transition: 'color 0.15s ease',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{link.label}</span>
+                    <ChevronDown
+                      size={14}
+                      style={{
+                        transform: isCompanyDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease',
+                        opacity: 0.7,
+                      }}
+                    />
+                    {active && (
+                      <span
                         style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(3, 1fr)',
-                          gap: '24px',
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: '2px',
+                          backgroundColor: '#09090B',
+                          borderRadius: '2px',
                         }}
-                      >
-                        {productCategories.map((cat) => (
-                          <div key={cat.group} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <div
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.06em',
-                                color: '#94A3B8',
-                                paddingLeft: '4px',
-                              }}
-                            >
-                              {cat.group}
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              {cat.items.map((prod) => {
-                                const IconComponent = prod.icon;
-                                return (
-                                  <Link
-                                    key={prod.title}
-                                    href={prod.href}
-                                    onClick={() => setIsProductsDropdownOpen(false)}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'flex-start',
-                                      gap: '12px',
-                                      padding: '10px 10px',
-                                      borderRadius: '10px',
-                                      textDecoration: 'none',
-                                      transition: 'background-color 0.15s ease, transform 0.15s ease',
-                                    }}
-                                    className="product-dropdown-item"
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.backgroundColor = '#F8FAFC';
-                                      e.currentTarget.style.transform = 'translateX(2px)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.backgroundColor = 'transparent';
-                                      e.currentTarget.style.transform = 'translateX(0)';
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: '32px',
-                                        height: '32px',
-                                        borderRadius: '8px',
-                                        backgroundColor: prod.bg,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        flexShrink: 0,
-                                        marginTop: '1px',
-                                      }}
-                                    >
-                                      <IconComponent size={16} color={prod.color} />
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span
-                                          style={{
-                                            fontSize: '13px',
-                                            fontWeight: 600,
-                                            color: '#0F172A',
-                                          }}
-                                        >
-                                          {prod.title}
-                                        </span>
-                                        {prod.badge && (
-                                          <span
-                                            style={{
-                                              fontSize: '9px',
-                                              fontWeight: 700,
-                                              padding: '1px 5px',
-                                              borderRadius: '4px',
-                                              backgroundColor: '#F4F4F5',
-                                              border: '1px solid #E4E4E7',
-                                              color: '#18181B',
-                                            }}
-                                          >
-                                            {prod.badge}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span
-                                        style={{
-                                          fontSize: '11px',
-                                          color: '#64748B',
-                                          lineHeight: 1.35,
-                                        }}
-                                      >
-                                        {prod.desc}
-                                      </span>
-                                    </div>
-                                  </Link>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      />
+                    )}
+                  </Link>
 
-                      {/* Dropdown Footer */}
+                  {/* Company Dropdown Card (Exact match to reference design) */}
+                  {isCompanyDropdownOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        right: '-20px',
+                        width: '210px',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '16px',
+                        border: '1px solid #E2E8F0',
+                        boxShadow:
+                          '0 20px 35px -5px rgba(15, 23, 42, 0.12), 0 10px 15px -3px rgba(15, 23, 42, 0.06)',
+                        padding: '12px',
+                        zIndex: 100,
+                        animation: 'fadeInSlide 0.18s ease-out forwards',
+                      }}
+                    >
+                      {/* Dropdown Header with Users Icon */}
                       <div
                         style={{
-                          marginTop: '20px',
-                          paddingTop: '16px',
-                          borderTop: '1px solid #F1F5F9',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
-                          backgroundColor: '#F8FAFC',
-                          margin: '20px -28px -24px',
-                          padding: '14px 28px',
-                          borderBottomLeftRadius: '16px',
-                          borderBottomRightRadius: '16px',
+                          gap: '8px',
+                          padding: '4px 8px 10px 8px',
+                          borderBottom: '1px solid #F1F5F9',
+                          marginBottom: '6px',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#475569' }}>
-                          <Sparkles size={14} color="#71717A" />
-                          <span>All engines integrate with deterministic policy & runtime verification.</span>
-                        </div>
+                        <Users size={16} color="#09090B" />
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#09090B' }}>Company</span>
+                      </div>
+
+                      {/* Clean Vertical Company Links */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {/* 1. About Kavach */}
                         <Link
-                          href="/platform"
-                          onClick={() => setIsProductsDropdownOpen(false)}
+                          href="/about"
+                          onClick={() => setIsCompanyDropdownOpen(false)}
                           style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#0F172A',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
+                            display: 'block',
+                            padding: '7px 10px',
+                            borderRadius: '8px',
+                            fontSize: '13.5px',
+                            fontWeight: 500,
+                            color: '#334155',
+                            textDecoration: 'none',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            e.currentTarget.style.color = '#09090B';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#334155';
                           }}
                         >
-                          Explore Control Plane Architecture <ArrowRight size={13} />
+                          About Kavach
                         </Link>
+
+                        {/* 2. Team */}
+                        <Link
+                          href="/team"
+                          onClick={() => setIsCompanyDropdownOpen(false)}
+                          style={{
+                            display: 'block',
+                            padding: '7px 10px',
+                            borderRadius: '8px',
+                            fontSize: '13.5px',
+                            fontWeight: 500,
+                            color: '#334155',
+                            textDecoration: 'none',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            e.currentTarget.style.color = '#09090B';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#334155';
+                          }}
+                        >
+                          Team
+                        </Link>
+
+                        {/* 3. Careers */}
+                        <Link
+                          href="/careers"
+                          onClick={() => setIsCompanyDropdownOpen(false)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '7px 10px',
+                            borderRadius: '8px',
+                            fontSize: '13.5px',
+                            fontWeight: 500,
+                            color: '#334155',
+                            textDecoration: 'none',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            e.currentTarget.style.color = '#09090B';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#334155';
+                          }}
+                        >
+                          <span>Careers</span>
+                        </Link>
+
+                        {/* 4. Contact Us */}
+                        <Link
+                          href="/contact"
+                          onClick={() => setIsCompanyDropdownOpen(false)}
+                          style={{
+                            display: 'block',
+                            padding: '7px 10px',
+                            borderRadius: '8px',
+                            fontSize: '13.5px',
+                            fontWeight: 500,
+                            color: '#334155',
+                            textDecoration: 'none',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            e.currentTarget.style.color = '#09090B';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#334155';
+                          }}
+                        >
+                          Contact Us
+                        </Link>
+
+                        {/* 5. Share Feedback (Interactive Modal) */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCompanyDropdownOpen(false);
+                            setFeedbackOpen(true);
+                          }}
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '7px 10px',
+                            borderRadius: '8px',
+                            fontSize: '13.5px',
+                            fontWeight: 500,
+                            color: '#334155',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            e.currentTarget.style.color = '#09090B';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#334155';
+                          }}
+                        >
+                          Share Feedback
+                        </button>
                       </div>
                     </div>
                   )}
@@ -668,6 +848,36 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                 <span>{link.label}</span>
                 <ExternalLink size={12} style={{ opacity: 0.6 }} />
               </a>
+            ) : link.isModalAction ? (
+              <button
+                key={link.label}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onOpenExpert) {
+                    onOpenExpert();
+                  } else {
+                    setBookDemoOpen(true);
+                  }
+                }}
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  color: '#475569',
+                  position: 'relative',
+                  padding: '6px 0',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'color 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#0F172A')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#475569')}
+              >
+                {link.label}
+              </button>
             ) : (
               <Link
                 key={link.label}
@@ -701,38 +911,7 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
         </nav>
 
         {/* Right Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {/* Search Trigger */}
-          <button
-            onClick={handleSearchClick}
-            type="button"
-            aria-label="Search Kavach Security"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minWidth: '40px',
-              minHeight: '40px',
-              borderRadius: '6px',
-              color: '#475569',
-              backgroundColor: 'transparent',
-              border: '1px solid transparent',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F1F5F9';
-              e.currentTarget.style.borderColor = '#E2E8F0';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.borderColor = 'transparent';
-            }}
-            title="Search code, cloud & findings (Cmd+K)"
-          >
-            <Search size={18} />
-          </button>
-
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {/* Auth State CTAs */}
           {mounted && isLoggedIn ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -745,13 +924,13 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  padding: '8px 16px',
-                  minHeight: '40px',
+                  padding: '8px 18px',
+                  minHeight: '42px',
                   backgroundColor: '#09090B',
                   color: '#FFFFFF',
-                  fontSize: '13px',
+                  fontSize: '13.5px',
                   fontWeight: 600,
-                  borderRadius: '8px',
+                  borderRadius: '12px',
                   textDecoration: 'none',
                   transition: 'background-color 0.15s ease',
                 }}
@@ -767,13 +946,13 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                 className="header-desktop-btn"
                 style={{
                   padding: '8px 14px',
-                  minHeight: '40px',
+                  minHeight: '42px',
                   fontSize: '13px',
                   fontWeight: 500,
                   color: '#64748B',
                   backgroundColor: 'transparent',
                   border: '1px solid #CBD5E1',
-                  borderRadius: '8px',
+                  borderRadius: '12px',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   alignItems: 'center',
@@ -794,73 +973,64 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Link
-                href="/login"
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenExpert) {
+                    onOpenExpert();
+                  } else {
+                    setBookDemoOpen(true);
+                  }
+                }}
                 className="header-desktop-btn"
                 style={{
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: '8px 14px',
-                  minHeight: '40px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: '#0F172A',
-                  borderRadius: '8px',
-                  textDecoration: 'none',
-                  transition: 'background-color 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F1F5F9';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/demo"
-                className="header-desktop-btn"
-                style={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '8px 14px',
-                  minHeight: '40px',
-                  fontSize: '13px',
+                  gap: '7px',
+                  padding: '8px 18px',
+                  minHeight: '42px',
+                  fontSize: '13.5px',
                   fontWeight: 600,
                   color: '#18181B',
-                  backgroundColor: '#F4F4F5',
+                  backgroundColor: '#FFFFFF',
                   border: '1px solid #E4E4E7',
-                  borderRadius: '8px',
-                  textDecoration: 'none',
-                  transition: 'background-color 0.15s ease',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#E4E4E7';
+                  e.currentTarget.style.backgroundColor = '#F4F4F5';
+                  e.currentTarget.style.borderColor = '#D4D4D8';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F4F4F5';
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.borderColor = '#E4E4E7';
                 }}
               >
-                Book Demo
-              </Link>
+                <Calendar size={15} color="#18181B" />
+                <span>Book a Demo</span>
+              </button>
+
               <Link
                 href="/signup"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: '8px 16px',
-                  minHeight: '40px',
+                  gap: '7px',
+                  padding: '8px 20px',
+                  minHeight: '42px',
                   backgroundColor: '#09090B',
                   color: '#FFFFFF',
-                  fontSize: '13px',
+                  fontSize: '13.5px',
                   fontWeight: 600,
-                  borderRadius: '8px',
+                  borderRadius: '12px',
                   textDecoration: 'none',
                   cursor: 'pointer',
                   transition: 'background-color 0.15s ease',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#27272A';
@@ -869,7 +1039,8 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                   e.currentTarget.style.backgroundColor = '#09090B';
                 }}
               >
-                Get Started
+                <span>Get Started</span>
+                <ArrowRight size={15} color="#FFFFFF" />
               </Link>
             </div>
           )}
@@ -1017,6 +1188,139 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
               );
             }
 
+            if (link.hasCompanyDropdown) {
+              return (
+                <div key={link.label} style={{ display: 'flex', flexDirection: 'column' }}>
+                  <button
+                    type="button"
+                    onClick={() => setMobileCompanyOpen(!mobileCompanyOpen)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '15px',
+                      fontWeight: 600,
+                      color: isActive(link.href) ? '#2563EB' : '#1E293B',
+                      padding: '10px 0',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      width: '100%',
+                    }}
+                  >
+                    <span>{link.label}</span>
+                    <ChevronDown
+                      size={16}
+                      style={{
+                        transform: mobileCompanyOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease',
+                      }}
+                    />
+                  </button>
+
+                  {mobileCompanyOpen && (
+                    <div
+                      style={{
+                        paddingLeft: '14px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        borderLeft: '2px solid #E2E8F0',
+                        margin: '4px 0 10px 6px',
+                      }}
+                    >
+                      <Link
+                        href="/about"
+                        onClick={() => setMobileMenuOpen(false)}
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          color: '#475569',
+                          padding: '4px 0',
+                        }}
+                      >
+                        About Kavach
+                      </Link>
+                      <Link
+                        href="/about#team"
+                        onClick={() => setMobileMenuOpen(false)}
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          color: '#475569',
+                          padding: '4px 0',
+                        }}
+                      >
+                        Team
+                      </Link>
+                      <Link
+                        href="/contact"
+                        onClick={() => setMobileMenuOpen(false)}
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          color: '#475569',
+                          padding: '4px 0',
+                        }}
+                      >
+                        Contact Us
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          setFeedbackOpen(true);
+                        }}
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          color: '#475569',
+                          padding: '4px 0',
+                          background: 'none',
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Share Product Feedback
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            if (link.isModalAction) {
+              return (
+                <button
+                  key={link.label}
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (onOpenExpert) {
+                      onOpenExpert();
+                    } else {
+                      setBookDemoOpen(true);
+                    }
+                  }}
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#1E293B',
+                    padding: '10px 0',
+                    background: 'none',
+                    border: 'none',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    width: '100%',
+                  }}
+                >
+                  {link.label}
+                </button>
+              );
+            }
+
             return (
               <Link
                 key={link.label}
@@ -1103,9 +1407,16 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
               >
                 Get Started
               </Link>
-              <Link
-                href="/demo"
-                onClick={() => setMobileMenuOpen(false)}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (onOpenExpert) {
+                    onOpenExpert();
+                  } else {
+                    setBookDemoOpen(true);
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1117,11 +1428,12 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                   color: '#18181B',
                   fontWeight: 600,
                   fontSize: '14px',
-                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  width: '100%',
                 }}
               >
                 Book Demo
-              </Link>
+              </button>
               <Link
                 href="/login"
                 onClick={() => setMobileMenuOpen(false)}
@@ -1205,12 +1517,26 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
         }
       `}</style>
 
+      </header>
+
       {/* Internal Search Modal for Pages without explicit onOpenSearch */}
       <SearchModal
         isOpen={onOpenSearch ? false : internalSearchOpen}
         onClose={() => setInternalSearchOpen(false)}
       />
-    </header>
+
+      {/* Official Cal.com-powered Book a Demo Modal */}
+      <BookDemoModal
+        isOpen={onOpenExpert ? false : bookDemoOpen}
+        onClose={() => setBookDemoOpen(false)}
+      />
+
+      {/* Product Feedback Modal */}
+      <FeedbackModal
+        isOpen={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+      />
+    </>
   );
 };
 

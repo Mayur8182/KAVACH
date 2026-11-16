@@ -1094,7 +1094,32 @@ class FindingsModuleService:
         )
         await self.db.commit()
 
-        if format.lower() == "json":
+        fmt_lower = format.lower().strip()
+        if fmt_lower == "pdf":
+            from app.services.reporting_engine import ReportingEngineService
+            rep_svc = ReportingEngineService(self.db, self.current_user)
+            report_data = await rep_svc.aggregate_report_data(
+                report_id="KAV-RPT-02",
+                project_id=project_id,
+                repository=repository,
+                branch=branch or "main",
+            )
+            pdf_bytes = rep_svc.generate_pdf(report_data)
+            return "application/pdf", f"sast_technical_audit_{now_str}.pdf", pdf_bytes
+
+        if fmt_lower == "sarif":
+            from app.services.reporting_engine import ReportingEngineService
+            rep_svc = ReportingEngineService(self.db, self.current_user)
+            report_data = await rep_svc.aggregate_report_data(
+                report_id="KAV-RPT-02",
+                project_id=project_id,
+                repository=repository,
+                branch=branch or "main",
+            )
+            sarif_str = rep_svc.generate_sarif(report_data)
+            return "application/sarif+json", f"sast_audit_{now_str}.sarif", sarif_str.encode("utf-8")
+
+        if fmt_lower == "json":
             data = [i.model_dump() for i in items]
             content = json.dumps(data, indent=2).encode("utf-8")
             return "application/json", f"sast_findings_{now_str}.json", content

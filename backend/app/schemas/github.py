@@ -439,3 +439,55 @@ class WebhookResponse(BaseModel):
     delivery_id: str
     status: str = Field(description="RECEIVED | DUPLICATE | IGNORED")
     message: str
+
+
+class GitHubInstallUrlRequest(BaseModel):
+    workspace_id: Optional[uuid.UUID] = None
+    project_id: Optional[uuid.UUID] = None
+    redirect_url: Optional[str] = None
+
+
+class GitHubInstallUrlResponse(BaseModel):
+    url: str
+    install_url: str
+    state: str
+    app_id: str
+    app_slug: str
+
+
+class GitHubInstallationItem(BaseModel):
+    id: str
+    installation_id: int
+    account_id: int
+    account_login: str
+    account_type: str
+    repository_selection: str
+    status: str
+    installed_at: Optional[str] = None
+    last_synced_at: Optional[str] = None
+    repositories_count: int = 0
+
+
+class GitHubInstallationListResponse(BaseModel):
+    installations: List[GitHubInstallationItem]
+    total: int
+
+
+class GitHubIntegrationStatusResponse(BaseModel):
+    configured: bool
+    connected: bool
+    app_id: Optional[str] = None
+    app_slug: Optional[str] = None
+    client_id: Optional[str] = None
+    installations_count: int = 0
+    repositories_count: int = 0
+    primary_account: Optional[str] = None
+    status: str
+    message: Optional[str] = None
+    installations: List[GitHubInstallationItem] = Field(default_factory=list)
+
+
+class SelectRepositoryRequest(BaseModel):
+    repository_id: uuid.UUID
+    project_id: Optional[uuid.UUID] = None
+

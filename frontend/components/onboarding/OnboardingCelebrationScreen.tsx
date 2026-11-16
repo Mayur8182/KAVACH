@@ -127,7 +127,7 @@ export const OnboardingCelebrationScreen: React.FC<OnboardingCelebrationProps> =
       if (onFinish) {
         onFinish();
       } else {
-        router.push('/overview');
+        router.push('/repositories');
       }
     }
   };

@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { CommandPalette } from './CommandPalette';
-import { ConnectRepoButton } from '@/components/common/ConnectRepoButton';
 import { TaskQueueDrawer } from '@/components/tasks/TaskQueueDrawer';
 import { api } from '@/lib/api/client';
 import { redirectToLogin, clearAuthToken, getAuthToken } from '@/lib/auth/token';
@@ -421,7 +420,9 @@ export const Topbar: React.FC<TopbarProps> = ({
   const isCodeOrWorkspace = activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace' || isApiSecurity;
 
   const currentScope = isCodeOrWorkspace
-    ? (currentRepository ? currentRepository.name : (isApiSecurity ? (selectedScopes['api-security'] || 'Select Repository') : 'All Repositories'))
+    ? (isApiSecurity
+        ? (selectedScopes['api-security'] || currentRepository?.name || 'Select Repository')
+        : (currentRepository ? currentRepository.name : 'All Repositories'))
     : (selectedScopes[activeWorkspace.id] || activeWorkspace.defaultScope);
 
   const availableScopes = isCodeOrWorkspace
@@ -1337,13 +1338,6 @@ export const Topbar: React.FC<TopbarProps> = ({
             </kbd>
           </div>
         </div>
-
-        {/* Connect Repo — non-api-security routes only */}
-        {!pathname.startsWith('/api-security') && (
-          <div className="kavach-hide-small-mobile" style={{ flexShrink: 0 }}>
-            <ConnectRepoButton size="sm" />
-          </div>
-        )}
 
         {/* Right Side: Task Queue, Bell & User Profile */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>

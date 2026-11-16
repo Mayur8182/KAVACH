@@ -332,8 +332,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // ── 0. UNIFIED CORE WORKSPACE NAVIGATION (Daily DevSecOps Flow, Zero Duplicates) ──
   const coreWorkspaceItems: NavItem[] = [
-    { id: 'ws-overview', label: 'Overview', href: '/overview', icon: LayoutGrid },
-    { id: 'ws-assets', label: 'Assets', href: '/assets', icon: FolderGit2 },
+    { id: 'ws-repositories', label: 'Repositories', href: '/repositories', icon: FolderGit2 },
     {
       id: 'ws-findings',
       label: 'Findings',
@@ -343,13 +342,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeBg: '#EF4444',
     },
     { id: 'ws-fixes', label: 'Fixes & Patches', href: '/fixes', icon: Sparkles },
-    { id: 'ws-runs', label: 'Security Runs', href: '/runs', icon: PlayCircle },
     { id: 'ws-reports', label: 'Reports', href: '/reports', icon: FileText },
   ];
 
   // ── 1. CORE CODE SECURITY SCANNERS (Unified, Clean, No Duplicates) ──
   const coreScannerItems: NavItem[] = [
-    { id: 'sc-repositories', label: 'Repositories', href: '/repositories', icon: FolderGit2 },
     {
       id: 'sc-sast',
       label: 'SAST Analysis',
@@ -607,6 +604,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'api-remediation', label: 'Remediation', href: '/api-security/remediation', icon: GitPullRequest },
     { id: 'api-reports', label: 'Reports & Compliance', href: '/api-security/reports', icon: FileCheck2 },
     { id: 'api-analyst', label: 'AI Security Analyst', href: '/api-security/analyst', icon: Bot },
+    { id: 'api-integrations', label: 'Integration Hub', href: '/api-security/integrations', icon: Link2 },
   ];
 
   // ── 4A. DEPENDENCIES & SCA ENGINE EXCLUSIVE NAVIGATION ──

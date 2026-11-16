@@ -15,6 +15,7 @@ import { useScope } from '@/context/ScopeContext';
 import { api } from '@/lib/api/client';
 import { toast } from '@/lib/toast';
 import { KavachDropdown } from '@/components/ui/KavachDropdown';
+import { trackStartScan, trackScanCompleted } from '@/lib/analytics/gtag';
 
 /* ─── Typography & Theme Tokens Matching Design Exactly ─── */
 const serif = "'Newsreader', 'Instrument Serif', Georgia, serif";
@@ -111,7 +112,7 @@ export default function SecurityAnalysisPage() {
   const [activeScanId,       setActiveScanId]       = useState<string | null>(null);
   const [scanStatus,         setScanStatus]         = useState<'IN_PROGRESS' | 'COMPLETED' | 'PAUSED' | 'STOPPED' | 'FAILED'>('IN_PROGRESS');
   const [progressPct,        setProgressPct]        = useState<number>(0);
-  const [totalEndpoints,     setTotalEndpoints]     = useState<number>(27);
+  const [totalEndpoints,     setTotalEndpoints]     = useState<number>(0);
   const [testedEndpoints,    setTestedEndpoints]    = useState<number>(0);
   const [inProgressCount,    setInProgressCount]    = useState<number>(0);
   const [failedCount,        setFailedCount]        = useState<number>(0);
@@ -147,20 +148,16 @@ export default function SecurityAnalysisPage() {
       .catch(() => setAvailableEndpoints([]));
   }, [activeApi?.id]);
 
-  /* Pre-flight verification */
+  /* Pre-flight verification — stable, non-jittering check */
   useEffect(() => {
-    setIsValidating(true);
-    const timer = setTimeout(() => {
-      setPreflightChecks({
-        repoConnected: true,
-        branchAccessible: true,
-        endpointCount: availableEndpoints.length || 27,
-        scannerVersion: 'v2.4.0',
-      });
-      setIsValidating(false);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [activeApi?.id, environment, availableEndpoints.length]);
+    setPreflightChecks({
+      repoConnected: Boolean(activeApi?.id || currentRepository?.id),
+      branchAccessible: true,
+      endpointCount: availableEndpoints.length || activeApi?.endpoints_count || 0,
+      scannerVersion: 'v2.4.0',
+    });
+    setIsValidating(false);
+  }, [activeApi?.id, activeApi?.endpoints_count, availableEndpoints.length, currentRepository?.id]);
 
   /* Enter running view if query parameter has scanId */
   useEffect(() => {
@@ -187,7 +184,7 @@ export default function SecurityAnalysisPage() {
       try {
         const data = await api.apiSecurity.getScan(activeScanId);
         if (data) {
-          const endpointsTotal = data.endpoints_count || totalEndpoints || 27;
+          const endpointsTotal = data.endpoints_count || totalEndpoints || availableEndpoints.length || (activeApi?.endpoints_count) || 0;
           setTotalEndpoints(endpointsTotal);
 
           const passed = data.tests_passed || 0;
@@ -355,6 +352,12 @@ export default function SecurityAnalysisPage() {
       setFindingsCount(0);
       setEtaText('3m 26s');
 
+      trackStartScan({
+        scan_type: 'api_security',
+        repository: activeApi?.name?.replace(' Code Inventory', '') || currentRepository?.name || 'api_target',
+        branch: selectedBranch || 'main',
+      });
+
       // Update URL without full page reload
       window.history.pushState(null, '', `/api-security/analysis?scanId=${newScanId}`);
 
@@ -400,8 +403,8 @@ export default function SecurityAnalysisPage() {
     window.history.pushState(null, '', '/api-security/analysis');
   };
 
-  const endpointCount = availableEndpoints.length || totalEndpoints || 27;
-  const currentRepoDisplay = activeApi?.name || (apis[0]?.name) || 'kavach-api';
+  const endpointCount = availableEndpoints.length || activeApi?.endpoints_count || totalEndpoints || 0;
+  const currentRepoDisplay = (activeApi?.name ? activeApi.name.replace(' Code Inventory', '').trim() : '') || currentRepository?.name || (apis[0]?.name ? apis[0].name.replace(' Code Inventory', '').trim() : '') || 'Connect Repository';
 
   // Circular gauge mathematics (R=34, viewBox 80x80)
   const R = 33;
@@ -1094,13 +1097,15 @@ export default function SecurityAnalysisPage() {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 340px',
+                  gridTemplateColumns: 'minmax(0, 1fr) 340px',
                   gap: '24px',
                   alignItems: 'start',
+                  width: '100%',
+                  boxSizing: 'border-box',
                 }}
               >
                 {/* ── LEFT COLUMN ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, width: '100%' }}>
 
                   {/* 1. Analysis Configuration Card */}
                   <div
@@ -1110,6 +1115,8 @@ export default function SecurityAnalysisPage() {
                       borderRadius: '12px',
                       padding: '22px 24px',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                      width: '100%',
+                      boxSizing: 'border-box',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '18px' }}>
@@ -1131,9 +1138,17 @@ export default function SecurityAnalysisPage() {
                       </h2>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                        gap: '14px',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                      }}
+                    >
                       {/* Repository */}
-                      <div>
+                      <div style={{ minWidth: 0, width: '100%' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: T.textSub, marginBottom: '6px' }}>
                           Repository
                         </label>
@@ -1143,22 +1158,22 @@ export default function SecurityAnalysisPage() {
                             const match = apis.find((a) => a.id === val);
                             if (match) setSelectedApi(match);
                           }}
-                          width="100%"
+                          fullWidth
                           options={
                             apis.length > 0
                               ? apis.map((a) => ({
                                   value: a.id,
-                                  label: a.name || 'kavach-api',
-                                  badge: 'Connected',
+                                  label: (a.name || 'API Target').replace(' Code Inventory', '').trim(),
+                                  badge: `${a.endpoints_count || 0} routes`,
                                 }))
-                              : [{ value: '', label: 'kavach-api' }]
+                              : [{ value: '', label: currentRepository?.name || 'Connect Repository' }]
                           }
                           ariaLabel="Select repository"
                         />
                       </div>
 
                       {/* Branch */}
-                      <div>
+                      <div style={{ minWidth: 0, width: '100%' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: T.textSub, marginBottom: '6px' }}>
                           Branch
                         </label>
@@ -1166,7 +1181,7 @@ export default function SecurityAnalysisPage() {
                           value={selectedBranch}
                           onChange={(val) => setSelectedBranch(val)}
                           icon={<GitBranch size={13} color="#64748B" />}
-                          width="100%"
+                          fullWidth
                           options={[
                             { value: 'main', label: 'main', badge: 'Default' },
                             { value: 'develop', label: 'develop' },
@@ -1177,7 +1192,7 @@ export default function SecurityAnalysisPage() {
                       </div>
 
                       {/* Environment */}
-                      <div>
+                      <div style={{ minWidth: 0, width: '100%' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: T.textSub, marginBottom: '6px' }}>
                           Environment
                         </label>
@@ -1185,7 +1200,7 @@ export default function SecurityAnalysisPage() {
                           value={environment}
                           onChange={(val) => setEnvironment(val)}
                           icon={<Layers size={13} color="#64748B" />}
-                          width="100%"
+                          fullWidth
                           options={[
                             { value: 'production', label: 'production', badgeColor: '#DC2626', badge: 'Live' },
                             { value: 'staging', label: 'staging' },
@@ -1196,7 +1211,7 @@ export default function SecurityAnalysisPage() {
                       </div>
 
                       {/* Target Scope */}
-                      <div>
+                      <div style={{ minWidth: 0, width: '100%' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: T.textSub, marginBottom: '6px' }}>
                           Target Scope
                         </label>
@@ -1204,10 +1219,10 @@ export default function SecurityAnalysisPage() {
                           value={scopeType}
                           onChange={(val) => setScopeType(val as any)}
                           icon={<Crosshair size={13} color="#64748B" />}
-                          width="100%"
+                          fullWidth
                           options={[
-                            { value: 'all', label: 'All Endpoints', badge: '27 routes' },
-                            { value: 'selected', label: 'High-Risk Only', badge: '18 routes', badgeColor: '#DC2626' },
+                            { value: 'all', label: 'All Endpoints', badge: `${endpointCount} routes` },
+                            { value: 'selected', label: 'High-Risk Only', badge: `${Math.max(1, Math.round(endpointCount * 0.4))} routes`, badgeColor: '#DC2626' },
                           ]}
                           ariaLabel="Select target scope"
                         />
@@ -1460,7 +1475,18 @@ export default function SecurityAnalysisPage() {
                 </div>
 
                 {/* ── RIGHT COLUMN SIDEBAR ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                    width: '340px',
+                    minWidth: '340px',
+                    maxWidth: '340px',
+                    flexShrink: 0,
+                    boxSizing: 'border-box',
+                  }}
+                >
 
                   {/* 1. Pre-flight Check Card */}
                   <div
@@ -1515,11 +1541,13 @@ export default function SecurityAnalysisPage() {
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                            {isValidating ? (
-                              <Loader2 size={12} color={T.textMuted} className="animate-spin" style={{ flexShrink: 0 }} />
-                            ) : (
-                              <Check size={12} color={T.green} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                            )}
+                            <div style={{ width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              {isValidating ? (
+                                <Loader2 size={12} color={T.textMuted} className="animate-spin" />
+                              ) : (
+                                <Check size={12} color={T.green} strokeWidth={2.5} />
+                              )}
+                            </div>
                             <span
                               style={{
                                 fontSize: '12.5px',
@@ -1628,12 +1656,12 @@ export default function SecurityAnalysisPage() {
                           <Info size={12} color="#9CA3AF" strokeWidth={1.6} />
                         </div>
 
-                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                           <KavachDropdown
                             value={String(row.value)}
                             onChange={(val) => row.setter(Number(val))}
                             size="sm"
-                            minWidth="90px"
+                            minWidth="80px"
                             align="right"
                             options={row.options.map((opt) => ({
                               value: String(opt),

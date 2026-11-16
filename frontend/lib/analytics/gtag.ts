@@ -105,8 +105,15 @@ export function sanitizeUrl(rawUrl: string): string {
  * Track a pageview in Google Analytics 4.
  */
 export function pageview(url: string, title?: string): void {
-  if (typeof window === 'undefined' || typeof window.gtag !== 'function') {
+  if (typeof window === 'undefined') {
     return;
+  }
+
+  window.dataLayer = window.dataLayer || [];
+  if (typeof window.gtag !== 'function') {
+    window.gtag = function () {
+      window.dataLayer.push(arguments);
+    };
   }
 
   const cleanPath = sanitizeUrl(url);
@@ -122,8 +129,15 @@ export function pageview(url: string, title?: string): void {
  * Send a generic custom event to GA4 with parameter sanitization.
  */
 export function event(action: string, params: Record<string, any> = {}): void {
-  if (typeof window === 'undefined' || typeof window.gtag !== 'function') {
+  if (typeof window === 'undefined') {
     return;
+  }
+
+  window.dataLayer = window.dataLayer || [];
+  if (typeof window.gtag !== 'function') {
+    window.gtag = function () {
+      window.dataLayer.push(arguments);
+    };
   }
 
   const cleanParams = sanitizeParams(params);
@@ -134,8 +148,15 @@ export function event(action: string, params: Record<string, any> = {}): void {
  * Update Google Consent Mode v2 state dynamically.
  */
 export function updateConsent(granted: boolean): void {
-  if (typeof window === 'undefined' || typeof window.gtag !== 'function') {
+  if (typeof window === 'undefined') {
     return;
+  }
+
+  window.dataLayer = window.dataLayer || [];
+  if (typeof window.gtag !== 'function') {
+    window.gtag = function () {
+      window.dataLayer.push(arguments);
+    };
   }
 
   window.gtag('consent', 'update', {
@@ -144,7 +165,7 @@ export function updateConsent(granted: boolean): void {
 }
 
 // ---------------------------------------------------------------------------
-// Business Conversion Events (Phase 5)
+// Business Conversion Events (Real Product Events)
 // ---------------------------------------------------------------------------
 
 /**
@@ -164,6 +185,23 @@ export function trackSignUp(params: { method?: string } = {}): void {
 export function trackLogin(params: { method?: string } = {}): void {
   event('login', {
     method: params.method || 'credentials',
+  });
+}
+
+/**
+ * project_created: User successfully creates a new project.
+ * Fired only when project creation API returns success.
+ */
+export function trackProjectCreated(params: {
+  project_id?: string;
+  project_name?: string;
+  primary_language?: string;
+  framework?: string;
+} = {}): void {
+  event('project_created', {
+    project_name: params.project_name ? params.project_name.substring(0, 50) : 'unspecified',
+    primary_language: params.primary_language || 'unspecified',
+    framework: params.framework || 'unspecified',
   });
 }
 

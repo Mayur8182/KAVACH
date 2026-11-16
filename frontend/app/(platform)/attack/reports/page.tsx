@@ -167,7 +167,10 @@ export default function AttackReportsPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{r.generated_at}</span>
                     <button
-                      onClick={() => alert(`Downloading report in ${r.file_format} format...`)}
+                      onClick={() => {
+                        const url = r.download_url || `/api/v1/attack/reports/download/${r.id}?format=${r.file_format || 'PDF'}`;
+                        window.open(url, '_blank');
+                      }}
                       style={{
                         display: 'flex',
                         alignItems: 'center',

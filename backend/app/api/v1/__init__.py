@@ -40,6 +40,8 @@ from app.api.v1.workspaces import router as workspaces_router, org_router
 from app.api.v1.onboarding import router as onboarding_router
 from app.api.v1.invitations import router as invitations_router
 from app.api.v1.integrations import router as integrations_router
+from app.api.v1.notifications import router as notifications_router
+from app.api.v1.reports import router as reports_router
 from app.api.v1.code_config import router as code_config_router, settings_router as code_settings_router
 from app.api.v1.tasks import router as tasks_router
 from app.api.v1.governance import router as governance_router
@@ -72,8 +74,10 @@ from app.api.v1.security_intelligence import router as security_intelligence_rou
 from app.api.v1.remediation import router as remediation_router
 from app.api.v1.cli import router as cli_router
 from app.api.v1.mcp import router as mcp_router
+from app.api.v1.model_security import router as model_security_router
 
 v1_router = APIRouter()
+v1_router.include_router(model_security_router)
 v1_router.include_router(mcp_router)
 v1_router.include_router(cli_router)
 v1_router.include_router(remediation_router)
@@ -103,6 +107,7 @@ v1_router.include_router(account_router)
 v1_router.include_router(sales_demo_router)
 v1_router.include_router(findings_module_router, prefix="/findings")
 v1_router.include_router(sast_router)
+v1_router.include_router(integrations_router)
 v1_router.include_router(integrations_v2_router)
 v1_router.include_router(hotspots_router)
 v1_router.include_router(tasks_router)
@@ -150,6 +155,7 @@ v1_router.include_router(workspaces_router)
 v1_router.include_router(org_router)
 v1_router.include_router(onboarding_router)
 v1_router.include_router(invitations_router)
-v1_router.include_router(integrations_router)
+v1_router.include_router(notifications_router)
+v1_router.include_router(reports_router)
 
 __all__ = ["v1_router"]

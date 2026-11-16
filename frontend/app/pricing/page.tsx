@@ -8,33 +8,20 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   Check,
-  Shield,
-  CreditCard,
-  Users,
-  HelpCircle,
-  Code2,
-  Cloud,
   ShieldCheck,
-  Building,
   ArrowRight,
   ChevronDown,
   ChevronUp,
-  Lock,
-  Layers,
-  Sparkles,
-  Server,
-  Zap,
 } from 'lucide-react';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
+import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
 import { SearchModal } from '@/components/common/SearchModal';
 import { TalkToExpertModal } from '@/components/common/TalkToExpertModal';
 import { trackPricingView, trackBeginCheckout, trackDemoRequest } from '@/lib/analytics/gtag';
 
 export default function PricingPage() {
-  const router = useRouter();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
   const [searchOpen, setSearchOpen] = useState(false);
   const [expertOpen, setExpertOpen] = useState(false);
@@ -103,9 +90,9 @@ export default function PricingPage() {
       features: [
         'Unlimited repositories & workspaces',
         'Deterministic OPA Rego policy enforcement',
-        'SLSA L3 supply chain provenance',
+        'SLSA Level 3 aligned cryptographic build provenance',
         'Multi-cloud CSPM & container vulnerability audit',
-        'SOC 2 Type II, ISO 27001, & HIPAA mapping',
+        'Framework mapping (SOC 2, ISO 27001, HIPAA & PCI readiness)',
         'Role-based access control (RBAC) & SSO (SAML/OIDC)',
         'Priority support (4-hour response SLA)',
       ],
@@ -154,7 +141,7 @@ export default function PricingPage() {
       items: [
         { feature: 'OPA Rego Policy Engine', dev: '—', team: 'Standard Rules', biz: 'Full Rego Editor', ent: 'Custom Invariants' },
         { feature: 'Deterministic CI/CD Merge Blocking', dev: '—', team: 'Critical/High', biz: 'Configurable Gates', ent: 'Zero-Tolerance Policy' },
-        { feature: 'Compliance Frameworks (SOC2, ISO, PCI)', dev: '—', team: 'SOC 2 Core', biz: 'All 7 Frameworks', ent: 'Custom Frameworks' },
+        { feature: 'Compliance Framework Mapping (SOC2, ISO, HIPAA, PCI, NIST, CIS, OWASP)', dev: '—', team: 'Core Controls', biz: 'All 7 Frameworks', ent: 'Custom Frameworks' },
         { feature: 'Audit Log Retention', dev: '7 Days', team: '90 Days', biz: '1 Year', ent: '7 Years (Immutable)' },
       ],
     },
@@ -179,8 +166,8 @@ export default function PricingPage() {
       <main style={{ flex: 1, width: '100%', maxWidth: '1240px', margin: '0 auto', padding: '48px 24px 96px' }}>
         {/* Header Section */}
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 12px', borderRadius: '16px', backgroundColor: '#EFF6FF', border: '1px solid #DBEAFE', color: '#2563EB', fontSize: '12px', fontWeight: 600, marginBottom: '16px' }}>
-            <ShieldCheck size={14} />
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '20px', backgroundColor: '#F4F4F5', border: '1px solid #E4E4E7', color: '#18181B', fontSize: '12px', fontWeight: 600, marginBottom: '16px' }}>
+            <ShieldCheck size={14} color="#18181B" />
             <span>Deterministic Security Pricing</span>
           </div>
           <h1 style={{ fontSize: '40px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.03em', margin: '0 0 12px' }}>
@@ -245,10 +232,10 @@ export default function PricingPage() {
                 key={p.name}
                 style={{
                   backgroundColor: '#FFFFFF',
-                  borderRadius: '12px',
-                  border: p.highlighted ? '2px solid #2563EB' : '1px solid #E2E8F0',
-                  boxShadow: p.highlighted ? '0 12px 24px -6px rgba(37, 99, 235, 0.12)' : '0 1px 3px rgba(0,0,0,0.04)',
-                  padding: '28px 24px',
+                  borderRadius: '16px',
+                  border: p.highlighted ? '2px solid #09090B' : '1px solid #E4E4E7',
+                  boxShadow: p.highlighted ? '0 12px 28px -6px rgba(0, 0, 0, 0.10)' : '0 1px 3px rgba(0,0,0,0.04)',
+                  padding: '32px 24px',
                   display: 'flex',
                   flexDirection: 'column',
                   position: 'relative',
@@ -261,11 +248,11 @@ export default function PricingPage() {
                       top: '-12px',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      backgroundColor: '#2563EB',
+                      backgroundColor: '#09090B',
                       color: '#FFFFFF',
                       fontSize: '11px',
                       fontWeight: 700,
-                      padding: '2px 12px',
+                      padding: '3px 14px',
                       borderRadius: '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.04em',
@@ -307,7 +294,7 @@ export default function PricingPage() {
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {p.features.map((f) => (
                       <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                        <Check size={16} color={p.highlighted ? '#2563EB' : '#047857'} style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <Check size={16} color={p.highlighted ? '#09090B' : '#047857'} style={{ flexShrink: 0, marginTop: '2px' }} />
                         <span>{f}</span>
                       </li>
                     ))}
@@ -319,23 +306,38 @@ export default function PricingPage() {
                     onClick={p.onCtaClick}
                     style={{
                       width: '100%',
-                      padding: '11px',
-                      borderRadius: '6px',
-                      fontSize: '13px',
+                      padding: '12px 20px',
+                      borderRadius: '12px',
+                      fontSize: '14px',
                       fontWeight: 600,
-                      backgroundColor: p.highlighted ? '#2563EB' : '#0F172A',
-                      color: '#FFFFFF',
-                      border: 'none',
+                      letterSpacing: '-0.01em',
+                      backgroundColor: p.highlighted ? '#09090B' : '#FFFFFF',
+                      color: p.highlighted ? '#FFFFFF' : '#18181B',
+                      border: p.highlighted ? 'none' : '1px solid #E4E4E7',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px',
+                      gap: '8px',
                       transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (p.highlighted) {
+                        e.currentTarget.style.backgroundColor = '#27272A';
+                      } else {
+                        e.currentTarget.style.backgroundColor = '#F4F4F5';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (p.highlighted) {
+                        e.currentTarget.style.backgroundColor = '#09090B';
+                      } else {
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      }
                     }}
                   >
                     <span>{p.ctaText}</span>
-                    <ArrowRight size={14} />
+                    <ArrowRight size={15} />
                   </button>
                 ) : (
                   <Link
@@ -351,37 +353,40 @@ export default function PricingPage() {
                     }}
                     style={{
                       width: '100%',
-                      padding: '11px',
-                      borderRadius: '6px',
-                      fontSize: '13px',
+                      padding: '12px 20px',
+                      borderRadius: '12px',
+                      fontSize: '14px',
                       fontWeight: 600,
-                      backgroundColor: p.highlighted ? '#2563EB' : '#FFFFFF',
-                      color: p.highlighted ? '#FFFFFF' : '#0F172A',
-                      border: p.highlighted ? 'none' : '1.5px solid #0F172A',
+                      letterSpacing: '-0.01em',
+                      backgroundColor: p.highlighted ? '#09090B' : '#FFFFFF',
+                      color: p.highlighted ? '#FFFFFF' : '#18181B',
+                      border: p.highlighted ? 'none' : '1px solid #E4E4E7',
                       textDecoration: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px',
+                      gap: '8px',
                       textAlign: 'center',
                       boxSizing: 'border-box',
                       transition: 'all 0.15s ease',
                     }}
                     onMouseEnter={(e) => {
-                      if (!p.highlighted) {
-                        e.currentTarget.style.backgroundColor = '#0F172A';
-                        e.currentTarget.style.color = '#FFFFFF';
+                      if (p.highlighted) {
+                        e.currentTarget.style.backgroundColor = '#27272A';
+                      } else {
+                        e.currentTarget.style.backgroundColor = '#F4F4F5';
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (!p.highlighted) {
+                      if (p.highlighted) {
+                        e.currentTarget.style.backgroundColor = '#09090B';
+                      } else {
                         e.currentTarget.style.backgroundColor = '#FFFFFF';
-                        e.currentTarget.style.color = '#0F172A';
                       }
                     }}
                   >
                     <span>{p.ctaText}</span>
-                    <ArrowRight size={14} />
+                    <ArrowRight size={15} />
                   </Link>
                 )}
               </div>
@@ -408,7 +413,7 @@ export default function PricingPage() {
                     <th style={{ padding: '14px 20px', width: '36%' }}>Feature</th>
                     <th style={{ padding: '14px 16px', width: '16%' }}>Developer</th>
                     <th style={{ padding: '14px 16px', width: '16%' }}>Team</th>
-                    <th style={{ padding: '14px 16px', width: '16%', color: '#0F172A', backgroundColor: 'rgba(239, 246, 255, 0.5)' }}>Business</th>
+                    <th style={{ padding: '14px 16px', width: '16%', color: '#0F172A', backgroundColor: '#F4F4F5' }}>Business</th>
                     <th style={{ padding: '14px 16px', width: '16%' }}>Enterprise</th>
                   </tr>
                 </thead>
@@ -431,7 +436,7 @@ export default function PricingPage() {
                           <td style={{ padding: '12px 16px', color: '#334155', fontWeight: 500 }}>
                             {row.team}
                           </td>
-                          <td style={{ padding: '12px 16px', color: '#0F172A', fontWeight: 600, backgroundColor: 'rgba(239, 246, 255, 0.4)' }}>
+                          <td style={{ padding: '12px 16px', color: '#0F172A', fontWeight: 600, backgroundColor: '#F4F4F5' }}>
                             {row.biz}
                           </td>
                           <td style={{ padding: '12px 16px', color: '#0F172A', fontWeight: 600 }}>
@@ -535,14 +540,14 @@ export default function PricingPage() {
             </h3>
           </div>
           <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.6, margin: '0 0 14px' }}>
-            All plans feature transparent billing with zero surprise price hikes. Annual subscriptions renew automatically at standard contracted rates with email notifications sent 30 days prior. You can self-cancel your plan at any time in Organization Settings. If you are not completely satisfied within your first 30 days, we provide a 100% full money-back refund.
+            All plans feature transparent billing with zero surprise price hikes. Annual subscriptions renew automatically at standard contracted rates with email notifications sent 30 days prior. You can self-cancel your plan at any time in Organization Settings. If you are not completely satisfied within your first 14 calendar days, we provide a 100% full money-back evaluation guarantee.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '12.5px' }}>
-            <Link href="/legal" style={{ color: '#2563EB', fontWeight: 600, textDecoration: 'none' }}>
+            <Link href="/legal" style={{ color: '#09090B', fontWeight: 600, textDecoration: 'none' }}>
               Full Refund & Cancellation Policy &rarr;
             </Link>
             <span style={{ color: '#CBD5E1' }}>•</span>
-            <Link href="/legal" style={{ color: '#2563EB', fontWeight: 600, textDecoration: 'none' }}>
+            <Link href="/legal" style={{ color: '#09090B', fontWeight: 600, textDecoration: 'none' }}>
               Data Processing Agreement (DPA) &rarr;
             </Link>
             <span style={{ color: '#CBD5E1' }}>•</span>
@@ -553,11 +558,14 @@ export default function PricingPage() {
         </div>
       </main>
 
+      <EnterpriseFooter />
+
       {/* Global Modals */}
       <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
       <TalkToExpertModal
         isOpen={expertOpen}
         onClose={() => setExpertOpen(false)}
+        productName={selectedPlanForModal}
       />
     </div>
   );

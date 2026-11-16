@@ -27,6 +27,8 @@ import {
   ExternalLink,
   Sparkles,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { KavachHeader } from '@/components/navigation/SecuLayerHeader';
 import { SalesSubNav } from '@/components/sales/SalesSubNav';
@@ -119,8 +121,50 @@ export default function BookDemoPage() {
     }
   };
 
-  // Calendar days grid for October 2026
-  const oct2026Days = Array.from({ length: 31 }, (_, i) => i + 1);
+  const today = new Date();
+  const [currentYear, setCurrentYear] = useState(() => today.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(() => today.getMonth()); // 0-indexed
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear((prev) => prev - 1);
+    } else {
+      setCurrentMonth((prev) => prev - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear((prev) => prev + 1);
+    } else {
+      setCurrentMonth((prev) => prev + 1);
+    }
+  };
+
+  // Calendar days grid calculation
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+
+  const calendarDays: Array<{ day: number | null; dateStr: string | null; isPast: boolean; isSelected: boolean }> = [];
+  for (let i = 0; i < firstDayIndex; i++) {
+    calendarDays.push({ day: null, dateStr: null, isPast: false, isSelected: false });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayDate = new Date(currentYear, currentMonth, d);
+    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const isPast = dayDate < todayMidnight;
+    const isSelected = selectedDate === dateStr;
+    calendarDays.push({ day: d, dateStr, isPast, isSelected });
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFC', color: '#0F172A', display: 'flex', flexDirection: 'column', fontFamily: "var(--font-sans, 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif)" }}>
@@ -291,7 +335,49 @@ export default function BookDemoPage() {
             <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '28px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#0F172A' }}>Select a Date</h3>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#2563EB' }}>October 2026</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#2563EB' }}>
+                    {monthNames[currentMonth]} {currentYear}
+                  </span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={handlePrevMonth}
+                      style={{
+                        background: 'none',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: '#64748B',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      title="Previous Month"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextMonth}
+                      style={{
+                        background: 'none',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: '#0F172A',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      title="Next Month"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Calendar Grid */}
@@ -300,31 +386,27 @@ export default function BookDemoPage() {
                   <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
-                  {/* Padding empty days for Wed Oct 1 start */}
-                  <div /> <div /> <div />
-                  {oct2026Days.map((d) => {
-                    const dateStr = `2026-10-${d.toString().padStart(2, '0')}`;
-                    const isSelected = selectedDate === dateStr;
-                    const isPassed = d < 5;
+                  {calendarDays.map((c, i) => {
+                    if (!c.day || !c.dateStr) return <div key={i} />;
                     return (
                       <button
-                        key={d}
+                        key={i}
                         type="button"
-                        disabled={isPassed}
-                        onClick={() => setSelectedDate(dateStr)}
+                        disabled={c.isPast}
+                        onClick={() => setSelectedDate(c.dateStr!)}
                         style={{
                           height: '38px',
                           borderRadius: '8px',
-                          border: isSelected ? '2px solid #2563EB' : '1px solid #E2E8F0',
-                          backgroundColor: isSelected ? '#2563EB' : isPassed ? '#F8FAFC' : '#FFFFFF',
-                          color: isSelected ? '#FFFFFF' : isPassed ? '#CBD5E1' : '#0F172A',
-                          fontWeight: isSelected ? 700 : 500,
+                          border: c.isSelected ? '2px solid #2563EB' : '1px solid #E2E8F0',
+                          backgroundColor: c.isSelected ? '#2563EB' : c.isPast ? '#F8FAFC' : '#FFFFFF',
+                          color: c.isSelected ? '#FFFFFF' : c.isPast ? '#CBD5E1' : '#0F172A',
+                          fontWeight: c.isSelected ? 700 : 500,
                           fontSize: '13px',
-                          cursor: isPassed ? 'not-allowed' : 'pointer',
+                          cursor: c.isPast ? 'not-allowed' : 'pointer',
                           transition: 'all 0.15s ease',
                         }}
                       >
-                        {d}
+                        {c.day}
                       </button>
                     );
                   })}

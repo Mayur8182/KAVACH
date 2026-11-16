@@ -138,15 +138,15 @@ export const KavachBrandLoader: React.FC<KavachBrandLoaderProps> = ({
             width: `${Math.round(dimensions.circle * 0.76)}px`,
             height: `${Math.round(dimensions.circle * 0.76)}px`,
             borderRadius: '50%',
-            border: isDark ? '2px solid rgba(59, 130, 246, 0.4)' : '2px solid rgba(37, 99, 235, 0.25)',
-            borderTopColor: isDark ? '#60A5FA' : '#2563EB',
+            border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid rgba(24, 24, 27, 0.15)',
+            borderTopColor: isDark ? '#FFFFFF' : '#18181B',
             borderRightColor: 'transparent',
             animation: 'kavach-radar-rev 2.2s linear infinite',
             pointerEvents: 'none',
           }}
         />
 
-        {/* Soft Blue Center Ground Glow */}
+        {/* Soft Center Ground Glow */}
         <div
           style={{
             position: 'absolute',
@@ -154,7 +154,7 @@ export const KavachBrandLoader: React.FC<KavachBrandLoaderProps> = ({
             width: `${Math.round(dimensions.circle * 0.65)}px`,
             height: '18px',
             borderRadius: '50%',
-            backgroundColor: isDark ? 'rgba(37, 99, 235, 0.25)' : 'rgba(37, 99, 235, 0.16)',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(24, 24, 27, 0.08)',
             filter: 'blur(8px)',
             pointerEvents: 'none',
           }}
@@ -287,8 +287,8 @@ export const KavachBrandLoader: React.FC<KavachBrandLoaderProps> = ({
             bottom: 0,
             width: '70%',
             background: isDark
-              ? 'linear-gradient(90deg, transparent, #3B82F6, #60A5FA, transparent)'
-              : 'linear-gradient(90deg, transparent, #3B82F6, #2563EB, transparent)',
+              ? 'linear-gradient(90deg, transparent, #FFFFFF, rgba(255, 255, 255, 0.5), transparent)'
+              : 'linear-gradient(90deg, transparent, #18181B, #52525B, transparent)',
             animation: 'kavach-beam-sweep 1.4s ease-in-out infinite',
           }}
         />
@@ -303,11 +303,11 @@ export const KavachBrandLoader: React.FC<KavachBrandLoaderProps> = ({
             gap: '6px',
             fontSize: '11px',
             fontWeight: 600,
-            color: isDark ? '#94A3B8' : '#475569',
+            color: isDark ? '#A1A1AA' : '#52525B',
             padding: '4px 11px',
             borderRadius: '9999px',
-            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF',
-            border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#F4F4F5',
+            border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E4E4E7',
             boxShadow: isDark ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.03)',
             marginTop: '4px',
           }}

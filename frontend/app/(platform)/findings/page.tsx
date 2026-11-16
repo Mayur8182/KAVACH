@@ -442,7 +442,25 @@ export default function UnifiedFindingsPage() {
                 Export
               </Button>
               {exportMenuOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-36 bg-white border border-[#E2E8F0] rounded-md shadow-md z-50 py-1 flex flex-col text-xs">
+                <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-[#E2E8F0] rounded-md shadow-md z-50 py-1 flex flex-col text-xs">
+                  <a
+                    href={api.findings.exportUrl(currentFilterParams, 'pdf')}
+                    download
+                    onClick={() => setExportMenuOpen(false)}
+                    className="px-3 py-1.5 text-[#0F172A] hover:bg-[#F8FAFC] flex items-center justify-between font-medium"
+                  >
+                    <span>PDF Technical Audit</span>
+                    <span className="text-[10px] text-blue-600 bg-blue-50 px-1 rounded font-mono">P0</span>
+                  </a>
+                  <a
+                    href={api.findings.exportUrl(currentFilterParams, 'sarif')}
+                    download
+                    onClick={() => setExportMenuOpen(false)}
+                    className="px-3 py-1.5 text-[#0F172A] hover:bg-[#F8FAFC] flex items-center justify-between font-medium"
+                  >
+                    <span>SARIF v2.1.0 JSON</span>
+                    <span className="text-[10px] text-purple-600 bg-purple-50 px-1 rounded font-mono">OASIS</span>
+                  </a>
                   <a
                     href={api.findings.exportUrl(currentFilterParams, 'csv')}
                     download

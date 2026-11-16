@@ -44,6 +44,27 @@ class User(Base, TimestampMixin):
         default=False,
         nullable=False,
     )
+
+    # OAuth Provider Identities
+    github_user_id: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+    )
+    google_user_id: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+    )
+    avatar_url: Mapped[Optional[str]] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+    auth_provider: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        default="oauth",
+    )
     onboarding_completed: Mapped[bool] = mapped_column(
         Boolean,
         default=False,

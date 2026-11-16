@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, ForeignKey, JSON, Integer
+from sqlalchemy import Column, String, DateTime, ForeignKey, JSON, Integer, Text, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -150,3 +150,67 @@ class RemediationEvidence(Base):
     
     metadata_ = Column("metadata", JSON, default=dict)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class AutofixJob(Base):
+    """
+    Tracks the full end-to-end lifecycle of an AI-driven or deterministic vulnerability remediation job:
+    Investigation -> Code Intelligence -> Strategy Proposal -> Patch Generation ->
+    Multi-layer Validation -> Self-Healing Retries -> GitHub Pull Request -> Verification & TTR.
+    """
+    __tablename__ = "autofix_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    finding_id = Column(String(255), nullable=False, index=True)
+    finding_type = Column(String(64), default="api_security")  # api_security, sast, sca, secrets, iac, container
+    project_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    api_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+
+    status = Column(String(64), default="QUEUED", index=True)
+    # QUEUED, INVESTIGATING, STRATEGIZING, GENERATING_PATCH, APPLYING_PATCH, VALIDATING, SELF_HEALING, VERIFIED, PR_CREATED, COMPLETED, FAILED
+    current_stage = Column(String(64), default="INVESTIGATION")
+    
+    repository_name = Column(String(255), nullable=True)
+    base_commit_sha = Column(String(128), nullable=True)
+    branch_name = Column(String(255), nullable=True)
+    target_file = Column(String(512), nullable=True)
+    language = Column(String(64), nullable=True)
+    framework = Column(String(64), nullable=True)
+
+    root_cause = Column(Text, nullable=True)
+    code_context = Column(JSON, default=dict)
+    strategies = Column(JSON, default=list)
+    selected_strategy = Column(JSON, default=dict)
+
+    patch_diff = Column(Text, nullable=True)
+    original_code = Column(Text, nullable=True)
+    patched_code = Column(Text, nullable=True)
+    files_affected = Column(JSON, default=list)
+
+    validation_results = Column(JSON, default=dict)
+    self_healing_attempts = Column(JSON, default=list)
+    attempt_count = Column(Integer, default=0)
+    max_attempts = Column(Integer, default=3)
+
+    execution_logs = Column(JSON, default=list)
+
+    pr_number = Column(Integer, nullable=True)
+    pr_url = Column(String(512), nullable=True)
+    pr_branch = Column(String(255), nullable=True)
+    pr_status = Column(String(64), default="NONE")  # NONE, OPEN, MERGED, CLOSED
+
+    # Precise Time to Resolution (TTR) Timestamps
+    detected_at = Column(DateTime(timezone=True), nullable=True)
+    autofix_started_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    investigation_completed_at = Column(DateTime(timezone=True), nullable=True)
+    patch_generated_at = Column(DateTime(timezone=True), nullable=True)
+    validation_completed_at = Column(DateTime(timezone=True), nullable=True)
+    pr_created_at = Column(DateTime(timezone=True), nullable=True)
+    pr_merged_at = Column(DateTime(timezone=True), nullable=True)
+    verification_completed_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    time_to_resolution_seconds = Column(Float, nullable=True)
+    durations = Column(JSON, default=dict)
+
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

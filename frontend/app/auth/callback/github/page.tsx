@@ -40,15 +40,47 @@ function GitHubCallbackContent() {
     if (processedRef.current) return;
     processedRef.current = true;
 
+    const token = searchParams.get('token');
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const oauthError = searchParams.get('error');
     const oauthDesc = searchParams.get('error_description');
 
     if (oauthError) {
-      setError('GitHub authorization declined');
-      setErrorSubtitle('The authorization request was declined by GitHub or cancelled.');
-      setErrorDetails(oauthDesc || `OAuth error: ${oauthError}`);
+      if (oauthError === 'incorrect_client_credentials' || oauthDesc?.toLowerCase().includes('client_secret') || oauthDesc?.toLowerCase().includes('incorrect')) {
+        setError('GitHub App Credentials Mismatch');
+        setErrorSubtitle('The GitHub App Client Secret in your backend does not match Client ID Iv23liqai7qjzsE9RllD.');
+        setErrorDetails('Please generate a new Client Secret in GitHub Developer Settings (GitHub Apps > Kavach Security > Client secrets) and paste it into backend/.env under GITHUB_CLIENT_SECRET.');
+      } else {
+        setError('GitHub authorization declined');
+        setErrorSubtitle('The authorization request was declined by GitHub or cancelled.');
+        setErrorDetails(oauthDesc || `OAuth error: ${oauthError}`);
+      }
+      return;
+    }
+
+    // Direct token redirect from backend unified callback
+    if (token) {
+      setAuthToken(token);
+      trackGitHubConnect({ context: 'oauth_callback' });
+      trackLogin({ method: 'github' });
+
+      Promise.all([
+        api.entitlements.getMe().catch(() => null),
+        api.projects.list().catch(() => []),
+      ]).then(([ent, projs]: [any, any]) => {
+        const hasProject = Array.isArray(projs) && projs.length > 0;
+        if (hasProject && typeof window !== 'undefined') {
+          localStorage.setItem('secu_active_project_id', projs[0].id);
+        }
+        if (ent?.onboarding_completed || hasProject) {
+          router.push('/overview');
+        } else {
+          router.push('/onboarding');
+        }
+      }).catch(() => {
+        router.push('/overview');
+      });
       return;
     }
 
@@ -61,22 +93,35 @@ function GitHubCallbackContent() {
 
     const exchangeCode = async () => {
       try {
-        const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback/github` : undefined;
-        const res = await api.auth.githubCallback({ code, state: state || undefined, redirect_uri: redirectUri });
+        const res = await api.auth.githubCallback({ code, state: state || undefined });
         if (res.access_token) {
           setAuthToken(res.access_token);
           trackGitHubConnect({ context: 'oauth_callback' });
           trackLogin({ method: 'github' });
 
           try {
-            const ent = await api.entitlements.getMe();
-            if (!ent?.onboarding_completed) {
-              router.push('/onboarding?github=connected');
-            } else {
+            // Existing users should not be forced through onboarding again if they already have a project and linked repository
+            const [ent, userProjects] = await Promise.all([
+              api.entitlements.getMe().catch(() => null),
+              api.projects.list().catch(() => []),
+            ]);
+
+            const hasProject = Array.isArray(userProjects) && userProjects.length > 0;
+
+            if (hasProject) {
+              const activeProj = userProjects[0];
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('secu_active_project_id', activeProj.id);
+              }
+            }
+
+            if (!res.is_new_user && (ent?.onboarding_completed || hasProject)) {
               router.push('/overview');
+            } else {
+              router.push('/onboarding');
             }
           } catch {
-            router.push('/onboarding?github=connected');
+            router.push(res.is_new_user ? '/onboarding' : '/overview');
           }
         } else {
           throw new Error('Authentication succeeded but no access token was returned.');
@@ -103,21 +148,16 @@ function GitHubCallbackContent() {
   const handleRetryGithub = async () => {
     setRetrying(true);
     try {
-      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://kavachsecurity.me';
-      const redirectUri = `${currentOrigin}/auth/callback/github`;
-      const data = await api.auth.getGithubAuthUrl(redirectUri);
+      const data = await api.auth.getGithubAuthUrl();
       if (data?.url) {
         window.location.href = data.url;
         return;
       }
-    } catch {
-      // fallback
+    } catch (err: any) {
+      console.warn('Backend GitHub authorization URL generation notice:', err);
     }
-    const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || 'Ov23likjqoMrdpB35SRt';
-    const redirectUri = encodeURIComponent(
-      process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI || (typeof window !== 'undefined' ? `${window.location.origin}/auth/callback/github` : 'https://kavachsecurity.me/auth/callback/github')
-    );
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=read:user,user:email,repo`;
+    setErrorSubtitle('Unable to launch GitHub authorization. Please ensure backend services are running.');
+    setRetrying(false);
   };
 
   return (

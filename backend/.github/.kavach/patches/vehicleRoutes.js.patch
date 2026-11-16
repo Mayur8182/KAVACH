@@ -1,0 +1,19 @@
+--- a/backend/routes/vehicleRoutes.js
++++ b/backend/routes/vehicleRoutes.js
+@@ -84,6 +84,16 @@
+ router.get('/:id', async (req, res) => {
+     try {
+         const vehicle = await Vehicle.findById(req.params.id).populate('category');
++        // [KAVACH-SECURITY-FIX] Enforce Object-Level Authorization (BOLA/IDOR) boundary
++        if (!req.user) {
++          return res.status(401).json({ error: 'Unauthorized: Authentication required' });
++        }
++        const targetId = req.params.id;
++        const isOwner = req.user.id === targetId || (req.user.userId && req.user.userId === targetId);
++        const isAdmin = req.user.role === 'admin' || req.user.isAdmin === true;
++        if (!isOwner && !isAdmin) {
++          return res.status(403).json({ error: 'Forbidden: Insufficient object permissions' });
++        }
+         if (vehicle) {
+             res.json(vehicle);
+         } else {

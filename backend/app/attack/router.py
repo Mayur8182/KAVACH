@@ -376,6 +376,42 @@ async def create_report(
     return await service.create_report(payload)
 
 
+@router.get("/reports/download/{report_id}", summary="Download Offensive Attack & Pentest Report (PDF or JSON)")
+async def download_attack_report(
+    report_id: str,
+    format: Optional[str] = Query("JSON"),
+    project_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.reporting_engine import ReportingEngineService
+    from fastapi.responses import Response
+    from datetime import datetime, timezone
+    import json
+
+    svc = ReportingEngineService(db, None)
+    report_data = await svc.aggregate_report_data(
+        report_id="KAV-RPT-11",
+        project_id=project_id,
+        timeframe="30d",
+    )
+    fmt = (format or "JSON").upper().strip()
+    safe_name = f"attack_pentest_report_{report_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+
+    if fmt == "PDF":
+        pdf_bytes = svc.generate_pdf(report_data)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.pdf"'},
+        )
+    else:
+        return Response(
+            content=json.dumps(report_data, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.json"'},
+        )
+
+
 @router.get("/policies", response_model=AttackPolicyListResponse)
 async def list_policies(
     project_id: Optional[str] = Query(None),

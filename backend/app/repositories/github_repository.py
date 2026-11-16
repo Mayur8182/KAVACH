@@ -62,6 +62,9 @@ class GitHubRepositoryDB:
         permissions: Optional[Dict[str, Any]] = None,
         repository_selection: str = "all",
         project_id: Optional[uuid.UUID] = None,
+        workspace_id: Optional[uuid.UUID] = None,
+        connected_by_user_id: Optional[uuid.UUID] = None,
+        app_id: Optional[str] = None,
     ) -> GitHubInstallation:
         existing = await self.get_installation_by_github_id(github_installation_id)
         now = datetime.now(timezone.utc)
@@ -71,14 +74,24 @@ class GitHubRepositoryDB:
             existing.permissions = permissions
             existing.repository_selection = repository_selection
             existing.last_verified_at = now
+            existing.last_synced_at = now
             if project_id and not existing.project_id:
                 existing.project_id = project_id
+            if workspace_id and not existing.workspace_id:
+                existing.workspace_id = workspace_id
+            if connected_by_user_id and not existing.connected_by_user_id:
+                existing.connected_by_user_id = connected_by_user_id
+            if app_id:
+                existing.app_id = app_id
             existing.updated_at = now
             await self.session.flush()
             return existing
 
         inst = GitHubInstallation(
             project_id=project_id,
+            workspace_id=workspace_id,
+            connected_by_user_id=connected_by_user_id,
+            app_id=app_id,
             github_installation_id=github_installation_id,
             github_account_id=github_account_id,
             github_account_login=github_account_login,
@@ -88,6 +101,7 @@ class GitHubRepositoryDB:
             repository_selection=repository_selection,
             installed_at=now,
             last_verified_at=now,
+            last_synced_at=now,
         )
         self.session.add(inst)
         await self.session.flush()
@@ -152,6 +166,7 @@ class GitHubRepositoryDB:
         permissions: Optional[Dict[str, Any]] = None,
         project_id: Optional[uuid.UUID] = None,
         installation_id: Optional[uuid.UUID] = None,
+        workspace_id: Optional[uuid.UUID] = None,
     ) -> GitHubRepository:
         existing = await self.get_repository_by_github_id(github_repository_id)
         now = datetime.now(timezone.utc)
@@ -171,6 +186,8 @@ class GitHubRepositoryDB:
                 existing.project_id = project_id
             if installation_id:
                 existing.installation_id = installation_id
+            if workspace_id:
+                existing.workspace_id = workspace_id
             existing.last_synced_at = now
             existing.updated_at = now
             await self.session.flush()
@@ -178,6 +195,7 @@ class GitHubRepositoryDB:
 
         repo = GitHubRepository(
             project_id=project_id,
+            workspace_id=workspace_id,
             installation_id=installation_id,
             github_repository_id=github_repository_id,
             owner=owner,

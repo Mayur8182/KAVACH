@@ -46,11 +46,29 @@ export default function ContactPage() {
   const [expertOpen, setExpertOpen] = useState(false);
 
   // Active top card mode: 'demo' | 'message' | 'email'
-  const [activeMode, setActiveMode] = useState<'demo' | 'message'>('demo');
+  // Default to 'message' (Contact Form) as requested
+  const [activeMode, setActiveMode] = useState<'demo' | 'message'>('message');
 
   // ── CAL.COM SCHEDULER STATE ──
-  const [selectedDate, setSelectedDate] = useState<number>(24); // Sat 24th
-  const [selectedMonth, setSelectedMonth] = useState<string>('October 2026');
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const [currentMonth, setCurrentMonth] = useState<{ year: number; month: number }>(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+
+  const [selectedDate, setSelectedDate] = useState<number>(() => {
+    const now = new Date();
+    const nextDay = new Date(now);
+    nextDay.setDate(now.getDate() + 1);
+    while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
+      nextDay.setDate(nextDay.getDate() + 1);
+    }
+    return nextDay.getDate();
+  });
   const [selectedSlot, setSelectedSlot] = useState<string | null>('3:30pm');
   const [is24Hour, setIs24Hour] = useState<boolean>(false);
   const [selectedTimezone, setSelectedTimezone] = useState<string>('Asia/Kolkata');
@@ -103,44 +121,29 @@ export default function ContactPage() {
 
   const currentSlots = is24Hour ? timeSlots24 : timeSlots12;
 
-  // Real calendar dates for October 2026 (Oct 1 = Thursday, 31 days)
-  const calendarDays: Array<{ day: number | null; date: number | null; isCurrent?: boolean; isNextMonth?: boolean }> = [
-    { day: null, date: null },
-    { day: null, date: null },
-    { day: null, date: null },
-    { day: null, date: null },
-    { day: 1, date: 1 },
-    { day: 2, date: 2 },
-    { day: 3, date: 3 },
-    { day: 4, date: 4 },
-    { day: 5, date: 5 },
-    { day: 6, date: 6 },
-    { day: 7, date: 7 },
-    { day: 8, date: 8 },
-    { day: 9, date: 9 },
-    { day: 10, date: 10 },
-    { day: 11, date: 11 },
-    { day: 12, date: 12 },
-    { day: 13, date: 13 },
-    { day: 14, date: 14 },
-    { day: 15, date: 15 },
-    { day: 16, date: 16 },
-    { day: 17, date: 17 },
-    { day: 18, date: 18 },
-    { day: 19, date: 19 },
-    { day: 20, date: 20 },
-    { day: 21, date: 21 },
-    { day: 22, date: 22 },
-    { day: 23, date: 23 },
-    { day: 24, date: 24, isCurrent: true },
-    { day: 25, date: 25 },
-    { day: 26, date: 26 },
-    { day: 27, date: 27 },
-    { day: 28, date: 28 },
-    { day: 29, date: 29 },
-    { day: 30, date: 30 },
-    { day: 31, date: 31 },
-  ];
+  const handlePrevMonth = () => {
+    setCurrentMonth((prev) => {
+      if (prev.month === 0) return { year: prev.year - 1, month: 11 };
+      return { year: prev.year, month: prev.month - 1 };
+    });
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth((prev) => {
+      if (prev.month === 11) return { year: prev.year + 1, month: 0 };
+      return { year: prev.year, month: prev.month + 1 };
+    });
+  };
+
+  const firstDayOfWeek = new Date(currentMonth.year, currentMonth.month, 1).getDay();
+  const daysInMonth = new Date(currentMonth.year, currentMonth.month + 1, 0).getDate();
+  const calendarDays: Array<{ date: number | null }> = [];
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    calendarDays.push({ date: null });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    calendarDays.push({ date: d });
+  }
 
   const categoryPills = [
     'Container Security',
@@ -166,7 +169,9 @@ export default function ContactPage() {
     setBookingError(null);
 
     try {
-      const preferredDate = `2026-10-${String(selectedDate).padStart(2, '0')}`;
+      const mStr = String(currentMonth.month + 1).padStart(2, '0');
+      const dStr = String(selectedDate).padStart(2, '0');
+      const preferredDate = `${currentMonth.year}-${mStr}-${dStr}`;
       const res = await api.sales.bookDemo({
         name: demoName.trim(),
         email: demoEmail.trim(),
@@ -276,12 +281,12 @@ export default function ContactPage() {
             onClick={() => setActiveMode('demo')}
             style={{
               backgroundColor: '#FFFFFF',
-              border: activeMode === 'demo' ? '2px solid #2563EB' : '1px solid #E4E4E7',
+              border: activeMode === 'demo' ? '2px solid #09090B' : '1px solid #E4E4E7',
               borderRadius: '16px',
               padding: '24px 28px',
               cursor: 'pointer',
               boxShadow: activeMode === 'demo'
-                ? '0 12px 28px -6px rgba(37, 99, 235, 0.18), 0 4px 10px rgba(0, 0, 0, 0.04)'
+                ? '0 12px 28px -6px rgba(0, 0, 0, 0.12), 0 4px 10px rgba(0, 0, 0, 0.04)'
                 : '0 2px 8px rgba(0, 0, 0, 0.03)',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
               transform: activeMode === 'demo' ? 'translateY(-2px)' : 'none',
@@ -312,7 +317,7 @@ export default function ContactPage() {
               style={{
                 fontSize: '14px',
                 fontWeight: 600,
-                color: '#2563EB',
+                color: '#09090B',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
@@ -328,12 +333,12 @@ export default function ContactPage() {
             onClick={() => setActiveMode('message')}
             style={{
               backgroundColor: '#FFFFFF',
-              border: activeMode === 'message' ? '2px solid #2563EB' : '1px solid #E4E4E7',
+              border: activeMode === 'message' ? '2px solid #09090B' : '1px solid #E4E4E7',
               borderRadius: '16px',
               padding: '24px 28px',
               cursor: 'pointer',
               boxShadow: activeMode === 'message'
-                ? '0 12px 28px -6px rgba(37, 99, 235, 0.18), 0 4px 10px rgba(0, 0, 0, 0.04)'
+                ? '0 12px 28px -6px rgba(0, 0, 0, 0.12), 0 4px 10px rgba(0, 0, 0, 0.04)'
                 : '0 2px 8px rgba(0, 0, 0, 0.03)',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
               transform: activeMode === 'message' ? 'translateY(-2px)' : 'none',
@@ -363,7 +368,7 @@ export default function ContactPage() {
               style={{
                 fontSize: '14px',
                 fontWeight: 600,
-                color: '#2563EB',
+                color: '#09090B',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
@@ -415,7 +420,7 @@ export default function ContactPage() {
               style={{
                 fontSize: '14px',
                 fontWeight: 600,
-                color: '#2563EB',
+                color: '#09090B',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
@@ -448,8 +453,8 @@ export default function ContactPage() {
               </h3>
               <p style={{ fontSize: '14px', color: '#15803D', margin: '0 0 12px 0', lineHeight: 1.5 }}>
                 Your meeting has been registered with Kavach Architecture Engineering on{' '}
-                <strong>{bookingSuccess.preferred_date || 'October 24, 2026'}</strong> at{' '}
-                <strong>{bookingSuccess.preferred_time_slot || '3:30 PM'}</strong> ({selectedTimezone}).
+                <strong>{bookingSuccess.preferred_date || `${monthNames[currentMonth.month]} ${selectedDate}, ${currentMonth.year}`}</strong> at{' '}
+                <strong>{bookingSuccess.preferred_time_slot || selectedSlot}</strong> ({selectedTimezone}).
               </p>
               <div
                 style={{
@@ -464,9 +469,21 @@ export default function ContactPage() {
                   fontFamily: 'monospace',
                 }}
               >
-                <span>Meeting Link:</span>
-                <strong>{bookingSuccess.meeting_url || 'https://meet.google.com/kav-walkthrough-30m'}</strong>
+                <span>Google Meet URL:</span>
+                <a
+                  href={bookingSuccess.meeting_url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#15803D', fontWeight: 700, textDecoration: 'underline' }}
+                >
+                  {bookingSuccess.meeting_url || 'https://meet.google.com/kav-walkthrough-30m'}
+                </a>
               </div>
+              {bookingSuccess.cal_booking_uid && (
+                <div style={{ marginTop: '8px', fontSize: '12px', color: '#15803D', fontFamily: 'monospace' }}>
+                  Cal.com Booking UID: <strong>{bookingSuccess.cal_booking_uid}</strong>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -669,15 +686,19 @@ export default function ContactPage() {
                 <div className="calcom-calendar-col" style={{ padding: '24px 18px', borderRight: '1px solid #E4E4E7', minWidth: 0, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
                     <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#18181B', margin: 0 }}>
-                      October <span style={{ color: '#71717A', fontWeight: 400 }}>2026</span>
+                      {monthNames[currentMonth.month]} <span style={{ color: '#71717A', fontWeight: 400 }}>{currentMonth.year}</span>
                     </h4>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#A1A1AA', padding: '2px' }}
+                        type="button"
+                        onClick={handlePrevMonth}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717A', padding: '2px' }}
                       >
                         <ChevronLeft size={16} />
                       </button>
                       <button
+                        type="button"
+                        onClick={handleNextMonth}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#18181B', padding: '2px' }}
                       >
                         <ChevronRight size={16} />
@@ -718,12 +739,13 @@ export default function ContactPage() {
                   >
                     {calendarDays.map((c, i) => {
                       if (!c.date) return <span key={i} />;
-                      const isSelected = selectedDate === c.date && !c.isNextMonth;
+                      const isSelected = selectedDate === c.date;
                       return (
                         <button
                           key={i}
+                          type="button"
                           onClick={() => {
-                            if (!c.isNextMonth) setSelectedDate(c.date);
+                            if (c.date) setSelectedDate(c.date);
                           }}
                           style={{
                             width: '32px',
@@ -734,15 +756,11 @@ export default function ContactPage() {
                             justifyContent: 'center',
                             borderRadius: '8px',
                             border: 'none',
-                            cursor: c.isNextMonth ? 'default' : 'pointer',
+                            cursor: 'pointer',
                             fontSize: '12px',
                             fontWeight: isSelected ? 700 : 500,
-                            backgroundColor: isSelected ? '#2563EB' : 'transparent',
-                            color: isSelected
-                              ? '#FFFFFF'
-                              : c.isNextMonth
-                              ? '#D4D4D8'
-                              : '#18181B',
+                            backgroundColor: isSelected ? '#09090B' : 'transparent',
+                            color: isSelected ? '#FFFFFF' : '#18181B',
                           }}
                         >
                           {c.date}
@@ -810,10 +828,10 @@ export default function ContactPage() {
                           style={{
                             width: '100%',
                             padding: '10px 12px',
-                            border: isSlotSelected ? '1px solid #2563EB' : '1px solid #E4E4E7',
+                            border: isSlotSelected ? '1px solid #09090B' : '1px solid #E4E4E7',
                             borderRadius: '8px',
-                            backgroundColor: isSlotSelected ? '#EFF6FF' : '#FFFFFF',
-                            color: isSlotSelected ? '#2563EB' : '#18181B',
+                            backgroundColor: isSlotSelected ? '#09090B' : '#FFFFFF',
+                            color: isSlotSelected ? '#FFFFFF' : '#18181B',
                             fontWeight: isSlotSelected ? 700 : 500,
                             fontSize: '13px',
                             cursor: 'pointer',
@@ -883,7 +901,7 @@ export default function ContactPage() {
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 600, color: '#18181B', lineHeight: 1.5 }}>
                     Kavach Security Technologies Pvt. Ltd.<br />
-                    San Francisco, CA &amp; London, UK
+                    Ahmedabad, Gujarat, India
                   </div>
                 </div>
 
@@ -942,7 +960,7 @@ export default function ContactPage() {
                     style={{
                       marginTop: '20px',
                       padding: '8px 18px',
-                      backgroundColor: '#2563EB',
+                      backgroundColor: '#09090B',
                       color: '#FFFFFF',
                       border: 'none',
                       borderRadius: '8px',
@@ -1081,9 +1099,9 @@ export default function ContactPage() {
                             style={{
                               padding: '6px 14px',
                               borderRadius: '20px',
-                              border: isSelected ? '1px solid #2563EB' : '1px solid #E4E4E7',
-                              backgroundColor: isSelected ? '#EFF6FF' : '#FFFFFF',
-                              color: isSelected ? '#2563EB' : '#52525B',
+                              border: isSelected ? '1px solid #09090B' : '1px solid #E4E4E7',
+                              backgroundColor: isSelected ? '#09090B' : '#FFFFFF',
+                              color: isSelected ? '#FFFFFF' : '#52525B',
                               fontSize: '13px',
                               fontWeight: isSelected ? 600 : 500,
                               cursor: 'pointer',
@@ -1093,7 +1111,7 @@ export default function ContactPage() {
                               transition: 'all 0.15s ease',
                             }}
                           >
-                            {isSelected && <Check size={13} color="#2563EB" />}
+                            {isSelected && <Check size={13} color="#FFFFFF" />}
                             <span>{pill}</span>
                           </button>
                         );
@@ -1136,15 +1154,21 @@ export default function ContactPage() {
                       disabled={msgLoading}
                       style={{
                         padding: '11px 24px',
-                        backgroundColor: '#2563EB',
+                        backgroundColor: '#09090B',
                         color: '#FFFFFF',
                         border: 'none',
                         borderRadius: '8px',
                         fontSize: '14px',
                         fontWeight: 600,
                         cursor: msgLoading ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                         transition: 'background-color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!msgLoading) e.currentTarget.style.backgroundColor = '#27272A';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!msgLoading) e.currentTarget.style.backgroundColor = '#09090B';
                       }}
                     >
                       {msgLoading ? 'Sending...' : 'Send message'}
@@ -1320,7 +1344,7 @@ export default function ContactPage() {
                     disabled={bookingLoading}
                     style={{
                       padding: '9px 20px',
-                      backgroundColor: '#2563EB',
+                      backgroundColor: '#09090B',
                       color: '#FFFFFF',
                       border: 'none',
                       borderRadius: '8px',

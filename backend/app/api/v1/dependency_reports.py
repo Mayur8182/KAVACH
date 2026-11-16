@@ -965,3 +965,55 @@ async def get_repository_comparison(
         ),
         repositories=rows,
     )
+
+
+# ── 7. Export SCA & Supply Chain Report (PDF / CSV) ──
+@router.get(
+    "/export",
+    summary="Export SCA & Software Supply Chain Risk Report (PDF / CSV)",
+    description="Downloads authoritative SCA vulnerabilities, package health, and license risks.",
+)
+async def export_dependency_report(
+    format: Optional[str] = Query("PDF", description="PDF, CSV, or JSON"),
+    repository: Optional[str] = Query(None),
+    branch: Optional[str] = Query("main"),
+    timeframe: Optional[str] = Query("30d"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.reporting_engine import ReportingEngineService
+    from fastapi.responses import Response
+    from datetime import datetime, timezone
+    import json
+
+    svc = ReportingEngineService(db, current_user)
+    report_data = await svc.aggregate_report_data(
+        report_id="KAV-RPT-04",
+        repository=repository,
+        branch=branch or "main",
+        timeframe=timeframe or "30d",
+    )
+
+    fmt = (format or "PDF").upper().strip()
+    safe_name = f"sca_supply_chain_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+
+    if fmt == "PDF":
+        pdf_bytes = svc.generate_pdf(report_data)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.pdf"'},
+        )
+    elif fmt == "CSV":
+        csv_bytes = svc.generate_csv(report_data)
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.csv"'},
+        )
+    else:
+        return Response(
+            content=json.dumps(report_data, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.json"'},
+        )

@@ -2442,13 +2442,40 @@ class CodeApiSecurityEngine:
             else:
                 mod.insert(line_idx + 1, f"{indent}# [KAVACH-SECURITY-FIX] Enforce authentication")
         elif env["language"] in ["javascript", "typescript"]:
+            file_text = "\n".join(lines)
+            guard_name = "authenticateToken"
+            if "protect" in file_text or "protect," in file_text or "{ protect }" in file_text:
+                guard_name = "protect"
+            else:
+                # Check workspace middleware for real exported guards
+                for cand_dir in [
+                    "backend/middleware", "backend/middlewares", "middleware", "middlewares",
+                    "scratch/github_workspaces", "backend/scratch/github_workspaces"
+                ]:
+                    if os.path.isdir(cand_dir):
+                        for root, _, files in os.walk(cand_dir):
+                            for fname in files:
+                                if "auth" in fname.lower() and fname.endswith((".js", ".ts")):
+                                    try:
+                                        with open(os.path.join(root, fname), "r", encoding="utf-8", errors="ignore") as mf:
+                                            m_content = mf.read()
+                                            if "protect" in m_content:
+                                                guard_name = "protect"
+                                                break
+                                    except Exception:
+                                        pass
+                            if guard_name == "protect":
+                                break
+                    if guard_name == "protect":
+                        break
+
             if "," in line:
                 parts = line.split(",", 1)
-                mod[line_idx] = f"{parts[0]}, authenticateToken,{parts[1]}"
+                mod[line_idx] = f"{parts[0]}, {guard_name},{parts[1]}"
             elif line.endswith(")"):
-                mod[line_idx] = line.replace(")", ", authenticateToken)")
+                mod[line_idx] = line.replace(")", f", {guard_name})")
             else:
-                mod[line_idx] = f"{line} // [KAVACH-SECURITY-FIX] authenticateToken required"
+                mod[line_idx] = f"{line} // [KAVACH-SECURITY-FIX] {guard_name} required"
         else:
             mod[line_idx] = f"{line} // [KAVACH-SECURITY-FIX] Enforce authentication"
 
@@ -3142,6 +3169,9 @@ class CodeApiSecurityEngine:
         file_content: str,
         finding_cwe: str,
         finding_rule: Optional[str] = None,
+        target_line: Optional[int] = None,
+        target_endpoint: Optional[str] = None,
+        target_snippet: Optional[str] = None,
     ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Deterministically rescans a modified file to verify if the specified vulnerability
@@ -3152,23 +3182,48 @@ class CodeApiSecurityEngine:
         analysis = self.analyze_codebase(temp_map, repo_name="VerificationWorkspace")
         active_findings = analysis["findings"]
 
-        # Check if any finding matching this CWE or taxonomy ID still exists
-        matching = [
+        # 1. Filter findings that match the specific CWE or taxonomy ID
+        cwe_matches = [
             f for f in active_findings
             if (f.get("cwe") == finding_cwe or (finding_rule and (f.get("taxonomy_id") == finding_rule or finding_rule in f.get("title", ""))))
         ]
 
+        # 2. If target_endpoint or target_snippet or target_line is specified,
+        # isolate the specific finding rather than failing due to unrelated findings in the same file.
+        matching = []
+        if target_endpoint:
+            target_path = target_endpoint.split()[-1].lower() if " " in target_endpoint else target_endpoint.lower().strip()
+            for f in cwe_matches:
+                f_title = f.get("title", "").lower()
+                f_endpoint = str(f.get("target_endpoint") or "").lower()
+                if target_path and (target_path in f_title or target_path in f_endpoint):
+                    matching.append(f)
+        elif target_snippet:
+            ts = target_snippet.strip()
+            for f in cwe_matches:
+                f_snip = f.get("evidence", {}).get("vulnerable_snippet", "").strip() if isinstance(f.get("evidence"), dict) else ""
+                if ts and f_snip and (ts in f_snip or f_snip in ts):
+                    matching.append(f)
+        elif target_line is not None and target_line > 0:
+            for f in cwe_matches:
+                f_line = f.get("line_number") or 0
+                if abs(f_line - target_line) <= 2:
+                    matching.append(f)
+        else:
+            matching = cwe_matches
+
         if not matching:
             rule_label = f" ({finding_rule})" if finding_rule else ""
+            target_desc = f" on {target_endpoint}" if target_endpoint else (f" around line {target_line}" if target_line else "")
             return (
                 True,
-                f"Deterministic rescan passed: Vulnerability {finding_cwe}{rule_label} successfully eliminated from {file_path}.",
+                f"Deterministic rescan passed: Vulnerability {finding_cwe}{rule_label}{target_desc} successfully eliminated from {file_path}.",
                 None,
             )
         else:
             first_fail = matching[0]
             tax_id = first_fail.get("taxonomy_id", "")
-            remaining_snippet = first_fail.get("evidence", {}).get("vulnerable_snippet", "")
+            remaining_snippet = first_fail.get("evidence", {}).get("vulnerable_snippet", "") if isinstance(first_fail.get("evidence"), dict) else ""
             return (
                 False,
                 f"Deterministic rescan failed: Vulnerability {finding_cwe} ({tax_id}) is still present at line {first_fail.get('line_number')}.",

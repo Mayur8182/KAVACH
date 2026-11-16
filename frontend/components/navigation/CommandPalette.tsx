@@ -28,6 +28,7 @@ import {
   X,
   Activity,
   Lock,
+  Link2,
   Cpu,
 } from 'lucide-react';
 
@@ -82,6 +83,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   // ── Secondary: AI tools & settings ──────────────────────────────
   const toolItems = useMemo<PaletteItem[]>(() => [
     { id: 'api-analyst',   label: 'AI Security Analyst', description: 'Natural-language queries over your API security data', group: 'AI & Configuration', icon: Bot,       href: '/api-security/analyst'   },
+    { id: 'api-integrations', label: 'Universal Integration & Partner Hub', description: 'Connect Aikido, Snyk, Wiz, Datadog, Jira, Slack, SARIF', group: 'AI & Configuration', icon: Link2, href: '/api-security/integrations' },
     { id: 'api-policies',  label: 'Policies',             description: 'OPA policy rules for API security enforcement',       group: 'AI & Configuration', icon: FileCheck2, href: '/api-security/policies'  },
     { id: 'api-settings',  label: 'API Security Settings',description: 'Scan targets, integrations & notification config',   group: 'AI & Configuration', icon: Settings,  href: '/api-security/settings'  },
   ], []);

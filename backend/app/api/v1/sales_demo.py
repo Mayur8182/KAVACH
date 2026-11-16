@@ -34,6 +34,7 @@ from app.models.sales_demo_models import (
 )
 from app.models.scan import SecurityFinding
 from app.services.audit_service import AuditService
+from app.services.cal_service import cal_service
 
 router = APIRouter(prefix="/sales", tags=["Sales, Demo & Enterprise Onboarding"])
 
@@ -321,36 +322,47 @@ async def list_security_experts(db: AsyncSession = Depends(get_db)):
 async def get_availability(
     date: str = Query(..., description="Date formatted as YYYY-MM-DD or Oct 14"),
     expert_id: Optional[str] = None,
+    timezone: str = Query("Asia/Kolkata", description="Attendee timezone"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Calculates real available time slots by checking against existing appointments in database."""
-    all_slots = ["10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "06:00 PM"]
-    
-    stmt = select(DemoAppointment).where(
-        DemoAppointment.date == date,
-        DemoAppointment.status.in_(["SCHEDULED", "CONFIRMED"]),
-    )
-    if expert_id:
-        stmt = stmt.where(DemoAppointment.expert_id == expert_id)
+    """Fetches real available time slots directly from Cal.com API v2 for Mayur's 30-minute event."""
+    try:
+        cal_data = await cal_service.get_available_slots(date_str=date, timezone_str=timezone)
+        return cal_data
+    except Exception as exc:
+        all_slots = [
+            "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+            "12:00 PM", "12:30 PM", "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM",
+            "03:00 PM", "03:30 PM", "04:00 PM", "04:30 PM"
+        ]
+        stmt = select(DemoAppointment).where(
+            DemoAppointment.date == date,
+            DemoAppointment.status.in_(["SCHEDULED", "CONFIRMED"]),
+        )
+        if expert_id:
+            stmt = stmt.where(DemoAppointment.expert_id == expert_id)
+            
+        res = await db.execute(stmt)
+        booked_appts = res.scalars().all()
+        booked_times = {appt.time for appt in booked_appts}
         
-    res = await db.execute(stmt)
-    booked_appts = res.scalars().all()
-    booked_times = {appt.time for appt in booked_appts}
-    
-    slots_status = [
-        {
-            "time": slot,
-            "available": slot not in booked_times,
-            "booked": slot in booked_times,
+        slots_status = [
+            {
+                "time": slot,
+                "time_12h": slot,
+                "time_24h": slot,
+                "available": slot not in booked_times,
+                "booked": slot in booked_times,
+            }
+            for slot in all_slots
+        ]
+        return {
+            "date": date,
+            "expert_id": expert_id,
+            "timezone": timezone,
+            "slots": slots_status,
+            "available_count": sum(1 for s in slots_status if s["available"]),
         }
-        for slot in all_slots
-    ]
-    return {
-        "date": date,
-        "expert_id": expert_id,
-        "slots": slots_status,
-        "available_count": sum(1 for s in slots_status if s["available"]),
-    }
 
 
 @router.get("/appointments")
@@ -395,26 +407,18 @@ async def book_demo(
     appt_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
 
-    # 1. Check double-booking constraint
-    check_stmt = select(DemoAppointment).where(
-        DemoAppointment.date == payload.preferred_date,
-        DemoAppointment.time == payload.preferred_time_slot,
-        DemoAppointment.status.in_(["SCHEDULED", "CONFIRMED"]),
-    )
-    if payload.assigned_expert:
-        check_stmt = check_stmt.where(DemoAppointment.expert_name == payload.assigned_expert)
-    
-    conflict = await db.execute(check_stmt)
-    if conflict.scalar_one_or_none():
-        raise HTTPException(
-            status_code=409,
-            detail=f"Time slot {payload.preferred_time_slot} on {payload.preferred_date} is already reserved. Please choose an available time slot.",
-        )
-    
     score, tier = calculate_lead_score(payload.company, payload.email)
-    meet_code = f"kvc-{uuid.uuid4().hex[:4]}-{uuid.uuid4().hex[:3]}"
-    meeting_id = meet_code
-    meeting_url = f"https://meet.google.com/{meet_code}"
+
+    # 1. Authoritative Cal.com API v2 integration:
+    # Directly creates genuine booking in Mayur's Cal.com account (event type 7917954)
+    # Configures real Google Meet video conference room returned by Cal.com
+    cal_res = await cal_service.create_booking(payload.dict())
+    cal_booking_uid = cal_res.get("cal_booking_uid", "")
+    cal_booking_id = cal_res.get("cal_booking_id")
+    meeting_url = cal_res.get("meeting_url", "")
+    confirmed_date = cal_res.get("confirmed_date", payload.preferred_date)
+    confirmed_slot = cal_res.get("confirmed_slot", payload.preferred_time_slot)
+    meeting_id = cal_booking_uid or f"cal_{appt_id[:8]}"
 
     expert_title = "Principal AI Security Architect"
     if "Rohit" in (payload.assigned_expert or ""):
@@ -423,8 +427,10 @@ async def book_demo(
         expert_title = "DevSecOps Expert"
     elif "Arjun" in (payload.assigned_expert or ""):
         expert_title = "Product Specialist"
+    else:
+        expert_title = "Co-Founder & Security Engineer"
 
-    # Persist authoritative Lead record
+    # Persist authoritative Lead record with real Cal.com booking metadata
     lead_record = Lead(
         id=req_id,
         name=payload.name,
@@ -433,30 +439,33 @@ async def book_demo(
         job_title=payload.job_title,
         status="DEMO_SCHEDULED",
         source="BOOK_DEMO",
-        assigned_sales_user=payload.assigned_expert,
+        assigned_sales_user=payload.assigned_expert or "Mayur",
         lead_score=score,
         qualification_tier=tier,
         metadata_json={
+            "cal_booking_uid": cal_booking_uid,
+            "cal_booking_id": cal_booking_id,
             "meeting_id": meeting_id,
             "meeting_url": meeting_url,
-            "preferred_date": payload.preferred_date,
-            "preferred_time_slot": payload.preferred_time_slot,
+            "preferred_date": confirmed_date,
+            "preferred_time_slot": confirmed_slot,
             "timezone": payload.timezone,
             "primary_focus": payload.primary_focus,
+            "cal_status": cal_res.get("status"),
         },
     )
     db.add(lead_record)
 
-    # Persist authoritative DemoAppointment record
+    # Persist authoritative DemoAppointment record with real Google Meet URL
     appt_record = DemoAppointment(
         id=appt_id,
         lead_id=req_id,
-        expert_name=payload.assigned_expert,
+        expert_name=payload.assigned_expert or "Mayur",
         customer_name=payload.name,
         customer_email=payload.email,
         company=payload.company,
-        date=payload.preferred_date,
-        time=payload.preferred_time_slot,
+        date=confirmed_date,
+        time=confirmed_slot,
         timezone=payload.timezone,
         demo_type=payload.primary_focus or "Live Platform Demo",
         meeting_provider="Google Meet",
@@ -474,22 +483,25 @@ async def book_demo(
         email=payload.email,
         company=payload.company,
         job_title=payload.job_title,
-        preferred_date=payload.preferred_date,
-        preferred_time_slot=payload.preferred_time_slot,
+        preferred_date=confirmed_date,
+        preferred_time_slot=confirmed_slot,
         timezone=payload.timezone,
         primary_focus=payload.primary_focus,
-        assigned_expert=payload.assigned_expert,
+        assigned_expert=payload.assigned_expert or "Mayur",
         expert_title=expert_title,
         notes=payload.notes,
         status="SCHEDULED",
         lead_score=score,
         qualification_tier=tier,
         metadata_json={
+            "cal_booking_uid": cal_booking_uid,
+            "cal_booking_id": cal_booking_id,
             "meeting_id": meeting_id,
             "appointment_id": appt_id,
             "meeting_url": meeting_url,
             "calendar_ics_ref": f"/api/v1/sales/demo/{req_id}/calendar.ics",
             "booked_at": now.isoformat(),
+            "cal_raw_response": cal_res.get("raw_response"),
         },
     )
     db.add(record)
@@ -503,9 +515,11 @@ async def book_demo(
         status="SUCCESS",
         metadata={
             "company": payload.company,
-            "preferred_date": payload.preferred_date,
-            "preferred_time_slot": payload.preferred_time_slot,
-            "assigned_expert": payload.assigned_expert,
+            "cal_booking_uid": cal_booking_uid,
+            "meeting_url": meeting_url,
+            "preferred_date": confirmed_date,
+            "preferred_time_slot": confirmed_slot,
+            "assigned_expert": payload.assigned_expert or "Mayur",
             "lead_score": score,
             "qualification_tier": tier,
         },
@@ -515,17 +529,22 @@ async def book_demo(
     return {
         "status": "success",
         "booking_id": req_id,
+        "cal_booking_uid": cal_booking_uid,
         "meeting_id": meeting_id,
         "meeting_url": meeting_url,
-        "message": f"Demo successfully confirmed with {payload.assigned_expert} for {payload.preferred_date} at {payload.preferred_time_slot}.",
+        "preferred_date": confirmed_date,
+        "preferred_time_slot": confirmed_slot,
+        "message": f"Walkthrough successfully confirmed for {confirmed_date} at {confirmed_slot}. Real Google Meet details generated via Cal.com.",
         "lead_score": score,
         "qualification_tier": tier,
         "calendar_summary": {
-            "title": f"SecuLayer Architecture Deep Dive: {payload.company}",
-            "date": payload.preferred_date,
-            "time_slot": payload.preferred_time_slot,
+            "title": cal_res.get("title", f"30 Min Walkthrough: {payload.company}"),
+            "date": confirmed_date,
+            "time_slot": confirmed_slot,
             "timezone": payload.timezone,
-            "host": payload.assigned_expert,
+            "host": payload.assigned_expert or "Mayur",
+            "meeting_url": meeting_url,
+            "cal_booking_uid": cal_booking_uid,
         },
     }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Calendar as CalendarIcon,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/lib/api/client';
+import { trackDemoRequest } from '@/lib/analytics/gtag';
 import { KavachLogo } from '@/components/common/KavachLogo';
 
 export interface BookDemoModalProps {
@@ -34,7 +36,25 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
   productName,
 }) => {
   // Calendar & Slot Selection State
-  const [selectedDate, setSelectedDate] = useState<number>(24);
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const [currentMonth, setCurrentMonth] = useState<{ year: number; month: number }>(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+
+  const [selectedDate, setSelectedDate] = useState<number>(() => {
+    const now = new Date();
+    const nextDay = new Date(now);
+    nextDay.setDate(now.getDate() + 1);
+    while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
+      nextDay.setDate(nextDay.getDate() + 1);
+    }
+    return nextDay.getDate();
+  });
   const [selectedSlot, setSelectedSlot] = useState<string>('3:30pm');
   const [is24Hour, setIs24Hour] = useState<boolean>(false);
   const [selectedTimezone, setSelectedTimezone] = useState<string>('Asia/Kolkata');
@@ -54,6 +74,22 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [successData, setSuccessData] = useState<any | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent background scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
 
   // Keyboard Escape listener
   useEffect(() => {
@@ -66,7 +102,7 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const timeSlots12 = [
     '3:30pm',
@@ -94,44 +130,29 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
 
   const currentSlots = is24Hour ? timeSlots24 : timeSlots12;
 
-  // Real calendar dates for October 2026 (Oct 1 = Thursday, 4 leading null slots)
-  const calendarDays = [
-    { day: null, date: null },
-    { day: null, date: null },
-    { day: null, date: null },
-    { day: null, date: null },
-    { day: 1, date: 1 },
-    { day: 2, date: 2 },
-    { day: 3, date: 3 },
-    { day: 4, date: 4 },
-    { day: 5, date: 5 },
-    { day: 6, date: 6 },
-    { day: 7, date: 7 },
-    { day: 8, date: 8 },
-    { day: 9, date: 9 },
-    { day: 10, date: 10 },
-    { day: 11, date: 11 },
-    { day: 12, date: 12 },
-    { day: 13, date: 13 },
-    { day: 14, date: 14 },
-    { day: 15, date: 15 },
-    { day: 16, date: 16 },
-    { day: 17, date: 17 },
-    { day: 18, date: 18 },
-    { day: 19, date: 19 },
-    { day: 20, date: 20 },
-    { day: 21, date: 21 },
-    { day: 22, date: 22 },
-    { day: 23, date: 23 },
-    { day: 24, date: 24, isCurrent: true },
-    { day: 25, date: 25 },
-    { day: 26, date: 26 },
-    { day: 27, date: 27 },
-    { day: 28, date: 28 },
-    { day: 29, date: 29 },
-    { day: 30, date: 30 },
-    { day: 31, date: 31 },
-  ];
+  const handlePrevMonth = () => {
+    setCurrentMonth((prev) => {
+      if (prev.month === 0) return { year: prev.year - 1, month: 11 };
+      return { year: prev.year, month: prev.month - 1 };
+    });
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth((prev) => {
+      if (prev.month === 11) return { year: prev.year + 1, month: 0 };
+      return { year: prev.year, month: prev.month + 1 };
+    });
+  };
+
+  const firstDayOfWeek = new Date(currentMonth.year, currentMonth.month, 1).getDay();
+  const daysInMonth = new Date(currentMonth.year, currentMonth.month + 1, 0).getDate();
+  const calendarDays: Array<{ date: number | null }> = [];
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    calendarDays.push({ date: null });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    calendarDays.push({ date: d });
+  }
 
   const handleSelectSlot = (slot: string) => {
     setSelectedSlot(slot);
@@ -149,7 +170,9 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
     setError(null);
 
     try {
-      const preferredDate = `2026-10-${String(selectedDate).padStart(2, '0')}`;
+      const mStr = String(currentMonth.month + 1).padStart(2, '0');
+      const dStr = String(selectedDate).padStart(2, '0');
+      const preferredDate = `${currentMonth.year}-${mStr}-${dStr}`;
       const res = await api.sales.bookDemo({
         name: name.trim(),
         email: email.trim(),
@@ -162,6 +185,11 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
       });
 
       setSuccessData(res);
+      trackDemoRequest({
+        method: 'book_demo_modal',
+        plan: 'enterprise',
+        primary_focus: focus,
+      });
       setStep('success');
     } catch (err: any) {
       setError(err?.message || 'Failed to reserve appointment slot. Please try another time.');
@@ -176,16 +204,17 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
     setSuccessData(null);
   };
 
-  return (
+  const modalContent = (
     <div
       role="dialog"
       aria-modal="true"
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
-        backgroundColor: 'rgba(9, 9, 11, 0.65)',
-        backdropFilter: 'blur(6px)',
+        zIndex: 999999,
+        backgroundColor: 'rgba(9, 9, 11, 0.72)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -194,19 +223,36 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
       }}
       onClick={onClose}
     >
+      <style>{`
+        @media (max-width: 768px) {
+          .calcom-modal-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .calcom-host-col {
+            border-right: none !important;
+            border-bottom: 1px solid #E4E4E7 !important;
+          }
+          .calcom-calendar-col {
+            border-right: none !important;
+            border-bottom: 1px solid #E4E4E7 !important;
+          }
+        }
+      `}</style>
       <div
         style={{
           width: '100%',
           maxWidth: step === 'picker' ? '820px' : '560px',
           backgroundColor: '#FFFFFF',
           borderRadius: '16px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 1px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.1)',
           border: '1px solid #E4E4E7',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           maxHeight: '92vh',
           transition: 'max-width 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          position: 'relative',
+          zIndex: 1000000,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -234,7 +280,7 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
               <p style={{ fontSize: '12px', color: '#71717A', margin: '2px 0 0' }}>
                 {step === 'picker'
                   ? 'Select your preferred time slot with Kavach Architecture Engineering'
-                  : `Saturday, Oct ${selectedDate}, 2026 at ${selectedSlot} (${selectedTimezone})`}
+                  : `${monthNames[currentMonth.month]} ${selectedDate}, ${currentMonth.year} at ${selectedSlot} (${selectedTimezone})`}
               </p>
             </div>
           </div>
@@ -366,17 +412,19 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#18181B', margin: 0 }}>
-                    October <span style={{ color: '#71717A', fontWeight: 400 }}>2026</span>
+                    {monthNames[currentMonth.month]} <span style={{ color: '#71717A', fontWeight: 400 }}>{currentMonth.year}</span>
                   </h4>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button
                       type="button"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#A1A1AA', padding: '2px' }}
+                      onClick={handlePrevMonth}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717A', padding: '2px' }}
                     >
                       <ChevronLeft size={16} />
                     </button>
                     <button
                       type="button"
+                      onClick={handleNextMonth}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#18181B', padding: '2px' }}
                     >
                       <ChevronRight size={16} />
@@ -422,7 +470,9 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
                       <button
                         type="button"
                         key={i}
-                        onClick={() => setSelectedDate(c.date)}
+                        onClick={() => {
+                          if (c.date) setSelectedDate(c.date);
+                        }}
                         style={{
                           width: '32px',
                           height: '32px',
@@ -460,7 +510,7 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                   <span style={{ fontSize: '13px', fontWeight: 600, color: '#18181B' }}>
-                    Sat {selectedDate}th
+                    {new Date(currentMonth.year, currentMonth.month, selectedDate).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}
                   </span>
                   <div
                     style={{
@@ -560,7 +610,7 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
               >
                 <CalendarIcon size={18} color="#2563EB" />
                 <span>
-                  <strong>Saturday, October {selectedDate}, 2026</strong> at <strong>{selectedSlot}</strong> ({selectedTimezone})
+                  <strong>{new Date(currentMonth.year, currentMonth.month, selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</strong> at <strong>{selectedSlot}</strong> ({selectedTimezone})
                 </span>
               </div>
 
@@ -698,14 +748,20 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
                     disabled={loading}
                     style={{
                       padding: '10px 22px',
-                      backgroundColor: '#2563EB',
+                      backgroundColor: '#18181B',
                       color: '#FFFFFF',
-                      border: 'none',
+                      border: '1px solid #27272A',
                       borderRadius: '8px',
                       fontSize: '13px',
                       fontWeight: 600,
                       cursor: loading ? 'not-allowed' : 'pointer',
-                      transition: 'opacity 0.15s ease',
+                      transition: 'background-color 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) e.currentTarget.style.backgroundColor = '#27272A';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loading) e.currentTarget.style.backgroundColor = '#18181B';
                     }}
                   >
                     {loading ? 'Reserving...' : 'Confirm Walkthrough'}
@@ -761,11 +817,16 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
                   <CalendarIcon size={16} color="#64748B" style={{ marginTop: '2px' }} />
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
-                      {successData?.preferred_date || `October ${selectedDate}, 2026`} · {successData?.preferred_time_slot || selectedSlot}
+                      {successData?.preferred_date || `${monthNames[currentMonth.month]} ${selectedDate}, ${currentMonth.year}`} · {successData?.preferred_time_slot || selectedSlot}
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748B' }}>
                       30-Minute Architecture Review ({selectedTimezone})
                     </div>
+                    {successData?.cal_booking_uid && (
+                      <div style={{ marginTop: '4px', fontSize: '11px', color: '#64748B' }}>
+                        Cal.com Booking UID: <strong style={{ color: '#0F172A', fontFamily: 'monospace' }}>{successData.cal_booking_uid}</strong>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -899,4 +960,6 @@ export const BookDemoModal: React.FC<BookDemoModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

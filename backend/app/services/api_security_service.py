@@ -451,9 +451,49 @@ Provide a strict JSON response with:
         try:
             gemini_res = await self.gemini._call_gemini_api(prompt)
             if gemini_res and isinstance(gemini_res, dict) and "recommended_tests" in gemini_res:
+                gemini_res.setdefault("recommended_security_tests", gemini_res.get("recommended_tests", []))
                 return gemini_res
         except Exception as e:
             logger.warning(f"[ApiSecurity] Gemini call failed, engaging deterministic analysis: {e}")
+
+        rec_tests = [
+            {
+                "category": "Authentication Testing",
+                "description": "Login, token validation, session management, signature checks",
+                "recommended": True,
+                "risk_justification": "Endpoints accept authentication headers; verify against bypasses.",
+            },
+            {
+                "category": "Authorization Testing",
+                "description": "Access control, BOLA/IDOR, function-level privilege escalation",
+                "recommended": True,
+                "risk_justification": "Path parameter {id} present in user and order routes.",
+            },
+            {
+                "category": "Rate Limiting & Abuse",
+                "description": "Brute force, request limits, abuse scenarios, HTTP 429 verification",
+                "recommended": True,
+                "risk_justification": "Authentication and checkout endpoints must enforce burst limits.",
+            },
+            {
+                "category": "Injection Testing",
+                "description": "SQL, NoSQL command, template injection vectors in query and body",
+                "recommended": True,
+                "risk_justification": "Search and parameter inputs need parameter-binding verification.",
+            },
+            {
+                "category": "Data Exposure",
+                "description": "Sensitive data, PII, excessive response data leakage",
+                "recommended": True,
+                "risk_justification": "User profile and order detail endpoints return complex objects.",
+            },
+            {
+                "category": "Schema & Input Validation",
+                "description": "Parameter validation, type checks, mass-assignment prevention",
+                "recommended": True,
+                "risk_justification": "POST /api/v1/orders accepts nested payloads vulnerable to extra fields.",
+            },
+        ]
 
         # Deterministic fallback conforming to standard
         return {
@@ -470,44 +510,8 @@ Provide a strict JSON response with:
                 "Found external API payment dependencies",
                 "Recommending 6 primary security test categories based on OWASP API Security Top 10",
             ],
-            "recommended_tests": [
-                {
-                    "category": "Authentication Testing",
-                    "description": "Login, token validation, session management, signature checks",
-                    "recommended": True,
-                    "risk_justification": "Endpoints accept authentication headers; verify against bypasses.",
-                },
-                {
-                    "category": "Authorization Testing",
-                    "description": "Access control, BOLA/IDOR, function-level privilege escalation",
-                    "recommended": True,
-                    "risk_justification": "Path parameter {id} present in user and order routes.",
-                },
-                {
-                    "category": "Rate Limiting & Abuse",
-                    "description": "Brute force, request limits, abuse scenarios, HTTP 429 verification",
-                    "recommended": True,
-                    "risk_justification": "Authentication and checkout endpoints must enforce burst limits.",
-                },
-                {
-                    "category": "Injection Testing",
-                    "description": "SQL, NoSQL command, template injection vectors in query and body",
-                    "recommended": True,
-                    "risk_justification": "Search and parameter inputs need parameter-binding verification.",
-                },
-                {
-                    "category": "Data Exposure",
-                    "description": "Sensitive data, PII, excessive response data leakage",
-                    "recommended": True,
-                    "risk_justification": "User profile and order detail endpoints return complex objects.",
-                },
-                {
-                    "category": "Schema & Input Validation",
-                    "description": "Parameter validation, type checks, mass-assignment prevention",
-                    "recommended": True,
-                    "risk_justification": "POST /api/v1/orders accepts nested payloads vulnerable to extra fields.",
-                },
-            ],
+            "recommended_tests": rec_tests,
+            "recommended_security_tests": rec_tests,
         }
 
     # =========================================================================
@@ -2094,6 +2098,61 @@ Provide a strict JSON response with:
 
         await self.db.commit()
 
+        # Dispatch API Scan Completed & Critical Vulnerability Notifications
+        try:
+            from app.services.notification_service import notification_service
+            from app.models.project import Project
+            from app.models.user import User
+
+            owner_email = "mayur@kavachsecurity.me"
+            proj_name = target.name if target else "API Service"
+            if target and target.project_id:
+                p_res = await self.db.execute(select(Project).where(Project.id == target.project_id))
+                p_obj = p_res.scalar_one_or_none()
+                if p_obj:
+                    proj_name = p_obj.name
+                    if p_obj.owner_id:
+                        u_res = await self.db.execute(select(User).where(User.id == p_obj.owner_id))
+                        u_obj = u_res.scalar_one_or_none()
+                        if u_obj and u_obj.email:
+                            owner_email = u_obj.email
+
+            await notification_service.dispatch(
+                template_id="api_scan_completed",
+                recipient_email=owner_email,
+                context={
+                    "api_target": target.name if target else "API Target",
+                    "endpoints_tested": total_tests_count,
+                    "completed_at": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                    "critical_count": scan.findings_critical,
+                    "high_count": scan.findings_high,
+                    "results_url": f"http://localhost:3002/api-security/scans/{scan.id}",
+                },
+                project_id=str(target.project_id) if target and target.project_id else None,
+                sync_delivery=False,
+            )
+
+            # If critical API finding detected, dispatch dedicated alert
+            if scan.findings_critical > 0 and created_findings:
+                crit_f = next((f for f in created_findings if f.severity == "CRITICAL"), created_findings[0])
+                first_ep = crit_f.affected_endpoints[0] if crit_f.affected_endpoints else "/api/v1/resource"
+                await notification_service.dispatch(
+                    template_id="api_vulnerability_detected",
+                    recipient_email=owner_email,
+                    context={
+                        "project_name": proj_name,
+                        "finding_id": f"API-{str(crit_f.id)[:6].upper()}",
+                        "api_endpoint_display": first_ep,
+                        "finding_title": crit_f.title,
+                        "impact_summary": crit_f.impact or "Broken Object Level Authorization allowing unauthorized record manipulation.",
+                        "review_finding_url": f"http://localhost:3002/api-security/findings/{crit_f.id}",
+                    },
+                    project_id=str(target.project_id) if target and target.project_id else None,
+                    sync_delivery=False,
+                )
+        except Exception as api_scan_notify_err:
+            logger.warning(f"Failed to dispatch api scan notifications: {api_scan_notify_err}")
+
     # =========================================================================
     # 4. CONVERSATIONAL AI SECURITY ANALYST
     # =========================================================================
@@ -2304,9 +2363,9 @@ User inquiry: {prompt}
                                                     file_map[rel] = f.read()
                                             except Exception:
                                                 pass
-                                            if len(file_map) >= 15:
+                                            if len(file_map) >= 150:
                                                 break
-                                if len(file_map) >= 15:
+                                if len(file_map) >= 150:
                                     break
                         if file_map:
                             break
@@ -2445,9 +2504,9 @@ User inquiry: {prompt}
                                             file_map[rel] = f.read()
                                     except Exception:
                                         pass
-                                    if len(file_map) >= 15:
+                                    if len(file_map) >= 150:
                                         break
-                        if len(file_map) >= 15:
+                        if len(file_map) >= 150:
                             break
                     try:
                         shutil.rmtree(temp_dir, ignore_errors=True)

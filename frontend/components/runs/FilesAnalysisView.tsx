@@ -29,14 +29,14 @@ interface FilesAnalysisViewProps {
 export const FilesAnalysisView: React.FC<FilesAnalysisViewProps> = ({
   files = [],
   findings = [],
-  currentAnalyzingFile = 'src/auth/session.ts',
+  currentAnalyzingFile = '',
   onSelectFile,
   onSelectFinding,
 }) => {
   const [filter, setFilter] = useState<'all' | 'vulnerable' | 'analyzing' | 'clean'>('all');
   const [search, setSearch] = useState('');
   const [selectedFileForPreview, setSelectedFileForPreview] = useState<string>(
-    files[0]?.path || 'src/auth/session.ts'
+    files[0]?.path || ''
   );
 
   // Group files or enrich with findings

@@ -38,20 +38,35 @@ function GoogleCallbackContent() {
     const exchangeCode = async () => {
       try {
         setStatusText('Verifying Google authorization credentials...');
-        const res = await api.auth.googleCallback({ code, state: state || undefined });
+        const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002';
+        const res = await api.auth.googleCallback({
+          code,
+          state: state || undefined,
+          redirect_uri: `${currentOrigin}/api/auth/callback/google`,
+        });
         if (res.access_token) {
           setAuthToken(res.access_token);
           trackLogin({ method: 'google' });
           setStatusText(`Welcome, ${res.user?.name || res.email || 'Developer'}! Resolving workspace entitlements...`);
           try {
-            const ent = await api.entitlements.getMe();
-            if (!ent?.onboarding_completed) {
-              router.push('/onboarding/products');
+            const [ent, userProjects] = await Promise.all([
+              api.entitlements.getMe().catch(() => null),
+              api.projects.list().catch(() => []),
+            ]);
+            const hasProject = Array.isArray(userProjects) && userProjects.length > 0;
+            if (hasProject) {
+              const activeProj = userProjects[0];
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('secu_active_project_id', activeProj.id);
+              }
+            }
+            if (!res.is_new_user && (ent?.onboarding_completed || hasProject)) {
+              router.push('/overview');
             } else {
-              router.push('/code');
+              router.push('/onboarding');
             }
           } catch {
-            router.push('/onboarding/products');
+            router.push(res.is_new_user ? '/onboarding' : '/overview');
           }
         } else {
           throw new Error('Authentication succeeded but no access token was returned.');

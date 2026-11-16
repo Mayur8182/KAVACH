@@ -28,6 +28,14 @@ function VerifyEmailExpiredContent() {
   const searchParams = useSearchParams();
   const initialEmail = searchParams.get('email') || 'you@company.com';
 
+  // Email verification completely removed: redirect directly to workspace/onboarding
+  React.useEffect(() => {
+    const hasProject = typeof window !== 'undefined' && Boolean(
+      localStorage.getItem('secu_active_project_id') || localStorage.getItem('secu_active_repo')
+    );
+    router.replace(hasProject ? '/overview' : '/onboarding');
+  }, [router]);
+
   const [email, setEmail] = useState(initialEmail);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [resending, setResending] = useState(false);

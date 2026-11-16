@@ -6,6 +6,8 @@ import { CookieConsentBanner } from '@/components/common/CookieConsentBanner';
 import { AgentationDevTool } from '@/components/dev/AgentationDevTool';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
+import { GoogleOneTap } from '@/components/auth/GoogleOneTap';
+import { CrispChat } from '@/components/common/CrispChat';
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kavachsecurity.me';
 
@@ -57,20 +59,29 @@ export const metadata: Metadata = {
     type: 'website',
     images: [
       {
-        url: '/kavach-logo-banner.png',
+        url: `${baseUrl}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: 'Kavach Security Autonomous Control Plane',
+        alt: 'Kavach Security — Autonomous Security for Code, Cloud & AI Agents',
+        type: 'image/png',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
+    site: '@Kavach_Secure',
+    creator: '@Kavach_Secure',
     title: 'Kavach Security | #1 Autonomous AI Defense & DevSecOps Platform',
     description:
       'Deterministic security control plane for code, cloud infrastructure, and autonomous AI agents. Scan your GitHub repository free today.',
-    images: ['/kavach-logo-banner.png'],
-    creator: '@kavach',
+    images: [
+      {
+        url: `${baseUrl}/twitter-card.png`,
+        width: 1200,
+        height: 630,
+        alt: 'Kavach Security — Autonomous Security for Code, Cloud & AI Agents',
+      },
+    ],
   },
   robots: {
     index: true,
@@ -85,12 +96,17 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/kavach-cube-white.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon.ico', sizes: 'any' },
       { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
-    shortcut: '/kavach-cube-white.png',
-    apple: '/kavach-cube-white.png',
+    shortcut: '/favicon.ico',
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
   },
+  manifest: '/site.webmanifest',
 };
 
 export default function RootLayout({
@@ -101,9 +117,6 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light">
       <head>
-        <link rel="icon" href="/kavach-cube.png" type="image/png" />
-        <link rel="shortcut icon" href="/kavach-cube.png" />
-        <link rel="apple-touch-icon" href="/kavach-cube.png" />
         {/* Editorial serif & clean sans fonts for premium typography */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -121,7 +134,11 @@ export default function RootLayout({
                   name: 'Kavach Security',
                   url: 'https://kavachsecurity.me',
                   logo: 'https://kavachsecurity.me/kavach-logo.png',
-                  sameAs: ['https://github.com/Mayur8182/KAVACH'],
+                  sameAs: [
+                    'https://x.com/Kavach_Secure',
+                    'https://www.linkedin.com/in/mayurbharvad/',
+                    'https://github.com/Mayur8182/KAVACH',
+                  ],
                   contactPoint: [
                     {
                       '@type': 'ContactPoint',
@@ -159,9 +176,11 @@ export default function RootLayout({
         </a>
         <ToastProvider />
         <GoogleAnalytics />
+        <GoogleOneTap />
         {children}
         <CookieConsentBanner />
         <AgentationDevTool />
+        <CrispChat />
       </body>
     </html>
   );

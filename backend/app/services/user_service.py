@@ -33,13 +33,14 @@ class UserService:
 
         hashed = hash_password(payload.password)
         verif_token = secrets.token_urlsafe(32)
+        is_smtp_ready = bool(settings.mail_username and settings.mail_password)
         user = User(
             email=payload.email.lower().strip(),
             name=payload.name.strip(),
             password_hash=hashed,
             is_active=True,
             is_superuser=False,
-            is_verified=False,
+            is_verified=True,  # Direct access: auto-verified, email verification screen completely removed
             verification_token=verif_token,
             verification_sent_at=datetime.now(timezone.utc),
         )
@@ -62,6 +63,29 @@ class UserService:
             import logging
             logging.getLogger("secure-control-plane.email").error(
                 f"Failed to deliver verification email to {created_user.email}: {exc}", exc_info=True
+            )
+
+        # Dispatch Welcome to Kavach notification using approved template
+        try:
+            from app.services.notification_service import notification_service
+            user_display_name = created_user.name or created_user.email.split("@")[0]
+            await notification_service.dispatch(
+                template_id="account_welcome",
+                recipient_email=created_user.email,
+                context={
+                    "first_name": user_display_name,
+                    "user_email": created_user.email,
+                    "plan_name": "Free Tier",
+                    "workspace_name": f"{user_display_name}'s Organization",
+                    "create_project_url": f"{app_url}/projects",
+                },
+                user_id=str(created_user.id),
+                sync_delivery=False,
+            )
+        except Exception as welcome_err:
+            import logging
+            logging.getLogger("secure-control-plane.email").warning(
+                f"Failed to dispatch welcome email: {welcome_err}"
             )
 
         # Record USER_CREATED audit event

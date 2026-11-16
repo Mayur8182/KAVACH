@@ -86,16 +86,12 @@ export default function AgentDetailRunPage() {
   const [loading, setLoading] = useState(true);
 
   const DEFAULT_INITIAL_FILES = [
-    'src/auth/session.ts',
-    'frontend/app/page.tsx',
-    'frontend/components/navigation/Sidebar.tsx',
-    'backend/app/main.py',
-    'backend/app/core/security.py',
-    'backend/app/code/sast_router.py',
-    'Dockerfile',
     'package.json',
+    'README.md',
+    'DEPLOYMENT.md',
+    'Dockerfile',
     'docker-compose.yml',
-    'render.yaml',
+    'backend/app/main.py',
   ];
 
   // Real Run Data & Inspected Files
@@ -223,17 +219,7 @@ export default function AgentDetailRunPage() {
         if (filesData && active) {
           const files = filesData.files && filesData.files.length > 0
             ? filesData.files
-            : [
-                'src/auth/session.ts',
-                'frontend/app/page.tsx',
-                'frontend/components/navigation/Sidebar.tsx',
-                'backend/app/main.py',
-                'backend/app/core/security.py',
-                'backend/app/code/sast_router.py',
-                'Dockerfile',
-                'package.json',
-                'docker-compose.yml',
-              ];
+            : DEFAULT_INITIAL_FILES;
           setFilesList(files);
           setTotalCodebaseFiles(filesData.totalFiles || files.length);
           setFileFindingsMap(filesData.fileFindings || {});
@@ -272,7 +258,7 @@ export default function AgentDetailRunPage() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const currentFile = filesList[activeFileIndex] || 'src/auth/session.ts';
+  const currentFile = filesList[activeFileIndex] || filesList[0] || '';
 
   // Finding resolution for active file
   const currentFindings = useMemo(() => {

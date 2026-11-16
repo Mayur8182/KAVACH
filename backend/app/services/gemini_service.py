@@ -130,6 +130,8 @@ REQUIREMENTS:
 Only return raw JSON. No markdown code fences outside JSON."""
 
     async def _call_gemini_api(self, prompt: str) -> Optional[Dict[str, Any]]:
+        if not self.api_key or self.api_key.startswith("AQ.") or self.api_key.startswith("dummy") or os.environ.get("TESTING"):
+            return None
         # Google AI Studio API uses query parameter 'key'
         candidate_models = ["gemini-2.5-flash-lite"]
         last_error = None

@@ -1,4 +1,5 @@
 import json
+import os
 from functools import lru_cache
 from typing import List, Union, Optional
 from pydantic import Field, field_validator
@@ -21,7 +22,8 @@ class Settings(BaseSettings):
     app_host: str = Field(default="0.0.0.0", description="Host to bind server")
     app_port: int = Field(default=8000, description="Port to bind server")
     api_v1_prefix: str = Field(default="/api/v1", description="Prefix for v1 REST endpoints")
-    public_app_url: str = Field(default="https://kavachsecurity.me", description="Public URL for frontend portal")
+    public_app_url: str = Field(default="http://localhost:8000", description="Public URL for frontend portal or local API")
+    mcp_base_url: Optional[str] = Field(default=None, description="Explicit base URL for MCP gateway endpoints (e.g. http://localhost:8000)")
     log_level: str = Field(default="INFO", description="Logging verbosity")
 
     # Security settings
@@ -87,11 +89,8 @@ class Settings(BaseSettings):
             "http://127.0.0.1:3002",
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-            "https://kavachsecurity.me",
-            "https://www.kavachsecurity.me",
-            "https://app.kavachsecurity.me",
-            "https://api.kavachsecurity.me",
-            "https://kavach-2brv.onrender.com",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
         ],
         description="Allowed CORS origin domains",
     )
@@ -113,15 +112,17 @@ class Settings(BaseSettings):
         elif isinstance(v, (list, set)):
             origins = [str(i).strip() for i in v if str(i).strip()]
 
-        essential = [
-            "https://kavachsecurity.me",
-            "https://www.kavachsecurity.me",
-            "https://app.kavachsecurity.me",
-            "https://api.kavachsecurity.me",
-        ]
-        for e in essential:
-            if e not in origins:
-                origins.append(e)
+        # Only append production domains if running in production mode
+        if os.environ.get("APP_ENV", "development").lower() == "production":
+            essential = [
+                "https://kavachsecurity.me",
+                "https://www.kavachsecurity.me",
+                "https://app.kavachsecurity.me",
+                "https://api.kavachsecurity.me",
+            ]
+            for e in essential:
+                if e not in origins:
+                    origins.append(e)
         return origins
 
     # Redis Cache Settings
@@ -144,26 +145,84 @@ class Settings(BaseSettings):
     gemini_api_key: Optional[str] = Field(default=None, description="Google Gemini API Key for Auto-Fix remediation")
     gemini_model: str = Field(default="gemini-2.5-flash-lite", description="Gemini model identifier")
 
-    # GitHub Integration Settings
+    # GitHub Integration & Native App Settings
+    github_app_id: Optional[str] = Field(
+        default="5771182",
+        description="GitHub App ID for RS256 JWT generation",
+    )
     github_token: Optional[str] = Field(
         default=None,
         description="GitHub Personal Access Token for remote git operations and PR creation",
     )
     github_client_id: Optional[str] = Field(
-        default=None,
-        description="GitHub OAuth App Client ID",
+        default="Iv23liqai7qjzsE9RllD",
+        description="GitHub App / OAuth Client ID",
     )
     github_client_secret: Optional[str] = Field(
         default=None,
-        description="GitHub OAuth App Client Secret",
+        description="GitHub App / OAuth Client Secret",
+    )
+    github_app_slug: str = Field(
+        default="kavach-security",
+        description="GitHub App Slug name used for installation URL",
+    )
+    github_app_name: Optional[str] = Field(
+        default="kavach-security",
+        description="GitHub App Display Name / Slug",
+    )
+    github_app_private_key: Optional[str] = Field(
+        default=None,
+        description="GitHub App Private Key in PEM format (or escaped newlines)",
+    )
+    github_private_key_path: Optional[str] = Field(
+        default=None,
+        description="Path to GitHub App Private Key PEM file",
+    )
+    github_webhook_secret: Optional[str] = Field(
+        default="kavach_github_webhook_secret_2026",
+        description="GitHub Webhook Secret for HMAC SHA-256 signature verification",
+    )
+    github_callback_url: str = Field(
+        default="http://localhost:8000/integrations/github/callback",
+        description="GitHub App installation and OAuth callback URL",
+    )
+    github_webhook_url: str = Field(
+        default="http://localhost:8000/webhooks/github",
+        description="GitHub Webhook receiver URL",
+    )
+    frontend_url: str = Field(
+        default="http://localhost:3002",
+        description="Frontend application root URL for user redirects",
     )
     github_redirect_uri: str = Field(
-        default="https://kavachsecurity.me/auth/callback/github",
+        default="http://localhost:8000/integrations/github/callback",
         description="GitHub OAuth Redirect URI",
     )
     github_workspace_dir: str = Field(
         default="scratch/github_workspaces",
         description="Base directory for temporary clone checkouts for scanning",
+    )
+
+    # Cal.com Scheduling Integration
+    cal_api_key: str = Field(
+        default="cal_live_a318f2142cfa1ac4d7053b9817947eb6",
+        description="Cal.com API key for booking integration",
+    )
+    cal_event_type_id: int = Field(
+        default=7917954,
+        description="Cal.com Event Type ID for 30min walkthrough",
+    )
+    cal_event_slug: str = Field(
+        default="30min",
+        description="Cal.com Event Slug",
+    )
+    cal_username: str = Field(
+        default="mayur-4bo7cv",
+        description="Cal.com Username",
+    )
+    cal_api_version: str = Field(
+        default="2024-08-13",
+        description="Cal.com API Version",
     )
 
     # Google OAuth Settings

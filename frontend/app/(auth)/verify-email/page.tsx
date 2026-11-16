@@ -42,19 +42,17 @@ function VerifyEmailContent() {
   } | null>(null);
   const [cooldown, setCooldown] = useState(0);
 
-  // If email param changes or is empty, try to resolve from auth profile
+  // Direct access: Email verification UI and onboarding dependency completely removed
   useEffect(() => {
-    if (emailParam) {
-      setEmail(emailParam);
+    const hasProject = typeof window !== 'undefined' && Boolean(
+      localStorage.getItem('secu_active_project_id') || localStorage.getItem('secu_active_repo')
+    );
+    if (hasProject) {
+      router.replace('/overview');
     } else {
-      api.auth
-        .me()
-        .then((u) => {
-          if (u?.email) setEmail(u.email);
-        })
-        .catch(() => {});
+      router.replace('/onboarding');
     }
-  }, [emailParam]);
+  }, [router]);
 
   // If token is present in query parameters (e.g., clicked from email), verify immediately
   useEffect(() => {

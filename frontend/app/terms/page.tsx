@@ -40,7 +40,7 @@ export default function TermsPage() {
         </div>
 
         <div style={{ padding: '20px 24px', backgroundColor: '#FAFAFA', border: '1px solid #E4E4E7', borderRadius: '10px', marginBottom: '40px', fontSize: '14px', lineHeight: 1.6, color: '#334155' }}>
-          These Terms of Service (&quot;Agreement&quot;) govern access to and use of the Kavach platform, API endpoints, Antigravity CLI, and MCP security gateway provided by Kavach Technologies Inc.
+          These Terms of Service (&quot;Agreement&quot;) govern access to and use of the Kavach platform, API endpoints, Antigravity CLI, and MCP security gateway provided by Kavach Security, having its principal place of operations in Ahmedabad, Gujarat, India.
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '36px', fontSize: '14px', lineHeight: 1.7, color: '#334155' }}>
@@ -85,8 +85,8 @@ export default function TermsPage() {
                 <span style={{ fontWeight: 700, color: '#09090B' }}>Billing, Cancellation & Refunds</span>
               </div>
               <ul style={{ paddingLeft: '20px', margin: 0, color: '#52525B', fontSize: '13px' }}>
-                <li><strong>Self-Serve Subscriptions (Pro / Team):</strong> You may cancel your subscription at any time via Account Settings → Billing. Cancellation takes effect at the conclusion of the current monthly or annual billing cycle, with no subsequent charges.</li>
-                <li><strong>14-Day Evaluation Refund Guarantee:</strong> If you are dissatisfied with Kavach within the first 14 calendar days of your initial paid subscription, contact <code>billing@kavachsecurity.me</code> for a full, no-questions-asked refund.</li>
+                <li><strong>Self-Serve Subscriptions (Developer, Team, Business):</strong> You may cancel your subscription at any time via Account Settings → Billing. Cancellation takes effect at the conclusion of the current monthly or annual billing cycle, with no subsequent charges.</li>
+                <li><strong>14-Day Evaluation Money-Back Guarantee:</strong> If you are dissatisfied with Kavach within the first 14 calendar days of your initial paid subscription, contact <code>billing@kavachsecurity.me</code> for a full, no-questions-asked refund.</li>
                 <li><strong>Enterprise Contracts:</strong> Enterprise agreements are governed by the specific terms detailed in the executed Master Services Agreement (MSA) and Statement of Work (SOW).</li>
               </ul>
             </div>
@@ -132,7 +132,7 @@ export default function TermsPage() {
               8. Governing Law & Dispute Resolution
             </h2>
             <p>
-              This Agreement shall be governed by and construed in accordance with the laws of the State of Delaware, United States, without giving effect to conflicts of law principles. Any dispute arising under or in connection with this Agreement shall be resolved through confidential binding arbitration in San Francisco, CA.
+              This Agreement shall be governed by and construed in accordance with the laws of the Republic of India, without giving effect to conflicts of law principles. Any dispute, claim, or controversy arising out of or relating to this Agreement or breach thereof shall be subject to the exclusive jurisdiction of the competent courts situated in Ahmedabad, Gujarat, India.
             </p>
           </section>
         </div>

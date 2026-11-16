@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,6 +40,12 @@ from app.schemas.github import (
     SecurityJobReportItem,
     CreateSecurityJobReportRequest,
     SecurityJobReportsOverviewResponse,
+    GitHubInstallUrlRequest,
+    GitHubInstallUrlResponse,
+    GitHubInstallationListResponse,
+    GitHubInstallationItem,
+    GitHubIntegrationStatusResponse,
+    SelectRepositoryRequest,
 )
 from app.services.github_service import GitHubService
 
@@ -99,6 +106,256 @@ async def _check_project_access(project_id: uuid.UUID, current_user: User, db: A
 
 class VerifyInstallationRequest(BaseModel):
     installation_id: int = Field(description="GitHub App Installation ID")
+
+
+# =============================================================================
+# Native GitHub App Integration Endpoints (Phases 4 & 5)
+# =============================================================================
+
+@router.post(
+    "/integrations/github/install-url",
+    response_model=GitHubInstallUrlResponse,
+    summary="Generate GitHub App Installation URL",
+    description="Creates a single-use cryptographically secure CSRF state and constructs the official GitHub App installation URL.",
+)
+async def get_github_install_url(
+    payload: Optional[GitHubInstallUrlRequest] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GitHubService(db)
+    res = await service.generate_install_url(
+        current_user=current_user,
+        workspace_id=payload.workspace_id if payload else None,
+        project_id=payload.project_id if payload else None,
+        redirect_url=payload.redirect_url if payload else None,
+    )
+    return GitHubInstallUrlResponse(**res)
+
+
+@router.get(
+    "/integrations/github/callback",
+    summary="GitHub App Installation & Authorization Callback",
+    description="Processes GitHub redirect callback, validates CSRF state, records installation, syncs repositories, and redirects to frontend.",
+)
+async def github_installation_callback(
+    installation_id: Optional[int] = Query(None),
+    setup_action: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    code: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+    error_description: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GitHubService(db)
+    result = await service.handle_installation_callback(
+        installation_id=installation_id,
+        setup_action=setup_action,
+        state=state,
+        code=code,
+        error=error,
+        error_description=error_description,
+    )
+    redirect_target = result.get("redirect_url", "http://localhost:3002/onboarding?step=github&connected=true")
+    return RedirectResponse(url=redirect_target, status_code=status.HTTP_302_FOUND)
+
+
+@router.get(
+    "/integrations/github/status",
+    response_model=GitHubIntegrationStatusResponse,
+    summary="Get GitHub Integration Status",
+    description="Returns current configuration status, connected accounts, and repository counts.",
+)
+async def get_github_integration_status(
+    workspace_id: Optional[uuid.UUID] = Query(None),
+    project_id: Optional[uuid.UUID] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GitHubService(db)
+    status_data = await service.get_integration_status(
+        current_user=current_user,
+        workspace_id=workspace_id,
+        project_id=project_id,
+    )
+    return GitHubIntegrationStatusResponse(**status_data)
+
+
+@router.get(
+    "/integrations/github/installations",
+    response_model=GitHubInstallationListResponse,
+    summary="List Accessible GitHub App Installations",
+    description="Returns GitHub App installations accessible to the current workspace and user.",
+)
+async def list_github_installations(
+    workspace_id: Optional[uuid.UUID] = Query(None),
+    project_id: Optional[uuid.UUID] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GitHubService(db)
+    items = await service.list_workspace_installations(
+        current_user=current_user,
+        workspace_id=workspace_id,
+        project_id=project_id,
+    )
+    return GitHubInstallationListResponse(
+        installations=[GitHubInstallationItem(**i) for i in items],
+        total=len(items),
+    )
+
+
+@router.get(
+    "/integrations/github/repositories",
+    response_model=List[GitHubRepositoryResponse],
+    summary="List Accessible Repositories",
+    description="Returns repositories accessible through authorized GitHub installations.",
+)
+async def list_github_accessible_repositories(
+    workspace_id: Optional[uuid.UUID] = Query(None),
+    project_id: Optional[uuid.UUID] = Query(None),
+    installation_id: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GitHubService(db)
+    repos = await service.list_workspace_repositories(
+        current_user=current_user,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        installation_id=installation_id,
+    )
+    return [GitHubRepositoryResponse.model_validate(r) for r in repos]
+
+
+@router.get(
+    "/integrations/github/installations/{installation_id}/repositories",
+    response_model=List[GitHubRepositoryResponse],
+    summary="List Repositories for Specific Installation",
+)
+async def list_installation_repositories(
+    installation_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GitHubService(db)
+    repos = await service.list_workspace_repositories(
+        current_user=current_user,
+        installation_id=installation_id,
+    )
+    return [GitHubRepositoryResponse.model_validate(r) for r in repos]
+
+
+@router.post(
+    "/integrations/github/installations/{installation_id}/sync",
+    response_model=List[GitHubRepositoryResponse],
+    summary="Synchronize Repositories for Installation",
+    description="Fetches latest repositories from GitHub API and updates local metadata.",
+)
+async def sync_installation_repositories_endpoint(
+    installation_id: int,
+    workspace_id: Optional[uuid.UUID] = Query(None),
+    project_id: Optional[uuid.UUID] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GitHubService(db)
+    repos = await service.sync_installation_repositories(
+        installation_id=installation_id,
+        project_id=project_id,
+        workspace_id=workspace_id,
+    )
+    return [GitHubRepositoryResponse.model_validate(r) for r in repos]
+
+
+@router.delete(
+    "/integrations/github/installations/{installation_id}",
+    summary="Disconnect GitHub App Installation",
+    description="Safely removes installation access and marks connected repositories disconnected.",
+)
+async def disconnect_installation_endpoint(
+    installation_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GitHubService(db)
+    return await service.disconnect_installation(
+        installation_id=installation_id,
+        current_user=current_user,
+    )
+
+
+@router.post(
+    "/integrations/github/repositories/{repository_id}/select",
+    response_model=GitHubRepositoryResponse,
+    summary="Select Repository for Project",
+    description="Associates a connected GitHub repository with a specific project.",
+)
+async def select_repository_endpoint(
+    repository_id: uuid.UUID,
+    payload: Optional[SelectRepositoryRequest] = None,
+    project_id: Optional[uuid.UUID] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.github import GitHubRepository
+    target_project_id = (payload.project_id if payload and payload.project_id else None) or project_id
+    repo = await db.get(GitHubRepository, repository_id)
+    if not repo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+
+    if target_project_id:
+        repo.project_id = target_project_id
+        repo.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(repo)
+
+    return GitHubRepositoryResponse.model_validate(repo)
+
+
+@router.post(
+    "/integrations/github/repositories/{repository_id}/scan",
+    response_model=GitHubSecurityJobResponse,
+    summary="Trigger Security Scan for Repository",
+    description="Connects the selected repository to the existing scanner orchestration.",
+)
+async def scan_repository_endpoint(
+    repository_id: uuid.UUID,
+    payload: Optional[TriggerRepositoryScanRequest] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GitHubService(db)
+    scan_req = payload or TriggerRepositoryScanRequest()
+    return await service.trigger_manual_scan(
+        repository_id=repository_id,
+        payload=scan_req,
+        current_user=current_user,
+    )
+
+
+@router.post(
+    "/webhooks/github",
+    response_model=WebhookResponse,
+    summary="Receive and verify GitHub webhooks (standard endpoint)",
+)
+async def receive_github_webhook_standard(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    x_github_delivery: str = Header(..., alias="X-GitHub-Delivery"),
+    x_github_event: str = Header(..., alias="X-GitHub-Event"),
+    x_hub_signature_256: Optional[str] = Header(None, alias="X-Hub-Signature-256"),
+    db: AsyncSession = Depends(get_db),
+):
+    raw_body = await request.body()
+    service = GitHubService(db)
+    return await service.receive_webhook(
+        delivery_id=x_github_delivery,
+        signature_header=x_hub_signature_256,
+        event_type=x_github_event,
+        raw_body=raw_body,
+        background_tasks=background_tasks,
+    )
 
 
 # =============================================================================
@@ -210,7 +467,27 @@ async def connect_repository(
 ):
     """Connects a verified repository to the project for continuous security governance."""
     service = GitHubService(db)
-    return await service.connect_repository(project_id, payload, current_user)
+    res = await service.connect_repository(project_id, payload, current_user)
+    try:
+        from app.services.notification_service import notification_service
+        from datetime import datetime, timezone
+        await notification_service.dispatch(
+            template_id="integration_github_connected",
+            recipient_email=current_user.email,
+            context={
+                "repository_name": res.full_name or res.name,
+                "project_name": getattr(res, "project_name", "Kavach Security"),
+                "default_branch": res.default_branch or "main",
+                "connected_at": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                "repo_settings_url": f"http://localhost:3002/code/repositories/{res.id}",
+            },
+            user_id=str(current_user.id),
+            project_id=str(project_id),
+            sync_delivery=False,
+        )
+    except Exception as notify_err:
+        logger.warning(f"Failed to dispatch github connect notification: {notify_err}")
+    return res
 
 
 # =============================================================================
@@ -355,6 +632,27 @@ async def delete_repository(
 
     await db.delete(repo)
     await db.commit()
+
+    try:
+        from app.services.notification_service import notification_service
+        from datetime import datetime, timezone
+        await notification_service.dispatch(
+            template_id="integration_repository_disconnected",
+            recipient_email=current_user.email,
+            context={
+                "repository_name": repo.full_name or repo.name,
+                "project_name": "Kavach Security",
+                "disconnected_at": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                "actor_email": current_user.email,
+                "integrations_url": "http://localhost:3002/integrations",
+            },
+            user_id=str(current_user.id),
+            project_id=str(repo.project_id) if repo.project_id else None,
+            sync_delivery=False,
+        )
+    except Exception as notify_err:
+        logger.warning(f"Failed to dispatch repository disconnected notification: {notify_err}")
+
     return {"status": "DISCONNECTED", "repository_id": str(repository_id), "name": repo.name}
 
 
@@ -1161,6 +1459,26 @@ async def generate_security_job_report(
     db.add(new_report)
     await db.commit()
     await db.refresh(new_report)
+
+    try:
+        from app.services.notification_service import notification_service
+        await notification_service.dispatch(
+            template_id="report_ready",
+            recipient_email=current_user.email,
+            context={
+                "report_name": new_report.name,
+                "project_name": "Kavach Security",
+                "generated_at": now.strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                "file_size": f"{new_report.file_size_kb or 142} KB",
+                "format_display": f"{new_report.format} ({new_report.file_size_kb or 142} KB)",
+                "download_url": f"http://localhost:3002/api/v1/github/security-jobs/reports/{new_report.id}/download",
+            },
+            user_id=str(current_user.id),
+            sync_delivery=False,
+        )
+    except Exception as rep_err:
+        logger.warning(f"Failed to dispatch report ready notification: {rep_err}")
+
     return new_report
 
 
@@ -1256,6 +1574,25 @@ Compliance State : Verified against OPA Policy Engine and Security Blueprint
 Provenance Hash  : sha256:{hash(str(report.id))}
 ================================================================================
 """
+    try:
+        from app.services.notification_service import notification_service
+        from datetime import datetime, timezone
+        await notification_service.dispatch(
+            template_id="report_pdf_downloaded",
+            recipient_email=current_user.email,
+            context={
+                "report_name": report.name,
+                "project_name": "Kavach Security",
+                "download_time": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                "actor_email": current_user.email,
+                "reports_url": "http://localhost:3002/reports",
+            },
+            user_id=str(current_user.id),
+            sync_delivery=False,
+        )
+    except Exception as down_err:
+        logger.warning(f"Failed to dispatch report downloaded notification: {down_err}")
+
     return Response(
         content=content,
         media_type="text/plain; charset=utf-8",

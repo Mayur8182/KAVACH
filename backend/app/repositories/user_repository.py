@@ -22,6 +22,16 @@ class UserRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_github_user_id(self, github_user_id: str) -> Optional[User]:
+        stmt = select(User).where(User.github_user_id == str(github_user_id).strip())
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_by_google_user_id(self, google_user_id: str) -> Optional[User]:
+        stmt = select(User).where(User.google_user_id == str(google_user_id).strip())
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def create(self, user: User) -> User:
         self.db.add(user)
         await self.db.flush()

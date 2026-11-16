@@ -3,16 +3,12 @@
 import React from 'react';
 import Link from 'next/link';
 import {
-  ShieldCheck,
   Bot,
   Boxes,
   Cloud,
   FileCheck,
-  Cpu,
   ArrowRight,
   Sparkles,
-  GitBranch,
-  Terminal,
 } from 'lucide-react';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
 import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
@@ -95,8 +91,9 @@ export default function SolutionsPage() {
             From AI coding agent boundaries to multi-cloud runtime defense, Kavach provides verifiable, evidence-backed security controls.
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', flexWrap: 'wrap' }}>
-            <Link
-              href="/demo"
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('kavach:open-book-demo'))}
               style={{
                 padding: '11px 24px',
                 backgroundColor: '#0F172A',
@@ -107,12 +104,14 @@ export default function SolutionsPage() {
                 textDecoration: 'none',
                 boxShadow: '0 2px 6px rgba(15,23,42,0.15)',
                 transition: 'background-color 0.15s ease',
+                border: 'none',
+                cursor: 'pointer',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1E293B')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0F172A')}
             >
-              See the product demo →
-            </Link>
+              Book a live demo →
+            </button>
             <Link
               href="/platform"
               style={{
@@ -211,39 +210,6 @@ export default function SolutionsPage() {
               </div>
             );
           })}
-        </div>
-      </section>
-
-      {/* Bottom CTA Banner */}
-      <section style={{ backgroundColor: '#F5F1E8', color: '#171717', borderTop: '1px solid #E4DED2', padding: '48px 24px', textAlign: 'center', marginTop: 'auto' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '30px', fontWeight: 800, margin: '0 0 12px', letterSpacing: '-0.02em' }}>
-            Ready to secure your engineering workflows?
-          </h2>
-          <p style={{ fontSize: '15px', color: '#66645F', margin: '0 0 28px' }}>
-            See how code, cloud, and runtime findings move into a clear review workflow.
-          </p>
-          <Link
-            href="/demo"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '12px 28px',
-              backgroundColor: '#171717',
-              color: '#FFFFFF',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: 600,
-              textDecoration: 'none',
-              transition: 'background-color 0.15s ease',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#393939')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#171717')}
-          >
-            <span>Explore the product demo</span>
-            <ArrowRight size={15} />
-          </Link>
         </div>
       </section>
       <EnterpriseFooter />

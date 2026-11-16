@@ -232,9 +232,52 @@ class ScanOrchestrator:
         and broadcasts notifications to Slack/Teams/Webhooks.
         """
         from app.services.github_service import GitHubService
+        from app.services.notification_service import notification_service
+        from app.models.project import Project
+        from app.models.user import User
+
+        owner_email = None
+        repo_name = "repository"
+        branch_name = "main"
 
         try:
             gh_service = GitHubService(self.db)
+            
+            # Lookup repo and project owner
+            repo_res = await self.db.execute(select(GitHubRepository).where(GitHubRepository.id == repository_id))
+            repo_obj = repo_res.scalar_one_or_none()
+            if repo_obj:
+                repo_name = repo_obj.full_name or repo_obj.name
+                branch_name = repo_obj.default_branch or "main"
+                if repo_obj.project_id:
+                    p_res = await self.db.execute(select(Project).where(Project.id == repo_obj.project_id))
+                    p_obj = p_res.scalar_one_or_none()
+                    if p_obj and p_obj.owner_id:
+                        u_res = await self.db.execute(select(User).where(User.id == p_obj.owner_id))
+                        u_obj = u_res.scalar_one_or_none()
+                        if u_obj:
+                            owner_email = u_obj.email
+
+            # Dispatch Scan Started notification
+            if owner_email:
+                try:
+                    await notification_service.dispatch(
+                        template_id="scan_started",
+                        recipient_email=owner_email,
+                        context={
+                            "project_name": repo_name,
+                            "branch": branch_name,
+                            "commit_hash": "HEAD",
+                            "started_at": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                            "scanners_list": ", ".join(required_scanners),
+                            "scan_url": f"http://localhost:3002/code/repositories/{repository_id}",
+                        },
+                        project_id=str(repo_obj.project_id) if repo_obj and repo_obj.project_id else None,
+                        sync_delivery=False,
+                    )
+                except Exception as start_err:
+                    logger.warning(f"Failed to dispatch scan_started notification: {start_err}")
+
             completed_job = await gh_service.execute_security_pipeline(job_id)
 
             # Query real findings summary for this repository
@@ -258,6 +301,47 @@ class ScanOrchestrator:
             repo = completed_job.repository
             repo_name = repo.full_name if repo else "repository"
             branch = completed_job.branch or "main"
+
+            # Dispatch Scan Completed email to project owner
+            if owner_email:
+                try:
+                    await notification_service.dispatch(
+                        template_id="scan_completed",
+                        recipient_email=owner_email,
+                        context={
+                            "project_name": repo_name,
+                            "branch": branch,
+                            "commit_hash": completed_job.commit_sha[:7] if completed_job.commit_sha else "HEAD",
+                            "scanned_at": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                            "critical_count": findings_summary["critical"],
+                            "high_count": findings_summary["high"],
+                            "medium_count": findings_summary["medium"],
+                            "low_count": findings_summary["low"],
+                            "findings_url": f"http://localhost:3002/code/repositories/{repository_id}?tab=Security%20Findings",
+                        },
+                        project_id=str(completed_job.project_id) if completed_job.project_id else None,
+                        sync_delivery=False,
+                    )
+
+                    # If critical findings exist, dispatch Critical Vulnerability Alert
+                    if findings_summary["critical"] > 0:
+                        await notification_service.dispatch(
+                            template_id="finding_critical_detected",
+                            recipient_email=owner_email,
+                            context={
+                                "project_name": repo_name,
+                                "finding_id": "CRIT-01",
+                                "finding_title": first_critical or "Critical Vulnerability Discovered",
+                                "severity": "Critical",
+                                "file_path": getattr(findings[0], "file_path", "src/main") if findings else "src/main",
+                                "detected_at": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                                "review_finding_url": f"http://localhost:3002/code/repositories/{repository_id}?tab=Security%20Findings",
+                            },
+                            project_id=str(completed_job.project_id) if completed_job.project_id else None,
+                            sync_delivery=False,
+                        )
+                except Exception as complete_err:
+                    logger.warning(f"Failed to dispatch scan completed notifications: {complete_err}")
 
             slack_stmt = select(RealIntegration).where(
                 RealIntegration.provider == "slack",
@@ -290,3 +374,19 @@ class ScanOrchestrator:
 
         except Exception as e:
             logger.error(f"Error in _run_scan_and_notify for job {job_id}: {e}")
+            if owner_email:
+                try:
+                    await notification_service.dispatch(
+                        template_id="scan_failed",
+                        recipient_email=owner_email,
+                        context={
+                            "project_name": repo_name,
+                            "branch": branch_name,
+                            "failed_at": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                            "error_reason": str(e)[:150],
+                            "scan_logs_url": f"http://localhost:3002/code/repositories/{repository_id}",
+                        },
+                        sync_delivery=False,
+                    )
+                except Exception:
+                    pass

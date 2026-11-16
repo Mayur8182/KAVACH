@@ -44,7 +44,7 @@ const T = {
 
 export default function ApiInventoryPage() {
   const router = useRouter();
-  const { apis, selectedApi, refreshApis, setIsGithubModalOpen } = useApiSecurity();
+  const { apis, selectedApi, setSelectedApi, refreshApis, setIsGithubModalOpen } = useApiSecurity();
   const { currentRepository } = useScope();
 
   // State
@@ -53,6 +53,24 @@ export default function ApiInventoryPage() {
   const [protocolStats, setProtocolStats] = useState<Record<string, number>>({});
   const [isLoading,     setIsLoading]     = useState(true);
   const [isDiscovering, setIsDiscovering] = useState(false);
+
+  // Sync selectedApi if unselected but apis or currentRepository are available
+  useEffect(() => {
+    if (!selectedApi && apis.length > 0) {
+      if (currentRepository) {
+        const cleanRepo = (currentRepository.name || '').toLowerCase().trim();
+        const matched = apis.find((a: any) => {
+          const aClean = (a.name || '').replace(' Code Inventory', '').trim().toLowerCase();
+          return aClean === cleanRepo || aClean.includes(cleanRepo) || cleanRepo.includes(aClean);
+        });
+        if (matched) {
+          setSelectedApi(matched);
+          return;
+        }
+      }
+      setSelectedApi(apis[0]);
+    }
+  }, [selectedApi, apis, currentRepository, setSelectedApi]);
 
   // Filters
   const [searchTerm,       setSearchTerm]       = useState('');

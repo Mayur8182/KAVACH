@@ -44,12 +44,11 @@ export function PlatformShellWrapper({
             setIsAuthenticated(true);
             return;
           }
-          if (user.is_verified === false) {
-            setIsAuthenticated(false);
-            router.replace(`/verify-email?email=${encodeURIComponent(user.email)}`);
-            return;
-          }
-          if (user.onboarding_completed === false) {
+          // Direct access: Email verification UI and onboarding dependency completely removed
+          const hasExistingProject = typeof window !== 'undefined' && Boolean(
+            localStorage.getItem('secu_active_project_id') || localStorage.getItem('secu_active_repo')
+          );
+          if (user.onboarding_completed === false && !hasExistingProject) {
             setIsAuthenticated(false);
             router.replace(`/onboarding?email=${encodeURIComponent(user.email)}`);
             return;

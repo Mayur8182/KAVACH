@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, TrendingUp, CalendarDays, Lock, Play, ShieldAlert, CheckCircle, RefreshCw } from 'lucide-react';
+import { ArrowRight, TrendingUp, CalendarDays, Lock, Play, ShieldAlert, CheckCircle, RefreshCw, Link2 } from 'lucide-react';
 import { KavachApiLayout } from './components/KavachApiLayout';
 import { KavachSkeletonPage } from './components/KavachSkeleton';
 import { useApiSecurity } from './context/ApiSecurityContext';
@@ -261,6 +261,25 @@ export default function ApiSecurityDashboard() {
                 <GithubIcon />
                 <span>{selectedApi ? `Repository: ${(selectedApi.name || selectedApi.repository || currentRepository?.name || 'Active Target').replace(' Code Inventory', '')}` : 'Connect Repository'}</span>
                 <span style={{ fontSize: '11px', color: '#64748B', backgroundColor: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>Change</span>
+              </button>
+
+              {/* Integration Hub CTA */}
+              <button
+                type="button"
+                onClick={() => router.push('/api-security/integrations')}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 18px', borderRadius: '8px',
+                  background: T.surface, color: T.text,
+                  border: `1px solid ${T.border}`,
+                  fontSize: '13.5px', fontWeight: 500,
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                  transition: 'background 0.15s',
+                }}
+              >
+                <Link2 size={14} color="#2563EB" />
+                <span>Integration Hub</span>
               </button>
             </div>
           </div>

@@ -44,6 +44,7 @@ import {
   FileCode,
 } from 'lucide-react';
 import { KavachApiLayout } from '../../components/KavachApiLayout';
+import { trackScanCompleted } from '@/lib/analytics/gtag';
 import { AnalysisProgressCard } from '../../components/AnalysisProgressCard';
 import { api } from '@/lib/api/client';
 import { useScope } from '@/context/ScopeContext';
@@ -77,6 +78,8 @@ function ScanDetailsContent() {
         );
         if (found && (!currentRepository || currentRepository.id !== found.id)) {
           setCurrentRepository(found);
+        } else if (!found && (!currentRepository || currentRepository.name !== cleanName)) {
+          setCurrentRepository({ id: cleanName, name: cleanName });
         }
       }
     }
@@ -112,6 +115,7 @@ function ScanDetailsContent() {
   const [copiedEvidenceId, setCopiedEvidenceId] = useState<string | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasTrackedScanCompleted = useRef(false);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -138,6 +142,16 @@ function ScanDetailsContent() {
         if (data.status === 'COMPLETED' || data.status === 'FAILED' || data.status === 'STOPPED') {
           if (timerRef.current) clearInterval(timerRef.current);
           loadResults(data.id || scanId);
+          if (data.status === 'COMPLETED' && !hasTrackedScanCompleted.current) {
+            hasTrackedScanCompleted.current = true;
+            trackScanCompleted({
+              scan_type: 'api_security',
+              findings_total: data.findings_count || 0,
+              critical_count: data.critical_count || 0,
+              high_count: data.high_count || 0,
+              duration_seconds: data.duration_seconds || 0,
+            });
+          }
         }
       }
     } catch (err) {

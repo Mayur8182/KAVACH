@@ -23,6 +23,7 @@ import {
   Layers,
   Cpu,
   AlertTriangle,
+  Calendar,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
@@ -30,6 +31,8 @@ import { KavachLogo, KavachMark } from '@/components/common/KavachLogo';
 import { ProductShowcase } from '@/components/landing/ProductShowcase';
 import { KavachSecurityPipelineFlow } from '@/components/pipeline/KavachSecurityPipelineFlow';
 import { KavachHeroSkeleton } from '@/components/landing/KavachHeroSkeleton';
+import { KavachHeroDashboardCard } from '@/components/landing/KavachHeroDashboardCard';
+import { KavachMcpConnectWidget } from '@/components/landing/KavachMcpConnectWidget';
 import '@/styles/kavach-home.css';
 
 // Official SVG Icons for Social Profiles
@@ -42,6 +45,18 @@ const LinkedinIcon: React.FC<{ size?: number; className?: string }> = ({ size = 
 const XIcon: React.FC<{ size?: number; className?: string }> = ({ size = 13, className }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+const YoutubeIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.5 12 3.5 12 3.5s-7.505 0-9.377.55a3.016 3.016 0 0 0-2.122 2.136C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.55 9.376.55 9.376.55s7.505 0 9.377-.55a3.016 3.016 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+  </svg>
+);
+
+const InstagramIcon: React.FC<{ size?: number; className?: string }> = ({ size = 15, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
   </svg>
 );
 
@@ -201,33 +216,16 @@ export default function KavachHomePage() {
   const [mounted, setMounted] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [expertOpen, setExpertOpen] = useState(false);
-  const [heroRepoInput, setHeroRepoInput] = useState('');
-  const [showFixedCode, setShowFixedCode] = useState(false);
-  const [copiedPatch, setCopiedPatch] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  // Form UX: Handle frictionless single-input repository scan submit
-  const handleHeroScanSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = heroRepoInput.trim();
-    if (trimmed) {
-      router.push(`/onboarding?repo=${encodeURIComponent(trimmed)}`);
-    } else {
-      router.push('/onboarding');
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('book-demo') === 'true') {
+        setExpertOpen(true);
+      }
     }
-  };
-
-  const copyPatch = () => {
-    const patch = `// Enforce parameterized query to prevent SQL Injection
-const query = 'SELECT * FROM users WHERE id = $1';
-const result = await db.query(query, [userId]);`;
-    navigator.clipboard.writeText(patch);
-    setCopiedPatch(true);
-    setTimeout(() => setCopiedPatch(false), 2000);
-  };
+  }, []);
 
   return (
     <div
@@ -250,212 +248,99 @@ const result = await db.query(query, [userId]);`;
       <main id="main-content" style={{ flex: 1, width: '100%', overflowX: 'hidden' }}>
 
         {/* ========================================================= */}
-        {/* SECTION 1: ABOVE THE FOLD HERO & LEAD CAPTURE             */}
+        {/* SECTION 1: HERO & DASHBOARD PREVIEW                       */}
         {/* ========================================================= */}
         {!mounted ? (
           <KavachHeroSkeleton />
         ) : (
           <section
-            className="kavach-home-hero"
+            style={{
+              maxWidth: '1380px',
+              margin: '0 auto',
+              padding: 'clamp(40px, 6vw, 68px) clamp(20px, 4vw, 48px) 32px',
+              width: '100%',
+              boxSizing: 'border-box',
+              textAlign: 'center',
+            }}
+          >
+            {/* 1. Green Pulse Badge from Image 3 */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 mb-6 shadow-xs select-none">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>SECURITY FOR CODE, CLOUD &amp; AI</span>
+            </div>
+
+            {/* 2. Bold Headline from Image 3 */}
+            <h1
+              style={{
+                fontSize: 'clamp(38px, 6vw, 68px)',
+                lineHeight: 1.08,
+                letterSpacing: '-0.04em',
+                fontWeight: 800,
+                color: '#0F172A',
+                margin: '0 auto 18px',
+                maxWidth: '820px',
+              }}
+            >
+              Secure Code, Cloud<br />&amp; AI Agents.
+            </h1>
+
+            {/* 3. Value Proposition Checkmarks from Image 3 */}
+            <div className="flex items-center justify-center gap-4 sm:gap-6 text-sm sm:text-base font-semibold text-gray-800 mb-8 select-none">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
+                <span>Detect</span>
+              </div>
+              <span className="text-gray-300 font-light select-none">|</span>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
+                <span>Fix</span>
+              </div>
+              <span className="text-gray-300 font-light select-none">|</span>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
+                <span>Prevent</span>
+              </div>
+            </div>
+
+            {/* 4. Action Buttons from Image 3 */}
+            <div className="flex flex-wrap items-center justify-center gap-3.5 mb-4">
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl bg-[#0F172A] hover:bg-black text-white font-semibold text-sm transition-all shadow-sm hover:shadow-md cursor-pointer"
+              >
+                <span>Get Started</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <button
+                type="button"
+                onClick={() => setExpertOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-gray-50 text-gray-800 border border-gray-300 font-semibold text-sm transition-all shadow-sm hover:shadow-md cursor-pointer"
+              >
+                <Calendar className="w-4 h-4 text-gray-700" />
+                <span>Book a Demo</span>
+              </button>
+            </div>
+
+            {/* 5. Security Overview Dashboard Card Directly Underneath (Image 2) */}
+            <KavachHeroDashboardCard />
+          </section>
+        )}
+
+        {/* ========================================================= */}
+        {/* SECTION 2: SIMPLIFIED AUTONOMOUS AI AGENT & MCP GATEWAY    */}
+        {/* ========================================================= */}
+        <section
+          id="autonomous-mcp"
           style={{
             maxWidth: '1380px',
             margin: '0 auto',
-            padding: 'clamp(36px, 5vw, 64px) clamp(20px, 4vw, 48px) 36px',
+            padding: 'clamp(20px, 4vw, 40px) clamp(20px, 4vw, 48px) clamp(32px, 5vw, 56px)',
             width: '100%',
             boxSizing: 'border-box',
           }}
         >
-          {/* Left Column: Eyebrow, Headline, Subtitle, Instant Form, Actions */}
-          <div>
-            {/* Eyebrow Pill */}
-            <div className="kavach-home-eyebrow">
-              <span className="kavach-pulse-dot" />
-              <span>AUTONOMOUS SECURITY &amp; CLOUD DEFENSE · KAVACH</span>
-            </div>
-
-            {/* Concise, High-Converting Headline (Rule #3) */}
-            <h1>
-              Autonomous Security for<br />
-              <em>Code, Cloud &amp; AI Agents.</em>
-            </h1>
-
-            {/* Value Proposition Subtitle (Rule #1, #3) */}
-            <p>
-              Kavach continuously inspects AST code trees, verifies eBPF runtime events, evaluates Open Policy Agent (OPA) guardrails, and commits verified pull requests before vulnerabilities reach production.
-            </p>
-
-            {/* Frictionless Instant Scan Form (Rule #6 Form UX) */}
-            <form onSubmit={handleHeroScanSubmit} className="kavach-hero-form">
-              <div className="kavach-hero-input-wrap">
-                <Terminal size={16} color="#64748B" style={{ flexShrink: 0 }} />
-                <input
-                  type="text"
-                  placeholder="Enter GitHub repository URL (e.g. org/repo)"
-                  value={heroRepoInput}
-                  onChange={(e) => setHeroRepoInput(e.target.value)}
-                  className="kavach-hero-input"
-                  aria-label="GitHub Repository URL"
-                />
-              </div>
-              <button type="submit" className="kavach-hero-submit-btn">
-                <span>Start Free Security Audit</span>
-                <ArrowRight size={14} />
-              </button>
-            </form>
-
-            {/* Micro-Trust Note Under Form */}
-            <div className="kavach-hero-guarantee">
-              <div className="guarantee-item">
-                <CheckCircle2 size={13} color="#10B981" />
-                <span>100% Free Forever Tier</span>
-              </div>
-              <span className="dot">•</span>
-              <div className="guarantee-item">
-                <ShieldCheck size={13} color="#10B981" />
-                <span>Zero Credit Card Required</span>
-              </div>
-              <span className="dot">•</span>
-              <div className="guarantee-item">
-                <Zap size={13} color="#10B981" />
-                <span>Ready in &lt; 60 Seconds</span>
-              </div>
-            </div>
-
-            {/* Secondary Action Link Options (Rule #4 Optimize CTAs) */}
-            <div className="kavach-home-actions">
-              <a href="#security-pipeline" className="kavach-action-primary">
-                <span>Explore Interactive Pipeline</span>
-                <ArrowRight size={14} />
-              </a>
-              <button
-                type="button"
-                onClick={() => setExpertOpen(true)}
-                className="kavach-action-secondary"
-              >
-                <span>Talk to Security Engineer</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Right Column: Interactive Code Review Preview Card (Rule #5 Engagement) */}
-          <div className="kavach-home-preview" aria-label="Interactive Security Review Terminal">
-            <div className="kavach-preview-top">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="kavach-status-chip">AST DETERMINISTIC RUN</span>
-                <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>rentalhub-api</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFixedCode(!showFixedCode)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  backgroundColor: showFixedCode ? '#ECFDF5' : '#F1F5F9',
-                  color: showFixedCode ? '#065F46' : '#334155',
-                  border: `1px solid ${showFixedCode ? '#A7F3D0' : '#E2E8F0'}`,
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <Sparkles size={12} color={showFixedCode ? '#059669' : '#64748B'} />
-                <span>{showFixedCode ? 'View Original Finding' : 'Preview OPA Verified Patch'}</span>
-              </button>
-            </div>
-
-            <div className="kavach-preview-file">
-              <Code2 size={14} color="#64748B" />
-              <span>src/routes/users.ts</span>
-              <small>Line 42 · CWE-89</small>
-            </div>
-
-            {!showFixedCode ? (
-              <>
-                <div className="kavach-preview-code">
-                  <span>40</span> router.get('/users', async (req, res) =&gt; &#123;
-                </div>
-                <div className="kavach-preview-code">
-                  <span>41</span> &nbsp; const userId = req.query.id;
-                </div>
-                <div className="kavach-preview-code issue">
-                  <span>42</span> &nbsp; db.query(`SELECT * FROM users WHERE id = '$&#123;userId&#125;'`);
-                </div>
-                <div className="kavach-preview-code">
-                  <span>43</span> &#125;);
-                </div>
-
-                <div className="kavach-preview-evidence">
-                  <ShieldAlert size={16} color="#B45309" style={{ flexShrink: 0 }} />
-                  <span>
-                    <b>SQL Injection Detected · High Severity</b>
-                    <small>Untrusted query parameter reaching database statement without parameterization.</small>
-                  </span>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="kavach-preview-code">
-                  <span>40</span> router.get('/users', async (req, res) =&gt; &#123;
-                </div>
-                <div className="kavach-preview-code">
-                  <span>41</span> &nbsp; const userId = req.query.id;
-                </div>
-                <div className="kavach-preview-code fixed-line">
-                  <span>42</span> &nbsp; const query = 'SELECT * FROM users WHERE id = $1';
-                </div>
-                <div className="kavach-preview-code fixed-line">
-                  <span>43</span> &nbsp; const result = await db.query(query, [userId]);
-                </div>
-
-                <div className="kavach-preview-evidence patch">
-                  <ShieldCheck size={16} color="#065F46" style={{ flexShrink: 0 }} />
-                  <span>
-                    <b>OPA Deterministic Gate Passed · Rescan Verified</b>
-                    <small>Parameterized SQL query verified. 0 vulnerabilities remaining.</small>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={copyPatch}
-                    style={{
-                      marginLeft: 'auto',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #A7F3D0',
-                      color: '#065F46',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    {copiedPatch ? <Check size={11} /> : <Copy size={11} />}
-                    <span>{copiedPatch ? 'Copied' : 'Copy Diff'}</span>
-                  </button>
-                </div>
-              </>
-            )}
-
-            <div className="kavach-preview-review">
-              <div>MB</div>
-              <span>
-                <b>Mayur Bharvad</b>
-                <small>Lead Security Architect</small>
-              </span>
-              <span className="kavach-preview-status">
-                <ShieldCheck size={12} />
-                <span>Deterministic Verification Active</span>
-              </span>
-            </div>
-          </div>
+          <KavachMcpConnectWidget />
         </section>
-        )}
 
         {/* ========================================================= */}
         {/* TRUST BADGES & METRICS BAR (Rule #2 Trust Signals)        */}
@@ -869,7 +754,7 @@ const result = await db.query(query, [userId]);`;
                 </a>
               </div>
               {/* Official Social Links */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                 <a
                   href="https://www.linkedin.com/company/kavach-security/"
                   target="_blank"
@@ -890,6 +775,26 @@ const result = await db.query(query, [userId]);`;
                 >
                   <XIcon size={13} />
                 </a>
+                <a
+                  href="https://www.youtube.com/@kavachsecurity/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer-social-btn"
+                  title="Kavach on YouTube"
+                  aria-label="Kavach on YouTube"
+                >
+                  <YoutubeIcon size={16} />
+                </a>
+                <a
+                  href="https://www.instagram.com/kavach_secure/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer-social-btn"
+                  title="Kavach on Instagram"
+                  aria-label="Kavach on Instagram"
+                >
+                  <InstagramIcon size={15} />
+                </a>
               </div>
             </div>
 
@@ -909,9 +814,16 @@ const result = await db.query(query, [userId]);`;
               <span className="footer-col-header">PLATFORM &amp; DOCS</span>
               <Link href="/api-security" className="footer-link">API Security</Link>
               <Link href="/blueprints" className="footer-link">Dynamic Blueprints</Link>
-              <Link href="/policies" className="footer-link">OPA Policy Engine</Link>
               <Link href="/docs" className="footer-link">Documentation &amp; API</Link>
-              <Link href="/demo" className="footer-link">Interactive Showcase</Link>
+              <Link href="/trust" className="footer-link">Trust Center</Link>
+              <button
+                type="button"
+                onClick={() => setExpertOpen(true)}
+                className="footer-link"
+                style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', font: 'inherit' }}
+              >
+                Book a Live Demo
+              </button>
             </div>
 
             {/* Col 4: Trust & Legal */}
@@ -919,6 +831,8 @@ const result = await db.query(query, [userId]);`;
               <span className="footer-col-header">TRUST &amp; COMPLIANCE</span>
               <Link href="/privacy" className="footer-link">Privacy Policy</Link>
               <Link href="/terms" className="footer-link">Terms of Service</Link>
+              <Link href="/dpa" className="footer-link">DPA &amp; SCCs</Link>
+              <Link href="/subprocessors" className="footer-link">Subprocessors</Link>
               <Link href="/contact" className="footer-link">Contact Support</Link>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
                 <span className="live-dot" />
@@ -929,8 +843,8 @@ const result = await db.query(query, [userId]);`;
 
           {/* Bottom Copyright & Social Sublinks */}
           <div className="footer-bottom-bar">
-            <span>© 2026 Kavach Inc. All rights reserved. Deterministic DevSecOps &amp; AI Defense.</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
+            <span>© 2026 Kavach Security. All rights reserved. Ahmedabad, Gujarat, India.</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
               <a
                 href="https://www.linkedin.com/company/kavach-security/"
                 target="_blank"
@@ -942,6 +856,26 @@ const result = await db.query(query, [userId]);`;
                 <span>LinkedIn</span>
               </a>
               <a
+                href="https://www.youtube.com/@kavachsecurity/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-sublink"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              >
+                <YoutubeIcon size={13} />
+                <span>YouTube</span>
+              </a>
+              <a
+                href="https://www.instagram.com/kavach_secure/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-sublink"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              >
+                <InstagramIcon size={13} />
+                <span>Instagram</span>
+              </a>
+              <a
                 href="https://x.com/Kavach_Secure"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -949,10 +883,11 @@ const result = await db.query(query, [userId]);`;
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
               >
                 <XIcon size={12} />
-                <span>X (Twitter)</span>
+                <span>X</span>
               </a>
               <Link href="/privacy" className="footer-sublink">Privacy</Link>
               <Link href="/terms" className="footer-sublink">Terms</Link>
+              <Link href="/trust" className="footer-sublink">Trust</Link>
               <Link href="/contact" className="footer-sublink">Support</Link>
             </div>
           </div>

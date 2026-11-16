@@ -1,4 +1,8 @@
 from app.models.base import Base, TimestampMixin
+from app.models.email_models import (
+    EmailDeliveryLog,
+    WorkspaceNotificationSettings,
+)
 from app.models.user import User
 from app.models.project import Project
 from app.models.agent import Agent
@@ -52,6 +56,7 @@ from app.models.remediation import (
     RemediationAttempt,
     RemediationReview,
     RemediationEvidence,
+    AutofixJob,
 )
 from app.models.sbom import SBOMJob, SBOMDocument, SBOMComponent
 from app.models.docker_models import (
@@ -86,6 +91,18 @@ from app.models.cicd import (
     CICDEnvironment,
     CICDIntegration,
     CICDTemplate,
+)
+from app.models.model_security import (
+    ModelSource,
+    ModelAsset,
+    ModelVersion,
+    ModelArtifact,
+    ModelScan,
+    ModelFinding,
+    ModelRemediationJob,
+    ModelComplianceEvidence,
+    ModelEndpoint,
+    ModelBehavioralTestRun,
 )
 from app.models.license_compliance import (
     LicenseComplianceRecord,
@@ -317,5 +334,15 @@ __all__ = [
     "SeatLimitOverride",
     "OrganizationTrial",
     "TrialEvent",
+    "ModelSource",
+    "ModelAsset",
+    "ModelVersion",
+    "ModelArtifact",
+    "ModelScan",
+    "ModelFinding",
+    "ModelRemediationJob",
+    "ModelComplianceEvidence",
+    "ModelEndpoint",
+    "ModelBehavioralTestRun",
 ]
 

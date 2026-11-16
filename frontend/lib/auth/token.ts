@@ -103,7 +103,7 @@ export function redirectToLogin(redirectPath?: string): void {
   clearAuthToken();
   if (typeof window !== 'undefined') {
     const current = redirectPath || window.location.pathname;
-    if (!current.startsWith('/login') && !current.startsWith('/register') && !current.startsWith('/signup')) {
+    if (!current.startsWith('/login') && !current.startsWith('/register') && !current.startsWith('/signup') && !current.startsWith('/auth/callback')) {
       window.location.href = `/login?redirect=${encodeURIComponent(current)}`;
     }
   }

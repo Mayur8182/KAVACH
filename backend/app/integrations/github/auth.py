@@ -25,17 +25,34 @@ class EnvSecretProvider(SecretProvider):
 
     def get_github_private_key(self) -> Optional[str]:
         settings = get_settings()
-        key_or_path = settings.github_app_private_key
+        key_or_path = (
+            getattr(settings, "github_private_key_path", None)
+            or getattr(settings, "github_app_private_key", None)
+            or getattr(settings, "github_private_key", None)
+            or os.environ.get("GITHUB_PRIVATE_KEY_PATH")
+            or os.environ.get("GITHUB_PRIVATE_KEY")
+            or os.environ.get("GITHUB_APP_PRIVATE_KEY")
+        )
         if not key_or_path:
             return None
 
-        # If it points to an existing file on disk, read it
-        if os.path.exists(key_or_path) and os.path.isfile(key_or_path):
-            with open(key_or_path, "r", encoding="utf-8") as f:
-                return f.read().strip()
+        # Check candidate file paths
+        candidate_paths = [
+            key_or_path,
+            os.path.abspath(key_or_path),
+            os.path.abspath(os.path.join(os.getcwd(), key_or_path)),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", key_or_path)),
+        ]
+        for p in candidate_paths:
+            if os.path.exists(p) and os.path.isfile(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    return f.read().strip()
 
         # Otherwise treat as raw PEM string (handle possible escaped newlines)
-        return key_or_path.replace("\\n", "\n").strip()
+        cleaned = key_or_path.replace("\\n", "\n").strip()
+        if "BEGIN " in cleaned and "PRIVATE KEY" in cleaned:
+            return cleaned
+        return key_or_path.strip()
 
     def get_webhook_secret(self) -> Optional[str]:
         settings = get_settings()

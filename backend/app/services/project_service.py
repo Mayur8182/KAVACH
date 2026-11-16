@@ -38,6 +38,10 @@ class ProjectService:
         )
         created = await self.repo.create(project)
 
+        # Ensure user's onboarding is marked complete upon successful project creation
+        current_user.onboarding_completed = True
+        self.db.add(current_user)
+
         # Record PROJECT_CREATED audit event
         await self.audit.log_event(
             action="PROJECT_CREATED",
@@ -56,6 +60,36 @@ class ProjectService:
         )
         await self.db.commit()
         await self.db.refresh(created)
+
+        # Dispatch Project Created notification
+        try:
+            from app.services.notification_service import notification_service
+            from app.core.config import get_settings
+            settings = get_settings()
+            app_url = settings.public_app_url.rstrip("/")
+            await notification_service.dispatch(
+                template_id="project_created",
+                recipient_email=current_user.email,
+                context={
+                    "project_name": created.name,
+                    "project_id": str(created.id),
+                    "created_at": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                    "environment": created.environment or "production",
+                    "application_type": created.application_type or "web_service",
+                    "actor_email": current_user.email,
+                    "workspace_name": "Personal Workspace",
+                    "project_settings_url": f"{app_url}/projects/{created.id}/settings",
+                },
+                user_id=str(current_user.id),
+                project_id=str(created.id),
+                sync_delivery=False,
+            )
+        except Exception as proj_err:
+            import logging
+            logging.getLogger("secure-control-plane.email").warning(
+                f"Failed to dispatch project created notification: {proj_err}"
+            )
+
         return created
 
     async def get_project(self, project_id: uuid.UUID, current_user: User) -> Project:

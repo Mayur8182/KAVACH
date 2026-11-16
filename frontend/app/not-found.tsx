@@ -2,321 +2,122 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ShieldAlert, ArrowLeft, Home, Terminal, Search, Compass } from 'lucide-react';
-import { KavachLogo } from '@/components/common/KavachLogo';
+import { useRouter } from 'next/navigation';
+import { Home, ArrowLeft, Headphones, Info } from 'lucide-react';
 
 export default function NotFound() {
+  const router = useRouter();
+
+  const handleGoBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/');
+    }
+  };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: '#F8FAFC',
-        color: '#0F172A',
-        fontFamily: "var(--font-sans, 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif)",
-        backgroundImage:
-          'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(219, 234, 254, 0.45), transparent 70%)',
-      }}
-    >
-      {/* Top Brand Navigation Bar */}
-      <header
-        style={{
-          padding: '16px 32px',
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-        }}
-      >
-        <Link
-          href="/"
-          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-          title="Return to Kavach Home"
-        >
-          <KavachLogo size={24} textSize={16} />
-        </Link>
-        <span
-          style={{
-            fontSize: '11px',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-            fontWeight: 700,
-            letterSpacing: '0.04em',
-            color: '#64748B',
-            padding: '5px 12px',
-            backgroundColor: '#F1F5F9',
-            borderRadius: '9999px',
-            border: '1px solid #E2E8F0',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <span
-            style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              backgroundColor: '#94A3B8',
-              display: 'inline-block',
-            }}
-          />
-          HTTP STATUS: 404
-        </span>
-      </header>
-
-      {/* Main 404 Elevated Card */}
-      <main
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '48px 24px',
-          maxWidth: '680px',
-          width: '100%',
-          margin: '0 auto',
-        }}
-      >
-        <div
-          style={{
-            width: '100%',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '16px',
-            padding: '40px 36px',
-            boxShadow:
-              '0 20px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.03)',
-            textAlign: 'center',
-          }}
-        >
-          {/* Avatar + Status */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '20px',
-            }}
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white text-slate-900 antialiased font-sans selection:bg-rose-100 selection:text-rose-900">
+      {/* Left Column: Brand, Status Badge, Content & Controls */}
+      <div className="w-full lg:w-1/2 min-h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-14 xl:p-16 bg-white relative z-10">
+        {/* Top Header: Official Brand Logo */}
+        <header className="flex items-center">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2.5 text-slate-900 hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-slate-400/40 rounded-lg"
+            title="Kavach Home"
           >
-            <div
-              style={{
-                width: '104px',
-                height: '104px',
-                borderRadius: '24px',
-                background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
-                border: '1.5px solid #E2E8F0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 12px 32px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04)',
-                position: 'relative',
+            <img
+              src="/kavach-shield.png"
+              alt="Kavach"
+              className="w-6 h-auto object-contain flex-shrink-0"
+              onError={(e) => {
+                // Fallback to cube if shield fails
+                (e.target as HTMLImageElement).src = '/kavach-cube.png';
               }}
-              aria-hidden="true"
-            >
-              <img
-                src="/kavach-cube.png"
-                alt="Kavach 3D Isometric Cube"
-                width={68}
-                height={72}
-                style={{
-                  width: '68px',
-                  height: 'auto',
-                  objectFit: 'contain',
-                  filter: 'drop-shadow(0 6px 14px rgba(37, 99, 235, 0.22))',
-                }}
-              />
-              <span
-                style={{
-                  position: 'absolute',
-                  bottom: '-3px',
-                  right: '-3px',
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  backgroundColor: '#2563EB',
-                  border: '2px solid #FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
-                }}
-                title="Kavach Security Search Active"
-              >
-                <Search size={11} color="#FFFFFF" strokeWidth={2.5} />
-              </span>
-            </div>
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: '#2563EB',
-                backgroundColor: '#EFF6FF',
-                border: '1px solid #BFDBFE',
-                borderRadius: '999px',
-                padding: '3px 10px',
-              }}
-            >
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2563EB', display: 'inline-block' }} />
-              Searching for this route...
-            </div>
+            />
+            <span className="text-xl sm:text-[22px] font-bold tracking-tight text-slate-950 font-sans">
+              kavach
+            </span>
+          </Link>
+        </header>
+
+        {/* Center Content Section */}
+        <main className="my-auto py-10 sm:py-14 max-w-lg w-full">
+          {/* Status Pill Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF1F2] border border-[#FFE4E6] text-[#E11D48] text-xs font-semibold tracking-wide uppercase shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-[#E11D48] animate-pulse" />
+            <span>HTTP 404 — Not Found</span>
           </div>
 
-          <div
-            style={{
-              fontSize: '12px',
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: '#64748B',
-              marginBottom: '8px',
-            }}
-          >
-            Route Not Found
-          </div>
-
-          <h1
-            style={{
-              fontSize: '28px',
-              fontWeight: 800,
-              letterSpacing: '-0.025em',
-              margin: '0 0 12px',
-              color: '#0F172A',
-            }}
-          >
-            404 — Endpoint Unregistered
+          {/* Heading */}
+          <h1 className="text-3xl sm:text-4xl lg:text-[40px] font-bold tracking-tight text-slate-950 mt-5 mb-3.5 leading-tight">
+            404 — Page Not Found
           </h1>
 
-          <p
-            style={{
-              fontSize: '14.5px',
-              lineHeight: 1.6,
-              color: '#475569',
-              margin: '0 0 32px',
-              maxWidth: '500px',
-              marginLeft: 'auto',
-              marginRight: 'auto',
-            }}
-          >
-            The requested path does not exist within the Kavach Security Control Plane. The resource may
-            have been moved, renamed, or restricted under active enterprise governance policies.
+          {/* Subtitle Description */}
+          <p className="text-sm sm:text-base text-slate-500 leading-relaxed max-w-md mb-8">
+            The page you&apos;re looking for doesn&apos;t exist or may have been moved. Please check the URL or return to your workspace.
           </p>
 
-          {/* Action Controls */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              flexWrap: 'wrap',
-            }}
-          >
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-3.5">
             <Link
               href="/"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '11px 20px',
-                minHeight: '44px',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #CBD5E1',
-                borderRadius: '8px',
-                color: '#0F172A',
-                fontSize: '13.5px',
-                fontWeight: 600,
-                textDecoration: 'none',
-                transition: 'background-color 0.15s ease',
-              }}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#0B0F19] hover:bg-slate-800 active:scale-[0.99] text-white text-sm font-medium rounded-xl transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900/40"
             >
-              <ArrowLeft size={16} aria-hidden="true" />
-              <span>Return Home</span>
+              <Home size={16} className="text-white" />
+              <span>Go to Dashboard</span>
             </Link>
 
-            <Link
-              href="/code"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '11px 22px',
-                minHeight: '44px',
-                backgroundColor: '#2563EB',
-                border: '1px solid #1D4ED8',
-                borderRadius: '8px',
-                color: '#FFFFFF',
-                fontSize: '13.5px',
-                fontWeight: 600,
-                textDecoration: 'none',
-                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.25)',
-              }}
+            <button
+              type="button"
+              onClick={handleGoBack}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white hover:bg-slate-50 active:scale-[0.99] border border-slate-200 text-slate-700 text-sm font-medium rounded-xl transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
             >
-              <Terminal size={16} aria-hidden="true" />
-              <span>Open Security Console</span>
-            </Link>
-
-            <Link
-              href="/"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '11px 20px',
-                minHeight: '44px',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #CBD5E1',
-                borderRadius: '8px',
-                color: '#475569',
-                fontSize: '13.5px',
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              <Home size={16} aria-hidden="true" />
-              <span>Kavach Home</span>
-            </Link>
+              <ArrowLeft size={16} className="text-slate-600" />
+              <span>Go Back</span>
+            </button>
           </div>
 
-          {/* Suggested Links */}
-          <div
-            style={{
-              marginTop: '36px',
-              paddingTop: '20px',
-              borderTop: '1px solid #F1F5F9',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '16px',
-              fontSize: '12.5px',
-              color: '#64748B',
-              flexWrap: 'wrap',
-            }}
-          >
-            <span>Common destinations:</span>
-            <Link href="/products/code" style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 600 }}>
-              Code Security
+          {/* Assistance Footer Links */}
+          <div className="mt-10 sm:mt-12 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+            <span>Need assistance?</span>
+            <Headphones size={13} className="text-slate-400" />
+            <Link
+              href="/contact"
+              className="text-slate-800 hover:text-slate-950 font-medium transition-colors hover:underline underline-offset-4"
+            >
+              Contact Security Desk
             </Link>
-            <span style={{ color: '#CBD5E1' }}>•</span>
-            <Link href="/products/cloud" style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 600 }}>
-              Cloud Posture
-            </Link>
-            <span style={{ color: '#CBD5E1' }}>•</span>
-            <Link href="/docs" style={{ color: '#475569', textDecoration: 'none', fontWeight: 500 }}>
+            <span className="text-slate-300">•</span>
+            <Link
+              href="/docs"
+              className="text-slate-500 hover:text-slate-900 transition-colors hover:underline underline-offset-4"
+            >
               Documentation
             </Link>
           </div>
+        </main>
+
+        {/* Bottom subtle spacer / copyright alignment */}
+        <footer className="text-[11px] text-slate-400 tracking-wide">
+          <span>Kavach Autonomous Zero-Trust Security Control Plane</span>
+        </footer>
+      </div>
+
+      {/* Right Column: 3D Isometric Illustration on Soft Warm Beige Canvas */}
+      <div className="w-full lg:w-1/2 min-h-[360px] lg:min-h-screen bg-[#FAF5EF] flex items-center justify-center p-8 lg:p-14 relative overflow-hidden border-t lg:border-t-0 lg:border-l border-amber-100/40">
+        <div className="relative max-w-lg w-full flex items-center justify-center">
+          <img
+            src="/images/error-404-illustration.png"
+            alt="404 Page Not Found Illustration"
+            className="w-full max-w-[460px] xl:max-w-[500px] h-auto object-contain select-none pointer-events-none drop-shadow-sm transition-transform duration-500 hover:scale-[1.02]"
+            loading="eager"
+            decoding="async"
+          />
         </div>
-      </main>
+      </div>
     </div>
   );
 }
-

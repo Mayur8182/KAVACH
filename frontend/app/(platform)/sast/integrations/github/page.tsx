@@ -122,6 +122,26 @@ export default function GitHubIntegrationPage() {
     }
   };
 
+  const handleConnectGitHubApp = async () => {
+    try {
+      setLoading(true);
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002';
+      const returnUrl = typeof window !== 'undefined' ? window.location.href : `${currentOrigin}/sast/integrations/github`;
+      const appData = await api.github.getInstallUrl({
+        redirect_url: returnUrl,
+      });
+      if (appData?.url || appData?.install_url) {
+        window.location.href = appData.url || appData.install_url;
+        return;
+      }
+      throw new Error('No authorization URL returned from server.');
+    } catch (err: any) {
+      console.error('GitHub App install failed:', err);
+      setActionMessage(err?.message || 'Could not initiate GitHub App installation.');
+      setLoading(false);
+    }
+  };
+
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -563,83 +583,137 @@ export default function GitHubIntegrationPage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 100,
-            backdropFilter: 'blur(2px)',
+            backdropFilter: 'blur(4px)',
           }}
         >
           <div
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '16px',
-              width: '480px',
+              width: '520px',
               maxWidth: '90vw',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+              padding: '28px',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
             }}
           >
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px 0' }}>
-              Connect GitHub Account
-            </h3>
-            <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 16px 0' }}>
-              Authorize SecuLayer to discover and scan your GitHub repositories.
-            </p>
-
-            <form onSubmit={handleConnect}>
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                  Account Username
-                </label>
-                <input
-                  type="text"
-                  value={accountInput}
-                  onChange={(e) => setAccountInput(e.target.value)}
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+                  Connect GitHub Repositories
+                </h3>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 650,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    backgroundColor: '#EFF6FF',
+                    color: '#2563EB',
+                    border: '1px solid #BFDBFE',
+                  }}
+                >
+                  GitHub App
+                </span>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowConnectModal(false)}
+                style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', padding: '4px' }}
+              >
+                ✕
+              </button>
+            </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                  Organization (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={orgInput}
-                  onChange={(e) => setOrgInput(e.target.value)}
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                />
-              </div>
+            <div
+              style={{
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '20px',
+                backgroundColor: '#F8FAFC',
+                marginBottom: '20px',
+                textAlign: 'center',
+              }}
+            >
+              <p style={{ fontSize: '13px', color: '#334155', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                Connect your organization or personal repositories using GitHub&apos;s native Install &amp; Authorize flow.
+                No manual tokens or permissions management needed.
+              </p>
+              <button
+                type="button"
+                onClick={handleConnectGitHubApp}
+                disabled={loading}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: '#09090B',
+                  color: '#FFFFFF',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: loading ? 'wait' : 'pointer',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                }}
+              >
+                {loading ? 'Redirecting to GitHub...' : 'Install & Authorize GitHub App →'}
+              </button>
+            </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                  Personal Access Token (or OAuth)
-                </label>
-                <input
-                  type="password"
-                  placeholder="ghp_xxxxxxxxxxxx"
-                  value={tokenInput}
-                  onChange={(e) => setTokenInput(e.target.value)}
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                />
-                <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>
-                  Requires <code style={{ color: '#2563EB' }}>repo</code>, <code style={{ color: '#2563EB' }}>read:user</code> scopes.
+            {/* Optional / Manual Fallback */}
+            <details style={{ fontSize: '12px', color: '#64748B' }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600, color: '#475569', marginBottom: '10px' }}>
+                Need manual Personal Access Token (PAT) for self-hosted?
+              </summary>
+              <form onSubmit={handleConnect} style={{ marginTop: '12px', borderTop: '1px solid #F1F5F9', paddingTop: '12px' }}>
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                    Account Username
+                  </label>
+                  <input
+                    type="text"
+                    value={accountInput}
+                    onChange={(e) => setAccountInput(e.target.value)}
+                    style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                  />
                 </div>
-              </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowConnectModal(false)}
-                  style={{ padding: '7px 14px', borderRadius: '6px', border: '1px solid #CBD5E1', backgroundColor: '#FFFFFF', fontSize: '12px', cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{ padding: '7px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#2563EB', color: '#FFFFFF', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Connect & Sync
-                </button>
-              </div>
-            </form>
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                    Organization (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={orgInput}
+                    onChange={(e) => setOrgInput(e.target.value)}
+                    style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                    Personal Access Token
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="ghp_xxxxxxxxxxxx"
+                    value={tokenInput}
+                    onChange={(e) => setTokenInput(e.target.value)}
+                    style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button
+                    type="submit"
+                    style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', backgroundColor: '#334155', color: '#FFFFFF', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Connect via PAT
+                  </button>
+                </div>
+              </form>
+            </details>
           </div>
         </div>
       )}

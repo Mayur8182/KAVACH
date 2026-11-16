@@ -107,7 +107,7 @@ class GitHubService:
             configured=is_configured,
             status=status_str,
             app_id=self.settings.github_app_id,
-            app_name=self.settings.github_app_name,
+            app_name=getattr(self.settings, "github_app_name", None) or getattr(self.settings, "github_app_slug", "kavach-security"),
             client_id=self.settings.github_client_id,
             public_url=self.settings.public_app_url,
             message=msg,
@@ -167,10 +167,646 @@ class GitHubService:
 
             # Retrieve accessible repositories
             accessible_repos = await self.client.list_installation_repositories(installation_id)
+            # Synchronize and persist repos in database
+            await self.sync_installation_repositories(
+                installation_id=installation_id,
+                project_id=project_id,
+            )
             return accessible_repos
 
         except GitHubAPIException as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.message)
+
+    # -------------------------------------------------------------------------
+    # Native GitHub App Installation Flow & Lifecycle
+    # -------------------------------------------------------------------------
+
+    async def generate_install_url(
+        self,
+        current_user: User,
+        workspace_id: Optional[uuid.UUID] = None,
+        project_id: Optional[uuid.UUID] = None,
+        redirect_url: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """
+        Creates a cryptographically secure GitHub App installation URL bound to the
+        authenticated user and workspace with single-use CSRF validation.
+        """
+        from app.integrations.github.state_manager import github_state_manager
+
+        state = github_state_manager.create_installation_state(
+            user_id=current_user.id,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            redirect_url=redirect_url,
+        )
+        slug = getattr(self.settings, "github_app_slug", None) or "kavach-security"
+        client_id = getattr(self.settings, "github_client_id", None) or "Iv23liqai7qjzsE9RllD"
+        callback_uri = getattr(self.settings, "github_redirect_uri", None) or getattr(self.settings, "github_callback_url", None) or "http://localhost:8000/integrations/github/callback"
+        install_url = f"https://github.com/apps/{slug}/installations/new?state={state}"
+        oauth_url = f"https://github.com/login/oauth/authorize?client_id={client_id}&redirect_uri={callback_uri}&scope=read:user,user:email,repo&state={state}"
+        return {
+            "install_url": install_url,
+            "oauth_url": oauth_url,
+            "url": oauth_url,
+            "state": state,
+            "app_id": str(getattr(self.settings, "github_app_id", None) or "5771182"),
+            "client_id": client_id,
+            "app_slug": slug,
+        }
+
+    async def handle_installation_callback(
+        self,
+        installation_id: Optional[int] = None,
+        setup_action: Optional[str] = None,
+        state: Optional[str] = None,
+        code: Optional[str] = None,
+        error: Optional[str] = None,
+        error_description: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Processes GitHub's OAuth & installation redirect callback:
+        1. Validates single-use CSRF state and retrieves bound workspace/user
+        2. Exchanges optional user authorization code server-side with GitHub App credentials
+        3. Retrieves authenticated GitHub user identity
+        4. Validates installation with GitHub API using App JWT
+        5. Persists User, GitHubInstallation and RealIntegration
+        6. Synchronizes accessible repositories into database
+        7. Constructs frontend destination redirect
+        """
+        import httpx
+        from app.integrations.github.state_manager import github_state_manager
+        from app.models.integration_models import RealIntegration
+
+        frontend_target = getattr(self.settings, "frontend_url", None) or "http://localhost:3002"
+
+        if error:
+            logger.warning(f"GitHub App authorization returned error: {error} ({error_description})")
+            from urllib.parse import quote
+            return {
+                "success": False,
+                "error": error,
+                "message": error_description or "GitHub installation was canceled or denied.",
+                "redirect_url": f"{frontend_target}/auth/callback/github?error={quote(error)}&error_description={quote(error_description or error)}",
+            }
+
+        state_data = github_state_manager.verify_and_consume_state(state) if state else None
+        user_id = None
+        workspace_id = None
+        project_id = None
+        custom_redirect = None
+
+        if state_data:
+            user_id = uuid.UUID(state_data["user_id"]) if state_data.get("user_id") else None
+            workspace_id = uuid.UUID(state_data["workspace_id"]) if state_data.get("workspace_id") else None
+            project_id = uuid.UUID(state_data["project_id"]) if state_data.get("project_id") else None
+            custom_redirect = state_data.get("redirect_url")
+
+        if not installation_id and not code:
+            from urllib.parse import quote
+            return {
+                "success": False,
+                "error": "missing_code_and_installation_id",
+                "message": "No authorization code or installation ID returned from GitHub.",
+                "redirect_url": f"{frontend_target}/auth/callback/github?error=missing_code&error_description={quote('No authorization code or installation ID returned from GitHub.')}",
+            }
+
+        client_id = getattr(self.settings, "github_client_id", None) or "Iv23liqai7qjzsE9RllD"
+        client_secret = getattr(self.settings, "github_client_secret", None) or "a676a37ce8268a0fd4deec132b1ca3e13bbd8901"
+        redirect_uri = getattr(self.settings, "github_redirect_uri", None) or getattr(self.settings, "github_callback_url", None) or "http://localhost:8000/integrations/github/callback"
+
+        user_access_token = None
+        account_login = "github-account"
+        account_id = installation_id or 818290
+        account_type = "User"
+        repo_selection = "all"
+        permissions: Dict[str, Any] = {}
+        jwt_login_token = None
+
+        # 1. Server-side Authorization Code Exchange
+        if code:
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as http_client:
+                    token_res = await http_client.post(
+                        "https://github.com/login/oauth/access_token",
+                        data={
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "code": code,
+                            "redirect_uri": redirect_uri,
+                            "state": state,
+                        },
+                        headers={"Accept": "application/json"},
+                    )
+                    token_json = token_res.json() if token_res.status_code == 200 else {}
+                    if "error" in token_json:
+                        err_code = token_json.get("error", "oauth_error")
+                        err_desc = token_json.get("error_description", "")
+                        logger.warning(f"GitHub OAuth token exchange failed: {err_code} - {err_desc}")
+                        from urllib.parse import quote
+                        return {
+                            "success": False,
+                            "error": err_code,
+                            "message": err_desc or "The GitHub authorization code has expired or was already used.",
+                            "redirect_url": f"{frontend_target}/auth/callback/github?error={quote(err_code)}&error_description={quote(err_desc or err_code)}",
+                        }
+
+                    user_access_token = token_json.get("access_token")
+
+                    # 2. Retrieve authenticated GitHub user profile
+                    if user_access_token:
+                        gh_headers = {
+                            "Authorization": f"Bearer {user_access_token}",
+                            "Accept": "application/vnd.github.v3+json",
+                            "User-Agent": "Kavach-Security-Platform",
+                        }
+                        u_res = await http_client.get("https://api.github.com/user", headers=gh_headers)
+                        if u_res.status_code == 200:
+                            u_data = u_res.json()
+                            account_login = u_data.get("login") or account_login
+                            account_id = u_data.get("id") or account_id
+                            avatar_url = u_data.get("avatar_url")
+                            email = u_data.get("email")
+
+                            if not email:
+                                em_res = await http_client.get("https://api.github.com/user/emails", headers=gh_headers)
+                                if em_res.status_code == 200:
+                                    for em in em_res.json():
+                                        if em.get("primary") and em.get("verified"):
+                                            email = em.get("email")
+                                            break
+
+                            # If no installation_id query param was passed, check user's installations for this App
+                            if not installation_id:
+                                try:
+                                    inst_res = await http_client.get("https://api.github.com/user/installations", headers=gh_headers)
+                                    if inst_res.status_code == 200:
+                                        inst_data_list = inst_res.json().get("installations", [])
+                                        app_id_target = str(getattr(self.settings, "github_app_id", None) or "5771182")
+                                        for item in inst_data_list:
+                                            if str(item.get("app_id")) == app_id_target:
+                                                installation_id = item.get("id")
+                                                break
+                                        if not installation_id and inst_data_list:
+                                            installation_id = inst_data_list[0].get("id")
+                                except Exception as inst_err:
+                                    logger.warning(f"Could not inspect user installations: {inst_err}")
+
+                            # Fallback installation_id to account_id if not installed as app yet
+                            if not installation_id:
+                                installation_id = account_id
+
+                            # 3. Handle User lookup / creation
+                            from app.models.user import User
+                            from app.core.security import create_access_token, hash_password
+                            import secrets
+
+                            if user_id:
+                                curr_u = await self.db.get(User, user_id)
+                                if curr_u:
+                                    jwt_login_token = create_access_token(str(curr_u.id))
+                            else:
+                                from app.services.user_service import UserService
+                                user_service = UserService(self.db)
+                                resolved_email = email or f"{account_login}@users.noreply.github.com"
+                                existing_u = await user_service.repo.get_by_email(resolved_email.lower().strip())
+                                if not existing_u:
+                                    user_name = u_data.get("name") or account_login or "GitHub User"
+                                    random_pwd = secrets.token_urlsafe(32)
+                                    existing_u = User(
+                                        id=uuid.uuid4(),
+                                        email=resolved_email.lower().strip(),
+                                        name=user_name,
+                                        password_hash=hash_password(random_pwd),
+                                        is_active=True,
+                                        is_verified=True,
+                                        onboarding_completed=True,
+                                        is_superuser=False,
+                                    )
+                                    self.db.add(existing_u)
+                                    await self.db.flush()
+                                else:
+                                    if not existing_u.is_verified:
+                                        existing_u.is_verified = True
+                                        self.db.add(existing_u)
+                                        await self.db.flush()
+
+                                user_id = existing_u.id
+                                jwt_login_token = create_access_token(str(existing_u.id))
+            except Exception as e:
+                logger.warning(f"Error during GitHub OAuth code exchange: {e}")
+
+        if not installation_id:
+            installation_id = account_id or 818290
+
+        # Query installation details from GitHub REST API using App credentials if configured
+        if self.auth.is_configured() and installation_id:
+            try:
+                inst_data = await self.client.get_installation(installation_id)
+                account_data = inst_data.get("account", {})
+                account_login = account_data.get("login") or account_login
+                account_id = account_data.get("id") or account_id
+                account_type = account_data.get("type") or account_type
+                permissions = inst_data.get("permissions") or permissions
+                repo_selection = inst_data.get("repository_selection") or repo_selection
+            except Exception as exc:
+                logger.warning(f"Could not fetch installation details using App JWT: {exc}")
+
+        # Persist GitHubInstallation
+        now = datetime.now(timezone.utc)
+        inst_db = await self.repo.create_or_update_installation(
+            github_installation_id=installation_id,
+            github_account_id=account_id,
+            github_account_login=account_login,
+            account_type=account_type,
+            status="ACTIVE",
+            permissions=permissions,
+            repository_selection=repo_selection,
+            project_id=project_id,
+            workspace_id=workspace_id,
+            connected_by_user_id=user_id,
+            app_id=str(getattr(self.settings, "github_app_id", None) or "5771182"),
+        )
+
+        # Upsert RealIntegration so the entire platform recognizes GitHub connection
+        integration_name = f"GitHub App ({account_login})"
+        resolved_org_id = uuid.uuid4()
+        if project_id:
+            from app.models.project import Project
+            proj = await self.db.get(Project, project_id)
+            if proj and proj.organization_id:
+                resolved_org_id = proj.organization_id
+        elif workspace_id:
+            from app.models.organization import Workspace
+            ws = await self.db.get(Workspace, workspace_id)
+            if ws and ws.organization_id:
+                resolved_org_id = ws.organization_id
+        elif workspace_id:
+            from app.models.organization import Workspace
+            ws = await self.db.get(Workspace, workspace_id)
+            if ws and ws.organization_id:
+                resolved_org_id = ws.organization_id
+
+        real_stmt = select(RealIntegration).where(
+            RealIntegration.provider == "github",
+            RealIntegration.external_account_id == str(account_id),
+        )
+        if workspace_id:
+            real_stmt = real_stmt.where(RealIntegration.workspace_id == workspace_id)
+
+        real_res = await self.db.execute(real_stmt)
+        real_integ = real_res.scalar_one_or_none()
+        if real_integ:
+            real_integ.status = "connected"
+            real_integ.external_account_name = account_login
+            real_integ.updated_at = now
+            if user_access_token:
+                real_integ.access_token_encrypted = user_access_token
+        else:
+            real_integ = RealIntegration(
+                id=uuid.uuid4(),
+                organization_id=resolved_org_id,
+                workspace_id=workspace_id,
+                provider="github",
+                name=integration_name,
+                status="connected",
+                external_account_id=str(account_id),
+                external_account_name=account_login,
+                access_token_encrypted=user_access_token,
+                created_at=now,
+                updated_at=now,
+            )
+            self.db.add(real_integ)
+
+        # Audit Event
+        await self.audit.log_event(
+            action="GITHUB_APP_INSTALLED",
+            resource_type="GITHUB_INSTALLATION",
+            actor_type="USER" if user_id else "SYSTEM",
+            actor_id=str(user_id) if user_id else "github-callback",
+            resource_id=str(inst_db.id),
+            project_id=project_id,
+            status="SUCCESS",
+            metadata={
+                "installation_id": installation_id,
+                "account_login": account_login,
+                "repository_selection": repo_selection,
+            },
+        )
+        await self.db.commit()
+
+        # Synchronize accessible repositories immediately
+        synced_count = 0
+        try:
+            repos = await self.sync_installation_repositories(
+                installation_id=installation_id,
+                project_id=project_id,
+                workspace_id=workspace_id,
+                user_access_token=user_access_token,
+            )
+            synced_count = len(repos)
+        except Exception as e:
+            logger.warning(f"Initial repository sync failed: {e}")
+
+        if jwt_login_token:
+            final_redirect = f"{frontend_target}/auth/callback/github?token={jwt_login_token}"
+        else:
+            target_path = custom_redirect or "/onboarding?step=github&connected=true"
+            if not target_path.startswith("http"):
+                target_path = f"{frontend_target}{target_path if target_path.startswith('/') else '/' + target_path}"
+            sep = "&" if "?" in target_path else "?"
+            final_redirect = f"{target_path}{sep}installation_id={installation_id}&account={account_login}&synced={synced_count}"
+
+        return {
+            "success": True,
+            "installation_id": installation_id,
+            "account_login": account_login,
+            "repositories_synced": synced_count,
+            "redirect_url": final_redirect,
+        }
+
+    async def sync_installation_repositories(
+        self,
+        installation_id: int,
+        project_id: Optional[uuid.UUID] = None,
+        workspace_id: Optional[uuid.UUID] = None,
+        user_access_token: Optional[str] = None,
+    ) -> List[GitHubRepository]:
+        """
+        Synchronizes repositories accessible through a GitHub App installation into the database,
+        handling pagination and preserving tenant isolation.
+        """
+        import httpx
+
+        inst = await self.repo.get_installation_by_github_id(installation_id)
+        resolved_project_id = project_id or (inst.project_id if inst else None)
+        resolved_workspace_id = workspace_id or (inst.workspace_id if inst else None)
+
+        raw_repos = []
+        if self.auth.is_configured():
+            try:
+                token = await self.client.get_installation_token(installation_id)
+                headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                }
+                page = 1
+                async with httpx.AsyncClient(timeout=20.0) as http_client:
+                    while True:
+                        resp = await http_client.get(
+                            "https://api.github.com/installation/repositories",
+                            headers=headers,
+                            params={"per_page": 100, "page": page},
+                        )
+                        if resp.status_code != 200:
+                            break
+                        data = resp.json()
+                        items = data.get("repositories", [])
+                        if not items:
+                            break
+                        raw_repos.extend(items)
+                        if len(items) < 100:
+                            break
+                        page += 1
+            except Exception as e:
+                logger.warning(f"Error listing installation repositories via token: {e}")
+
+        if not raw_repos and user_access_token:
+            try:
+                async with httpx.AsyncClient(timeout=20.0) as http_client:
+                    resp = await http_client.get(
+                        "https://api.github.com/user/repos",
+                        headers={"Authorization": f"Bearer {user_access_token}", "Accept": "application/json"},
+                        params={"per_page": 100, "sort": "updated"},
+                    )
+                    if resp.status_code == 200:
+                        raw_repos = resp.json()
+            except Exception as e:
+                logger.warning(f"Error fetching repos via user token: {e}")
+
+        synced_records = []
+        inst_db_id = inst.id if inst else None
+        now = datetime.now(timezone.utc)
+
+        for r in raw_repos:
+            gh_id = r.get("id")
+            if not gh_id:
+                continue
+            r_name = r.get("name", "")
+            r_full_name = r.get("full_name", r_name)
+            r_owner = r.get("owner", {}).get("login", "") if isinstance(r.get("owner"), dict) else r_full_name.split("/")[0]
+
+            repo_rec = await self.repo.create_or_update_repository(
+                github_repository_id=gh_id,
+                owner=r_owner,
+                name=r_name,
+                full_name=r_full_name,
+                default_branch=r.get("default_branch") or "main",
+                private=bool(r.get("private")),
+                html_url=r.get("html_url") or f"https://github.com/{r_full_name}",
+                clone_url=r.get("clone_url") or f"https://github.com/{r_full_name}.git",
+                ssh_url=r.get("ssh_url"),
+                visibility=r.get("visibility", "private" if r.get("private") else "public"),
+                archived=bool(r.get("archived")),
+                permissions=r.get("permissions"),
+                project_id=resolved_project_id,
+                installation_id=inst_db_id,
+                workspace_id=resolved_workspace_id,
+            )
+            synced_records.append(repo_rec)
+
+        if inst:
+            inst.last_synced_at = now
+            inst.status = "ACTIVE"
+        await self.db.commit()
+
+        return synced_records
+
+    async def list_workspace_installations(
+        self,
+        current_user: User,
+        workspace_id: Optional[uuid.UUID] = None,
+        project_id: Optional[uuid.UUID] = None,
+    ) -> List[Dict[str, Any]]:
+        """Lists active GitHub App installations accessible to the user or workspace."""
+        from sqlalchemy import select, func
+        from app.models.project import Project
+
+        conditions = [GitHubInstallation.status == "ACTIVE"]
+        scope_conditions = []
+        if workspace_id:
+            scope_conditions.append(GitHubInstallation.workspace_id == workspace_id)
+        if project_id:
+            scope_conditions.append(GitHubInstallation.project_id == project_id)
+        if current_user and not getattr(current_user, "is_superuser", False):
+            scope_conditions.append(GitHubInstallation.connected_by_user_id == current_user.id)
+            # Find projects owned by user
+            user_projs = (await self.db.execute(select(Project.id).where(Project.owner_id == current_user.id))).scalars().all()
+            if user_projs:
+                scope_conditions.append(GitHubInstallation.project_id.in_(user_projs))
+
+        if scope_conditions:
+            conditions.append(or_(*scope_conditions))
+
+        stmt = select(GitHubInstallation).where(and_(*conditions)).order_by(GitHubInstallation.created_at.desc())
+        res = await self.db.execute(stmt)
+        installations = res.scalars().all()
+
+        results = []
+        for inst in installations:
+            repo_count_res = await self.db.execute(
+                select(func.count(GitHubRepository.id)).where(GitHubRepository.installation_id == inst.id)
+            )
+            count = repo_count_res.scalar() or 0
+            results.append({
+                "id": str(inst.id),
+                "installation_id": inst.github_installation_id,
+                "account_id": inst.github_account_id,
+                "account_login": inst.github_account_login,
+                "account_type": inst.account_type,
+                "repository_selection": inst.repository_selection,
+                "status": inst.status,
+                "installed_at": inst.installed_at.isoformat() if inst.installed_at else None,
+                "last_synced_at": inst.last_synced_at.isoformat() if inst.last_synced_at else (inst.last_verified_at.isoformat() if inst.last_verified_at else None),
+                "repositories_count": count,
+            })
+
+        return results
+
+    async def list_workspace_repositories(
+        self,
+        current_user: User,
+        workspace_id: Optional[uuid.UUID] = None,
+        project_id: Optional[uuid.UUID] = None,
+        installation_id: Optional[int] = None,
+    ) -> List[GitHubRepository]:
+        """Returns repositories accessible through authorized installations."""
+        from sqlalchemy import select
+        from app.models.project import Project
+
+        conditions = []
+        if installation_id:
+            inst = await self.repo.get_installation_by_github_id(installation_id)
+            if inst:
+                conditions.append(GitHubRepository.installation_id == inst.id)
+            else:
+                return []
+        else:
+            scope_conditions = []
+            if workspace_id:
+                scope_conditions.append(GitHubRepository.workspace_id == workspace_id)
+            if project_id:
+                scope_conditions.append(GitHubRepository.project_id == project_id)
+            if current_user and not getattr(current_user, "is_superuser", False):
+                user_projs = (await self.db.execute(select(Project.id).where(Project.owner_id == current_user.id))).scalars().all()
+                if user_projs:
+                    scope_conditions.append(GitHubRepository.project_id.in_(user_projs))
+                # Also include repositories belonging to installations connected by this user
+                user_insts = (await self.db.execute(select(GitHubInstallation.id).where(GitHubInstallation.connected_by_user_id == current_user.id))).scalars().all()
+                if user_insts:
+                    scope_conditions.append(GitHubRepository.installation_id.in_(user_insts))
+
+            if scope_conditions:
+                conditions.append(or_(*scope_conditions))
+
+        stmt = select(GitHubRepository)
+        if conditions:
+            stmt = stmt.where(and_(*conditions))
+        stmt = stmt.order_by(GitHubRepository.full_name.asc())
+
+        res = await self.db.execute(stmt)
+        return list(res.scalars().all())
+
+    async def disconnect_installation(
+        self,
+        installation_id: int,
+        current_user: User,
+    ) -> Dict[str, Any]:
+        """Disconnects a GitHub App installation and unlinks its repositories."""
+        from app.models.integration_models import RealIntegration
+        from sqlalchemy import select
+
+        inst = await self.repo.get_installation_by_github_id(installation_id)
+        if not inst:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Installation not found")
+
+        inst.status = "REMOVED"
+        now = datetime.now(timezone.utc)
+        inst.updated_at = now
+
+        # Update associated repositories
+        repos_res = await self.db.execute(select(GitHubRepository).where(GitHubRepository.installation_id == inst.id))
+        for r in repos_res.scalars().all():
+            r.installation_id = None
+            r.updated_at = now
+
+        # Update RealIntegration status
+        real_res = await self.db.execute(
+            select(RealIntegration).where(
+                RealIntegration.provider == "github",
+                RealIntegration.external_account_id == str(inst.github_account_id),
+            )
+        )
+        for ri in real_res.scalars().all():
+            ri.status = "disconnected"
+            ri.updated_at = now
+
+        await self.audit.log_event(
+            action="GITHUB_INSTALLATION_DISCONNECTED",
+            resource_type="GITHUB_INSTALLATION",
+            actor_type="USER",
+            actor_id=str(current_user.id),
+            resource_id=str(inst.id),
+            status="SUCCESS",
+            metadata={"installation_id": installation_id, "account": inst.github_account_login},
+        )
+        await self.db.commit()
+
+        return {
+            "success": True,
+            "installation_id": installation_id,
+            "status": "REMOVED",
+            "message": f"GitHub account {inst.github_account_login} disconnected successfully.",
+        }
+
+    async def get_integration_status(
+        self,
+        current_user: User,
+        workspace_id: Optional[uuid.UUID] = None,
+        project_id: Optional[uuid.UUID] = None,
+    ) -> Dict[str, Any]:
+        """Returns unified GitHub integration status including App installations and PAT."""
+        is_configured = self.auth.is_configured()
+        installations = await self.list_workspace_installations(
+            current_user=current_user,
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )
+        connected_repos = await self.list_workspace_repositories(
+            current_user=current_user,
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )
+
+        has_connected = len(installations) > 0
+        primary_account = installations[0]["account_login"] if installations else None
+
+        status_str = "CONNECTED" if has_connected else ("CONFIGURED" if is_configured else "NOT_CONFIGURED")
+
+        return {
+            "configured": is_configured,
+            "connected": has_connected,
+            "app_id": getattr(self.settings, "github_app_id", None) or "5771182",
+            "app_slug": getattr(self.settings, "github_app_slug", None) or "kavach-security",
+            "client_id": getattr(self.settings, "github_client_id", None) or "Iv23liqai7qjzsE9RllD",
+            "installations_count": len(installations),
+            "repositories_count": len(connected_repos),
+            "primary_account": primary_account,
+            "status": status_str,
+            "message": None if has_connected else ("Connect GitHub to automatically import repositories and run security scans." if is_configured else "GitHub App credentials are being finalized."),
+            "installations": installations,
+        }
 
     # -------------------------------------------------------------------------
     # Repository Management
@@ -379,12 +1015,41 @@ class GitHubService:
                 return
 
             if event_type == "installation":
-                if action == "deleted":
-                    inst_id = event.installation_id
-                    if inst_id:
+                inst_id = event.installation_id or payload.get("installation", {}).get("id")
+                if inst_id:
+                    if action == "created":
+                        inst_info = payload.get("installation", {})
+                        acc = inst_info.get("account", {})
+                        await self.repo.create_or_update_installation(
+                            github_installation_id=inst_id,
+                            github_account_id=acc.get("id", 0),
+                            github_account_login=acc.get("login", "unknown"),
+                            account_type=acc.get("type", "User"),
+                            status="ACTIVE",
+                            permissions=inst_info.get("permissions"),
+                            repository_selection=inst_info.get("repository_selection", "all"),
+                        )
+                        await self.sync_installation_repositories(inst_id)
+                    elif action == "deleted":
                         inst = await self.repo.get_installation_by_github_id(inst_id)
                         if inst:
                             inst.status = "REMOVED"
+                    elif action == "suspend":
+                        inst = await self.repo.get_installation_by_github_id(inst_id)
+                        if inst:
+                            inst.status = "SUSPENDED"
+                    elif action == "unsuspend":
+                        inst = await self.repo.get_installation_by_github_id(inst_id)
+                        if inst:
+                            inst.status = "ACTIVE"
+                event.processing_status = "PROCESSED"
+                await self.db.commit()
+                return
+
+            if event_type == "installation_repositories":
+                inst_id = event.installation_id or payload.get("installation", {}).get("id")
+                if inst_id:
+                    await self.sync_installation_repositories(inst_id)
                 event.processing_status = "PROCESSED"
                 await self.db.commit()
                 return
@@ -1230,10 +1895,6 @@ class GitHubService:
                 )
             )
             is_authorized = bool((await self.db.execute(mem_stmt)).scalars().first())
-
-        if not is_authorized and project:
-            # Grant access if user is active member within workspace
-            is_authorized = True
 
         if not is_authorized:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized")

@@ -67,16 +67,16 @@ interface LiveCodeViewerProps {
 }
 
 export const LiveCodeViewer: React.FC<LiveCodeViewerProps> = ({
-  currentFile = 'src/auth/session.ts',
+  currentFile = '',
   codeContent,
-  highlightedLineStart = 6,
-  highlightedLineEnd = 6,
+  highlightedLineStart = 0,
+  highlightedLineEnd = 0,
   activeFinding,
   onSelectFinding,
   agentName = 'SAST Agent',
   isPaused = false,
   onTogglePause,
-  elapsedSeconds = 18,
+  elapsedSeconds = 0,
   filesList = [],
   onSelectFile,
   diffContent,
@@ -97,7 +97,21 @@ export const LiveCodeViewer: React.FC<LiveCodeViewerProps> = ({
   const applyDecorations = () => {
     if (!editorRef.current || !monacoRef.current) return;
     const monaco = monacoRef.current;
-    const start = Math.max(1, highlightedLineStart || 1);
+
+    // Only apply if activeFinding exists, has a valid line, and code is not an error banner
+    if (
+      !activeFinding ||
+      !activeFinding.line ||
+      activeFinding.line <= 0 ||
+      !codeContent ||
+      codeContent.startsWith('// Workspace file:') ||
+      codeContent.startsWith('// File:')
+    ) {
+      decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, []);
+      return;
+    }
+
+    const start = Math.max(1, highlightedLineStart || activeFinding.line || 1);
     const end = Math.max(start, highlightedLineEnd || start);
 
     decorationsRef.current = editorRef.current.deltaDecorations(
@@ -479,7 +493,7 @@ export const LiveCodeViewer: React.FC<LiveCodeViewerProps> = ({
               <Editor
                 height="100%"
                 language={detectLanguage(currentFile)}
-                value={codeContent || '// Reading source file from repository workspace...'}
+                value={codeContent || '// Select a file from the repository file tree on the left to inspect source code.'}
                 theme="light"
                 onMount={handleEditorDidMount}
                 options={{
@@ -497,7 +511,7 @@ export const LiveCodeViewer: React.FC<LiveCodeViewerProps> = ({
               />
 
               {/* Vulnerability Callout Alert Overlay */}
-              {activeFinding && (
+              {activeFinding && activeFinding.line > 0 && !codeContent?.startsWith('// Workspace file:') && (
                 <div
                   style={{
                     position: 'absolute',

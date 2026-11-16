@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -508,6 +508,27 @@ async def change_password(
     )
 
     await db.commit()
+
+    # Dispatch Password Changed notification email
+    try:
+        from app.services.notification_service import notification_service
+        from app.core.config import get_settings
+        settings = get_settings()
+        await notification_service.dispatch(
+            template_id="auth_password_changed",
+            recipient_email=user.email,
+            context={
+                "user_email": user.email,
+                "changed_at": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                "session_summary": "Password updated via Account Security Settings",
+                "security_settings_url": f"{settings.public_app_url}/account/security",
+            },
+            user_id=str(user.id),
+            sync_delivery=False,
+        )
+    except Exception as pwd_err:
+        logger.warning(f"Failed to dispatch password changed notification: {pwd_err}")
+
     return {"success": True, "message": "Password changed successfully."}
 
 
@@ -1179,6 +1200,23 @@ async def delete_user_account(
         },
     )
     await db.commit()
+
+    # Dispatch Account Deletion Confirmed notification
+    try:
+        from app.services.notification_service import notification_service
+        await notification_service.dispatch(
+            template_id="account_deletion_confirmed",
+            recipient_email=user.email,
+            context={
+                "user_email": user.email,
+                "deleted_at": datetime.now(timezone.utc).strftime("%b %d, %Y, %I:%M %p (UTC)"),
+                "retention_period": "30 days",
+            },
+            user_id=str(user.id),
+            sync_delivery=False,
+        )
+    except Exception as del_err:
+        logger.warning(f"Failed to dispatch account deletion notification: {del_err}")
 
     return {
         "status": "success",
