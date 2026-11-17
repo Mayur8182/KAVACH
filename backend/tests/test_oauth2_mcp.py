@@ -525,3 +525,4 @@ async def test_09_end_to_end_user_project_isolation(
     alice_p_names = [p["name"] for p in projects]
     assert "Alice Banking Core" in alice_p_names
     assert "Bob Secret Microservice" not in alice_p_names
+

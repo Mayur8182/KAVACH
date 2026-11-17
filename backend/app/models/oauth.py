@@ -194,3 +194,4 @@ class OAuthToken(Base, TimestampMixin):
         DateTime(timezone=True),
         nullable=True,
     )
+

@@ -183,6 +183,14 @@ const nextConfig = {
         destination: `${backendUrl}/api/:path*`,
       },
       {
+        source: '/.well-known/:path*',
+        destination: `${backendUrl}/.well-known/:path*`,
+      },
+      {
+        source: '/oauth/:path*',
+        destination: `${backendUrl}/oauth/:path*`,
+      },
+      {
         source: '/mcp',
         destination: `${backendUrl}/mcp`,
       },
