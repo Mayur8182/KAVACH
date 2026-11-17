@@ -38,7 +38,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   'platform-integrations': Layers,
 };
 
-// Formats content by parsing markdown-like **bold** and `code` without literal asterisks
+// Formats content by parsing markdown-like **bold**, `code`, and Symptom/Cause/Remediation badges without literal asterisks
 const renderFormattedContent = (content: string) => {
   if (!content) return null;
   const lines = content.split('\n');
@@ -47,7 +47,18 @@ const renderFormattedContent = (content: string) => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {lines.map((line, lineIdx) => {
         if (!line.trim()) return null;
-        const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+
+        // Strip any residual raw asterisks around prefixes like **Symptom:** or **Cause:**
+        const cleanedLine = line.replace(/^\s*\*\*(Symptom|Cause|Remediation):\*\*/i, '$1:');
+        const prefixMatch = cleanedLine.match(/^(Symptom|Cause|Remediation):\s*(.*)$/i);
+        let prefix = '';
+        let rest = cleanedLine;
+        if (prefixMatch) {
+          prefix = prefixMatch[1] + ': ';
+          rest = prefixMatch[2];
+        }
+
+        const parts = rest.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
 
         return (
           <p
@@ -59,6 +70,21 @@ const renderFormattedContent = (content: string) => {
               margin: 0,
             }}
           >
+            {prefix && (
+              <strong
+                style={{
+                  fontWeight: 650,
+                  color: prefix.toLowerCase().startsWith('symptom')
+                    ? '#DC2626'
+                    : prefix.toLowerCase().startsWith('cause')
+                    ? '#D97706'
+                    : '#16A34A',
+                  marginRight: '6px',
+                }}
+              >
+                {prefix}
+              </strong>
+            )}
             {parts.map((part, partIdx) => {
               if (part.startsWith('**') && part.endsWith('**')) {
                 const boldText = part.slice(2, -2);
