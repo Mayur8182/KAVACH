@@ -208,7 +208,7 @@ class GitHubService:
         return {
             "install_url": install_url,
             "oauth_url": oauth_url,
-            "url": oauth_url,
+            "url": install_url,
             "state": state,
             "app_id": str(getattr(self.settings, "github_app_id", None) or "5771182"),
             "client_id": client_id,
@@ -366,6 +366,18 @@ class GitHubService:
                             if user_id:
                                 curr_u = await self.db.get(User, user_id)
                                 if curr_u:
+                                    if account_id and not curr_u.github_user_id:
+                                        curr_u.github_user_id = str(account_id)
+                                    if avatar_url and not curr_u.avatar_url:
+                                        curr_u.avatar_url = avatar_url
+                                    curr_state = dict(curr_u.onboarding_state or {})
+                                    if not curr_u.onboarding_completed:
+                                        curr_state["status"] = "REPOSITORY_SELECTION_REQUIRED" if project_id else "PROJECT_CREATION_REQUIRED"
+                                        curr_state["current_step"] = "select_repository" if project_id else "create_project"
+                                        curr_state["github_installed"] = True
+                                        curr_u.onboarding_state = curr_state
+                                    self.db.add(curr_u)
+                                    await self.db.flush()
                                     jwt_login_token = create_access_token(str(curr_u.id))
                             else:
                                 from app.services.user_service import UserService
@@ -379,10 +391,18 @@ class GitHubService:
                                         id=uuid.uuid4(),
                                         email=resolved_email.lower().strip(),
                                         name=user_name,
+                                        github_user_id=str(account_id) if account_id else None,
+                                        avatar_url=avatar_url,
+                                        auth_provider="github",
                                         password_hash=hash_password(random_pwd),
                                         is_active=True,
                                         is_verified=True,
-                                        onboarding_completed=True,
+                                        onboarding_completed=False,
+                                        onboarding_state={
+                                            "status": "PROJECT_CREATION_REQUIRED",
+                                            "current_step": "create_project",
+                                            "github_installed": True,
+                                        },
                                         is_superuser=False,
                                     )
                                     self.db.add(existing_u)
@@ -390,8 +410,15 @@ class GitHubService:
                                 else:
                                     if not existing_u.is_verified:
                                         existing_u.is_verified = True
-                                        self.db.add(existing_u)
-                                        await self.db.flush()
+                                    if account_id and not existing_u.github_user_id:
+                                        existing_u.github_user_id = str(account_id)
+                                    if avatar_url and not existing_u.avatar_url:
+                                        existing_u.avatar_url = avatar_url
+                                    curr_state = dict(existing_u.onboarding_state or {})
+                                    curr_state["github_installed"] = True
+                                    existing_u.onboarding_state = curr_state
+                                    self.db.add(existing_u)
+                                    await self.db.flush()
 
                                 user_id = existing_u.id
                                 jwt_login_token = create_access_token(str(existing_u.id))
@@ -510,16 +537,19 @@ class GitHubService:
         except Exception as e:
             logger.warning(f"Initial repository sync failed: {e}")
 
+        from urllib.parse import quote
+        target_path = custom_redirect or "/onboarding?step=create_project&installed=true"
+        if getattr(self.settings, "app_env", "") == "production" and "localhost:3002" in target_path:
+            target_path = target_path.replace("http://localhost:3002", "https://kavachsecurity.me")
+        if not target_path.startswith("http"):
+            target_path = f"{frontend_target}{target_path if target_path.startswith('/') else '/' + target_path}"
+        sep = "&" if "?" in target_path else "?"
+        destination_url = f"{target_path}{sep}installation_id={installation_id}&account={account_login}&synced={synced_count}&installed=true"
+
         if jwt_login_token:
-            final_redirect = f"{frontend_target}/auth/callback/github?token={jwt_login_token}"
+            final_redirect = f"{frontend_target}/auth/callback/github?token={jwt_login_token}&next={quote(destination_url)}&installation_id={installation_id}&account={account_login}&synced={synced_count}&installed=true"
         else:
-            target_path = custom_redirect or "/onboarding?step=github&connected=true"
-            if getattr(self.settings, "app_env", "") == "production" and "localhost:3002" in target_path:
-                target_path = target_path.replace("http://localhost:3002", "https://kavachsecurity.me")
-            if not target_path.startswith("http"):
-                target_path = f"{frontend_target}{target_path if target_path.startswith('/') else '/' + target_path}"
-            sep = "&" if "?" in target_path else "?"
-            final_redirect = f"{target_path}{sep}installation_id={installation_id}&account={account_login}&synced={synced_count}"
+            final_redirect = destination_url
 
         return {
             "success": True,
@@ -619,6 +649,15 @@ class GitHubService:
                 workspace_id=resolved_workspace_id,
             )
             synced_records.append(repo_rec)
+
+        if inst and raw_repos:
+            current_gh_ids = {r.get("id") for r in raw_repos if r.get("id")}
+            old_repos_stmt = select(GitHubRepository).where(GitHubRepository.installation_id == inst.id)
+            old_repos_res = await self.db.execute(old_repos_stmt)
+            for old_repo in old_repos_res.scalars().all():
+                if old_repo.github_repository_id not in current_gh_ids:
+                    old_repo.installation_id = None
+                    old_repo.updated_at = now
 
         if inst:
             inst.last_synced_at = now
@@ -1037,7 +1076,15 @@ class GitHubService:
                     elif action == "deleted":
                         inst = await self.repo.get_installation_by_github_id(inst_id)
                         if inst:
+                            now = datetime.now(timezone.utc)
                             inst.status = "REMOVED"
+                            inst.updated_at = now
+                            from sqlalchemy import update
+                            await self.db.execute(
+                                update(GitHubRepository)
+                                .where(GitHubRepository.installation_id == inst.id)
+                                .values(installation_id=None, updated_at=now)
+                            )
                     elif action == "suspend":
                         inst = await self.repo.get_installation_by_github_id(inst_id)
                         if inst:
@@ -1053,6 +1100,22 @@ class GitHubService:
             if event_type == "installation_repositories":
                 inst_id = event.installation_id or payload.get("installation", {}).get("id")
                 if inst_id:
+                    repos_removed = payload.get("repositories_removed", [])
+                    if repos_removed:
+                        inst = await self.repo.get_installation_by_github_id(inst_id)
+                        if inst:
+                            now = datetime.now(timezone.utc)
+                            removed_ids = [r.get("id") for r in repos_removed if r.get("id")]
+                            if removed_ids:
+                                from sqlalchemy import update
+                                await self.db.execute(
+                                    update(GitHubRepository)
+                                    .where(
+                                        GitHubRepository.installation_id == inst.id,
+                                        GitHubRepository.github_repository_id.in_(removed_ids)
+                                    )
+                                    .values(installation_id=None, updated_at=now)
+                                )
                     await self.sync_installation_repositories(inst_id)
                 event.processing_status = "PROCESSED"
                 await self.db.commit()

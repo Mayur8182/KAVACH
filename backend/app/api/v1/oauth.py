@@ -76,6 +76,29 @@ def get_base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
+def get_frontend_url(request: Optional[Request] = None) -> str:
+    """Deterministically extracts frontend base URL for user authentication redirects."""
+    settings = get_settings()
+    if request:
+        origin = request.headers.get("origin")
+        if origin and ("localhost:3002" in origin or "kavachsecurity.me" in origin):
+            return origin.rstrip("/")
+        referer = request.headers.get("referer")
+        if referer:
+            try:
+                parsed = urlparse(referer)
+                if "localhost:3002" in parsed.netloc or "kavachsecurity.me" in parsed.netloc:
+                    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+            except Exception:
+                pass
+        forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+        if forwarded_host and "kavachsecurity.me" in forwarded_host:
+            return "https://kavachsecurity.me"
+    if settings.app_env == "production":
+        return "https://kavachsecurity.me"
+    return settings.frontend_url or "http://localhost:3002"
+
+
 def verify_pkce(code_verifier: str, code_challenge: str, method: str = "S256") -> bool:
     """Verifies PKCE code_verifier against code_challenge using SHA256 (RFC 7636)."""
     if method != "S256":
@@ -281,11 +304,18 @@ def _render_authorization_page(
     error_message: Optional[str] = None,
     info_message: Optional[str] = None,
     siwc_enabled: bool = False,
+    request: Optional[Request] = None,
 ) -> HTMLResponse:
     """
     Renders Kavach-branded Dark Mode Passwordless OAuth Authorization & Consent Screen.
     STRICTLY PASSWORDLESS: No email or password forms. Offers enterprise SSO (GitHub, Google, and optional SIWC).
     """
+    frontend_url = get_frontend_url(request)
+    resume_url = f"/oauth/authorize?resume_tx={transaction_token}"
+    login_url = f"{frontend_url}/login?redirect={quote(resume_url)}"
+    github_login_url = f"{frontend_url}/login?redirect={quote(resume_url)}&provider=github"
+    google_login_url = f"{frontend_url}/login?redirect={quote(resume_url)}&provider=google"
+
     error_html = ""
     if error_message:
         error_html = f"""
@@ -318,14 +348,24 @@ def _render_authorization_page(
     sep = "&" if "?" in redirect_uri else "?"
     cancel_url = f"{redirect_uri}{sep}{urlencode({'error': 'access_denied', 'error_description': 'User cancelled authorization.', 'state': state or ''})}"
 
+    auto_redirect_meta = ""
+    if not user:
+        auto_redirect_meta = f"""
+        <meta http-equiv="refresh" content="0;url={login_url}">
+        <script>
+            if (typeof window !== 'undefined') {{
+                window.location.href = "{login_url}";
+            }}
+        </script>
+        """
+
     if user:
         # User is authenticated: Show authorized identity, project context, and allow/deny consent
         provider_name = (user.auth_provider or "Kavach").capitalize()
         project_count = len(user_projects or [])
-        project_text = f"{project_count} project(s) accessible" if project_count > 0 else "Default project environment"
-        if user_projects and len(user_projects) > 0:
-            first_proj = user_projects[0].name
-            project_text = f"Primary Project: <strong>{first_proj}</strong> ({project_count} accessible)"
+        target_project = user_projects[0] if user_projects else None
+        project_name = target_project.name if target_project else "Default Project"
+        project_id_str = str(target_project.id) if target_project else ""
 
         org_name = user_orgs[0].name if user_orgs else "Personal Organization"
 
@@ -340,7 +380,8 @@ def _render_authorization_page(
 
         <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px 14px; margin-bottom: 20px;">
             <div style="font-size: 11px; text-transform: uppercase; color: #9ca3af; font-weight: 600; letter-spacing: 0.05em; margin-bottom: 4px;">Authorized Security Context</div>
-            <div style="font-size: 13px; color: #e5e7eb;">{project_text}</div>
+            <div style="font-size: 13px; color: #e5e7eb; font-weight: 600;">{project_name}</div>
+            <div style="font-size: 11px; color: #9ca3af; font-family: monospace; margin-top: 4px;">Project ID: <span style="color: #60a5fa;">{project_id_str}</span></div>
         </div>
 
         <form method="POST" action="/oauth/authorize">
@@ -351,6 +392,7 @@ def _render_authorization_page(
             <input type="hidden" name="code_challenge" value="{code_challenge}">
             <input type="hidden" name="code_challenge_method" value="{code_challenge_method}">
             <input type="hidden" name="scope" value="{' '.join(requested_scopes)}">
+            <input type="hidden" name="project_id" value="{project_id_str}">
 
             <button type="submit" name="action" value="allow" class="btn-primary">
                 Authorize & Connect MCP
@@ -361,7 +403,7 @@ def _render_authorization_page(
         </form>
         """
     else:
-        # User is unauthenticated: Display enterprise SSO buttons (strictly passwordless)
+        # User is unauthenticated: Redirect to login page or display enterprise SSO buttons (strictly passwordless)
         siwc_button_html = ""
         if siwc_enabled:
             siwc_button_html = f"""
@@ -372,26 +414,28 @@ def _render_authorization_page(
                 <span>Sign in with ChatGPT</span>
             </a>
             """
-        else:
-            siwc_button_html = """
-            <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #9ca3af; text-align: center; margin-bottom: 16px;">
-                Sign in with ChatGPT (SIWC) requires OpenAI partner application review.<br>Please continue with GitHub or Google.
-            </div>
-            """
 
         user_content = f"""
-        <p style="font-size: 13px; color: #d1d5db; margin: 0 0 14px 0; font-weight: 500;">
-            Sign in with your verified provider to connect your Kavach account:
+        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); color: #93c5fd; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; text-align: center;">
+            Redirecting to Kavach Sign In...
+        </div>
+
+        <a href="{login_url}" class="btn-primary" style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; box-sizing: border-box; text-align: center;">
+            Continue to Kavach Sign In
+        </a>
+
+        <p style="font-size: 13px; color: #d1d5db; margin: 12px 0 14px 0; font-weight: 500; text-align: center;">
+            Or authenticate directly with:
         </p>
 
-        <a href="/oauth/login/github?tx={transaction_token}" class="btn-sso btn-github" style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px;">
+        <a href="{github_login_url}" class="btn-sso btn-github" style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px;">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                 <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
             </svg>
             <span>Continue with GitHub</span>
         </a>
 
-        <a href="/oauth/login/google?tx={transaction_token}" class="btn-sso btn-google" style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px;">
+        <a href="{google_login_url}" class="btn-sso btn-google" style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px;">
             <svg width="20" height="20" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
                 <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
@@ -414,6 +458,7 @@ def _render_authorization_page(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Authorize Kavach Security MCP</title>
+    {auto_redirect_meta}
     <style>
         body {{
             background-color: #030712;
@@ -688,12 +733,26 @@ async def oauth_authorize_get(
         if not requested_scopes:
             requested_scopes = SUPPORTED_SCOPES
 
-        # Check existing user from Bearer header if present
+        # Check existing user from Bearer header, cookies, or query params if present
         auth_user_id = current_user.id if current_user else None
         if not auth_user_id:
-            auth_header = request.headers.get("Authorization")
+            auth_token = None
+            auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
             if auth_header and auth_header.startswith("Bearer "):
-                token_payload, err = decode_token_safely(auth_header.replace("Bearer ", "").strip())
+                auth_token = auth_header.replace("Bearer ", "").strip()
+            elif request.cookies.get("seculayer_auth_token"):
+                auth_token = request.cookies.get("seculayer_auth_token")
+            elif request.cookies.get("kavach_token"):
+                auth_token = request.cookies.get("kavach_token")
+            elif request.cookies.get("access_token"):
+                auth_token = request.cookies.get("access_token")
+            elif request.query_params.get("token"):
+                auth_token = request.query_params.get("token")
+            elif request.query_params.get("access_token"):
+                auth_token = request.query_params.get("access_token")
+
+            if auth_token:
+                token_payload, err = decode_token_safely(auth_token)
                 if token_payload and "sub" in token_payload and not err:
                     try:
                         auth_user_id = uuid.UUID(token_payload["sub"])
@@ -719,6 +778,18 @@ async def oauth_authorize_get(
         await db.commit()
         await db.refresh(pending_tx)
 
+    # Check for authentication update from query parameter token or session
+    if not pending_tx.user_id:
+        param_token = request.query_params.get("token") or request.query_params.get("access_token") or request.cookies.get("seculayer_auth_token") or request.cookies.get("kavach_token")
+        if param_token:
+            p_claims, p_err = decode_token_safely(param_token)
+            if p_claims and "sub" in p_claims and not p_err:
+                try:
+                    pending_tx.user_id = uuid.UUID(p_claims["sub"])
+                    await db.commit()
+                except Exception:
+                    pass
+
     # Resolve user and their accessible projects & organizations for tenant isolation
     resolved_user: Optional[User] = None
     user_projects: List[Project] = []
@@ -729,6 +800,7 @@ async def oauth_authorize_get(
         u_stmt = select(User).where(User.id == target_user_id)
         resolved_user = (await db.execute(u_stmt)).scalar_one_or_none()
         if resolved_user:
+            pending_tx.user_id = resolved_user.id
             # Query user's real projects
             p_stmt = (
                 select(Project)
@@ -736,10 +808,79 @@ async def oauth_authorize_get(
                 .order_by(Project.created_at.desc())
             )
             user_projects = list((await db.execute(p_stmt)).scalars().all())
+            if not user_projects:
+                # Auto-provision default project if user has none
+                starter_project = Project(
+                    id=uuid.uuid4(),
+                    name=f"{resolved_user.name or 'Default'}'s Project",
+                    owner_id=resolved_user.id,
+                    environment="production",
+                    application_type="web",
+                    default_branch="main",
+                )
+                db.add(starter_project)
+                await db.commit()
+                await db.refresh(starter_project)
+                user_projects = [starter_project]
+
+            target_project = user_projects[0]
+            pending_tx.selected_project_id = target_project.id
+            await db.commit()
 
             # Query user's organizations
             o_stmt = select(Organization).limit(3)
             user_orgs = list((await db.execute(o_stmt)).scalars().all())
+
+            # If user was redirected directly from login (or auto_approve requested), complete authorization immediately
+            auto_approve = (
+                request.query_params.get("auto_approve") in {"1", "true"}
+                or request.query_params.get("from_login") in {"1", "true"}
+            )
+            if auto_approve:
+                auth_code = secrets.token_urlsafe(32)
+                record = OAuthAuthorizationCode(
+                    code=auth_code,
+                    client_id=pending_tx.client_id,
+                    user_id=resolved_user.id,
+                    redirect_uri=pending_tx.redirect_uri,
+                    scope=pending_tx.scope,
+                    code_challenge=pending_tx.code_challenge,
+                    code_challenge_method=pending_tx.code_challenge_method,
+                    is_used=False,
+                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+                )
+                db.add(record)
+                pending_tx.is_completed = True
+                await db.commit()
+
+                base_url = get_base_url(request)
+                callback_params = {
+                    "code": auth_code,
+                    "iss": base_url,
+                    "project_id": str(target_project.id),
+                    "projectId": str(target_project.id),
+                    "project_name": target_project.name,
+                }
+                if pending_tx.state:
+                    callback_params["state"] = pending_tx.state
+
+                sep = "&" if "?" in pending_tx.redirect_uri else "?"
+                redirect_target = f"{pending_tx.redirect_uri}{sep}{urlencode(callback_params)}"
+                return RedirectResponse(url=redirect_target, status_code=status.HTTP_302_FOUND)
+
+    # If unauthenticated and redirect_to_login or prompt=login requested, 302 redirect directly to login page
+    if not resolved_user:
+        redirect_to_login = (
+            request.query_params.get("redirect_to_login") in {"1", "true"}
+            or request.query_params.get("prompt") == "login"
+        )
+        if redirect_to_login:
+            frontend_url = get_frontend_url(request)
+            resume_url = f"/oauth/authorize?resume_tx={pending_tx.transaction_token}"
+            return RedirectResponse(
+                url=f"{frontend_url}/login?redirect={quote(resume_url)}",
+                status_code=status.HTTP_302_FOUND,
+            )
 
     client_display = client_id
     c_rec = await _resolve_oauth_client(client_id, db)
@@ -761,6 +902,7 @@ async def oauth_authorize_get(
         user_projects=user_projects,
         user_orgs=user_orgs,
         siwc_enabled=bool(settings.openai_siwc_enabled and settings.openai_siwc_client_id),
+        request=request,
     )
 
 
@@ -855,6 +997,35 @@ async def oauth_authorize_post(
             detail="Authenticated user account not found.",
         )
 
+    # Resolve target project context to associate with authorization code and redirect
+    target_project_id = pending_tx.selected_project_id
+    target_project_name = "Default Project"
+    p_stmt = (
+        select(Project)
+        .where(Project.owner_id == user.id, Project.deleted_at.is_(None))
+        .order_by(Project.created_at.desc())
+    )
+    user_projects = list((await db.execute(p_stmt)).scalars().all())
+    if user_projects:
+        target_project_id = user_projects[0].id
+        target_project_name = user_projects[0].name
+    elif not target_project_id:
+        default_proj = Project(
+            id=uuid.uuid4(),
+            name=f"{user.name or 'Default'}'s Project",
+            owner_id=user.id,
+            environment="production",
+            application_type="web",
+            default_branch="main",
+        )
+        db.add(default_proj)
+        await db.commit()
+        await db.refresh(default_proj)
+        target_project_id = default_proj.id
+        target_project_name = default_proj.name
+
+    pending_tx.selected_project_id = target_project_id
+
     # Generate single-use authorization code (10-minute expiry per RFC 6749)
     auth_code = secrets.token_urlsafe(32)
     record = OAuthAuthorizationCode(
@@ -886,6 +1057,7 @@ async def oauth_authorize_post(
             "redirect_uri": pending_tx.redirect_uri,
             "scope": record.scope,
             "transaction_token": pending_tx.transaction_token,
+            "project_id": str(target_project_id),
         },
     )
     await db.commit()
@@ -893,6 +1065,9 @@ async def oauth_authorize_post(
     callback_params = {
         "code": auth_code,
         "iss": base_url,
+        "project_id": str(target_project_id),
+        "projectId": str(target_project_id),
+        "project_name": target_project_name,
     }
     if pending_tx.state:
         callback_params["state"] = pending_tx.state
@@ -1475,7 +1650,17 @@ async def oauth_token_endpoint(
         code_record.is_used = True
         await db.commit()
 
-        # Issue access token
+        # Resolve target project context for the authenticated user
+        p_stmt = (
+            select(Project)
+            .where(Project.owner_id == code_record.user_id, Project.deleted_at.is_(None))
+            .order_by(Project.created_at.desc())
+        )
+        user_projects = list((await db.execute(p_stmt)).scalars().all())
+        target_project = user_projects[0] if user_projects else None
+        target_project_id = target_project.id if target_project else None
+
+        # Issue access token with embedded project_id
         access_token_expires = timedelta(hours=1)
         access_token = create_oauth_access_token(
             subject=code_record.user_id,
@@ -1484,6 +1669,7 @@ async def oauth_token_endpoint(
             audience=f"{base_url}/mcp",
             issuer=base_url,
             expires_delta=access_token_expires,
+            project_id=target_project_id,
         )
 
         refresh_token = None
@@ -1522,6 +1708,7 @@ async def oauth_token_endpoint(
                 "grant_type": "authorization_code",
                 "scope": code_record.scope,
                 "has_refresh_token": bool(refresh_token),
+                "project_id": str(target_project_id) if target_project_id else None,
             },
         )
         await db.commit()
@@ -1532,6 +1719,20 @@ async def oauth_token_endpoint(
             "expires_in": int(access_token_expires.total_seconds()),
             "scope": code_record.scope,
         }
+        if target_project:
+            response_body["project_id"] = str(target_project.id)
+            response_body["projectId"] = str(target_project.id)
+            response_body["project_name"] = target_project.name
+        if user_projects:
+            response_body["projects"] = [
+                {
+                    "id": str(p.id),
+                    "name": p.name,
+                    "environment": p.environment,
+                    "repository_url": p.repository_url,
+                }
+                for p in user_projects
+            ]
         if refresh_token:
             response_body["refresh_token"] = refresh_token
 
@@ -1569,6 +1770,16 @@ async def oauth_token_endpoint(
         token_rec.is_revoked = True
         await db.commit()
 
+        # Resolve target project context
+        p_stmt = (
+            select(Project)
+            .where(Project.owner_id == token_rec.user_id, Project.deleted_at.is_(None))
+            .order_by(Project.created_at.desc())
+        )
+        user_projects = list((await db.execute(p_stmt)).scalars().all())
+        target_project = user_projects[0] if user_projects else None
+        target_project_id = target_project.id if target_project else None
+
         new_access_token = create_oauth_access_token(
             subject=token_rec.user_id,
             client_id=token_rec.client_id,
@@ -1576,6 +1787,7 @@ async def oauth_token_endpoint(
             audience=f"{base_url}/mcp",
             issuer=base_url,
             expires_delta=timedelta(hours=1),
+            project_id=target_project_id,
         )
         new_refresh_token = f"kavach_rf_{secrets.token_urlsafe(32)}"
         new_refresh_hash = hashlib.sha256(new_refresh_token.encode()).hexdigest()
@@ -1594,13 +1806,28 @@ async def oauth_token_endpoint(
         db.add(new_token_record)
         await db.commit()
 
-        return {
+        refresh_res = {
             "access_token": new_access_token,
             "token_type": "Bearer",
             "expires_in": 3600,
             "refresh_token": new_refresh_token,
             "scope": new_token_record.scope,
         }
+        if target_project:
+            refresh_res["project_id"] = str(target_project.id)
+            refresh_res["projectId"] = str(target_project.id)
+            refresh_res["project_name"] = target_project.name
+        if user_projects:
+            refresh_res["projects"] = [
+                {
+                    "id": str(p.id),
+                    "name": p.name,
+                    "environment": p.environment,
+                    "repository_url": p.repository_url,
+                }
+                for p in user_projects
+            ]
+        return refresh_res
 
     else:
         return JSONResponse(
@@ -1618,12 +1845,21 @@ async def oauth_token_endpoint(
 @router.post("/oauth/userinfo")
 async def oauth_userinfo_endpoint(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     OpenID Connect UserInfo Endpoint (OIDC Core 1.0).
-    Allows ChatGPT, Claude, and OIDC clients to retrieve authenticated user identity claims.
+    Allows ChatGPT, Claude, and OIDC clients to retrieve authenticated user identity claims and active project ID.
     """
-    return {
+    p_stmt = (
+        select(Project)
+        .where(Project.owner_id == current_user.id, Project.deleted_at.is_(None))
+        .order_by(Project.created_at.desc())
+    )
+    user_projects = list((await db.execute(p_stmt)).scalars().all())
+    primary_project = user_projects[0] if user_projects else None
+
+    res = {
         "sub": str(current_user.id),
         "name": getattr(current_user, "name", None) or current_user.email,
         "email": current_user.email,
@@ -1631,6 +1867,21 @@ async def oauth_userinfo_endpoint(
         "picture": getattr(current_user, "avatar_url", None),
         "preferred_username": current_user.email,
     }
+    if primary_project:
+        res["project_id"] = str(primary_project.id)
+        res["projectId"] = str(primary_project.id)
+        res["project_name"] = primary_project.name
+    if user_projects:
+        res["projects"] = [
+            {
+                "id": str(p.id),
+                "name": p.name,
+                "environment": p.environment,
+                "repository_url": p.repository_url,
+            }
+            for p in user_projects
+        ]
+    return res
 
 
 # ── OAuth 2.1 Token Revocation (RFC 7009) ──

@@ -65,21 +65,37 @@ function GitHubCallbackContent() {
       trackGitHubConnect({ context: 'oauth_callback' });
       trackLogin({ method: 'github' });
 
+      const nextParam = searchParams.get('next');
+
       Promise.all([
-        api.entitlements.getMe().catch(() => null),
+        api.onboarding.getState().catch(() => null),
         api.projects.list().catch(() => []),
-      ]).then(([ent, projs]: [any, any]) => {
+      ]).then(([onboardingState, projs]: [any, any]) => {
         const hasProject = Array.isArray(projs) && projs.length > 0;
         if (hasProject && typeof window !== 'undefined') {
           localStorage.setItem('secu_active_project_id', projs[0].id);
         }
-        if (ent?.onboarding_completed || hasProject) {
+
+        if (nextParam && nextParam.startsWith('/')) {
+          if (nextParam.includes('overview') || nextParam.includes('dashboard')) {
+            if (onboardingState?.onboarding_completed && hasProject) {
+              router.push('/overview');
+              return;
+            }
+          } else {
+            router.push(nextParam);
+            return;
+          }
+        }
+
+        // Rule G & H: Only go to overview if onboarding is complete AND project exists
+        if (onboardingState?.onboarding_completed && hasProject) {
           router.push('/overview');
         } else {
           router.push('/onboarding');
         }
       }).catch(() => {
-        router.push('/overview');
+        router.push('/onboarding');
       });
       return;
     }
@@ -100,9 +116,10 @@ function GitHubCallbackContent() {
           trackLogin({ method: 'github' });
 
           try {
-            // Existing users should not be forced through onboarding again if they already have a project and linked repository
-            const [ent, userProjects] = await Promise.all([
-              api.entitlements.getMe().catch(() => null),
+            const nextParam = res.next_route || searchParams.get('next');
+
+            const [onboardingState, userProjects] = await Promise.all([
+              api.onboarding.getState().catch(() => null),
               api.projects.list().catch(() => []),
             ]);
 
@@ -115,7 +132,19 @@ function GitHubCallbackContent() {
               }
             }
 
-            if (!res.is_new_user && (ent?.onboarding_completed || hasProject)) {
+            if (nextParam && nextParam.startsWith('/')) {
+              if (nextParam.includes('overview') || nextParam.includes('dashboard')) {
+                if (!res.is_new_user && onboardingState?.onboarding_completed && hasProject) {
+                  router.push('/overview');
+                  return;
+                }
+              } else {
+                router.push(nextParam);
+                return;
+              }
+            }
+
+            if (!res.is_new_user && onboardingState?.onboarding_completed && hasProject) {
               router.push('/overview');
             } else {
               router.push('/onboarding');

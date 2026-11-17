@@ -4,7 +4,7 @@ from typing import Any, List, Optional, Union
 
 import argon2
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,8 +93,9 @@ def create_oauth_access_token(
     expires_delta: Optional[timedelta] = None,
     subject: Optional[Any] = None,
     scopes: Optional[Union[List[str], str]] = None,
+    project_id: Optional[Union[str, uuid.UUID]] = None,
 ) -> str:
-    """Generates RFC-compliant OAuth 2.1 JWT access token with standard claims."""
+    """Generates RFC-compliant OAuth 2.1 JWT access token with standard claims and project context."""
     sub = str(user_id if user_id is not None else subject)
     final_scope = scope
     if final_scope is None:
@@ -122,6 +123,9 @@ def create_oauth_access_token(
         "token_type": "Bearer",
         "type": "access",
     }
+    if project_id:
+        payload["project_id"] = str(project_id)
+        payload["projectId"] = str(project_id)
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -234,19 +238,48 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
+    request: Request = None,
     auth_credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> Optional[User]:
     """
-    FastAPI dependency that attempts to resolve the authenticated user from Bearer JWT.
+    FastAPI dependency that attempts to resolve the authenticated user from:
+    1. Bearer JWT in Authorization header
+    2. Cookies (seculayer_auth_token, kavach_token, access_token)
+    3. Query parameter (token, access_token)
     Returns User if validly authenticated, or None if unauthenticated.
     Never silently impersonates or falls back to unintended accounts.
     """
+    token_str: Optional[str] = None
     if auth_credentials and auth_credentials.credentials:
-        try:
-            return await get_current_user(auth_credentials, db)
-        except HTTPException:
-            return None
+        token_str = auth_credentials.credentials
+    elif request:
+        auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token_str = auth_header.replace("Bearer ", "").strip()
+        elif request.cookies.get("seculayer_auth_token"):
+            token_str = request.cookies.get("seculayer_auth_token")
+        elif request.cookies.get("kavach_token"):
+            token_str = request.cookies.get("kavach_token")
+        elif request.cookies.get("access_token"):
+            token_str = request.cookies.get("access_token")
+        elif request.query_params.get("token"):
+            token_str = request.query_params.get("token")
+        elif request.query_params.get("access_token"):
+            token_str = request.query_params.get("access_token")
+
+    if token_str:
+        payload, err = decode_token_safely(token_str)
+        if payload and "sub" in payload and not err:
+            try:
+                user_id = uuid.UUID(payload["sub"])
+                stmt = select(User).where(User.id == user_id, User.is_active == True)
+                res = await db.execute(stmt)
+                user = res.scalar_one_or_none()
+                if user:
+                    return user
+            except Exception:
+                pass
     return None
 
 

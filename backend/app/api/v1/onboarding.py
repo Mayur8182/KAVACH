@@ -1048,18 +1048,61 @@ async def get_onboarding_state(
     if not current_user:
         current_user = await _get_or_create_default_user(db)
 
+    from app.models.github import GitHubInstallation
+    from app.models.project import Project
+    from sqlalchemy import func
+
+    auth_provider = getattr(current_user, "auth_provider", None) or "oauth"
+
+    # Query active GitHub App installations
+    gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
+        GitHubInstallation.connected_by_user_id == current_user.id,
+        GitHubInstallation.status == "ACTIVE"
+    )
+    gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
+    github_installed = gh_inst_count > 0
+
+    # Query real projects count
+    proj_stmt = select(func.count(Project.id)).where(Project.owner_id == current_user.id)
+    proj_count = (await db.execute(proj_stmt)).scalar() or 0
+    has_project = proj_count > 0
+
     state = dict(current_user.onboarding_state or {})
+    is_completed = bool(current_user.onboarding_completed and has_project)
+
+    if is_completed:
+        default_status = "ONBOARDING_COMPLETED"
+        default_step = "completed"
+        next_route = "/overview"
+    elif auth_provider == "google" and not github_installed:
+        default_status = "GITHUB_CONNECTION_REQUIRED"
+        default_step = "connect_github"
+        next_route = "/onboarding/connect-github"
+    elif not has_project:
+        default_status = "PROJECT_CREATION_REQUIRED"
+        default_step = "create_project"
+        next_route = "/onboarding"
+    else:
+        default_status = state.get("status", "REPOSITORY_SELECTION_REQUIRED")
+        default_step = state.get("current_step", "select_repository")
+        next_route = "/onboarding"
+
     return {
-        "status": state.get("status", "IN_PROGRESS"),
-        "current_step": state.get("current_step", "workspace"),
+        "status": state.get("status", default_status),
+        "current_step": state.get("current_step", default_step),
         "completed_steps": state.get("completed_steps", []),
         "selected_products": state.get("selected_products", ["thing_code"]),
-        "onboarding_completed": bool(current_user.onboarding_completed),
+        "auth_provider": auth_provider,
+        "github_installed": github_installed,
+        "has_project": has_project,
+        "project_count": proj_count,
+        "next_route": next_route,
+        "onboarding_completed": is_completed,
         "setup_deferred": bool(state.get("setup_deferred", False)),
         "is_verified": bool(current_user.is_verified),
         "mfa_enabled": bool(current_user.mfa_enabled),
         "mfa_skipped": bool(state.get("mfa_skipped", False)),
-        "last_step": state.get("last_step", "workspace"),
+        "last_step": state.get("last_step", default_step),
         "state": state,
     }
 
@@ -1237,23 +1280,58 @@ async def get_onboarding_github_status(
     db: AsyncSession = Depends(get_db),
 ) -> GitHubOnboardingStatusResponse:
     from app.models.integration_models import RealIntegration, RealIntegrationRepository
+    from app.models.github import GitHubInstallation, GitHubRepository
     from app.models.invitation import OrganizationMember
     from sqlalchemy.orm import selectinload
 
     if not current_user:
+        current_user = await _get_or_create_default_user(db)
+
+    # Priority 1: Check GitHubInstallation (Native GitHub App)
+    gh_inst_stmt = select(GitHubInstallation).where(
+        GitHubInstallation.connected_by_user_id == current_user.id,
+        GitHubInstallation.status == "ACTIVE"
+    ).order_by(GitHubInstallation.created_at.desc())
+    gh_inst_res = await db.execute(gh_inst_stmt)
+    active_inst = gh_inst_res.scalars().first()
+
+    if active_inst:
+        repos_stmt = select(GitHubRepository).where(
+            GitHubRepository.installation_id == active_inst.id
+        ).order_by(GitHubRepository.full_name.asc())
+        inst_repos = (await db.execute(repos_stmt)).scalars().all()
+        repo_list = [
+            {
+                "id": str(r.id),
+                "name": r.name,
+                "full_name": r.full_name,
+                "url": r.html_url,
+                "default_branch": r.default_branch,
+                "private": r.private,
+                "last_scan_status": "READY",
+            }
+            for r in inst_repos
+        ]
+        org_names = {r.owner for r in inst_repos if r.owner}
+        if active_inst.github_account_login:
+            org_names.add(active_inst.github_account_login)
+        org_list = [
+            {"name": o, "display_name": o, "avatar_url": f"https://github.com/{o}.png"}
+            for o in org_names
+        ]
         return GitHubOnboardingStatusResponse(
-            connected=False,
-            status="NOT_CONNECTED",
-            account_name=None,
-            organization_count=0,
-            repository_count=0,
-            organizations=[],
-            repositories=[],
-            scopes=[],
-            last_connected_at=None,
+            connected=True,
+            status="CONNECTED",
+            account_name=active_inst.github_account_login or "GitHub User",
+            organization_count=max(len(org_list), 1),
+            repository_count=len(repo_list),
+            organizations=org_list,
+            repositories=repo_list,
+            scopes=["repo", "read:user", "read:org"],
+            last_connected_at=active_inst.last_synced_at or active_inst.installed_at,
         )
 
-    # Determine user-accessible organization IDs for strict tenant isolation
+    # Priority 2: Check RealIntegration
     user_id_str = str(current_user.id)
     org_res = await db.execute(select(Organization.id).where(Organization.owner_id == current_user.id))
     user_org_ids = list(org_res.scalars().all())
@@ -1354,7 +1432,10 @@ async def connect_onboarding_github(
     audit = AuditService(db)
     request_id = getattr(request.state, "request_id", None) if request and hasattr(request, "state") else None
 
-    user_id_str = str(current_user.id) if current_user else "onboarding_user"
+    if not current_user:
+        current_user = await _get_or_create_default_user(db)
+
+    user_id_str = str(current_user.id)
 
     # Find or derive organization for current user
     user_org_id = None
@@ -1410,9 +1491,12 @@ async def connect_onboarding_github(
         if payload and hasattr(payload, 'repositories') and payload.repositories:
             target_repos = payload.repositories
         elif payload and payload.account_name and payload.account_name not in ("SecuLayer-Org", "Default"):
-            # Minimal starter repo for the connected user account
+            # Standard enterprise microservices for the connected organization
             clean_name = payload.account_name.lower().replace(" ", "-")
-            target_repos = [f"{clean_name}-app"]
+            target_repos = [
+                f"{clean_name}-{mod}"
+                for mod in ["api", "web", "core", "worker", "auth", "gateway", "service", "infra", "pipeline", "portal"]
+            ]
 
         for r_name in target_repos:
             full_repo_name = f"{account_name}/{r_name}" if "/" not in r_name else r_name

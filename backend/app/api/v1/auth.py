@@ -358,17 +358,11 @@ async def get_current_user_profile(
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
     from app.models.project import Project
+    from app.models.github import GitHubInstallation
     from sqlalchemy import select, func
 
     settings = get_settings()
     modified = False
-
-    # Auto-complete onboarding if user already has created projects
-    if not current_user.onboarding_completed:
-        p_count = (await db.execute(select(func.count(Project.id)).where(Project.owner_id == current_user.id))).scalar() or 0
-        if p_count > 0:
-            current_user.onboarding_completed = True
-            modified = True
 
     # Auto-verify email if SMTP is not configured in local/dev environment
     if not current_user.is_verified and not (settings.mail_username and settings.mail_password):
@@ -380,7 +374,17 @@ async def get_current_user_profile(
         await db.commit()
         await db.refresh(current_user)
 
-    return UserResponse.model_validate(current_user)
+    # Check active GitHub App installation for user
+    gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
+        GitHubInstallation.connected_by_user_id == current_user.id,
+        GitHubInstallation.status == "ACTIVE"
+    )
+    gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
+    github_installed = gh_inst_count > 0
+
+    resp = UserResponse.model_validate(current_user)
+    resp.github_installed = github_installed
+    return resp
 
 
 class UserAccessContextResponse(BaseModel):
@@ -441,6 +445,9 @@ class GitHubAuthResponse(BaseModel):
     avatar_url: Optional[str] = None
     github_access_token: Optional[str] = None
     is_new_user: bool = False
+    github_installed: bool = False
+    onboarding_completed: bool = False
+    next_route: str = "/onboarding"
 
 
 @router.get(
@@ -713,55 +720,72 @@ async def github_oauth_callback(
         await db.commit()
         await db.refresh(active_user)
 
-    # Ensure personal project exists for this user
+    # Check existing projects and GitHub App installations (do not auto-create dummy project for new users)
     from app.models.project import Project
     from app.models.integration import Integration
-    from sqlalchemy import select
+    from app.models.github import GitHubInstallation
+    from sqlalchemy import func, select
     import json
 
     proj_stmt = select(Project).where(Project.owner_id == active_user.id).limit(1)
     proj_res = await db.execute(proj_stmt)
     active_proj = proj_res.scalars().first()
-    if not active_proj:
-        active_proj = Project(
-            id=uuid.uuid4(),
-            owner_id=active_user.id,
-            name=f"{active_user.name}'s Project",
-            description=f"Personal security workspace for {active_user.name}",
-            environment="production",
-            application_type="web_service",
-        )
-        db.add(active_proj)
-        await db.commit()
-        await db.refresh(active_proj)
 
-    # Persist GitHub integration credentials for the project so user repositories are directly accessible
-    integ_stmt = select(Integration).where(
-        Integration.project_id == active_proj.id,
-        Integration.provider == "github"
-    )
-    integ_res = await db.execute(integ_stmt)
-    existing_integ = integ_res.scalars().first()
-    creds_payload = json.dumps({
-        "access_token": gh_access_token,
-        "login": gh_user.get("login"),
-        "name": gh_user.get("name"),
-        "avatar_url": gh_user.get("avatar_url"),
-        "github_id": gh_user.get("id"),
-        "email": email,
-    })
-    if existing_integ:
-        existing_integ.credentials_json = creds_payload
-        existing_integ.is_connected = True
-    else:
-        new_integ = Integration(
-            project_id=active_proj.id,
-            provider="github",
-            credentials_json=creds_payload,
-            is_connected=True,
+    # If user already has a project, persist GitHub credentials to it
+    if active_proj:
+        integ_stmt = select(Integration).where(
+            Integration.project_id == active_proj.id,
+            Integration.provider == "github"
         )
-        db.add(new_integ)
-    await db.commit()
+        integ_res = await db.execute(integ_stmt)
+        existing_integ = integ_res.scalars().first()
+        creds_payload = json.dumps({
+            "access_token": gh_access_token,
+            "login": gh_user.get("login"),
+            "name": gh_user.get("name"),
+            "avatar_url": gh_user.get("avatar_url"),
+            "github_id": gh_user.get("id"),
+            "email": email,
+        })
+        if existing_integ:
+            existing_integ.credentials_json = creds_payload
+            existing_integ.is_connected = True
+        else:
+            new_integ = Integration(
+                project_id=active_proj.id,
+                provider="github",
+                credentials_json=creds_payload,
+                is_connected=True,
+            )
+            db.add(new_integ)
+        await db.commit()
+
+    # Query active GitHub App installation count
+    gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
+        GitHubInstallation.connected_by_user_id == active_user.id,
+        GitHubInstallation.status == "ACTIVE"
+    )
+    gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
+    github_installed = gh_inst_count > 0
+
+    # Query real project count
+    proj_count_stmt = select(func.count(Project.id)).where(Project.owner_id == active_user.id)
+    proj_count = (await db.execute(proj_count_stmt)).scalar() or 0
+    has_project = proj_count > 0
+
+    if is_new_user:
+        active_user.onboarding_completed = False
+        active_user.onboarding_state = {
+            "status": "PROJECT_CREATION_REQUIRED",
+            "current_step": "create_project",
+        }
+        await db.commit()
+        await db.refresh(active_user)
+        next_route = "/onboarding"
+    elif active_user.onboarding_completed and has_project:
+        next_route = "/overview"
+    else:
+        next_route = "/onboarding"
 
     # Track active session and audit history
     client_ip = request.client.host if request.client else "127.0.0.1"
@@ -826,12 +850,16 @@ async def github_oauth_callback(
             "id": str(active_user.id),
             "email": active_user.email,
             "name": active_user.name,
-            "onboarding_completed": bool(active_user.onboarding_completed),
+            "auth_provider": "github",
+            "onboarding_completed": bool(active_user.onboarding_completed and has_project),
         },
         github_login=gh_user.get("login"),
         avatar_url=active_user.avatar_url or gh_user.get("avatar_url"),
         github_access_token=gh_access_token,
         is_new_user=is_new_user,
+        github_installed=github_installed,
+        onboarding_completed=bool(active_user.onboarding_completed and has_project),
+        next_route=next_route,
     )
 
 
@@ -1838,6 +1866,9 @@ class GoogleAuthResponse(BaseModel):
     email: Optional[str] = None
     picture: Optional[str] = None
     is_new_user: bool = False
+    github_installed: bool = False
+    onboarding_completed: bool = False
+    next_route: str = "/onboarding/connect-github"
 
 
 class GoogleConfigResponse(BaseModel):
@@ -2045,6 +2076,10 @@ async def google_oauth_redirect_callback(
                 is_active=True,
                 is_verified=True,
                 onboarding_completed=False,
+                onboarding_state={
+                    "status": "GITHUB_CONNECTION_REQUIRED",
+                    "current_step": "connect_github",
+                },
                 is_superuser=is_founder_email,
             )
             active_user = await user_service.repo.create(new_user)
@@ -2052,16 +2087,28 @@ async def google_oauth_redirect_callback(
             await db.refresh(active_user)
             is_new_user = True
 
-            proj = Project(
-                id=uuid.uuid4(),
-                owner_id=active_user.id,
-                name=f"{active_user.name}'s Project",
-                description=f"Personal security workspace for {active_user.name}",
-                environment="production",
-                application_type="web_service",
-            )
-            db.add(proj)
-            await db.commit()
+    # Check active GitHub installation and project counts for Google user routing
+    from app.models.github import GitHubInstallation
+    from app.models.project import Project
+    from sqlalchemy import func
+
+    gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
+        GitHubInstallation.connected_by_user_id == active_user.id,
+        GitHubInstallation.status == "ACTIVE"
+    )
+    gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
+    github_installed = gh_inst_count > 0
+
+    proj_stmt = select(func.count(Project.id)).where(Project.owner_id == active_user.id)
+    proj_count = (await db.execute(proj_stmt)).scalar() or 0
+    has_project = proj_count > 0
+
+    if is_new_user or not github_installed:
+        next_route = "/onboarding/connect-github"
+    elif active_user.onboarding_completed and has_project:
+        next_route = "/overview"
+    else:
+        next_route = "/onboarding"
 
     # Session tracking
     client_ip = request.client.host if request.client else "127.0.0.1"
@@ -2113,7 +2160,7 @@ async def google_oauth_redirect_callback(
     await db.commit()
 
     return RedirectResponse(
-        url=f"{frontend_target}/auth/callback/google?token={access_token}",
+        url=f"{frontend_target}/auth/callback/google?token={access_token}&next={next_route}&is_new_user={str(is_new_user).lower()}",
         status_code=302,
     )
 
@@ -2273,6 +2320,10 @@ async def google_oauth_callback(
                 is_active=True,
                 is_verified=True,
                 onboarding_completed=False,  # New user -> onboarding flow
+                onboarding_state={
+                    "status": "GITHUB_CONNECTION_REQUIRED",
+                    "current_step": "connect_github",
+                },
                 is_superuser=is_founder_email,
             )
             active_user = await user_service.repo.create(new_user)
@@ -2280,17 +2331,28 @@ async def google_oauth_callback(
             await db.refresh(active_user)
             is_new_user = True
 
-            # Create default workspace project
-            proj = Project(
-                id=uuid.uuid4(),
-                owner_id=active_user.id,
-                name=f"{active_user.name}'s Project",
-                description=f"Personal security workspace for {active_user.name}",
-                environment="production",
-                application_type="web_service",
-            )
-            db.add(proj)
-            await db.commit()
+    # Check active GitHub installation and project counts for Google user routing
+    from app.models.github import GitHubInstallation
+    from app.models.project import Project
+    from sqlalchemy import func
+
+    gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
+        GitHubInstallation.connected_by_user_id == active_user.id,
+        GitHubInstallation.status == "ACTIVE"
+    )
+    gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
+    github_installed = gh_inst_count > 0
+
+    proj_stmt = select(func.count(Project.id)).where(Project.owner_id == active_user.id)
+    proj_count = (await db.execute(proj_stmt)).scalar() or 0
+    has_project = proj_count > 0
+
+    if is_new_user or not github_installed:
+        next_route = "/onboarding/connect-github"
+    elif active_user.onboarding_completed and has_project:
+        next_route = "/overview"
+    else:
+        next_route = "/onboarding"
 
     # Register active session & login history
     session_id = str(uuid.uuid4())
@@ -2346,11 +2408,15 @@ async def google_oauth_callback(
             "id": str(active_user.id),
             "email": active_user.email,
             "name": active_user.name,
-            "onboarding_completed": bool(active_user.onboarding_completed),
+            "auth_provider": "google",
+            "onboarding_completed": bool(active_user.onboarding_completed and has_project),
         },
         email=active_user.email,
         picture=picture,
         is_new_user=is_new_user,
+        github_installed=github_installed,
+        onboarding_completed=bool(active_user.onboarding_completed and has_project),
+        next_route=next_route,
     )
 
 
@@ -2586,11 +2652,15 @@ async def google_one_tap(
             "id": str(active_user.id),
             "email": active_user.email,
             "name": active_user.name,
-            "onboarding_completed": bool(active_user.onboarding_completed),
+            "auth_provider": "google",
+            "onboarding_completed": bool(active_user.onboarding_completed and has_project),
         },
         email=active_user.email,
         picture=picture,
         is_new_user=is_new_user,
+        github_installed=github_installed,
+        onboarding_completed=bool(active_user.onboarding_completed and has_project),
+        next_route=next_route,
     )
 
 

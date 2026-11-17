@@ -40,23 +40,49 @@ function GoogleCallbackContent() {
     if (token) {
       setAuthToken(token);
       trackLogin({ method: 'google' });
-      setStatusText('Google authentication verified. Resolving workspace entitlements...');
+      setStatusText('Google authentication verified. Resolving onboarding destination...');
+
+      const nextParam = searchParams.get('next');
 
       Promise.all([
-        api.entitlements.getMe().catch(() => null),
+        api.onboarding.getState().catch(() => null),
         api.projects.list().catch(() => []),
-      ]).then(([ent, projs]: [any, any]) => {
+      ]).then(([onboardingState, projs]: [any, any]) => {
         const hasProject = Array.isArray(projs) && projs.length > 0;
         if (hasProject && typeof window !== 'undefined') {
           localStorage.setItem('secu_active_project_id', projs[0].id);
         }
-        if (ent?.onboarding_completed || hasProject) {
+
+        // If explicitly directed to a specific step
+        if (nextParam && nextParam.startsWith('/')) {
+          if (nextParam.includes('connect-github')) {
+            router.push('/onboarding/connect-github');
+            return;
+          }
+          if (nextParam.includes('overview') || nextParam.includes('dashboard')) {
+            if (onboardingState?.onboarding_completed && hasProject) {
+              router.push('/overview');
+              return;
+            }
+          } else {
+            router.push(nextParam);
+            return;
+          }
+        }
+
+        // Provider routing rules: Google user must connect GitHub App before project creation
+        const isGithubInstalled = Boolean(onboardingState?.github_installed);
+        const isOnboardingDone = Boolean(onboardingState?.onboarding_completed && hasProject);
+
+        if (isOnboardingDone) {
           router.push('/overview');
+        } else if (!isGithubInstalled) {
+          router.push('/onboarding/connect-github');
         } else {
           router.push('/onboarding');
         }
       }).catch(() => {
-        router.push('/overview');
+        router.push('/onboarding/connect-github');
       });
       return;
     }
@@ -73,10 +99,10 @@ function GoogleCallbackContent() {
         if (res.access_token) {
           setAuthToken(res.access_token);
           trackLogin({ method: 'google' });
-          setStatusText(`Welcome, ${res.user?.name || res.email || 'Developer'}! Resolving workspace entitlements...`);
+          setStatusText(`Welcome, ${res.user?.name || res.email || 'Developer'}! Resolving onboarding destination...`);
           try {
-            const [ent, userProjects] = await Promise.all([
-              api.entitlements.getMe().catch(() => null),
+            const [onboardingState, userProjects] = await Promise.all([
+              api.onboarding.getState().catch(() => null),
               api.projects.list().catch(() => []),
             ]);
             const hasProject = Array.isArray(userProjects) && userProjects.length > 0;
@@ -86,13 +112,36 @@ function GoogleCallbackContent() {
                 localStorage.setItem('secu_active_project_id', activeProj.id);
               }
             }
-            if (!res.is_new_user && (ent?.onboarding_completed || hasProject)) {
+
+            const nextTarget = res.next_route || searchParams.get('next');
+            if (nextTarget && nextTarget.startsWith('/')) {
+              if (nextTarget.includes('connect-github')) {
+                router.push('/onboarding/connect-github');
+                return;
+              }
+              if (nextTarget.includes('overview') || nextTarget.includes('dashboard')) {
+                if (onboardingState?.onboarding_completed && hasProject) {
+                  router.push('/overview');
+                  return;
+                }
+              } else {
+                router.push(nextTarget);
+                return;
+              }
+            }
+
+            const isGithubInstalled = Boolean(res.github_installed ?? onboardingState?.github_installed);
+            const isOnboardingDone = Boolean(onboardingState?.onboarding_completed && hasProject);
+
+            if (isOnboardingDone) {
               router.push('/overview');
+            } else if (!isGithubInstalled) {
+              router.push('/onboarding/connect-github');
             } else {
               router.push('/onboarding');
             }
           } catch {
-            router.push(res.is_new_user ? '/onboarding' : '/overview');
+            router.push(res.is_new_user ? '/onboarding/connect-github' : '/overview');
           }
         } else {
           throw new Error('Authentication succeeded but no access token was returned.');

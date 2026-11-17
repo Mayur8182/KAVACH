@@ -28,6 +28,12 @@ class UserResponse(BaseModel):
     is_superuser: bool
     is_verified: bool = False
     onboarding_completed: bool = False
+    auth_provider: Optional[str] = "oauth"
+    github_user_id: Optional[str] = None
+    google_user_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+    onboarding_state: Optional[dict] = None
+    github_installed: bool = False
     created_at: datetime
     updated_at: datetime
 
