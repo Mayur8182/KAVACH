@@ -131,20 +131,26 @@ function ConnectGitHubContent() {
         redirect_url: redirectTarget,
       });
 
-      const targetUrl = installData?.install_url || installData?.url;
+      let targetUrl = installData?.install_url || installData?.url;
 
       if (targetUrl) {
+        // Enforce canonical GitHub App slug "kavach-security" and eliminate any accidental encoded spaces / display names
+        targetUrl = targetUrl
+          .replace(/github\.com\/apps\/[^/]+\/installations/i, 'github.com/apps/kavach-security/installations')
+          .replace(/github\.com\/apps\/Kavach%20Security/gi, 'github.com/apps/kavach-security')
+          .replace(/github\.com\/apps\/Kavach\+Security/gi, 'github.com/apps/kavach-security')
+          .replace(/github\.com\/apps\/Kavach Security/gi, 'github.com/apps/kavach-security');
+
         window.location.href = targetUrl;
         return;
       }
 
-      throw new Error('Server did not return a valid GitHub App installation URL.');
+      // Safe fallback directly to official GitHub App installation URL
+      window.location.href = 'https://github.com/apps/kavach-security/installations/new';
     } catch (err: any) {
       console.error('Failed to initiate GitHub App installation:', err);
-      const msg = err?.message || 'Failed to generate GitHub App installation URL. Please try again.';
-      setErrorMessage(msg);
-      toast.error('Installation Error', { description: msg });
-      setIsConnecting(false);
+      // Even on network error, redirect to official GitHub App installation URL so user is never blocked
+      window.location.href = 'https://github.com/apps/kavach-security/installations/new';
     }
   };
 

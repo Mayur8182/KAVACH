@@ -111,8 +111,15 @@ export function ProjectGitHubConnectModal({
         redirect_url: returnUrl,
       });
 
-      if (installRes?.url || installRes?.install_url) {
-        window.location.href = installRes.url || installRes.install_url;
+      let targetUrl = installRes?.url || installRes?.install_url;
+      if (targetUrl) {
+        // Enforce canonical GitHub App slug "kavach-security"
+        targetUrl = targetUrl
+          .replace(/github\.com\/apps\/[^/]+\/installations/i, 'github.com/apps/kavach-security/installations')
+          .replace(/github\.com\/apps\/Kavach%20Security/gi, 'github.com/apps/kavach-security')
+          .replace(/github\.com\/apps\/Kavach\+Security/gi, 'github.com/apps/kavach-security')
+          .replace(/github\.com\/apps\/Kavach Security/gi, 'github.com/apps/kavach-security');
+        window.location.href = targetUrl;
         return;
       }
       throw new Error('Could not generate official GitHub App installation URL.');

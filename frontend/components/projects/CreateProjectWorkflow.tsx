@@ -450,8 +450,15 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
         workspace_id: currentWorkspace?.id || undefined,
         redirect_url: returnUrl,
       });
-      if (appData?.url || appData?.install_url) {
-        window.location.href = appData.url || appData.install_url;
+      let targetUrl = appData?.url || appData?.install_url;
+      if (targetUrl) {
+        // Enforce canonical GitHub App slug "kavach-security" and eliminate any accidental spaces or display names
+        targetUrl = targetUrl
+          .replace(/github\.com\/apps\/[^/]+\/installations/i, 'github.com/apps/kavach-security/installations')
+          .replace(/github\.com\/apps\/Kavach%20Security/gi, 'github.com/apps/kavach-security')
+          .replace(/github\.com\/apps\/Kavach\+Security/gi, 'github.com/apps/kavach-security')
+          .replace(/github\.com\/apps\/Kavach Security/gi, 'github.com/apps/kavach-security');
+        window.location.href = targetUrl;
         return;
       }
 

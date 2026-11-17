@@ -1,7 +1,7 @@
 import json
 import os
 from functools import lru_cache
-from typing import List, Union, Optional
+from typing import Any, List, Union, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -170,6 +170,16 @@ class Settings(BaseSettings):
         default="kavach-security",
         description="GitHub App Display Name / Slug",
     )
+
+    @field_validator("github_app_slug", "github_app_name", mode="before")
+    @classmethod
+    def normalize_github_slug(cls, v: Any) -> str:
+        if not v or not isinstance(v, str):
+            return "kavach-security"
+        cleaned = v.strip().lower().replace(" ", "-").replace("_", "-")
+        if "kavach" in cleaned:
+            return "kavach-security"
+        return cleaned or "kavach-security"
     github_app_private_key: Optional[str] = Field(
         default=None,
         description="GitHub App Private Key in PEM format (or escaped newlines)",

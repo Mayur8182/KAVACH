@@ -200,7 +200,15 @@ class GitHubService:
             project_id=project_id,
             redirect_url=redirect_url,
         )
-        slug = getattr(self.settings, "github_app_slug", None) or "kavach-security"
+        raw_slug = getattr(self.settings, "github_app_slug", None) or "kavach-security"
+        slug = "kavach-security"
+        if raw_slug and isinstance(raw_slug, str):
+            cleaned = raw_slug.strip().lower().replace(" ", "-").replace("_", "-")
+            if "kavach" in cleaned:
+                slug = "kavach-security"
+            elif cleaned:
+                slug = cleaned
+
         client_id = getattr(self.settings, "github_client_id", None) or "Iv23liqai7qjzsE9RllD"
         callback_uri = getattr(self.settings, "github_redirect_uri", None) or getattr(self.settings, "github_callback_url", None) or "http://localhost:8000/integrations/github/callback"
         install_url = f"https://github.com/apps/{slug}/installations/new?state={state}"

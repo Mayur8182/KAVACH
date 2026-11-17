@@ -917,6 +917,8 @@ async def oauth_authorize_post(
     code_challenge_method: str = Form("S256"),
     scope: Optional[str] = Form(None),
     state: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
@@ -974,6 +976,33 @@ async def oauth_authorize_post(
 
     # 2. User Allowed: Ensure user identity is verified
     user_id = pending_tx.user_id or (current_user.id if current_user else None)
+    if not user_id and email and password:
+        from app.core.security import verify_password
+        user_stmt = select(User).where(User.email == email.lower().strip())
+        user_res = await db.execute(user_stmt)
+        auth_candidate = user_res.scalar_one_or_none()
+        if not auth_candidate or not verify_password(password, auth_candidate.password_hash):
+            client_display = pending_tx.client_id
+            c_rec = await _resolve_oauth_client(pending_tx.client_id, db)
+            if c_rec and c_rec.client_name:
+                client_display = c_rec.client_name
+            scopes_list = [s for s in pending_tx.scope.split() if s]
+            return _render_authorization_page(
+                client_name=client_display,
+                requested_scopes=scopes_list,
+                transaction_token=pending_tx.transaction_token,
+                client_id=pending_tx.client_id,
+                redirect_uri=pending_tx.redirect_uri,
+                state=pending_tx.state,
+                code_challenge=pending_tx.code_challenge,
+                code_challenge_method=pending_tx.code_challenge_method,
+                error_message="Invalid email or password. Please check your credentials.",
+                request=request,
+            )
+        user_id = auth_candidate.id
+        pending_tx.user_id = user_id
+        await db.commit()
+
     if not user_id:
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
@@ -1672,13 +1701,10 @@ async def oauth_token_endpoint(
             project_id=target_project_id,
         )
 
-        refresh_token = None
-        refresh_expires_at = None
-        refresh_hash = None
-        if "offline_access" in code_record.scope:
-            refresh_token = f"kavach_rf_{secrets.token_urlsafe(32)}"
-            refresh_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-            refresh_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+        # Issue standard refresh token (RFC 6749) for persistent MCP assistant sessions
+        refresh_token = f"kavach_rf_{secrets.token_urlsafe(32)}"
+        refresh_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+        refresh_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
 
         token_hash = hashlib.sha256(access_token.encode()).hexdigest()
         token_record = OAuthToken(

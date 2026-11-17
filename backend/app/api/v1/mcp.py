@@ -524,6 +524,19 @@ async def mcp_handle_message(
                     user_project_id = uuid.UUID(str(arguments["project_id"]).strip())
                 except (ValueError, TypeError):
                     pass
+            elif arguments.get("projectId"):
+                try:
+                    user_project_id = uuid.UUID(str(arguments["projectId"]).strip())
+                except (ValueError, TypeError):
+                    pass
+
+            if not user_project_id and token_payload:
+                raw_token_proj = token_payload.get("project_id") or token_payload.get("projectId")
+                if raw_token_proj:
+                    try:
+                        user_project_id = uuid.UUID(str(raw_token_proj).strip())
+                    except (ValueError, TypeError):
+                        pass
 
             if not user_project_id:
                 p_stmt = select(Project.id).where(
@@ -533,6 +546,12 @@ async def mcp_handle_message(
                 p_res = (await db.execute(p_stmt)).scalars().all()
                 if len(p_res) >= 1:
                     user_project_id = p_res[0]
+
+            if user_project_id:
+                if not arguments.get("project_id"):
+                    arguments["project_id"] = str(user_project_id)
+                if not arguments.get("projectId"):
+                    arguments["projectId"] = str(user_project_id)
 
             identity = AgentIdentity(
                 agent_id=current_user.id,

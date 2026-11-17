@@ -57,30 +57,7 @@ function LoginContent() {
   const [githubLoading, setGithubLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = getAuthToken();
-      if (token && !isTokenExpired(token)) {
-        const redirectParam = searchParams.get('redirect') || '/overview';
-        router.replace(redirectParam);
-        return;
-      }
-
-      const p = new URLSearchParams(window.location.search);
-      if (p.get('logged_out') === '1') {
-        toast.info('You have been signed out safely', {
-          description: 'Authenticate with your provider to access your workspace again.',
-        });
-      }
-      const urlError = p.get('error') || p.get('error_description') || p.get('message');
-      if (urlError) {
-        const decoded = decodeURIComponent(urlError);
-        setError(decoded);
-        toast.error('Authentication Notice', { description: decoded });
-      }
-    }
-  }, [searchParams, router]);
+  const autoTriggerRef = React.useRef(false);
 
   const handleGithubAuth = async () => {
     setGithubLoading(true);
@@ -88,8 +65,13 @@ function LoginContent() {
     try {
       const currentOrigin =
         typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002';
+      const redirectParam = searchParams.get('redirect');
+      let returnUrl = `${currentOrigin}/auth/callback/github`;
+      if (redirectParam) {
+        returnUrl += `?next=${encodeURIComponent(redirectParam)}`;
+      }
       const data = await api.auth.getGithubAuthUrl({
-        return_url: `${currentOrigin}/auth/callback/github`,
+        return_url: returnUrl,
       });
       if (data?.url) {
         window.location.href = data.url;
@@ -111,8 +93,16 @@ function LoginContent() {
     setGoogleLoading(true);
     setError(null);
     try {
-      // Direct backend Google OAuth integration (matching GitHub pattern)
-      const data = await api.auth.getGoogleAuthUrl();
+      const currentOrigin =
+        typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002';
+      const redirectParam = searchParams.get('redirect');
+      let returnUrl = `${currentOrigin}/auth/callback/google`;
+      if (redirectParam) {
+        returnUrl += `?next=${encodeURIComponent(redirectParam)}`;
+      }
+      const data = await api.auth.getGoogleAuthUrl({
+        return_url: returnUrl,
+      });
       if (data?.url) {
         window.location.href = data.url;
         return;
@@ -128,6 +118,45 @@ function LoginContent() {
       setGoogleLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = getAuthToken();
+      const redirectParam = searchParams.get('redirect');
+      if (token && !isTokenExpired(token)) {
+        if (redirectParam && redirectParam.includes('/oauth')) {
+          const sep = redirectParam.includes('?') ? '&' : '?';
+          window.location.href = `${redirectParam}${sep}token=${encodeURIComponent(token)}&auto_approve=1`;
+          return;
+        }
+        router.replace(redirectParam || '/overview');
+        return;
+      }
+
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('logged_out') === '1') {
+        toast.info('You have been signed out safely', {
+          description: 'Authenticate with your provider to access your workspace again.',
+        });
+      }
+      const urlError = p.get('error') || p.get('error_description') || p.get('message');
+      if (urlError) {
+        const decoded = decodeURIComponent(urlError);
+        setError(decoded);
+        toast.error('Authentication Notice', { description: decoded });
+      }
+
+      const providerParam = searchParams.get('provider');
+      if (!autoTriggerRef.current && providerParam) {
+        autoTriggerRef.current = true;
+        if (providerParam === 'github') {
+          handleGithubAuth();
+        } else if (providerParam === 'google') {
+          handleGoogleAuth();
+        }
+      }
+    }
+  }, [searchParams, router]);
 
   return (
     <div className="min-h-screen w-full bg-[#FFFFFF] flex flex-col lg:grid lg:grid-cols-12 overflow-x-hidden font-sans selection:bg-blue-100 selection:text-blue-900">

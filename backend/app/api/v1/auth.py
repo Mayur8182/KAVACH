@@ -32,7 +32,7 @@ from app.services.user_service import UserService
 router = APIRouter(prefix="/auth", tags=["Authentication & Users"])
 
 
-def generate_oauth_state(provider: str) -> str:
+def generate_oauth_state(provider: str, return_url: Optional[str] = None) -> str:
     """Generates signed, tamper-proof OAuth state JWT to prevent CSRF attacks."""
     settings = get_settings()
     payload = {
@@ -40,14 +40,15 @@ def generate_oauth_state(provider: str) -> str:
         "nonce": secrets.token_hex(16),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
     }
+    if return_url:
+        payload["return_url"] = return_url
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def verify_oauth_state(state: Optional[str], expected_provider: str) -> bool:
-    """Validates signature, expiration, and provider binding of OAuth state token."""
+def decode_oauth_state(state: Optional[str], expected_provider: str) -> Optional[Dict[str, Any]]:
+    """Decodes and validates OAuth state JWT, returning claims payload if valid."""
     if not state or state.strip() == "":
-        logger.warning("OAuth state verification rejected: missing state token (CSRF defense).")
-        return False
+        return None
     settings = get_settings()
     try:
         data = jwt.decode(
@@ -56,13 +57,16 @@ def verify_oauth_state(state: Optional[str], expected_provider: str) -> bool:
             algorithms=[settings.jwt_algorithm],
             options={"require": ["exp", "provider"]},
         )
-        return data.get("provider") == expected_provider
-    except jwt.ExpiredSignatureError:
-        logger.warning(f"OAuth state token has expired for provider: {expected_provider}")
-        return False
-    except Exception as exc:
-        logger.warning(f"OAuth state cryptographic signature verification failed: {exc}")
-        return False
+        if data.get("provider") == expected_provider:
+            return data
+        return None
+    except Exception:
+        return None
+
+
+def verify_oauth_state(state: Optional[str], expected_provider: str) -> bool:
+    """Validates signature, expiration, and provider binding of OAuth state token."""
+    return decode_oauth_state(state, expected_provider) is not None
 
 
 
@@ -1889,6 +1893,7 @@ class GoogleOneTapRequest(BaseModel):
 )
 async def get_google_auth_url(
     redirect_uri: Optional[str] = None,
+    return_url: Optional[str] = None,
 ) -> GoogleAuthUrlResponse:
     settings = get_settings()
     client_id = settings.google_client_id or "918237465-seculayer-dev.apps.googleusercontent.com"
@@ -1903,7 +1908,7 @@ async def get_google_auth_url(
     else:
         resolved_redirect_uri = "http://localhost:8000/integrations/google/callback"
 
-    state = generate_oauth_state("google")
+    state = generate_oauth_state("google", return_url=return_url)
     scope = "openid email profile"
 
     auth_url = (
@@ -1962,8 +1967,10 @@ async def google_oauth_redirect_callback(
         )
 
     # 0. Validate OAuth CSRF State parameter
-    if state and not verify_oauth_state(state, expected_provider="google"):
+    state_claims = decode_oauth_state(state, expected_provider="google") if state else None
+    if state and not state_claims:
         logger.warning(f"[Google OAuth] State verification failed for state={state}")
+    custom_return_url = state_claims.get("return_url") if state_claims else None
 
     # Determine the exact callback URL that was used for token exchange
     callback_base = str(request.url).split("?")[0]
@@ -2103,7 +2110,9 @@ async def google_oauth_redirect_callback(
     proj_count = (await db.execute(proj_stmt)).scalar() or 0
     has_project = proj_count > 0
 
-    if is_new_user or not github_installed:
+    if custom_return_url:
+        next_route = custom_return_url
+    elif is_new_user or not github_installed:
         next_route = "/onboarding/connect-github"
     elif active_user.onboarding_completed and has_project:
         next_route = "/overview"
@@ -2177,11 +2186,13 @@ async def google_oauth_callback(
     db: AsyncSession = Depends(get_db),
 ) -> GoogleAuthResponse:
     # 0. Validate OAuth CSRF State parameter (Checkpoint 8)
-    if not verify_oauth_state(payload.state, expected_provider="google"):
+    state_claims = decode_oauth_state(payload.state, expected_provider="google") if payload.state else None
+    if payload.state and not state_claims:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="OAuth state verification failed. The request may be forged (CSRF) or has expired.",
         )
+    custom_return_url = state_claims.get("return_url") if state_claims else None
 
     from app.services.audit_service import AuditService
     from datetime import datetime, timezone
@@ -2347,7 +2358,9 @@ async def google_oauth_callback(
     proj_count = (await db.execute(proj_stmt)).scalar() or 0
     has_project = proj_count > 0
 
-    if is_new_user or not github_installed:
+    if custom_return_url:
+        next_route = custom_return_url
+    elif is_new_user or not github_installed:
         next_route = "/onboarding/connect-github"
     elif active_user.onboarding_completed and has_project:
         next_route = "/overview"

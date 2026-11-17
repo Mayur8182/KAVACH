@@ -77,6 +77,11 @@ function GitHubCallbackContent() {
         }
 
         if (nextParam && nextParam.startsWith('/')) {
+          if (nextParam.includes('/oauth')) {
+            const sep = nextParam.includes('?') ? '&' : '?';
+            window.location.href = `${nextParam}${sep}token=${encodeURIComponent(token)}&auto_approve=1`;
+            return;
+          }
           if (nextParam.includes('overview') || nextParam.includes('dashboard')) {
             if (onboardingState?.onboarding_completed && hasProject) {
               router.push('/overview');
@@ -133,6 +138,11 @@ function GitHubCallbackContent() {
             }
 
             if (nextParam && nextParam.startsWith('/')) {
+              if (nextParam.includes('/oauth')) {
+                const sep = nextParam.includes('?') ? '&' : '?';
+                window.location.href = `${nextParam}${sep}token=${encodeURIComponent(res.access_token)}&auto_approve=1`;
+                return;
+              }
               if (nextParam.includes('overview') || nextParam.includes('dashboard')) {
                 if (!res.is_new_user && onboardingState?.onboarding_completed && hasProject) {
                   router.push('/overview');

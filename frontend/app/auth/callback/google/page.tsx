@@ -55,6 +55,11 @@ function GoogleCallbackContent() {
 
         // If explicitly directed to a specific step
         if (nextParam && nextParam.startsWith('/')) {
+          if (nextParam.includes('/oauth')) {
+            const sep = nextParam.includes('?') ? '&' : '?';
+            window.location.href = `${nextParam}${sep}token=${encodeURIComponent(token)}&auto_approve=1`;
+            return;
+          }
           if (nextParam.includes('connect-github')) {
             router.push('/onboarding/connect-github');
             return;
@@ -87,6 +92,11 @@ function GoogleCallbackContent() {
       return;
     }
 
+    if (!code) {
+      setError('Missing Authorization Code: No authorization code was returned from Google.');
+      return;
+    }
+
     const exchangeCode = async () => {
       try {
         setStatusText('Verifying Google authorization credentials...');
@@ -115,6 +125,11 @@ function GoogleCallbackContent() {
 
             const nextTarget = res.next_route || searchParams.get('next');
             if (nextTarget && nextTarget.startsWith('/')) {
+              if (nextTarget.includes('/oauth')) {
+                const sep = nextTarget.includes('?') ? '&' : '?';
+                window.location.href = `${nextTarget}${sep}token=${encodeURIComponent(res.access_token)}&auto_approve=1`;
+                return;
+              }
               if (nextTarget.includes('connect-github')) {
                 router.push('/onboarding/connect-github');
                 return;

@@ -963,6 +963,8 @@ class ThingApiClient {
       github_login?: string;
       avatar_url?: string;
       is_new_user?: boolean;
+      next_route?: string;
+      github_installed?: boolean;
     }> => {
       const res = await this.request<any>('/api/v1/auth/github/callback', {
         method: 'POST',
@@ -973,9 +975,19 @@ class ThingApiClient {
       });
       return res.data;
     },
-    getGoogleAuthUrl: async (redirect_uri?: string): Promise<{ url: string; client_id: string; redirect_uri: string; state: string }> => {
-      const endpoint = redirect_uri ? `/api/v1/auth/google/url?redirect_uri=${encodeURIComponent(redirect_uri)}` : '/api/v1/auth/google/url';
-      const res = await this.request<any>(endpoint, {
+    getGoogleAuthUrl: async (
+      paramsOrRedirect?: any
+    ): Promise<{ url: string; client_id: string; redirect_uri: string; state: string }> => {
+      let qs = '';
+      if (typeof paramsOrRedirect === 'string') {
+        qs = `?redirect_uri=${encodeURIComponent(paramsOrRedirect)}`;
+      } else if (paramsOrRedirect) {
+        const q = new URLSearchParams();
+        if (paramsOrRedirect.redirect_uri) q.append('redirect_uri', paramsOrRedirect.redirect_uri);
+        if (paramsOrRedirect.return_url) q.append('return_url', paramsOrRedirect.return_url);
+        qs = q.toString() ? `?${q.toString()}` : '';
+      }
+      const res = await this.request<any>(`/api/v1/auth/google/url${qs}`, {
         skipAuth: true,
       });
       return res.data;
@@ -993,6 +1005,8 @@ class ThingApiClient {
       email?: string;
       picture?: string;
       is_new_user?: boolean;
+      next_route?: string;
+      github_installed?: boolean;
     }> => {
       const res = await this.request<any>('/api/v1/auth/google/one-tap', {
         method: 'POST',
@@ -1010,6 +1024,8 @@ class ThingApiClient {
       email?: string;
       picture?: string;
       is_new_user?: boolean;
+      next_route?: string;
+      github_installed?: boolean;
     }> => {
       const res = await this.request<any>('/api/v1/auth/google/callback', {
         method: 'POST',
