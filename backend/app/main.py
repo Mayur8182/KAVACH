@@ -460,11 +460,19 @@ def create_application() -> FastAPI:
     from app.api.v1.oauth import (
         oauth_protected_resource_metadata,
         oauth_authorization_server_metadata,
+        chatgpt_plugin_manifest,
         oauth_authorize_get,
         oauth_authorize_post,
         oauth_token_endpoint,
         oauth_revoke_endpoint,
         oauth_register_client,
+    )
+    app.add_api_route(
+        "/.well-known/ai-plugin.json",
+        chatgpt_plugin_manifest,
+        methods=["GET"],
+        include_in_schema=True,
+        tags=["OAuth 2.1 Discovery"],
     )
     app.add_api_route(
         "/.well-known/oauth-protected-resource",

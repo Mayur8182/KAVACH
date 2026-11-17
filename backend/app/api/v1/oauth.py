@@ -39,6 +39,7 @@ SUPPORTED_SCOPES = [
     "scans:run",
     "findings:read",
     "remediation:propose",
+    "offline_access",
 ]
 
 SCOPE_DESCRIPTIONS = {
@@ -47,6 +48,7 @@ SCOPE_DESCRIPTIONS = {
     "scans:run": "Trigger automated security scans (SAST, SCA, Secrets, IaC)",
     "findings:read": "Inspect security vulnerabilities, attack surface, and active incidents",
     "remediation:propose": "Generate automated security fixes and remediation patches",
+    "offline_access": "Maintain uninterrupted background connection using secure refresh tokens",
 }
 
 
@@ -117,6 +119,37 @@ async def oauth_authorization_server_metadata(request: Request):
         "scopes_supported": SUPPORTED_SCOPES,
         "service_documentation": f"{base}/docs",
         "ui_locales_supported": ["en"],
+    }
+
+
+@router.get("/.well-known/ai-plugin.json")
+async def chatgpt_plugin_manifest(request: Request):
+    """
+    ChatGPT Plugin & Action Manifest (OpenAI specification).
+    Allows ChatGPT to automatically configure the Kavach plugin with OAuth 2.1.
+    """
+    base = get_base_url(request)
+    return {
+        "schema_version": "v1",
+        "name_for_human": "Kavach Security Gateway",
+        "name_for_model": "kavach_security",
+        "description_for_human": "Autonomous application security, cloud posture audits, vulnerability scans, and AI remediation.",
+        "description_for_model": "Kavach Security MCP Gateway provides real-time security scanning (SAST, SCA, Secrets, IaC), cloud inventory, incident management, and automated remediation with verified tenant isolation.",
+        "auth": {
+            "type": "oauth",
+            "client_url": f"{base}/oauth/authorize",
+            "scope": " ".join(SUPPORTED_SCOPES),
+            "authorization_url": f"{base}/oauth/token",
+            "authorization_content_type": "application/x-www-form-urlencoded",
+            "verification_tokens": {},
+        },
+        "api": {
+            "type": "openapi",
+            "url": f"{base}/openapi.json",
+        },
+        "logo_url": f"{base}/logo.png",
+        "contact_email": "security@kavachsecurity.me",
+        "legal_info_url": "https://kavachsecurity.me/terms",
     }
 
 
