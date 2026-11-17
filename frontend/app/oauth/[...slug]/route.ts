@@ -16,3 +16,4 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const path = `/oauth/${(params.slug || []).join('/')}`;
   return proxyToBackend(req, path);
 }
+

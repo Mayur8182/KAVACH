@@ -239,6 +239,44 @@ class Settings(BaseSettings):
         description="Google OAuth Redirect URI",
     )
 
+    # OpenAI Sign in with ChatGPT (SIWC) Settings
+    openai_siwc_enabled: bool = Field(
+        default=False,
+        description="Whether Sign in with ChatGPT (SIWC) is enabled for Kavach",
+    )
+    openai_siwc_client_id: Optional[str] = Field(
+        default=None,
+        description="Approved OpenAI SIWC Client ID",
+    )
+    openai_siwc_client_secret: Optional[str] = Field(
+        default=None,
+        description="Approved OpenAI SIWC Client Secret",
+    )
+    openai_siwc_issuer: str = Field(
+        default="https://auth.openai.com",
+        description="OpenAI OIDC Issuer URL",
+    )
+    openai_siwc_auth_url: str = Field(
+        default="https://auth.openai.com/oauth/authorize",
+        description="OpenAI SIWC Authorization URL",
+    )
+    openai_siwc_token_url: str = Field(
+        default="https://auth.openai.com/oauth/token",
+        description="OpenAI SIWC Token Exchange URL",
+    )
+    openai_siwc_jwks_uri: str = Field(
+        default="https://auth.openai.com/oauth/jwks",
+        description="OpenAI SIWC JWKS URI for token signature verification",
+    )
+    openai_siwc_scopes: str = Field(
+        default="openid profile email",
+        description="Scopes requested from OpenAI for SIWC",
+    )
+    openai_siwc_redirect_uri: Optional[str] = Field(
+        default=None,
+        description="Kavach callback URL registered with OpenAI SIWC application",
+    )
+
     # Enterprise SSO (SAML 2.0 / OIDC)
     sso_entrypoint_url: Optional[str] = Field(
         default="https://auth.seculayer-sso.com/login",

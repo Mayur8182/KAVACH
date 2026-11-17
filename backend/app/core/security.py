@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, List, Optional, Union
 
 import argon2
 import jwt
@@ -85,14 +85,26 @@ def create_refresh_token(
 
 
 def create_oauth_access_token(
-    user_id: uuid.UUID,
-    client_id: str,
-    scope: str,
-    issuer: str,
+    user_id: Optional[Any] = None,
+    client_id: str = "kavach_mcp_client",
+    scope: Optional[str] = None,
+    issuer: str = "https://kavachsecurity.me",
     audience: Optional[str] = None,
     expires_delta: Optional[timedelta] = None,
+    subject: Optional[Any] = None,
+    scopes: Optional[Union[List[str], str]] = None,
 ) -> str:
     """Generates RFC-compliant OAuth 2.1 JWT access token with standard claims."""
+    sub = str(user_id if user_id is not None else subject)
+    final_scope = scope
+    if final_scope is None:
+        if isinstance(scopes, list):
+            final_scope = " ".join(scopes)
+        elif isinstance(scopes, str):
+            final_scope = scopes
+        else:
+            final_scope = ""
+
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
@@ -100,10 +112,10 @@ def create_oauth_access_token(
 
     payload = {
         "iss": issuer,
-        "sub": str(user_id),
+        "sub": sub,
         "aud": audience or f"{issuer}/mcp",
         "client_id": client_id,
-        "scope": scope,
+        "scope": final_scope,
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "jti": str(uuid.uuid4()),

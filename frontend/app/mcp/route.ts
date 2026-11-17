@@ -18,3 +18,4 @@ export async function POST(req: NextRequest) {
 export async function HEAD(req: NextRequest) {
   return proxyToBackend(req, '/mcp');
 }
+

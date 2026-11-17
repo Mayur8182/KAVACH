@@ -479,6 +479,12 @@ async def mcp_handle_message(
                     "name": t.name,
                     "description": t.description,
                     "inputSchema": t.input_schema,
+                    "securitySchemes": [
+                        {
+                            "type": "oauth2",
+                            "scopes": [TOOL_REQUIRED_SCOPES.get(t.name, "projects:read")],
+                        }
+                    ],
                 }
                 for t in tools
             ]
@@ -495,6 +501,11 @@ async def mcp_handle_message(
             error = {
                 "code": -32002,
                 "message": f"Authentication required to execute tool '{tool_name}'. Please authenticate with a valid Bearer token.",
+                "data": {
+                    "_meta": {
+                        "mcp/www_authenticate": 'Bearer error="unauthorized", error_description="Authentication required to execute this tool."'
+                    }
+                },
             }
         elif token_payload and "scope" in token_payload and not current_user.is_superuser:
             granted_scopes = set(token_payload.get("scope", "").split())

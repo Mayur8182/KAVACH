@@ -56,6 +56,15 @@ class User(Base, TimestampMixin):
         nullable=True,
         index=True,
     )
+    chatgpt_user_id: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+    )
+    chatgpt_issuer: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
     avatar_url: Mapped[Optional[str]] = mapped_column(
         String(500),
         nullable=True,

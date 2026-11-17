@@ -74,3 +74,4 @@ export async function proxyToBackend(req: NextRequest, targetPath: string): Prom
     );
   }
 }
+

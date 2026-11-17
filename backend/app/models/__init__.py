@@ -263,6 +263,7 @@ from app.models.oauth import (
     OAuthClient,
     OAuthAuthorizationCode,
     OAuthToken,
+    OAuthPendingTransaction,
 )
 
 __all__ = [
@@ -353,5 +354,6 @@ __all__ = [
     "OAuthClient",
     "OAuthAuthorizationCode",
     "OAuthToken",
+    "OAuthPendingTransaction",
 ]
 

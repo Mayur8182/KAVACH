@@ -10,3 +10,4 @@ export async function OPTIONS(req: NextRequest) {
 export async function GET(req: NextRequest) {
   return proxyToBackend(req, '/.well-known/ai-plugin.json');
 }
+

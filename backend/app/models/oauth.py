@@ -195,3 +195,99 @@ class OAuthToken(Base, TimestampMixin):
         nullable=True,
     )
 
+
+class OAuthPendingTransaction(Base, TimestampMixin):
+    """
+    Pending OAuth authorization transaction (Outer MCP transaction).
+    Bridges ChatGPT/Claude outer authorization flow with inner identity provider (GitHub, Google, SIWC).
+    """
+    __tablename__ = "oauth_pending_transactions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    transaction_token: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+    client_id: Mapped[str] = mapped_column(
+        String(255),
+        index=True,
+        nullable=False,
+    )
+    redirect_uri: Mapped[str] = mapped_column(
+        String(1000),
+        nullable=False,
+    )
+    state: Mapped[Optional[str]] = mapped_column(
+        String(1000),
+        nullable=True,
+    )
+    code_challenge: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    code_challenge_method: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="S256",
+    )
+    resource: Mapped[Optional[str]] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+    scope: Mapped[str] = mapped_column(
+        String(500),
+        nullable=False,
+    )
+
+    # Inner Identity Provider details
+    inner_provider: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+    inner_state: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+    )
+    inner_nonce: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    inner_code_verifier: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    # Authenticated user ID (once identity is verified)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    selected_project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    selected_org_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    is_completed: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+

@@ -46,6 +46,8 @@ async def _run_startup_migrations() -> None:
     required_columns = [
         ("users", "github_user_id", "VARCHAR(100)"),
         ("users", "google_user_id", "VARCHAR(100)"),
+        ("users", "chatgpt_user_id", "VARCHAR(100)"),
+        ("users", "chatgpt_issuer", "VARCHAR(255)"),
         ("users", "avatar_url", "VARCHAR(500)"),
         ("users", "auth_provider", "VARCHAR(50) DEFAULT 'oauth'"),
         ("github_security_jobs", "job_number", "VARCHAR(50)"),
@@ -453,81 +455,9 @@ def create_application() -> FastAPI:
         tags=["MCP Root Gateway"],
     )
 
-    # Root-level OAuth 2.1 & Discovery Endpoints (RFC 9207, RFC 8414, RFC 7591)
-    from app.api.v1.oauth import (
-        oauth_protected_resource_metadata,
-        oauth_authorization_server_metadata,
-        chatgpt_plugin_manifest,
-        oauth_authorize_get,
-        oauth_authorize_post,
-        oauth_token_endpoint,
-        oauth_revoke_endpoint,
-        oauth_register_client,
-    )
-    app.add_api_route(
-        "/.well-known/ai-plugin.json",
-        chatgpt_plugin_manifest,
-        methods=["GET"],
-        include_in_schema=True,
-        tags=["OAuth 2.1 Discovery"],
-    )
-    app.add_api_route(
-        "/.well-known/oauth-protected-resource",
-        oauth_protected_resource_metadata,
-        methods=["GET"],
-        include_in_schema=True,
-        tags=["OAuth 2.1 Discovery"],
-    )
-    app.add_api_route(
-        "/.well-known/oauth-authorization-server",
-        oauth_authorization_server_metadata,
-        methods=["GET"],
-        include_in_schema=True,
-        tags=["OAuth 2.1 Discovery"],
-    )
-    app.add_api_route(
-        "/.well-known/openid-configuration",
-        oauth_authorization_server_metadata,
-        methods=["GET"],
-        include_in_schema=True,
-        tags=["OAuth 2.1 Discovery"],
-    )
-    app.add_api_route(
-        "/oauth/authorize",
-        oauth_authorize_get,
-        methods=["GET"],
-        include_in_schema=True,
-        tags=["OAuth 2.1 Authorization"],
-    )
-    app.add_api_route(
-        "/oauth/authorize",
-        oauth_authorize_post,
-        methods=["POST"],
-        include_in_schema=True,
-        tags=["OAuth 2.1 Authorization"],
-    )
-    app.add_api_route(
-        "/oauth/token",
-        oauth_token_endpoint,
-        methods=["POST"],
-        include_in_schema=True,
-        tags=["OAuth 2.1 Authorization"],
-    )
-    app.add_api_route(
-        "/oauth/revoke",
-        oauth_revoke_endpoint,
-        methods=["POST"],
-        include_in_schema=True,
-        tags=["OAuth 2.1 Authorization"],
-    )
-    app.add_api_route(
-        "/oauth/register",
-        oauth_register_client,
-        methods=["POST"],
-        status_code=status.HTTP_201_CREATED,
-        include_in_schema=True,
-        tags=["OAuth 2.1 Authorization"],
-    )
+    # Root-level OAuth 2.1, Discovery, & SSO Endpoints (RFC 9207, RFC 8414, RFC 7591, OIDC)
+    from app.api.v1.oauth import router as oauth_router
+    app.include_router(oauth_router)
 
     # Include versioned API routers (/api/v1/...)
     app.include_router(main_router, prefix="/api")
