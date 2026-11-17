@@ -51,7 +51,14 @@ class SemgrepScanner(SecurityScanner):
         try:
             data = json.loads(raw_stdout)
         except Exception:
-            return []
+            try:
+                json_start = raw_stdout.find('{"')
+                if json_start != -1:
+                    data = json.loads(raw_stdout[json_start:])
+                else:
+                    return []
+            except Exception:
+                return []
 
         results = data.get("results", [])
         findings: List[NormalizedFindingCandidate] = []

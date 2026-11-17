@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, List, Optional
 from app.mcp.schemas import ToolDefinition
-from app.mcp.tools.projects import execute_get_project
+from app.mcp.tools.projects import execute_get_project, execute_list_projects
 from app.mcp.tools.security import (
     execute_check_security_policy,
     execute_get_security_blueprint,
@@ -50,6 +50,55 @@ class MCPToolRegistry:
         self._register_default_tools()
 
     def _register_default_tools(self) -> None:
+        # 0. list_projects (Phase 1)
+        self.register(
+            ToolDefinition(
+                name="list_projects",
+                description="List all verified security projects owned by the authenticated user with pagination and tenant isolation.",
+                version="1.0.0",
+                category="PROJECT",
+                required_permission="PROJECT_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of projects to return (1-100, default 20)",
+                            "default": 20,
+                        },
+                        "offset": {
+                            "type": "integer",
+                            "description": "Offset pagination cursor (default 0)",
+                            "default": 0,
+                        },
+                    },
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "total_count": {"type": "integer"},
+                        "limit": {"type": "integer"},
+                        "offset": {"type": "integer"},
+                        "projects": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "repository": {"type": "string"},
+                                    "status": {"type": "string"},
+                                    "created_at": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                },
+            ),
+            execute_list_projects,
+        )
+
         # 1. get_project
         self.register(
             ToolDefinition(

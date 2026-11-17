@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.engines.scanner.engine import verification_engine
 from app.engines.scanner.models import ScanTarget
 from app.engines.scanner.registry import default_scanner_registry
+from app.models.project import Project
 from app.models.user import User
 from app.mcp.errors import (
     MCPInvalidInputError,
@@ -13,6 +14,7 @@ from app.mcp.errors import (
     MCPToolNotAvailableError,
 )
 from app.mcp.schemas import MCPContext, ToolExecutionResult
+from app.mcp.tools.context_helper import resolve_authorized_project
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.scan_repository import ScanRepository
 from app.schemas.scan import ScanTriggerRequest
@@ -26,16 +28,12 @@ async def execute_run_security_scan(
 ) -> ToolExecutionResult:
     """
     Executes a real security scan invoking the Step 6 verification engine.
-    Does not fake or simulate findings.
+    Does not fake or simulate findings. Enforces verified project context and tenant isolation.
     """
-    raw_pid = arguments.get("project_id")
-    if not raw_pid:
-        raise MCPInvalidInputError("Missing required parameter 'project_id'.")
-
-    try:
-        project_uuid = uuid.UUID(str(raw_pid))
-    except (ValueError, TypeError):
-        raise MCPInvalidInputError(f"Invalid UUID string for 'project_id': '{raw_pid}'.")
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+    project_uuid = project.id
 
     target = arguments.get("target", {})
     target_path = target.get("path") if isinstance(target, dict) else arguments.get("target_path")
@@ -52,11 +50,11 @@ async def execute_run_security_scan(
     # Target scanners filter if specified
     enabled_scanners = arguments.get("scanners", ["semgrep", "gitleaks", "osv", "trivy", "checkov"])
 
-    # Create dummy user representation of agent's principal for service authorization
+    # Create user representation of agent's principal for service authorization
     principal_user = User(
         id=context.identity.agent_id,
         email=context.identity.authenticated_principal,
-        full_name=context.identity.agent_name,
+        name=context.identity.agent_name,
         is_superuser=True,  # Agent already passed MCP authorization pipeline
     )
 
@@ -64,7 +62,7 @@ async def execute_run_security_scan(
     payload = ScanTriggerRequest(
         target_path=resolved_path,
         blueprint_id=arguments.get("blueprint_id"),
-        scanners_enabled=enabled_scanners,
+        selected_scanners=enabled_scanners,
     )
 
     try:
@@ -75,6 +73,12 @@ async def execute_run_security_scan(
             request_id=context.request_id,
         )
 
+        duration = 0.0
+        if scan_record.started_at and scan_record.completed_at:
+            duration = (scan_record.completed_at - scan_record.started_at).total_seconds()
+
+        total_findings = getattr(scan_record, "finding_count", 0) or len(getattr(scan_record, "findings", []) or [])
+
         return ToolExecutionResult(
             status="SUCCESS",
             data={
@@ -82,8 +86,10 @@ async def execute_run_security_scan(
                 "project_id": str(scan_record.project_id),
                 "status": scan_record.status,
                 "target_path": scan_record.target_path,
-                "duration_seconds": scan_record.duration_seconds,
-                "summary": scan_record.summary or {},
+                "duration_seconds": duration,
+                "finding_count": total_findings,
+                "total_findings": total_findings,
+                "scanners_executed": enabled_scanners,
             },
             message=f"Security scan executed with status: {scan_record.status}",
             result_reference=str(scan_record.id),
@@ -102,7 +108,7 @@ async def execute_get_scan(
     db: AsyncSession,
 ) -> ToolExecutionResult:
     """
-    Retrieves full verified scan results, findings, and evidence.
+    Retrieves full verified scan results, findings, and evidence with tenant isolation checks.
     """
     raw_sid = arguments.get("scan_id")
     if not raw_sid:
@@ -122,12 +128,16 @@ async def execute_get_scan(
             error_code="MCP_RESOURCE_NOT_FOUND",
         )
 
-    # Project isolation check
-    if scan.project_id != context.identity.project_id:
+    # Project ownership and tenant isolation check
+    is_superuser = bool(context.metadata.get("is_superuser", False))
+    from sqlalchemy import select
+    project_stmt = select(Project).where(Project.id == scan.project_id)
+    scan_project = (await db.execute(project_stmt)).scalar_one_or_none()
+    if scan_project and scan_project.owner_id != context.identity.agent_id and not is_superuser:
         return ToolExecutionResult(
             status="DENIED",
-            message=f"Scan '{scan_uuid}' belongs to another project.",
-            error_code="MCP_PROJECT_ACCESS_DENIED",
+            message=f"Access denied: Security scan '{scan_uuid}' belongs to another tenant. Cross-tenant access is blocked.",
+            error_code="MCP_TENANT_ACCESS_DENIED",
         )
 
     findings = await scan_repo.get_findings_for_scan(scan_uuid)
@@ -165,7 +175,10 @@ async def execute_get_scan(
             "findings": findings_summary,
             "verifications_count": len(verifications_summary),
             "verifications": verifications_summary,
-            "summary": scan.summary or {},
+            "summary": {
+                "total_findings": len(findings_summary),
+                "total_verifications": len(verifications_summary),
+            },
         },
         message=f"Retrieved scan details for '{scan_uuid}'.",
         result_reference=str(scan.id),

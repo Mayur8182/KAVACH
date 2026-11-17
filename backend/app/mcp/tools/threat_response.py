@@ -13,6 +13,7 @@ from app.threat_intel.service import ThreatIntelService
 from app.response.service import ResponseService
 from app.response.models import Incident, ResponseAction
 from app.mcp.schemas import MCPContext, ToolExecutionResult
+from app.mcp.tools.context_helper import resolve_authorized_project
 
 
 async def execute_query_threat_intelligence(
@@ -23,8 +24,10 @@ async def execute_query_threat_intelligence(
     """
     Correlates IOCs and threat vectors against active threat intelligence feeds.
     """
-    proj_id_str = arguments.get("project_id")
-    proj_uuid = uuid.UUID(proj_id_str) if proj_id_str else context.identity.project_id
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+    proj_uuid = project.id
 
     service = ThreatIntelService(db)
     query_text = arguments.get("query", "")
@@ -49,8 +52,10 @@ async def execute_get_active_incidents(
     """
     Retrieves active security incidents and their severity levels.
     """
-    proj_id_str = arguments.get("project_id")
-    proj_uuid = uuid.UUID(proj_id_str) if proj_id_str else context.identity.project_id
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+    proj_uuid = project.id
 
     stmt = select(Incident).where(Incident.project_id == proj_uuid).order_by(desc(Incident.created_at)).limit(20)
     res = await db.execute(stmt)
@@ -59,7 +64,21 @@ async def execute_get_active_incidents(
     return ToolExecutionResult(
         status="SUCCESS",
         data={
+            "project_id": str(proj_uuid),
+            "project_name": project.name,
             "total_incidents": len(incidents),
+            "total_count": len(incidents),
+            "active_incidents": [
+                {
+                    "id": str(inc.id),
+                    "title": inc.title,
+                    "severity": inc.severity,
+                    "status": inc.status,
+                    "source": inc.source,
+                    "description": inc.description,
+                }
+                for inc in incidents
+            ],
             "incidents": [
                 {
                     "id": str(inc.id),
@@ -72,7 +91,7 @@ async def execute_get_active_incidents(
                 for inc in incidents
             ],
         },
-        message=f"Retrieved {len(incidents)} active incident(s).",
+        message=f"Retrieved {len(incidents)} active incident(s) for project '{project.name}'.",
     )
 
 
@@ -126,20 +145,26 @@ async def execute_audit_attack_surface(
     """
     from app.attack.service import AttackService
 
-    proj_id_str = arguments.get("project_id")
-    proj_uuid = uuid.UUID(proj_id_str) if proj_id_str else context.identity.project_id
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+    proj_uuid = project.id
 
     attack_service = AttackService(db)
-    overview = await attack_service.get_overview(proj_uuid)
-    findings = await attack_service.list_findings(proj_uuid, limit=10)
-    paths = await attack_service.list_attack_paths(proj_uuid)
+    overview = await attack_service.get_overview(str(proj_uuid))
+    findings = await attack_service.list_findings(str(proj_uuid), limit=10)
+    paths = await attack_service.list_attack_paths(str(proj_uuid))
 
     data = {
+        "project_id": str(proj_uuid),
+        "project_name": project.name,
         "status": "DISCOVERED",
-        "total_attack_surface_assets": overview.metrics.total_attack_surface_assets,
-        "critical_exploits_count": overview.metrics.critical_exploits_count,
-        "high_exploits_count": overview.metrics.high_exploits_count,
-        "attack_paths_count": len(paths.items),
+        "total_assets": overview.metrics.exposed_assets,
+        "exposed_assets": overview.metrics.exposed_assets,
+        "tested_assets": overview.metrics.tested_assets,
+        "verified_issues": overview.metrics.verified_issues,
+        "attack_paths_count": overview.metrics.attack_paths,
+        "exposed_ports": 0,
         "top_findings": [f.model_dump() for f in findings.items[:5]],
         "attack_paths": [p.model_dump() for p in paths.items[:3]],
     }
@@ -147,7 +172,7 @@ async def execute_audit_attack_surface(
     return ToolExecutionResult(
         status="SUCCESS",
         data=data,
-        message=f"Attack surface audited. {overview.metrics.total_attack_surface_assets} asset(s), {overview.metrics.critical_exploits_count} critical exploit vector(s).",
+        message=f"Attack surface audited. {overview.metrics.exposed_assets} asset(s), {overview.metrics.verified_issues} verified issue(s).",
     )
 
 
@@ -163,8 +188,10 @@ async def execute_simulate_attack_path(
     from app.attack.service import AttackService
     from app.attack.schemas import StartDastRunRequest
 
-    proj_id_str = arguments.get("project_id")
-    proj_uuid = uuid.UUID(proj_id_str) if proj_id_str else context.identity.project_id
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+    proj_uuid = project.id
     target_url = arguments.get("target_url", "https://api.staging.secuprep.internal")
     scan_profile = arguments.get("scan_profile", "FULL_ACTIVE")
 

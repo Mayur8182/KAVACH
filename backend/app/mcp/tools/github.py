@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.github import GitHubCommit, GitHubPullRequest, GitHubRepository
 from app.mcp.errors import MCPInvalidInputError, MCPNotConfiguredError
 from app.mcp.schemas import MCPContext, ToolExecutionResult
+from app.mcp.tools.context_helper import resolve_authorized_project
 from app.services.github_service import GitHubService
 
 
@@ -17,8 +18,12 @@ async def execute_get_github_repository(
     """
     Retrieves connected GitHub repository details for the project.
     """
+    project, err_result = await resolve_authorized_project(context, arguments, db)
+    if err_result:
+        return err_result
+
     stmt = select(GitHubRepository).where(
-        GitHubRepository.project_id == context.identity.project_id
+        GitHubRepository.project_id == project.id
     )
     res = await db.execute(stmt)
     repo = res.scalar_one_or_none()
@@ -26,7 +31,7 @@ async def execute_get_github_repository(
     if not repo:
         return ToolExecutionResult(
             status="NOT_CONFIGURED",
-            message="No GitHub repository connected to this project.",
+            message=f"No GitHub repository connected to project '{project.name}'.",
             error_code="MCP_NOT_CONFIGURED",
         )
 
@@ -34,6 +39,7 @@ async def execute_get_github_repository(
         status="SUCCESS",
         data={
             "id": str(repo.id),
+            "project_id": str(project.id),
             "owner": repo.owner,
             "repo_name": repo.repo_name,
             "full_name": repo.full_name,
@@ -41,7 +47,7 @@ async def execute_get_github_repository(
             "private": repo.private,
             "status": repo.status,
         },
-        message=f"Retrieved GitHub repository '{repo.full_name}'.",
+        message=f"Retrieved GitHub repository '{repo.full_name}' for project '{project.name}'.",
         result_reference=str(repo.id),
     )
 
@@ -54,14 +60,22 @@ async def execute_get_pull_request(
     """
     Retrieves pull request information for the project.
     """
+    project, err_result = await resolve_authorized_project(context, arguments, db)
+    if err_result:
+        return err_result
+
     pr_number = arguments.get("pr_number")
     if not pr_number:
-        raise MCPInvalidInputError("Missing required parameter 'pr_number'.")
+        return ToolExecutionResult(
+            status="INVALID_INPUT",
+            message="Missing required parameter 'pr_number'.",
+            error_code="MCP_INVALID_INPUT",
+        )
 
     stmt = select(GitHubPullRequest).join(
         GitHubRepository, GitHubPullRequest.repository_id == GitHubRepository.id
     ).where(
-        GitHubRepository.project_id == context.identity.project_id,
+        GitHubRepository.project_id == project.id,
         GitHubPullRequest.pr_number == int(pr_number),
     )
     res = await db.execute(stmt)
@@ -70,7 +84,7 @@ async def execute_get_pull_request(
     if not pr:
         return ToolExecutionResult(
             status="NOT_FOUND",
-            message=f"Pull request #{pr_number} not found for this project.",
+            message=f"Pull request #{pr_number} not found for project '{project.name}'.",
             error_code="MCP_RESOURCE_NOT_FOUND",
         )
 
@@ -78,6 +92,7 @@ async def execute_get_pull_request(
         status="SUCCESS",
         data={
             "id": str(pr.id),
+            "project_id": str(project.id),
             "pr_number": pr.pr_number,
             "title": pr.title,
             "state": pr.state,

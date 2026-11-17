@@ -55,18 +55,53 @@ def create_access_token(
         "sub": str(subject),
         "exp": expire,
         "iat": datetime.now(timezone.utc),
+        "type": "access",
     }
     if session_id:
         payload["session_id"] = str(session_id)
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
+def create_refresh_token(
+    subject: str,
+    expires_delta: Optional[timedelta] = None,
+    session_id: Optional[str] = None,
+) -> str:
+    """Generates signed JWT refresh token with extended validity (30 days default)."""
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(days=30)
+
+    payload = {
+        "sub": str(subject),
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+        "type": "refresh",
+    }
+    if session_id:
+        payload["session_id"] = str(session_id)
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_token_safely(token: str) -> tuple[Optional[dict], Optional[str]]:
+    """
+    Decodes JWT token and differentiates between expired vs invalid token.
+    Returns (payload, error_type). error_type is 'expired', 'invalid', or None.
+    """
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        return payload, None
+    except jwt.ExpiredSignatureError:
+        return None, "expired"
+    except jwt.PyJWTError:
+        return None, "invalid"
+
+
 def decode_access_token(token: str) -> Optional[dict]:
     """Decodes and validates JWT access token signature and expiration."""
-    try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-    except jwt.PyJWTError:
-        return None
+    payload, _ = decode_token_safely(token)
+    return payload
 
 
 async def get_current_user(
@@ -84,12 +119,18 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = decode_access_token(auth_credentials.credentials)
+    payload, err_type = decode_token_safely(auth_credentials.credentials)
+    if err_type == "expired":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="The access token has expired. Please refresh your token.",
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The access token expired"'},
+        )
     if not payload or "sub" not in payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired access token",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Invalid access token",
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The access token is invalid"'},
         )
 
     user_id_str = payload["sub"]

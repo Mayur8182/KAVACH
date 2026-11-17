@@ -36,3 +36,5 @@ class Token(BaseModel):
     """JWT bearer token response."""
     access_token: str
     token_type: str = "bearer"
+    refresh_token: Optional[str] = None
+    expires_in: Optional[int] = None

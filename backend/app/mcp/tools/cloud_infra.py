@@ -13,6 +13,7 @@ from app.cloud.service import CloudService
 from app.models.docker_models import DockerImage, ContainerImageFinding
 from app.models.kubernetes_models import KubernetesWorkload
 from app.mcp.schemas import MCPContext, ToolExecutionResult
+from app.mcp.tools.context_helper import resolve_authorized_project
 
 
 async def execute_audit_cloud_posture(
@@ -23,8 +24,10 @@ async def execute_audit_cloud_posture(
     """
     Audits cloud security posture, active observations, and IAM security for the project.
     """
-    proj_id_str = arguments.get("project_id")
-    proj_uuid = uuid.UUID(proj_id_str) if proj_id_str else context.identity.project_id
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+    proj_uuid = project.id
 
     cloud_service = CloudService(db)
     overview = await cloud_service.get_overview(proj_uuid)
@@ -59,19 +62,26 @@ async def execute_get_cloud_inventory(
     """
     Lists real cloud assets and infrastructure resources across connected providers.
     """
-    proj_id_str = arguments.get("project_id")
-    proj_uuid = uuid.UUID(proj_id_str) if proj_id_str else context.identity.project_id
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+    proj_uuid = project.id
 
     cloud_service = CloudService(db)
-    assets = await cloud_service.list_assets(proj_uuid, limit=arguments.get("limit", 50))
+    assets = await cloud_service.get_assets(project_id=str(proj_uuid), limit=arguments.get("limit", 50))
 
+    items_dumped = [a.model_dump() if hasattr(a, "model_dump") else dict(a) for a in assets.items]
     return ToolExecutionResult(
         status="SUCCESS",
         data={
+            "project_id": str(proj_uuid),
+            "project_name": project.name,
             "total_assets": assets.total,
-            "assets": [a.model_dump() for a in assets.items],
+            "total_resources": assets.total,
+            "assets": items_dumped,
+            "resources": items_dumped,
         },
-        message=f"Retrieved {len(assets.items)} verified cloud asset(s).",
+        message=f"Retrieved {len(assets.items)} verified cloud asset(s) for project '{project.name}'.",
     )
 
 
@@ -83,8 +93,10 @@ async def execute_scan_container_image_security(
     """
     Inspects Docker container images and CVE vulnerabilities.
     """
-    proj_id_str = arguments.get("project_id")
-    proj_uuid = uuid.UUID(proj_id_str) if proj_id_str else context.identity.project_id
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+    proj_uuid = project.id
 
     stmt = select(DockerImage).where(DockerImage.project_id == proj_uuid).order_by(desc(DockerImage.created_at)).limit(20)
     res = await db.execute(stmt)

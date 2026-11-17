@@ -18,6 +18,23 @@ def create_mcp_server(name: str = "secure-control-plane-mcp") -> MCPServer:
     """
     server = MCPServer(name)
 
+    # 0. list_projects tool (Phase 1)
+    @server.tool(
+        name="list_projects",
+        description="List all verified security projects owned by the authenticated user with pagination and tenant isolation.",
+    )
+    async def list_projects(session_id: str, limit: int = 20, offset: int = 0) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="list_projects",
+                arguments={"limit": limit, "offset": offset},
+            )
+            return json.dumps(res.model_dump(), default=str)
+
     # 1. get_project tool
     @server.tool(
         name="get_project",

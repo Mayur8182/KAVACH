@@ -79,8 +79,9 @@ def create_error_response(
     status_code: int,
     details: Optional[Any] = None,
     request_id: Optional[str] = None,
+    headers: Optional[Dict[str, str]] = None,
 ) -> JSONResponse:
-    """Formats a standardized error payload with correlation ID support."""
+    """Formats a standardized error payload with correlation ID and header support."""
     payload: Dict[str, Any] = {
         "error": {
             "code": code,
@@ -92,8 +93,10 @@ def create_error_response(
         payload["error"]["request_id"] = request_id
     if details is not None:
         payload["error"]["details"] = details
-    headers = {"X-Request-ID": request_id} if request_id else None
-    return JSONResponse(status_code=status_code, content=payload, headers=headers)
+    resp_headers = dict(headers) if headers else {}
+    if request_id:
+        resp_headers["X-Request-ID"] = request_id
+    return JSONResponse(status_code=status_code, content=payload, headers=resp_headers or None)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -137,6 +140,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             message=str(exc.detail),
             status_code=exc.status_code,
             request_id=req_id,
+            headers=getattr(exc, "headers", None),
         )
 
     @app.exception_handler(Exception)

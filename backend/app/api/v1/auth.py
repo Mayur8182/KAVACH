@@ -11,13 +11,16 @@ from fastapi.responses import JSONResponse, RedirectResponse
 logger = logging.getLogger("thing.auth")
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import (
     create_access_token,
+    create_refresh_token,
     decode_access_token,
+    decode_token_safely,
     get_current_user,
     get_current_user_optional,
     hash_password,
@@ -245,7 +248,103 @@ async def login_for_access_token(
         logger.warning(f"Failed to dispatch sign-in notification: {signin_err}")
 
     access_token = create_access_token(subject=str(authenticated_user.id), session_id=session_id)
-    return Token(access_token=access_token, token_type="bearer")
+    refresh_token = create_refresh_token(subject=str(authenticated_user.id), session_id=session_id)
+    expires_in = settings.access_token_expire_minutes * 60
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        refresh_token=refresh_token,
+        expires_in=expires_in,
+    )
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post(
+    "/refresh",
+    response_model=Token,
+    summary="Refresh access token using refresh token",
+    description="Exchanges a valid refresh token for a newly minted access token and rotated refresh token.",
+)
+async def refresh_access_token(
+    payload: RefreshTokenRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Token:
+    from app.services.audit_service import AuditService
+    settings = get_settings()
+    audit = AuditService(db)
+
+    token_payload, err_type = decode_token_safely(payload.refresh_token)
+    if err_type == "expired":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired. Please re-authenticate.",
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The refresh token expired"'},
+        )
+    if not token_payload or token_payload.get("type") != "refresh" or "sub" not in token_payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token.",
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="Invalid refresh token"'},
+        )
+
+    user_id_str = token_payload["sub"]
+    try:
+        user_uuid = uuid.UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Malformed token subject",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    stmt = select(User).where(User.id == user_uuid)
+    user = (await db.execute(stmt)).scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account not found or deactivated.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    session_id = token_payload.get("session_id") or str(uuid.uuid4())
+    # Session revocation check
+    if token_payload.get("session_id") and user.active_sessions is not None:
+        valid_session = any(
+            isinstance(s, dict) and s.get("id") == token_payload["session_id"] and not s.get("revoked", False)
+            for s in user.active_sessions
+        )
+        if not valid_session:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session has been revoked.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    new_access_token = create_access_token(subject=str(user.id), session_id=session_id)
+    new_refresh_token = create_refresh_token(subject=str(user.id), session_id=session_id)
+    expires_in = settings.access_token_expire_minutes * 60
+
+    await audit.log_event(
+        action="USER_TOKEN_REFRESH",
+        resource_type="auth",
+        actor_type="user",
+        actor_id=str(user.id),
+        resource_id=user.email,
+        status="SUCCESS",
+        metadata={"email": user.email, "session_id": session_id},
+    )
+    await db.commit()
+
+    return Token(
+        access_token=new_access_token,
+        token_type="bearer",
+        refresh_token=new_refresh_token,
+        expires_in=expires_in,
+    )
 
 
 @router.get(

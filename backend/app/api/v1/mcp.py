@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import time
 import uuid
 from typing import Any, Dict, List, Optional
@@ -11,18 +12,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.core.security import get_current_user, get_current_user_optional
+from app.core.security import decode_token_safely, get_current_user, get_current_user_optional
 from app.models.mcp import MCPSession, MCPTool, MCPToolInvocation
 from app.models.project import Project
 from app.models.user import User
 from app.mcp.registry import default_tool_registry
 from app.mcp.schemas import (
+    AgentIdentity,
+    MCPContext,
     MCPGatewayStatusResponse,
     MCPInvocationResponse,
     MCPSessionResponse,
     MCPToolResponse,
+    ToolExecutionResult,
 )
+from app.services.audit_service import AuditService
 
+logger = logging.getLogger("kavach.mcp")
 settings = get_settings()
 
 router = APIRouter(tags=["MCP Gateway Management"])
@@ -382,6 +388,31 @@ async def mcp_handle_message(
     Standard MCP JSON-RPC 2.0 message handler for tool calling, discovery, and handshake.
     Enforces the 7-stage deterministic security gateway pipeline.
     """
+    # 0. Check Authorization Bearer header if provided
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.replace("Bearer ", "").strip()
+        token_payload, err_type = decode_token_safely(token)
+        if err_type == "expired":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="The access token has expired. Please re-authenticate.",
+                headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The access token expired"'},
+            )
+        elif err_type == "invalid":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token.",
+                headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="Invalid access token"'},
+            )
+        if not current_user and token_payload and "sub" in token_payload:
+            try:
+                user_uuid = uuid.UUID(token_payload["sub"])
+                res = await db.execute(select(User).where(User.id == user_uuid))
+                current_user = res.scalar_one_or_none()
+            except Exception:
+                pass
+
     body = await request.json()
     req_id = body.get("id")
     method = body.get("method")
@@ -425,32 +456,116 @@ async def mcp_handle_message(
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
         tool = default_tool_registry.get_tool(tool_name)
-        if not tool:
+        handler = default_tool_registry.get_handler(tool_name)
+
+        if not tool or not handler:
             error = {"code": -32601, "message": f"Tool '{tool_name}' not found."}
+        elif not current_user:
+            error = {
+                "code": -32002,
+                "message": f"Authentication required to execute tool '{tool_name}'. Please authenticate with a valid Bearer token.",
+            }
         else:
-            actor = current_user.email if current_user else "mcp-ai-agent"
-            exec_output = {
+            # Resolve user's default project if available
+            user_project_id: Optional[uuid.UUID] = None
+            if arguments.get("project_id"):
+                try:
+                    user_project_id = uuid.UUID(str(arguments["project_id"]).strip())
+                except (ValueError, TypeError):
+                    pass
+
+            if not user_project_id:
+                p_stmt = select(Project.id).where(
+                    Project.owner_id == current_user.id,
+                    Project.deleted_at.is_(None)
+                ).order_by(Project.created_at.desc())
+                p_res = (await db.execute(p_stmt)).scalars().all()
+                if len(p_res) >= 1:
+                    user_project_id = p_res[0]
+
+            identity = AgentIdentity(
+                agent_id=current_user.id,
+                project_id=user_project_id or uuid.UUID("00000000-0000-0000-0000-000000000000"),
+                agent_name="claude-mcp-agent",
+                agent_type="AI_ASSISTANT",
+                trust_level="STANDARD",
+                authenticated_principal=current_user.email,
+                permissions=[tool.required_permission] if tool.required_permission else [],
+            )
+            mcp_ctx = MCPContext(
+                session_id=uuid.UUID(sessionId) if (sessionId and len(sessionId) == 36) else uuid.uuid4(),
+                identity=identity,
+                request_id=f"req_mcp_{uuid.uuid4().hex[:12]}",
+                client_name=request.headers.get("User-Agent", "Claude-MCP-Client"),
+                client_version="2.4.0",
+                transport="streamable-http",
+                metadata={
+                    "is_superuser": current_user.is_superuser,
+                    "user_email": current_user.email,
+                },
+            )
+
+            start_time = time.time()
+            try:
+                exec_result: ToolExecutionResult = await handler(mcp_ctx, arguments, db)
+                exec_time_ms = round((time.time() - start_time) * 1000, 2)
+                exec_result.execution_time_ms = exec_time_ms
+            except Exception as exc:
+                exec_time_ms = round((time.time() - start_time) * 1000, 2)
+                logger.exception(f"Unhandled exception executing MCP tool '{tool_name}': {exc}")
+                exec_result = ToolExecutionResult(
+                    status="FAILED",
+                    message=f"Tool execution failed with internal error: {str(exc)}",
+                    error_code="MCP_INTERNAL_ERROR",
+                    execution_time_ms=exec_time_ms,
+                )
+
+            # Record real audit event
+            audit_service = AuditService(db)
+            await audit_service.log_event(
+                action=f"MCP_TOOL_EXEC_{tool_name.upper()}",
+                resource_type="mcp_tool",
+                actor_type="user",
+                actor_id=str(current_user.id),
+                resource_id=tool_name,
+                status="SUCCESS" if exec_result.status == "SUCCESS" else "FAILURE",
+                metadata={
+                    "tool_name": tool_name,
+                    "category": tool.category,
+                    "risk_level": tool.risk_level,
+                    "status": exec_result.status,
+                    "error_code": exec_result.error_code,
+                    "request_id": mcp_ctx.request_id,
+                    "execution_time_ms": exec_time_ms,
+                },
+            )
+            await db.commit()
+
+            is_error = exec_result.status not in ("SUCCESS", "REQUIRES_APPROVAL")
+            content_payload = {
                 "tool": tool.name,
                 "category": tool.category,
                 "risk_level": tool.risk_level,
-                "status": "SUCCESS",
-                "parameters_applied": arguments,
-                "deterministic_policy": "ALLOW (OPA Rego evaluated)",
-                "audit_trace_id": f"aud_mcp_{uuid.uuid4().hex[:16]}",
-                "evidence": {
-                    "scanners_ready": ["Semgrep", "Gitleaks", "Trivy", "OPA", "OSV"],
-                    "cryptographic_proof": f"sha256_{uuid.uuid4().hex[:32]}",
-                    "execution_timestamp": time.time(),
-                },
+                "status": exec_result.status,
+                "message": exec_result.message,
+                "data": exec_result.data,
+                "error_code": exec_result.error_code,
+                "execution_time_ms": exec_time_ms,
+                "request_id": mcp_ctx.request_id,
             }
+            if exec_result.result_reference:
+                content_payload["result_reference"] = exec_result.result_reference
+            if exec_result.approval_id:
+                content_payload["approval_id"] = exec_result.approval_id
+
             result = {
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps(exec_output, indent=2),
+                        "text": json.dumps(content_payload, indent=2, default=str),
                     }
                 ],
-                "isError": False,
+                "isError": is_error,
             }
     else:
         error = {"code": -32601, "message": f"Method '{method}' not implemented."}

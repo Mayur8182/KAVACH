@@ -12,6 +12,7 @@ import uuid
 from app.data.service import DataService
 from app.agent.service import AgentService
 from app.mcp.schemas import MCPContext, ToolExecutionResult
+from app.mcp.tools.context_helper import resolve_authorized_project
 
 
 async def execute_audit_compliance_framework(
@@ -22,8 +23,10 @@ async def execute_audit_compliance_framework(
     """
     Audits compliance status against SOC2, ISO 27001, or HIPAA benchmarks.
     """
-    proj_id_str = arguments.get("project_id")
-    proj_uuid = uuid.UUID(proj_id_str) if proj_id_str else context.identity.project_id
+    project, err_result = await resolve_authorized_project(context, arguments, db)
+    if err_result:
+        return err_result
+    proj_uuid = project.id
     framework = arguments.get("framework", "SOC2_TYPE_II").upper()
 
     # Query blueprint requirements for this project
@@ -39,6 +42,8 @@ async def execute_audit_compliance_framework(
     return ToolExecutionResult(
         status="SUCCESS",
         data={
+            "project_id": str(proj_uuid),
+            "project_name": project.name,
             "framework": framework,
             "compliance_score": compliance_score,
             "total_controls": total_reqs,
@@ -58,8 +63,10 @@ async def execute_scan_sensitive_data_posture(
     """
     Audits DSPM data assets, PII classifications, and database sensitivity footprints.
     """
-    proj_id_str = arguments.get("project_id")
-    proj_uuid = uuid.UUID(proj_id_str) if proj_id_str else context.identity.project_id
+    project, err_result = await resolve_authorized_project(context, arguments, db)
+    if err_result:
+        return err_result
+    proj_uuid = project.id
 
     data_service = DataService(db)
     overview = await data_service.get_overview(proj_uuid)
@@ -67,7 +74,7 @@ async def execute_scan_sensitive_data_posture(
     return ToolExecutionResult(
         status="SUCCESS",
         data=overview if isinstance(overview, dict) else (overview.model_dump() if hasattr(overview, "model_dump") else {}),
-        message="Sensitive data posture and DSPM classification retrieved.",
+        message=f"Sensitive data posture and DSPM classification retrieved for project '{project.name}'.",
     )
 
 
@@ -79,8 +86,10 @@ async def execute_audit_agent_permissions_posture(
     """
     Audits active agent sessions, excessive permissions, and privilege escalation risks.
     """
-    proj_id_str = arguments.get("project_id")
-    proj_uuid = uuid.UUID(proj_id_str) if proj_id_str else context.identity.project_id
+    project, err_result = await resolve_authorized_project(context, arguments, db)
+    if err_result:
+        return err_result
+    proj_uuid = project.id
 
     agent_service = AgentService(db)
     risk_summary = await agent_service.get_risk(str(proj_uuid))
@@ -95,9 +104,11 @@ async def execute_audit_agent_permissions_posture(
     return ToolExecutionResult(
         status="SUCCESS",
         data={
+            "project_id": str(proj_uuid),
+            "project_name": project.name,
             "risk_summary": risk_summary,
             "total_agents": agents_list.get("total", 0),
             "high_risk_agents": high_risk_agents,
         },
-        message=f"Agent permissions audited. {len(high_risk_agents)} high/critical risk agent(s) identified.",
+        message=f"Agent permissions audited for '{project.name}'. {len(high_risk_agents)} high/critical risk agent(s) identified.",
     )
