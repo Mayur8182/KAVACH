@@ -429,6 +429,16 @@ def create_application() -> FastAPI:
         tags=["GitHub Webhook Root"],
     )
 
+    # Root-level Google OAuth Callback (matching GitHub Integration pattern)
+    from app.api.v1.auth import google_oauth_redirect_callback
+    app.add_api_route(
+        "/integrations/google/callback",
+        google_oauth_redirect_callback,
+        methods=["GET"],
+        include_in_schema=True,
+        tags=["Google Integration Root Callbacks"],
+    )
+
     # Include versioned API routers (/api/v1/...)
     app.include_router(main_router, prefix="/api")
 

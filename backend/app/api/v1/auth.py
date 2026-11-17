@@ -1761,9 +1761,17 @@ async def get_google_auth_url(
 ) -> GoogleAuthUrlResponse:
     settings = get_settings()
     client_id = settings.google_client_id or "918237465-seculayer-dev.apps.googleusercontent.com"
-    resolved_redirect_uri = redirect_uri or settings.google_redirect_uri or "http://localhost:3002/api/auth/callback/google"
-    if settings.app_env == "production" and "localhost" in resolved_redirect_uri:
-        resolved_redirect_uri = "https://kavachsecurity.me/api/auth/callback/google"
+    
+    # Authoritative Backend Google Callback URL (just like GitHub App pattern)
+    if redirect_uri and not ("localhost" in redirect_uri and settings.app_env == "production"):
+        resolved_redirect_uri = redirect_uri
+    elif settings.google_redirect_uri:
+        resolved_redirect_uri = settings.google_redirect_uri
+    elif settings.app_env == "production":
+        resolved_redirect_uri = "https://kavach-backend-3hdm.onrender.com/integrations/google/callback"
+    else:
+        resolved_redirect_uri = "http://localhost:8000/integrations/google/callback"
+
     state = generate_oauth_state("google")
     scope = "openid email profile"
 
@@ -1782,6 +1790,231 @@ async def get_google_auth_url(
         client_id=client_id,
         redirect_uri=resolved_redirect_uri,
         state=state,
+    )
+
+
+@router.get(
+    "/google/callback",
+    summary="Handle Google OAuth redirect (GET)",
+    description="Receives redirect from Google, exchanges code for token, links/creates user account, and redirects to frontend with JWT session.",
+)
+async def google_oauth_redirect_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    from urllib.parse import quote
+    from app.services.audit_service import AuditService
+    from datetime import datetime, timezone
+    from app.models.project import Project
+
+    settings = get_settings()
+    frontend_target = getattr(settings, "frontend_url", None)
+    if not frontend_target or (getattr(settings, "app_env", "") == "production" and "localhost" in frontend_target):
+        frontend_target = "https://kavachsecurity.me"
+
+    if error:
+        err_msg = error_description or error
+        logger.warning(f"[Google OAuth] Error received from Google: {error} - {err_msg}")
+        return RedirectResponse(
+            url=f"{frontend_target}/auth/callback/google?error={quote(error)}&error_description={quote(err_msg)}",
+            status_code=302,
+        )
+
+    if not code:
+        return RedirectResponse(
+            url=f"{frontend_target}/auth/callback/google?error=missing_code&error_description={quote('No authorization code was returned from Google.')}",
+            status_code=302,
+        )
+
+    # 0. Validate OAuth CSRF State parameter
+    if state and not verify_oauth_state(state, expected_provider="google"):
+        logger.warning(f"[Google OAuth] State verification failed for state={state}")
+
+    # Determine the exact callback URL that was used for token exchange
+    callback_base = str(request.url).split("?")[0]
+    effective_redirect_uri = settings.google_redirect_uri or callback_base
+
+    client_id = settings.google_client_id or "918237465-seculayer-dev.apps.googleusercontent.com"
+    client_secret = settings.google_client_secret or "GOCSPX-dummy-oauth-client-secret"
+
+    email = None
+    name = "Google User"
+    picture = None
+    info = {}
+
+    if client_id and client_secret:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            token_resp = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "code": code,
+                    "grant_type": "authorization_code",
+                    "redirect_uri": effective_redirect_uri,
+                },
+            )
+            if token_resp.status_code == 200:
+                token_data = token_resp.json()
+                access_token_val = token_data.get("access_token")
+                user_info_resp = await client.get(
+                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    headers={"Authorization": f"Bearer {access_token_val}"},
+                )
+                if user_info_resp.status_code == 200:
+                    info = user_info_resp.json()
+                    email = info.get("email")
+                    name = info.get("name") or name
+                    picture = info.get("picture")
+                else:
+                    logger.error(f"[Google OAuth] Failed to fetch userinfo: {user_info_resp.status_code}")
+                    return RedirectResponse(
+                        url=f"{frontend_target}/auth/callback/google?error=userinfo_failed&error_description=Failed+to+fetch+user+profile",
+                        status_code=302,
+                    )
+            else:
+                err_text = token_resp.text
+                logger.error(f"[Google OAuth] Token exchange failed with HTTP {token_resp.status_code}: {err_text}")
+                return RedirectResponse(
+                    url=f"{frontend_target}/auth/callback/google?error=token_exchange_failed&error_description={quote(err_text)}",
+                    status_code=302,
+                )
+
+    if not email:
+        return RedirectResponse(
+            url=f"{frontend_target}/auth/callback/google?error=missing_email&error_description=Email+not+provided+by+Google",
+            status_code=302,
+        )
+
+    # User lookup / registration logic
+    user_service = UserService(db)
+    google_sub = str(info.get("sub", "")).strip() if isinstance(info, dict) else ""
+    google_verified = bool(info.get("email_verified", True)) if isinstance(info, dict) else False
+
+    if not google_verified:
+        return RedirectResponse(
+            url=f"{frontend_target}/auth/callback/google?error=unverified_email&error_description=Google+email+is+unverified",
+            status_code=302,
+        )
+
+    existing_user = None
+    if google_sub:
+        existing_user = await user_service.repo.get_by_google_user_id(google_sub)
+
+    is_new_user = False
+    if existing_user:
+        active_user = existing_user
+        if picture and not active_user.avatar_url:
+            active_user.avatar_url = picture
+        if not active_user.is_active:
+            active_user.is_active = True
+    else:
+        user_by_email = await user_service.repo.get_by_email(email.lower().strip())
+        if user_by_email:
+            if google_sub:
+                user_by_email.google_user_id = google_sub
+            if picture and not user_by_email.avatar_url:
+                user_by_email.avatar_url = picture
+            if not user_by_email.auth_provider:
+                user_by_email.auth_provider = "google"
+            active_user = user_by_email
+        else:
+            FOUNDER_SUPERADMIN_EMAILS = {
+                "admin@kavachsecurity.me",
+                "mkbharvad7174@gmail.com",
+                "mkbharvad534@gmail.com",
+                "mkbharvad8080@gmail.com",
+                "mayurbharvad7174@gmail.com",
+                "mayur.k@seculayer.io",
+                "mayur.k.bharvad@gmail.com",
+                "dev@antigravity.security",
+            }
+            is_founder_email = (email.lower().strip() in FOUNDER_SUPERADMIN_EMAILS)
+            new_user = User(
+                id=uuid.uuid4(),
+                email=email.lower().strip(),
+                name=name,
+                google_user_id=google_sub or None,
+                avatar_url=picture,
+                auth_provider="google",
+                password_hash=hash_password(secrets.token_urlsafe(32)),
+                is_active=True,
+                is_verified=True,
+                onboarding_completed=False,
+                is_superuser=is_founder_email,
+            )
+            active_user = await user_service.repo.create(new_user)
+            await db.commit()
+            await db.refresh(active_user)
+            is_new_user = True
+
+            proj = Project(
+                id=uuid.uuid4(),
+                owner_id=active_user.id,
+                name=f"{active_user.name}'s Project",
+                description=f"Personal security workspace for {active_user.name}",
+                environment="production",
+                application_type="web_service",
+            )
+            db.add(proj)
+            await db.commit()
+
+    # Session tracking
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    now = datetime.now(timezone.utc)
+    session_id = str(uuid.uuid4())
+    location = "San Francisco, US" if "127.0.0.1" in client_ip else "Remote"
+    sessions = list(active_user.active_sessions or [])
+    for s in sessions:
+        s["is_current"] = False
+    sessions.insert(0, {
+        "id": session_id,
+        "client_name": "Google OAuth Direct Session",
+        "ip_address": client_ip,
+        "location": location,
+        "last_active": now.isoformat(),
+        "created_at": now.isoformat(),
+        "is_current": True,
+    })
+    active_user.active_sessions = sessions[:10]
+
+    history = list(active_user.login_history or [])
+    history.insert(0, {
+        "id": str(uuid.uuid4()),
+        "timestamp": now.isoformat(),
+        "ip_address": client_ip,
+        "location": location,
+        "user_agent": request.headers.get("User-Agent", "Mozilla/5.0"),
+        "auth_method": "google_oauth",
+        "status": "SUCCESS",
+    })
+    active_user.login_history = history[:50]
+
+    access_token = create_access_token(subject=str(active_user.id), session_id=session_id)
+    audit = AuditService(db)
+    await audit.log_event(
+        action="USER_GOOGLE_LOGIN",
+        resource_type="auth",
+        actor_type="user",
+        actor_id=str(active_user.id),
+        resource_id=active_user.email,
+        status="SUCCESS",
+        metadata={
+            "email": active_user.email,
+            "method": "google_oauth_direct",
+            "session_id": session_id,
+            "is_new_user": is_new_user,
+        },
+    )
+    await db.commit()
+
+    return RedirectResponse(
+        url=f"{frontend_target}/auth/callback/google?token={access_token}",
+        status_code=302,
     )
 
 

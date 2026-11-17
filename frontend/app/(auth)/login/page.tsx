@@ -111,10 +111,8 @@ function LoginContent() {
     setGoogleLoading(true);
     setError(null);
     try {
-      const currentOrigin =
-        typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002';
-      const redirectUri = `${currentOrigin}/api/auth/callback/google`;
-      const data = await api.auth.getGoogleAuthUrl(redirectUri);
+      // Direct backend Google OAuth integration (matching GitHub pattern)
+      const data = await api.auth.getGoogleAuthUrl();
       if (data?.url) {
         window.location.href = data.url;
         return;

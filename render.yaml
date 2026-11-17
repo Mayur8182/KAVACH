@@ -59,7 +59,7 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_REDIRECT_URI
-        value: https://kavachsecurity.me/api/auth/callback/google
+        value: https://kavach-backend-3hdm.onrender.com/integrations/google/callback
       # Gemini AI
       - key: GEMINI_API_KEY
         sync: false

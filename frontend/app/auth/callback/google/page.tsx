@@ -25,13 +25,39 @@ function GoogleCallbackContent() {
     if (processedRef.current) return;
     processedRef.current = true;
 
-    const code = searchParams.get('code') || 'google_oauth_authorized_token';
+    const token = searchParams.get('token');
+    const code = searchParams.get('code');
     const state = searchParams.get('state');
     const oauthError = searchParams.get('error');
     const oauthDesc = searchParams.get('error_description');
 
     if (oauthError) {
       setError(oauthDesc || `Google authorization failed (${oauthError}).`);
+      return;
+    }
+
+    // Direct token redirect from backend unified callback (matching GitHub App pattern)
+    if (token) {
+      setAuthToken(token);
+      trackLogin({ method: 'google' });
+      setStatusText('Google authentication verified. Resolving workspace entitlements...');
+
+      Promise.all([
+        api.entitlements.getMe().catch(() => null),
+        api.projects.list().catch(() => []),
+      ]).then(([ent, projs]: [any, any]) => {
+        const hasProject = Array.isArray(projs) && projs.length > 0;
+        if (hasProject && typeof window !== 'undefined') {
+          localStorage.setItem('secu_active_project_id', projs[0].id);
+        }
+        if (ent?.onboarding_completed || hasProject) {
+          router.push('/overview');
+        } else {
+          router.push('/onboarding');
+        }
+      }).catch(() => {
+        router.push('/overview');
+      });
       return;
     }
 
