@@ -467,6 +467,72 @@ async def mcp_handle_message(
     return response_payload
 
 
+@router.api_route(
+    "/mcp",
+    methods=["GET", "POST", "OPTIONS", "HEAD"],
+    summary="Unified MCP Gateway Endpoint (Streamable HTTP & SSE)",
+    description="Unified entrypoint for Anthropic Claude Connectors, Cursor, and MCP clients supporting both Streamable HTTP and SSE transports.",
+)
+async def mcp_unified_endpoint(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """
+    Handles both Streamable HTTP (JSON-RPC POST) and SSE (GET) on a single unified URL.
+    Ensures seamless connectivity for Anthropic Claude Custom Connectors and third-party AI agents.
+    """
+    from fastapi.responses import JSONResponse, Response
+
+    # 1. CORS Preflight
+    if request.method == "OPTIONS":
+        return Response(
+            status_code=200,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS, HEAD",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-MCP-Session-Id, X-Requested-With",
+            },
+        )
+
+    # 2. JSON-RPC 2.0 POST (Streamable HTTP / Claude Custom Connector)
+    if request.method == "POST":
+        return await mcp_handle_message(request=request, sessionId=None, db=db, current_user=current_user)
+
+    # 3. GET / HEAD
+    accept = request.headers.get("accept", "").lower()
+    if "text/event-stream" in accept:
+        return await mcp_sse_transport(request=request)
+
+    # Probed by Claude connector validator or browser
+    base_url = get_mcp_base_url(request)
+    tools = default_tool_registry.list_tools()
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "ONLINE",
+            "gateway_name": "Kavach Autonomous MCP Security Gateway",
+            "mcp_protocol_version": "2024-11-05",
+            "server_version": "2.4.0",
+            "transports": ["streamable-http", "sse"],
+            "endpoints": {
+                "mcp": f"{base_url}/mcp",
+                "sse": f"{base_url}/sse",
+                "api_sse": f"{base_url}/api/v1/mcp/sse",
+                "api_message": f"{base_url}/api/v1/mcp/message",
+                "tools": f"{base_url}/api/v1/mcp/tools",
+                "status": f"{base_url}/api/v1/mcp/status",
+                "manifest": f"{base_url}/api/v1/mcp/manifest",
+            },
+            "tools_count": len(tools),
+        },
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-cache",
+        },
+    )
+
+
 async def _verify_project_owner(project_id: uuid.UUID, user: User, db: AsyncSession) -> Project:
     project = await db.get(Project, project_id)
     if not project:

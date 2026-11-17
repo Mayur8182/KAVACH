@@ -182,6 +182,14 @@ const nextConfig = {
         source: '/api/:path*',
         destination: `${backendUrl}/api/:path*`,
       },
+      {
+        source: '/mcp',
+        destination: `${backendUrl}/mcp`,
+      },
+      {
+        source: '/sse',
+        destination: `${backendUrl}/sse`,
+      },
     ];
   },
 };

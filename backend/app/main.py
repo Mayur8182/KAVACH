@@ -439,6 +439,23 @@ def create_application() -> FastAPI:
         tags=["Google Integration Root Callbacks"],
     )
 
+    # Root-level MCP Gateway Endpoints (Streamable HTTP & SSE for Claude Connectors & AI Agents)
+    from app.api.v1.mcp import mcp_unified_endpoint, mcp_sse_transport
+    app.add_api_route(
+        "/mcp",
+        mcp_unified_endpoint,
+        methods=["GET", "POST", "OPTIONS", "HEAD"],
+        include_in_schema=True,
+        tags=["MCP Root Gateway"],
+    )
+    app.add_api_route(
+        "/sse",
+        mcp_sse_transport,
+        methods=["GET"],
+        include_in_schema=True,
+        tags=["MCP Root Gateway"],
+    )
+
     # Include versioned API routers (/api/v1/...)
     app.include_router(main_router, prefix="/api")
 
