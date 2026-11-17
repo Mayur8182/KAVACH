@@ -22,6 +22,7 @@ from app.core.database import get_db
 from app.core.security import (
     create_oauth_access_token,
     decode_token_safely,
+    get_current_user,
     verify_password,
 )
 from app.models.oauth import OAuthAuthorizationCode, OAuthClient, OAuthToken
@@ -40,6 +41,9 @@ SUPPORTED_SCOPES = [
     "findings:read",
     "remediation:propose",
     "offline_access",
+    "openid",
+    "profile",
+    "email",
 ]
 
 SCOPE_DESCRIPTIONS = {
@@ -49,6 +53,9 @@ SCOPE_DESCRIPTIONS = {
     "findings:read": "Inspect security vulnerabilities, attack surface, and active incidents",
     "remediation:propose": "Generate automated security fixes and remediation patches",
     "offline_access": "Maintain uninterrupted background connection using secure refresh tokens",
+    "openid": "Verify your identity using OpenID Connect",
+    "profile": "Access your profile information",
+    "email": "Access your email address",
 }
 
 
@@ -110,6 +117,7 @@ async def oauth_authorization_server_metadata(request: Request):
         "issuer": base,
         "authorization_endpoint": f"{base}/oauth/authorize",
         "token_endpoint": f"{base}/oauth/token",
+        "userinfo_endpoint": f"{base}/oauth/userinfo",
         "registration_endpoint": f"{base}/oauth/register",
         "revocation_endpoint": f"{base}/oauth/revoke",
         "response_types_supported": ["code"],
@@ -926,3 +934,25 @@ async def oauth_revoke_endpoint(
         await db.commit()
 
     return Response(status_code=200)
+
+
+# ── OpenID Connect UserInfo Endpoint (OIDC Core 1.0) ──
+
+@router.get("/oauth/userinfo")
+@router.post("/oauth/userinfo")
+async def oauth_userinfo_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    OpenID Connect UserInfo Endpoint (OIDC Core 1.0).
+    Allows ChatGPT, Claude, and OIDC clients to retrieve authenticated user identity claims.
+    """
+    return {
+        "sub": str(current_user.id),
+        "name": getattr(current_user, "name", None) or current_user.email,
+        "email": current_user.email,
+        "email_verified": getattr(current_user, "is_verified", True),
+        "picture": getattr(current_user, "avatar_url", None),
+        "preferred_username": current_user.email,
+    }
+

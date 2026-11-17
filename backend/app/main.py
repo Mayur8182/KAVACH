@@ -342,11 +342,8 @@ def create_application() -> FastAPI:
     app.add_middleware(IdempotencyMiddleware)
     app.add_middleware(RateLimitingMiddleware)
 
-    # Configure CORS: In development, strictly allow explicitly configured local origins without production domain dependencies
-    if settings.app_env == "production":
-        origin_regex = r"^https?://([a-zA-Z0-9-]+\.)*(onrender\.com|kavachsecurity\.me)(:[0-9]+)?$"
-    else:
-        origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$"
+    # Configure CORS: In production, dev, and AI integrations (Claude, ChatGPT, Cursor, Anthropic), allow all HTTP/HTTPS origins
+    origin_regex = r"^https?://.*$"
 
     app.add_middleware(
         CORSMiddleware,
