@@ -31,6 +31,23 @@ from app.services.audit_service import AuditService
 logger = logging.getLogger("kavach.mcp")
 settings = get_settings()
 
+TOOL_REQUIRED_SCOPES = {
+    "list_projects": "projects:read",
+    "get_project": "projects:read",
+    "get_cloud_inventory": "projects:read",
+    "audit_cloud_posture": "projects:read",
+    "get_security_blueprint": "projects:read",
+    "check_security_policy": "projects:read",
+    "analyze_codebase": "projects:read",
+    "get_active_incidents": "findings:read",
+    "audit_attack_surface": "findings:read",
+    "get_scan": "scans:read",
+    "run_security_scan": "scans:run",
+    "security_check": "scans:run",
+    "propose_remediation": "remediation:propose",
+    "apply_remediation": "remediation:apply",
+}
+
 router = APIRouter(tags=["MCP Gateway Management"])
 
 
@@ -389,6 +406,7 @@ async def mcp_handle_message(
     Enforces the 7-stage deterministic security gateway pipeline.
     """
     # 0. Check Authorization Bearer header if provided
+    token_payload: Optional[Dict[str, Any]] = None
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.replace("Bearer ", "").strip()
@@ -405,6 +423,19 @@ async def mcp_handle_message(
                 detail="Invalid authentication token.",
                 headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="Invalid access token"'},
             )
+
+        import hashlib
+        from app.models.oauth import OAuthToken
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        rev_stmt = select(OAuthToken.is_revoked).where(OAuthToken.access_token_hash == token_hash)
+        rev_res = (await db.execute(rev_stmt)).scalar_one_or_none()
+        if rev_res is True:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="The access token has been revoked.",
+                headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The access token has been revoked"'},
+            )
+
         if not current_user and token_payload and "sub" in token_payload:
             try:
                 user_uuid = uuid.UUID(token_payload["sub"])
@@ -465,7 +496,16 @@ async def mcp_handle_message(
                 "code": -32002,
                 "message": f"Authentication required to execute tool '{tool_name}'. Please authenticate with a valid Bearer token.",
             }
-        else:
+        elif token_payload and "scope" in token_payload and not current_user.is_superuser:
+            granted_scopes = set(token_payload.get("scope", "").split())
+            required_scope = TOOL_REQUIRED_SCOPES.get(tool_name)
+            if required_scope and granted_scopes and required_scope not in granted_scopes:
+                error = {
+                    "code": -32003,
+                    "message": f"Access denied: Insufficient scope. Tool '{tool_name}' requires scope '{required_scope}'.",
+                }
+
+        if not error and current_user:
             # Resolve user's default project if available
             user_project_id: Optional[uuid.UUID] = None
             if arguments.get("project_id"):

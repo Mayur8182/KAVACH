@@ -259,6 +259,12 @@ from app.models.ai_assistant import (
 )
 
 
+from app.models.oauth import (
+    OAuthClient,
+    OAuthAuthorizationCode,
+    OAuthToken,
+)
+
 __all__ = [
     "Base",
     "TimestampMixin",
@@ -344,5 +350,8 @@ __all__ = [
     "ModelComplianceEvidence",
     "ModelEndpoint",
     "ModelBehavioralTestRun",
+    "OAuthClient",
+    "OAuthAuthorizationCode",
+    "OAuthToken",
 ]
 

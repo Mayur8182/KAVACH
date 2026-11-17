@@ -1,3 +1,4 @@
+from app.api.v1.oauth import router as oauth_router
 from fastapi import APIRouter
 from app.api.v1.health import router as health_router
 from app.api.v1.auth import router as auth_router
@@ -157,5 +158,6 @@ v1_router.include_router(onboarding_router)
 v1_router.include_router(invitations_router)
 v1_router.include_router(notifications_router)
 v1_router.include_router(reports_router)
+v1_router.include_router(oauth_router)
 
 __all__ = ["v1_router"]

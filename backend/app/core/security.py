@@ -84,13 +84,47 @@ def create_refresh_token(
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
+def create_oauth_access_token(
+    user_id: uuid.UUID,
+    client_id: str,
+    scope: str,
+    issuer: str,
+    audience: Optional[str] = None,
+    expires_delta: Optional[timedelta] = None,
+) -> str:
+    """Generates RFC-compliant OAuth 2.1 JWT access token with standard claims."""
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    payload = {
+        "iss": issuer,
+        "sub": str(user_id),
+        "aud": audience or f"{issuer}/mcp",
+        "client_id": client_id,
+        "scope": scope,
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+        "jti": str(uuid.uuid4()),
+        "token_type": "Bearer",
+        "type": "access",
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
 def decode_token_safely(token: str) -> tuple[Optional[dict], Optional[str]]:
     """
     Decodes JWT token and differentiates between expired vs invalid token.
     Returns (payload, error_type). error_type is 'expired', 'invalid', or None.
     """
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            options={"verify_aud": False},
+        )
         return payload, None
     except jwt.ExpiredSignatureError:
         return None, "expired"

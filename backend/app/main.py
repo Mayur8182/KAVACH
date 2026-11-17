@@ -11,7 +11,7 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -454,6 +454,74 @@ def create_application() -> FastAPI:
         methods=["GET"],
         include_in_schema=True,
         tags=["MCP Root Gateway"],
+    )
+
+    # Root-level OAuth 2.1 & Discovery Endpoints (RFC 9207, RFC 8414, RFC 7591)
+    from app.api.v1.oauth import (
+        oauth_protected_resource_metadata,
+        oauth_authorization_server_metadata,
+        oauth_authorize_get,
+        oauth_authorize_post,
+        oauth_token_endpoint,
+        oauth_revoke_endpoint,
+        oauth_register_client,
+    )
+    app.add_api_route(
+        "/.well-known/oauth-protected-resource",
+        oauth_protected_resource_metadata,
+        methods=["GET"],
+        include_in_schema=True,
+        tags=["OAuth 2.1 Discovery"],
+    )
+    app.add_api_route(
+        "/.well-known/oauth-authorization-server",
+        oauth_authorization_server_metadata,
+        methods=["GET"],
+        include_in_schema=True,
+        tags=["OAuth 2.1 Discovery"],
+    )
+    app.add_api_route(
+        "/.well-known/openid-configuration",
+        oauth_authorization_server_metadata,
+        methods=["GET"],
+        include_in_schema=True,
+        tags=["OAuth 2.1 Discovery"],
+    )
+    app.add_api_route(
+        "/oauth/authorize",
+        oauth_authorize_get,
+        methods=["GET"],
+        include_in_schema=True,
+        tags=["OAuth 2.1 Authorization"],
+    )
+    app.add_api_route(
+        "/oauth/authorize",
+        oauth_authorize_post,
+        methods=["POST"],
+        include_in_schema=True,
+        tags=["OAuth 2.1 Authorization"],
+    )
+    app.add_api_route(
+        "/oauth/token",
+        oauth_token_endpoint,
+        methods=["POST"],
+        include_in_schema=True,
+        tags=["OAuth 2.1 Authorization"],
+    )
+    app.add_api_route(
+        "/oauth/revoke",
+        oauth_revoke_endpoint,
+        methods=["POST"],
+        include_in_schema=True,
+        tags=["OAuth 2.1 Authorization"],
+    )
+    app.add_api_route(
+        "/oauth/register",
+        oauth_register_client,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+        include_in_schema=True,
+        tags=["OAuth 2.1 Authorization"],
     )
 
     # Include versioned API routers (/api/v1/...)
