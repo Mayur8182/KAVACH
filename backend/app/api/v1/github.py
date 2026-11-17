@@ -156,7 +156,14 @@ async def github_installation_callback(
         error=error,
         error_description=error_description,
     )
-    redirect_target = result.get("redirect_url", "http://localhost:3002/onboarding?step=github&connected=true")
+    settings = get_settings()
+    frontend_target = getattr(settings, "frontend_url", None)
+    if not frontend_target or (getattr(settings, "app_env", "") == "production" and "localhost" in frontend_target):
+        frontend_target = "https://kavachsecurity.me"
+    default_redirect = f"{frontend_target}/onboarding?step=github&connected=true"
+    redirect_target = result.get("redirect_url") or default_redirect
+    if getattr(settings, "app_env", "") == "production" and "localhost:3002" in redirect_target:
+        redirect_target = redirect_target.replace("http://localhost:3002", "https://kavachsecurity.me")
     return RedirectResponse(url=redirect_target, status_code=status.HTTP_302_FOUND)
 
 
