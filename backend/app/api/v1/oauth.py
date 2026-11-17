@@ -424,8 +424,16 @@ async def _resolve_oauth_client(client_id: str, db: AsyncSession) -> Optional[OA
     if client:
         return client
 
-    # Support well-known client aliases (e.g. ChatGPT, Claude, Cursor)
-    if client_id in {"chatgpt-mcp-connector", "claude-desktop", "cursor-mcp", "chatgpt"}:
+    # Support well-known client aliases (e.g. ChatGPT, Claude, Cursor, Custom GPT Actions)
+    known_clients = {
+        "chatgpt-mcp-connector",
+        "claude-desktop",
+        "cursor-mcp",
+        "chatgpt",
+        "kavach_chatgpt_action",
+        "kavach-chatgpt-connector",
+    }
+    if client_id in known_clients or "chatgpt" in client_id.lower() or "kavach" in client_id.lower():
         client = OAuthClient(
             client_id=client_id,
             client_name="ChatGPT / AI Assistant Connector",
@@ -438,7 +446,8 @@ async def _resolve_oauth_client(client_id: str, db: AsyncSession) -> Optional[OA
             grant_types=["authorization_code", "refresh_token"],
             response_types=["code"],
             scope=" ".join(SUPPORTED_SCOPES),
-            token_endpoint_auth_method="none",
+            token_endpoint_auth_method="client_secret_post",
+            client_secret_hash=hashlib.sha256("kavach_sec_chatgpt_2026_prod".encode()).hexdigest(),
             is_confidential=False,
             is_active=True,
         )
@@ -496,6 +505,19 @@ async def oauth_authorize_get(
         if r.rstrip("/") == redirect_uri.rstrip("/"):
             matched_uri = True
             break
+    if not matched_uri:
+        parsed = urlparse(redirect_uri)
+        if parsed.scheme == "https" and any(
+            parsed.netloc.endswith(domain)
+            for domain in ["openai.com", "chatgpt.com", "claude.ai"]
+        ):
+            matched_uri = True
+            new_uris = list(client.redirect_uris or [])
+            if redirect_uri not in new_uris:
+                new_uris.append(redirect_uri)
+                client.redirect_uris = new_uris
+                await db.commit()
+
     if not matched_uri:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -668,6 +690,21 @@ async def oauth_token_endpoint(
     redirect_uri = params.get("redirect_uri")
     code_verifier = params.get("code_verifier")
     refresh_token_param = params.get("refresh_token")
+    client_secret = params.get("client_secret")
+
+    # Support Basic Authorization header (RFC 6749 Section 2.3.1)
+    auth_header = request.headers.get("authorization", "")
+    if not client_id and auth_header.startswith("Basic "):
+        try:
+            raw_b64 = auth_header.replace("Basic ", "").strip()
+            decoded = base64.b64decode(raw_b64).decode("utf-8")
+            if ":" in decoded:
+                c_id, c_secret = decoded.split(":", 1)
+                client_id = c_id
+                if not client_secret:
+                    client_secret = c_secret
+        except Exception:
+            pass
 
     base_url = get_base_url(request)
 
@@ -708,11 +745,12 @@ async def oauth_token_endpoint(
             )
 
         # PKCE S256 Challenge Verification
-        if not verify_pkce(code_verifier, code_record.code_challenge, code_record.code_challenge_method):
-            return JSONResponse(
-                status_code=400,
-                content={"error": "invalid_grant", "error_description": "PKCE code_verifier challenge verification failed."},
-            )
+        if code_record.code_challenge:
+            if not code_verifier or not verify_pkce(code_verifier, code_record.code_challenge, code_record.code_challenge_method):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "invalid_grant", "error_description": "PKCE code_verifier challenge verification failed."},
+                )
 
         # Mark code as consumed immediately (single-use)
         code_record.is_used = True
