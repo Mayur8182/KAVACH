@@ -6,7 +6,7 @@
  * Transparent tiered pricing for Code Security, Cloud CSPM, and Runtime Invariants.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Check,
@@ -14,6 +14,12 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  User,
+  Users,
+  Building2,
+  Layers,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
 import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
@@ -22,11 +28,13 @@ import { TalkToExpertModal } from '@/components/common/TalkToExpertModal';
 import { trackPricingView, trackBeginCheckout, trackDemoRequest } from '@/lib/analytics/gtag';
 
 export default function PricingPage() {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [searchOpen, setSearchOpen] = useState(false);
   const [expertOpen, setExpertOpen] = useState(false);
   const [selectedPlanForModal, setSelectedPlanForModal] = useState<string>('Business');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [activeDot, setActiveDot] = useState<number>(1);
+  const cardsContainerRef = useRef<HTMLDivElement>(null);
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
@@ -42,78 +50,83 @@ export default function PricingPage() {
     setExpertOpen(true);
   };
 
+  const scrollCards = (direction: 'left' | 'right') => {
+    if (!cardsContainerRef.current) return;
+    const container = cardsContainerRef.current;
+    const scrollAmount = 320;
+    container.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    });
+  };
+
+  const handleScroll = () => {
+    if (!cardsContainerRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = cardsContainerRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) return;
+    const progress = scrollLeft / maxScroll;
+    if (progress < 0.3) {
+      setActiveDot(0);
+    } else if (progress > 0.7) {
+      setActiveDot(2);
+    } else {
+      setActiveDot(1);
+    }
+  };
+
+  const scrollToDot = (dotIndex: number) => {
+    if (!cardsContainerRef.current) return;
+    const { scrollWidth, clientWidth } = cardsContainerRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    let target = 0;
+    if (dotIndex === 1) target = maxScroll * 0.5;
+    if (dotIndex === 2) target = maxScroll;
+    cardsContainerRef.current.scrollTo({ left: target, behavior: 'smooth' });
+    setActiveDot(dotIndex);
+  };
+
   const plans = [
     {
       name: 'Developer',
-      tagline: 'Essential security for individual developers and open-source contributors.',
+      subtitle: 'For individual use.',
+      icon: User,
       priceMonthly: 0,
       priceAnnual: 0,
       ctaText: 'Start Free',
       ctaHref: '/signup',
       highlighted: false,
-      features: [
-        'Up to 3 active repositories',
-        'Built-in AST static analysis & secret scanning',
-        'Automated PR security checks',
-        'Standard CVE vulnerability alerts',
-        'Community documentation & support',
-        '100 scan minutes per month',
-      ],
     },
     {
       name: 'Team',
-      tagline: 'Deterministic security enforcement for growing engineering teams.',
-      priceMonthly: 49,
-      priceAnnual: 39,
-      ctaText: 'Start 14-Day Trial',
+      subtitle: 'For small teams.',
+      icon: Users,
+      priceMonthly: 9,
+      priceAnnual: 7,
+      ctaText: 'Start Trial',
       ctaHref: '/signup?plan=team',
       highlighted: false,
-      features: [
-        'Up to 25 repositories & 15 developers',
-        'Semgrep SAST, Gitleaks, & Trivy engines',
-        'Blocking CI/CD merge gates',
-        'Automated dependency auto-fix PRs',
-        'Secrets remediation & historical audit',
-        'Standard email support (12-hour SLA)',
-        'Unlimited automated scan runs',
-      ],
     },
     {
       name: 'Business',
+      subtitle: 'For growing teams.',
+      icon: Building2,
       badge: 'Most Popular',
-      tagline: 'Complete DevSecOps governance, cloud posture, and compliance assurance.',
-      priceMonthly: 199,
-      priceAnnual: 159,
-      ctaText: 'Upgrade to Business',
+      priceMonthly: 29,
+      priceAnnual: 24,
+      ctaText: 'Get Started',
       ctaHref: '/signup?plan=business',
       highlighted: true,
-      features: [
-        'Unlimited repositories & workspaces',
-        'Deterministic OPA Rego policy enforcement',
-        'SLSA Level 3 aligned cryptographic build provenance',
-        'Multi-cloud CSPM & container vulnerability audit',
-        'Framework mapping (SOC 2, ISO 27001, HIPAA & PCI readiness)',
-        'Role-based access control (RBAC) & SSO (SAML/OIDC)',
-        'Priority support (4-hour response SLA)',
-      ],
     },
     {
       name: 'Enterprise',
-      tagline: 'Custom architectures, dedicated tenancy, and mission-critical SLAs.',
+      subtitle: 'For large organizations.',
+      icon: Layers,
       priceMonthly: 'Custom',
       priceAnnual: 'Custom',
-      ctaText: 'Contact Security Team',
+      ctaText: 'Contact Sales',
       onCtaClick: () => handleContactSales('Enterprise'),
       highlighted: false,
-      features: [
-        'Dedicated single-tenant VPC or on-prem deployment',
-        'Self-hosted scanner runner clusters',
-        'Custom OPA Rego invariants and compliance rules',
-        'Air-gapped deployment support',
-        'Dedicated Technical Account Manager',
-        'Custom enterprise security SLA (99.99%)',
-        'Custom vendor security assessments & SOC report',
-      ],
     },
   ];
 
@@ -157,281 +170,368 @@ export default function PricingPage() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column' }}>
+      <style>{`
+        @keyframes cardFadeUp {
+          from {
+            opacity: 0;
+            transform: translateY(22px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
       {/* Top Navigation */}
       <SecuLayerHeader
         onOpenSearch={() => setSearchOpen(true)}
         onOpenExpert={() => setExpertOpen(true)}
       />
 
-      <main style={{ flex: 1, width: '100%', maxWidth: '1240px', margin: '0 auto', padding: '48px 24px 96px' }}>
+      <main style={{ flex: 1, width: '100%', maxWidth: '1240px', margin: '0 auto', padding: '40px 24px 80px' }}>
         {/* Header Section */}
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '20px', backgroundColor: '#F4F4F5', border: '1px solid #E4E4E7', color: '#18181B', fontSize: '12px', fontWeight: 600, marginBottom: '16px' }}>
-            <ShieldCheck size={14} color="#18181B" />
-            <span>Deterministic Security Pricing</span>
-          </div>
-          <h1 style={{ fontSize: '40px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.03em', margin: '0 0 12px' }}>
-            Predictable Pricing for High-Velocity Teams
+        <div style={{ textAlign: 'center', marginBottom: '44px' }}>
+          <h1 style={{ fontSize: '44px', fontWeight: 800, color: '#09090B', letterSpacing: '-0.035em', margin: '0 0 10px', lineHeight: 1.15 }}>
+            Simple Pricing
           </h1>
-          <p style={{ fontSize: '16px', color: '#64748B', maxWidth: '600px', margin: '0 auto 28px', lineHeight: 1.6 }}>
-            Every plan includes real deterministic scanning with zero simulated metrics. Choose the governance tier that fits your engineering pipeline.
+          <p style={{ fontSize: '16px', color: '#71717A', margin: '0 auto 28px', maxWidth: '600px', fontWeight: 400 }}>
+            Choose a plan that fits your team.
           </p>
 
           {/* Billing Switcher */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', backgroundColor: '#F1F5F9', padding: '4px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E4E4E7',
+              borderRadius: '9999px',
+              padding: '4px',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+            }}
+          >
             <button
+              type="button"
               onClick={() => setBillingCycle('monthly')}
               style={{
-                padding: '8px 18px',
-                fontSize: '13px',
+                padding: '8px 24px',
+                fontSize: '13.5px',
                 fontWeight: billingCycle === 'monthly' ? 600 : 500,
-                color: billingCycle === 'monthly' ? '#0F172A' : '#64748B',
-                backgroundColor: billingCycle === 'monthly' ? '#FFFFFF' : 'transparent',
+                color: billingCycle === 'monthly' ? '#FFFFFF' : '#71717A',
+                backgroundColor: billingCycle === 'monthly' ? '#09090B' : 'transparent',
                 border: 'none',
-                borderRadius: '8px',
-                boxShadow: billingCycle === 'monthly' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                borderRadius: '9999px',
                 cursor: 'pointer',
+                transition: 'all 0.18s ease',
               }}
             >
-              Monthly Billing
+              Monthly
             </button>
 
             <button
+              type="button"
               onClick={() => setBillingCycle('annual')}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '8px 18px',
-                fontSize: '13px',
+                padding: '8px 24px',
+                fontSize: '13.5px',
                 fontWeight: billingCycle === 'annual' ? 600 : 500,
-                color: billingCycle === 'annual' ? '#0F172A' : '#64748B',
-                backgroundColor: billingCycle === 'annual' ? '#FFFFFF' : 'transparent',
+                color: billingCycle === 'annual' ? '#FFFFFF' : '#71717A',
+                backgroundColor: billingCycle === 'annual' ? '#09090B' : 'transparent',
                 border: 'none',
-                borderRadius: '8px',
-                boxShadow: billingCycle === 'annual' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                borderRadius: '9999px',
                 cursor: 'pointer',
+                transition: 'all 0.18s ease',
               }}
             >
-              <span>Annual Billing</span>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#047857', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', padding: '1px 6px', borderRadius: '10px' }}>
-                Save 20%
-              </span>
+              <span>Annual</span>
+              {billingCycle !== 'annual' && (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    color: '#047857',
+                    backgroundColor: '#ECFDF5',
+                    padding: '2px 7px',
+                    borderRadius: '10px',
+                    border: '1px solid #A7F3D0',
+                  }}
+                >
+                  Save 20%
+                </span>
+              )}
             </button>
           </div>
         </div>
 
-        {/* Pricing Cards Grid with Staggered Cascading Animation */}
-        <style dangerouslySetInnerHTML={{ __html: `
-          @keyframes pricingCardFadeUp {
-            0% {
-              opacity: 0;
-              transform: translateY(32px) scale(0.98);
-            }
-            100% {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
-          }
-          .pricing-card-hover {
-            transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
-          }
-          .pricing-card-hover:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.12) !important;
-            border-color: #0F172A !important;
-          }
-        ` }} />
+        {/* Pricing Cards Carousel / Grid */}
+        <div style={{ position: 'relative', maxWidth: '1240px', margin: '0 auto 24px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Left Arrow Button */}
+          <button
+            type="button"
+            onClick={() => scrollCards('left')}
+            aria-label="Previous plans"
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E4E4E7',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#09090B',
+              flexShrink: 0,
+              transition: 'all 0.15s ease',
+              zIndex: 2,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F4F4F5'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+          >
+            <ChevronLeft size={20} />
+          </button>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '22px', marginBottom: '64px', alignItems: 'stretch' }}>
-          {plans.map((p, index) => {
-            const isCustom = typeof p.priceAnnual === 'string';
-            const price = isCustom ? 'Custom' : billingCycle === 'annual' ? p.priceAnnual : p.priceMonthly;
+          {/* Cards Container with Smooth Scroll & Staggered Animation */}
+          <div
+            ref={cardsContainerRef}
+            onScroll={handleScroll}
+            className="hide-scrollbar"
+            style={{
+              flex: 1,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, minmax(240px, 1fr))',
+              gap: '18px',
+              overflowX: 'auto',
+              scrollSnapType: 'x mandatory',
+              scrollBehavior: 'smooth',
+              padding: '6px 2px 14px',
+            }}
+          >
+            {plans.map((p, idx) => {
+              const isCustom = typeof p.priceAnnual === 'string';
+              const price = isCustom ? 'Custom' : billingCycle === 'annual' ? p.priceAnnual : p.priceMonthly;
+              const IconComp = p.icon;
+              const isPopular = p.highlighted;
 
-            return (
-              <div
-                key={p.name}
-                className="pricing-card-hover"
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '18px',
-                  border: p.highlighted ? '2px solid #09090B' : '1px solid #E2E8F0',
-                  boxShadow: p.highlighted ? '0 16px 36px -8px rgba(0, 0, 0, 0.12)' : '0 2px 6px rgba(0,0,0,0.03)',
-                  padding: '36px 26px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  position: 'relative',
-                  opacity: 0,
-                  animation: `pricingCardFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) ${index * 130}ms forwards`,
-                  boxSizing: 'border-box',
-                }}
-              >
-                {p.badge && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '-13px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      backgroundColor: '#09090B',
-                      color: '#FFFFFF',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      padding: '4px 16px',
-                      borderRadius: '20px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    }}
-                  >
-                    {p.badge}
-                  </div>
-                )}
+              return (
+                <div
+                  key={p.name}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '24px',
+                    border: isPopular ? '2px solid #09090B' : '1px solid #E4E4E7',
+                    boxShadow: isPopular ? '0 10px 25px -4px rgba(0, 0, 0, 0.08)' : '0 2px 8px rgba(0, 0, 0, 0.02)',
+                    padding: '30px 24px 28px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    boxSizing: 'border-box',
+                    scrollSnapAlign: 'start',
+                    animation: `cardFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both`,
+                    animationDelay: `${idx * 90}ms`,
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = isPopular ? '0 16px 36px -6px rgba(0, 0, 0, 0.14)' : '0 12px 28px -6px rgba(0, 0, 0, 0.06)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = isPopular ? '0 10px 25px -4px rgba(0, 0, 0, 0.08)' : '0 2px 8px rgba(0, 0, 0, 0.02)';
+                  }}
+                >
+                  {/* Top Row: Icon + Most Popular Badge */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '22px' }}>
+                    <div
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '12px',
+                        backgroundColor: '#F4F4F5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <IconComp size={22} color="#09090B" strokeWidth={1.8} />
+                    </div>
 
-                <div style={{ marginBottom: '22px' }}>
-                  <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
-                    {p.name}
-                  </h2>
-                  <p style={{ fontSize: '13px', color: '#64748B', margin: 0, minHeight: '38px', lineHeight: 1.5 }}>
-                    {p.tagline}
-                  </p>
-                </div>
-
-                <div style={{ marginBottom: '24px', paddingBottom: '22px', borderBottom: '1px solid #F1F5F9' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                    <span style={{ fontSize: '38px', fontWeight: 850, color: '#0F172A', letterSpacing: '-0.035em' }}>
-                      {typeof price === 'number' ? `$${price}` : price}
-                    </span>
-                    {typeof price === 'number' && (
-                      <span style={{ fontSize: '13.5px', color: '#64748B', fontWeight: 500 }}>
-                        / seat / month
-                      </span>
+                    {p.badge && (
+                      <div
+                        style={{
+                          backgroundColor: '#09090B',
+                          color: '#FFFFFF',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          padding: '4px 12px',
+                          borderRadius: '9999px',
+                          letterSpacing: '-0.01em',
+                        }}
+                      >
+                        {p.badge}
+                      </div>
                     )}
                   </div>
-                  {typeof price === 'number' && billingCycle === 'annual' && price > 0 && (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: '#047857', marginTop: '6px', fontWeight: 600, backgroundColor: '#ECFDF5', padding: '2px 8px', borderRadius: '6px' }}>
-                      Billed annually (Save ${(((p.priceMonthly as number) - (p.priceAnnual as number)) * 12)}/seat/yr)
-                    </div>
-                  )}
-                </div>
 
-                <div style={{ flex: 1, marginBottom: '30px' }}>
-                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '16px' }}>
-                    What&apos;s Included:
+                  {/* Plan Name */}
+                  <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#09090B', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
+                    {p.name}
+                  </h2>
+
+                  {/* Plan Subtitle */}
+                  <p style={{ fontSize: '13.5px', color: '#71717A', margin: '0 0 28px', minHeight: '20px' }}>
+                    {p.subtitle}
+                  </p>
+
+                  {/* Price */}
+                  <div style={{ marginBottom: '4px' }}>
+                    <span style={{ fontSize: '42px', fontWeight: 850, color: '#09090B', letterSpacing: '-0.04em', lineHeight: 1 }}>
+                      {typeof price === 'number' ? `$${price}` : price}
+                    </span>
                   </div>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {p.features.map((f) => (
-                      <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13.5px', color: '#334155', lineHeight: 1.45 }}>
-                        <div
-                          style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            backgroundColor: p.highlighted ? '#F1F5F9' : '#ECFDF5',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            marginTop: '2px',
-                          }}
-                        >
-                          <Check size={12} color={p.highlighted ? '#09090B' : '#059669'} strokeWidth={2.8} />
-                        </div>
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
 
-                {p.onCtaClick ? (
-                  <button
-                    onClick={p.onCtaClick}
-                    style={{
-                      width: '100%',
-                      padding: '12px 20px',
-                      borderRadius: '12px',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      letterSpacing: '-0.01em',
-                      backgroundColor: p.highlighted ? '#09090B' : '#FFFFFF',
-                      color: p.highlighted ? '#FFFFFF' : '#18181B',
-                      border: p.highlighted ? 'none' : '1px solid #E4E4E7',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      transition: 'all 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (p.highlighted) {
-                        e.currentTarget.style.backgroundColor = '#27272A';
-                      } else {
-                        e.currentTarget.style.backgroundColor = '#F4F4F5';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (p.highlighted) {
-                        e.currentTarget.style.backgroundColor = '#09090B';
-                      } else {
-                        e.currentTarget.style.backgroundColor = '#FFFFFF';
-                      }
-                    }}
-                  >
-                    <span>{p.ctaText}</span>
-                    <ArrowRight size={15} />
-                  </button>
-                ) : (
-                  <Link
-                    href={p.ctaHref || '/signup'}
-                    onClick={() => {
-                      if (p.priceMonthly > 0 || p.priceAnnual > 0) {
-                        trackBeginCheckout({
-                          plan_name: p.name,
-                          price: typeof p.priceAnnual === 'number' ? (billingCycle === 'annual' ? p.priceAnnual : p.priceMonthly) : 0,
-                          billing_cycle: billingCycle,
-                        });
-                      }
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '12px 20px',
-                      borderRadius: '12px',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      letterSpacing: '-0.01em',
-                      backgroundColor: p.highlighted ? '#09090B' : '#FFFFFF',
-                      color: p.highlighted ? '#FFFFFF' : '#18181B',
-                      border: p.highlighted ? 'none' : '1px solid #E4E4E7',
-                      textDecoration: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      textAlign: 'center',
-                      boxSizing: 'border-box',
-                      transition: 'all 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (p.highlighted) {
-                        e.currentTarget.style.backgroundColor = '#27272A';
-                      } else {
-                        e.currentTarget.style.backgroundColor = '#F4F4F5';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (p.highlighted) {
-                        e.currentTarget.style.backgroundColor = '#09090B';
-                      } else {
-                        e.currentTarget.style.backgroundColor = '#FFFFFF';
-                      }
-                    }}
-                  >
-                    <span>{p.ctaText}</span>
-                    <ArrowRight size={15} />
-                  </Link>
-                )}
-              </div>
+                  {/* Cadence */}
+                  <div style={{ fontSize: '13.5px', color: '#71717A', marginBottom: '32px' }}>
+                    / month
+                  </div>
+
+                  {/* CTA Button */}
+                  <div style={{ marginTop: 'auto' }}>
+                    {p.onCtaClick ? (
+                      <button
+                        type="button"
+                        onClick={p.onCtaClick}
+                        style={{
+                          width: '100%',
+                          padding: '13px 20px',
+                          borderRadius: '12px',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          letterSpacing: '-0.01em',
+                          backgroundColor: isPopular ? '#09090B' : '#FFFFFF',
+                          color: isPopular ? '#FFFFFF' : '#09090B',
+                          border: isPopular ? 'none' : '1px solid #E4E4E7',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isPopular ? '#27272A' : '#F4F4F5';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = isPopular ? '#09090B' : '#FFFFFF';
+                        }}
+                      >
+                        {p.ctaText}
+                      </button>
+                    ) : (
+                      <Link
+                        href={p.ctaHref || '/signup'}
+                        onClick={() => {
+                          if (p.priceMonthly > 0 || p.priceAnnual > 0) {
+                            trackBeginCheckout({
+                              plan_name: p.name,
+                              price: typeof p.priceAnnual === 'number' ? (billingCycle === 'annual' ? p.priceAnnual : p.priceMonthly) : 0,
+                              billing_cycle: billingCycle,
+                            });
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '13px 20px',
+                          borderRadius: '12px',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          letterSpacing: '-0.01em',
+                          backgroundColor: isPopular ? '#09090B' : '#FFFFFF',
+                          color: isPopular ? '#FFFFFF' : '#09090B',
+                          border: isPopular ? 'none' : '1px solid #E4E4E7',
+                          textDecoration: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxSizing: 'border-box',
+                          textAlign: 'center',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isPopular ? '#27272A' : '#F4F4F5';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = isPopular ? '#09090B' : '#FFFFFF';
+                        }}
+                      >
+                        {p.ctaText}
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Right Arrow Button */}
+          <button
+            type="button"
+            onClick={() => scrollCards('right')}
+            aria-label="Next plans"
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E4E4E7',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#09090B',
+              flexShrink: 0,
+              transition: 'all 0.15s ease',
+              zIndex: 2,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F4F4F5'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+
+        {/* 3 Pagination Dots */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '64px' }}>
+          {[0, 1, 2].map((dot) => {
+            const isActive = activeDot === dot;
+            return (
+              <button
+                key={dot}
+                type="button"
+                onClick={() => scrollToDot(dot)}
+                aria-label={`View page ${dot + 1}`}
+                style={{
+                  width: isActive ? '18px' : '6px',
+                  height: '6px',
+                  borderRadius: '9999px',
+                  backgroundColor: isActive ? '#09090B' : '#D4D4D8',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
+              />
             );
           })}
         </div>

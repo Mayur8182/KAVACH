@@ -368,7 +368,12 @@ async def get_github_auth_url(
     if redirect_uri and ("3002" in redirect_uri or "auth/callback" in redirect_uri or "onboarding" in redirect_uri or "kavachsecurity.me" in redirect_uri):
         effective_return_url = redirect_uri
     if not effective_return_url:
-        effective_return_url = f"{settings.frontend_url}/onboarding?step=github&connected=true"
+        frontend_base = settings.frontend_url
+        if not frontend_base or (settings.app_env == "production" and "localhost" in frontend_base):
+            frontend_base = "https://kavachsecurity.me"
+        effective_return_url = f"{frontend_base}/onboarding?step=github&connected=true"
+    elif settings.app_env == "production" and "localhost:3002" in effective_return_url:
+        effective_return_url = effective_return_url.replace("http://localhost:3002", "https://kavachsecurity.me")
 
     u_id = current_user.id if (current_user and hasattr(current_user, "id") and not hasattr(current_user, "dependency")) else None
     w_id = uuid.UUID(workspace_id) if workspace_id else None
@@ -1757,6 +1762,8 @@ async def get_google_auth_url(
     settings = get_settings()
     client_id = settings.google_client_id or "918237465-seculayer-dev.apps.googleusercontent.com"
     resolved_redirect_uri = redirect_uri or settings.google_redirect_uri or "http://localhost:3002/api/auth/callback/google"
+    if settings.app_env == "production" and "localhost" in resolved_redirect_uri:
+        resolved_redirect_uri = "https://kavachsecurity.me/api/auth/callback/google"
     state = generate_oauth_state("google")
     scope = "openid email profile"
 
@@ -1812,6 +1819,8 @@ async def google_oauth_callback(
 
     # If Google OAuth client credentials are configured, exchange code with Google API
     effective_redirect_uri = payload.redirect_uri or settings.google_redirect_uri or "http://localhost:3002/api/auth/callback/google"
+    if settings.app_env == "production" and "localhost" in effective_redirect_uri:
+        effective_redirect_uri = "https://kavachsecurity.me/api/auth/callback/google"
     client_id = settings.google_client_id or "918237465-seculayer-dev.apps.googleusercontent.com"
     client_secret = settings.google_client_secret or "GOCSPX-dummy-oauth-client-secret"
     if client_id and client_secret:

@@ -238,7 +238,9 @@ class GitHubService:
         from app.integrations.github.state_manager import github_state_manager
         from app.models.integration_models import RealIntegration
 
-        frontend_target = getattr(self.settings, "frontend_url", None) or "http://localhost:3002"
+        frontend_target = getattr(self.settings, "frontend_url", None)
+        if not frontend_target or (getattr(self.settings, "app_env", "") == "production" and "localhost" in frontend_target):
+            frontend_target = "https://kavachsecurity.me"
 
         if error:
             logger.warning(f"GitHub App authorization returned error: {error} ({error_description})")
@@ -512,6 +514,8 @@ class GitHubService:
             final_redirect = f"{frontend_target}/auth/callback/github?token={jwt_login_token}"
         else:
             target_path = custom_redirect or "/onboarding?step=github&connected=true"
+            if getattr(self.settings, "app_env", "") == "production" and "localhost:3002" in target_path:
+                target_path = target_path.replace("http://localhost:3002", "https://kavachsecurity.me")
             if not target_path.startswith("http"):
                 target_path = f"{frontend_target}{target_path if target_path.startswith('/') else '/' + target_path}"
             sep = "&" if "?" in target_path else "?"
