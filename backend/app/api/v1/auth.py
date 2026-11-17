@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import jwt
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse, RedirectResponse
 
 logger = logging.getLogger("thing.auth")
 from fastapi.security import OAuth2PasswordRequestForm
