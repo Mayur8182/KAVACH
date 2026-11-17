@@ -39,9 +39,9 @@ services:
       # Frontend URL
       - key: FRONTEND_URL
         value: https://kavachsecurity.me
-      # CORS — allows the frontend domain + onrender preview URLs
+      # CORS — allows all enterprise subdomains + onrender preview URLs
       - key: CORS_ORIGINS
-        value: "https://kavachsecurity.me,https://www.kavachsecurity.me,https://kavach-frontend.onrender.com,https://kavach-frontend-1f5x.onrender.com"
+        value: "https://kavachsecurity.me,https://www.kavachsecurity.me,https://app.kavachsecurity.me,https://api.kavachsecurity.me,https://mcp.kavachsecurity.me,https://docs.kavachsecurity.me,https://auth.kavachsecurity.me,https://status.kavachsecurity.me,https://support.kavachsecurity.me,https://kavach-frontend.onrender.com,https://kavach-frontend-1f5x.onrender.com"
       # GitHub OAuth
       - key: GITHUB_CLIENT_ID
         sync: false
