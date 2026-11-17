@@ -21,20 +21,38 @@ from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# ReportLab imports for publication-grade PDF generation
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer,
-    Table,
-    TableStyle,
-    PageBreak,
-    KeepTogether,
-)
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from reportlab.pdfgen import canvas
+# ReportLab imports for publication-grade PDF generation with fail-safe fallback
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import (
+        SimpleDocTemplate,
+        Paragraph,
+        Spacer,
+        Table,
+        TableStyle,
+        PageBreak,
+        KeepTogether,
+    )
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+    A4 = (595.27, 841.89)
+    SimpleDocTemplate = Paragraph = Spacer = Table = TableStyle = PageBreak = KeepTogether = None
+    getSampleStyleSheet = ParagraphStyle = colors = None
+
+    class _DummyCanvas:
+        def __init__(self, *args, **kwargs):
+            pass
+        def showPage(self):
+            pass
+        def save(self):
+            pass
+
+    class canvas:
+        Canvas = _DummyCanvas
 
 # Models for authoritative data extraction
 from app.models.project import Project
@@ -595,6 +613,11 @@ class ReportingEngineService:
         Renders a publication-grade PDF conforming strictly to the 12-section architecture
         and the visual standards from the attached document screenshots.
         """
+        if not REPORTLAB_AVAILABLE or SimpleDocTemplate is None:
+            raise HTTPException(
+                status_code=503,
+                detail="PDF report generation requires the reportlab package. Ensure reportlab is installed.",
+            )
         buf = io.BytesIO()
         meta = report_data["metadata"]
 

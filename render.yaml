@@ -121,3 +121,7 @@ services:
         value: https://kavach-backend-3hdm.onrender.com
       - key: NEXT_PUBLIC_GA_ID
         value: G-FKNM7K5XNC
+      - key: NEXT_PUBLIC_CRISP_WEBSITE_ID
+        value: "910b6a23-3f96-4cb1-8c97-f560fe259628"
+      - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+        value: "665278507315-farpqaqne7fppfjp01ti2etmjh1ueu9v.apps.googleusercontent.com"

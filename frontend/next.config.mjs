@@ -171,6 +171,14 @@ const nextConfig = {
 
     return [
       {
+        source: '/500',
+        destination: '/server-error',
+      },
+      {
+        source: '/404',
+        destination: '/not-found-page',
+      },
+      {
         source: '/api/:path*',
         destination: `${backendUrl}/api/:path*`,
       },
