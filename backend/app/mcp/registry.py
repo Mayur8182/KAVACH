@@ -48,6 +48,12 @@ from app.mcp.tools.governance_compliance import (
     execute_scan_sensitive_data_posture,
     execute_audit_agent_permissions_posture,
 )
+from app.mcp.tools.posture_audit import (
+    execute_list_project_findings,
+    execute_get_project_posture,
+    execute_list_pending_approvals,
+    execute_get_mcp_audit_trail,
+)
 
 
 class MCPToolRegistry:
@@ -722,6 +728,87 @@ class MCPToolRegistry:
                 },
             ),
             execute_simulate_attack_path,
+        )
+
+        # 23. list_project_findings
+        self.register(
+            ToolDefinition(
+                name="list_project_findings",
+                description="List verified vulnerability findings from PostgreSQL for the active or specified project with optional severity, status, and category filters.",
+                version="1.0.0",
+                category="SECURITY",
+                required_permission="SECURITY_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                        "severity": {"type": "string", "description": "Filter severity: CRITICAL, HIGH, MEDIUM, LOW, INFORMATIONAL"},
+                        "status": {"type": "string", "description": "Filter finding status (e.g. open, resolved)"},
+                        "category": {"type": "string", "description": "Optional category filter"},
+                        "limit": {"type": "integer", "description": "Max findings to return (1-100, default 25)", "default": 25},
+                    },
+                },
+            ),
+            execute_list_project_findings,
+        )
+
+        # 24. get_project_posture
+        self.register(
+            ToolDefinition(
+                name="get_project_posture",
+                description="Retrieve live project security posture computed from real open findings, recent scans, active security blueprints, and pending human approvals.",
+                version="1.0.0",
+                category="PROJECT",
+                required_permission="PROJECT_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                    },
+                },
+            ),
+            execute_get_project_posture,
+        )
+
+        # 25. list_pending_approvals
+        self.register(
+            ToolDefinition(
+                name="list_pending_approvals",
+                description="List real pending Human-in-the-Loop SecurityApproval tickets in PostgreSQL awaiting sign-off for gated MCP actions.",
+                version="1.0.0",
+                category="POLICY",
+                required_permission="POLICY_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Optional project UUID filter"},
+                    },
+                },
+            ),
+            execute_list_pending_approvals,
+        )
+
+        # 26. get_mcp_audit_trail
+        self.register(
+            ToolDefinition(
+                name="get_mcp_audit_trail",
+                description="Query the immutable PostgreSQL audit trail of MCP tool invocations, resource reads, approvals, and policy verdicts for a project.",
+                version="1.0.0",
+                category="SECURITY",
+                required_permission="SECURITY_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                        "limit": {"type": "integer", "description": "Max audit events to return (1-100, default 25)", "default": 25},
+                    },
+                },
+            ),
+            execute_get_mcp_audit_trail,
         )
 
     def register(self, tool: ToolDefinition, handler: Callable) -> None:

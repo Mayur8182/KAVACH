@@ -77,6 +77,7 @@ from app.api.v1.security_intelligence import router as security_intelligence_rou
 from app.api.v1.remediation import router as remediation_router
 from app.api.v1.cli import router as cli_router
 from app.api.v1.mcp import router as mcp_router
+from app.api.v1.mcp_suite import router as mcp_suite_router
 from app.api.v1.model_security import router as model_security_router
 from app.api.v1.code_audit import router as code_audit_router
 from app.api.v1.orchestrator import router as orchestrator_router
@@ -88,6 +89,7 @@ v1_router.include_router(orchestrator_router)
 v1_router.include_router(code_audit_router, prefix="/code-audit")
 v1_router.include_router(model_security_router)
 v1_router.include_router(mcp_router)
+v1_router.include_router(mcp_suite_router)
 v1_router.include_router(cli_router)
 v1_router.include_router(remediation_router)
 v1_router.include_router(runs_router)

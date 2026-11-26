@@ -18,6 +18,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { ProtectWorkshell } from '@/components/protect/ProtectWorkshell';
+import { McpEnterpriseSuite } from '@/components/protect/McpEnterpriseSuite';
 import {
   EmptyProtectState,
   EnforcementDecisionBadge,
@@ -118,7 +119,14 @@ export default function McpSecurityPage() {
 
   return (
     <ProtectWorkshell>
-      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', backgroundColor: '#F8FAFC' }}>
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', backgroundColor: '#F8FAFC' }}>
+        <McpEnterpriseSuite
+          protectServers={servers}
+          protectTools={tools}
+          protectRequests={requests}
+          onSyncProtect={loadData}
+        />
+
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>

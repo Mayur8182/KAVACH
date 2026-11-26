@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Terminal,
   Trash2,
+  XCircle,
 } from 'lucide-react';
 import {
   api,
@@ -193,6 +194,14 @@ export default function McpConnectionsSettingsPage() {
   const [clientToDisconnect, setClientToDisconnect] = useState<OAuthConnectedClient | null>(null);
   const [disconnectingClientId, setDisconnectingClientId] = useState<string | null>(null);
 
+  // Advanced MCP 2025 approvals & protocol manifest state
+  const [approvals, setApprovals] = useState<{ pending_count: number; items: any[] }>({
+    pending_count: 0,
+    items: [],
+  });
+  const [manifestInfo, setManifestInfo] = useState<any | null>(null);
+  const [decidingApprovalId, setDecidingApprovalId] = useState<string | null>(null);
+
   // Quick setup tab
   const [activeSetupTab, setActiveSetupTab] = useState<SetupClientKey>('claude');
 
@@ -209,10 +218,24 @@ export default function McpConnectionsSettingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.oauth.getConnections();
+      const [connRes, apprRes, manifestRes] = await Promise.allSettled([
+        api.oauth.getConnections(),
+        api.mcp.getApprovals(),
+        api.mcp.getManifest(),
+      ]);
+      if (connRes.status === 'rejected') {
+        throw connRes.reason;
+      }
+      const res = connRes.value;
       setData(res);
       setDefaultWorkspaceId(res.user?.default_workspace_id || res.workspaces?.[0]?.id || '');
       setDefaultProjectId(res.user?.default_project_id || res.projects?.[0]?.id || '');
+      if (apprRes.status === 'fulfilled' && apprRes.value) {
+        setApprovals(apprRes.value);
+      }
+      if (manifestRes.status === 'fulfilled' && manifestRes.value) {
+        setManifestInfo(manifestRes.value);
+      }
     } catch (err: any) {
       setError({
         message: err?.message || 'Unable to load MCP connections from backend.',
@@ -222,6 +245,25 @@ export default function McpConnectionsSettingsPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleDecideApproval = async (approvalId: string, decision: 'APPROVED' | 'REJECTED') => {
+    setDecidingApprovalId(approvalId);
+    try {
+      await api.mcp.decideApproval(approvalId, decision);
+      toast.success(
+        decision === 'APPROVED'
+          ? 'MCP tool execution approved'
+          : 'MCP tool execution rejected',
+      );
+      await loadConnections();
+    } catch (err: any) {
+      toast.error('Failed to record approval decision', {
+        description: err?.message || 'Verify permissions and approval status.',
+      });
+    } finally {
+      setDecidingApprovalId(null);
+    }
+  };
 
   useEffect(() => {
     loadConnections();
@@ -1263,6 +1305,280 @@ export default function McpConnectionsSettingsPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Human-in-the-Loop Approvals Gate & MCP 2025 Capabilities */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+              gap: '20px',
+            }}
+          >
+            {/* Pending Human-in-the-Loop Approvals */}
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #EAECF0',
+                borderRadius: '12px',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldCheck size={16} color="#4F46E5" />
+                  <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+                    Human-in-the-Loop MCP Approval Gate
+                  </h2>
+                </div>
+                <span
+                  style={{
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    backgroundColor: approvals.pending_count > 0 ? '#FEF3C7' : '#ECFDF5',
+                    color: approvals.pending_count > 0 ? '#B45309' : '#059669',
+                  }}
+                >
+                  {approvals.pending_count} pending
+                </span>
+              </div>
+
+              {approvals.items.length === 0 ? (
+                <div
+                  style={{
+                    padding: '24px 16px',
+                    textAlign: 'center',
+                    border: '1px dashed #E2E8F0',
+                    borderRadius: '8px',
+                    backgroundColor: '#F8FAFC',
+                  }}
+                >
+                  <div style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A' }}>
+                    No gated MCP approvals waiting
+                  </div>
+                  <p style={{ fontSize: '12.5px', color: '#64748B', marginTop: '4px' }}>
+                    When ChatGPT, Claude, or an IDE invokes a high-risk tool (`verify_remediation_patch`,
+                    `quarantine_compromised_target`, `simulate_attack_path`), execution pauses here for approval.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto' }}>
+                  {approvals.items.map((ap) => {
+                    const isPending = ap.status === 'PENDING';
+                    const busy = decidingApprovalId === ap.id;
+                    return (
+                      <div
+                        key={ap.id}
+                        style={{
+                          padding: '12px',
+                          backgroundColor: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12.5px', fontWeight: 700, color: '#0F172A' }}>
+                              {ap.tool_name || ap.operation_type}
+                            </code>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '2px 7px',
+                                borderRadius: '4px',
+                                backgroundColor:
+                                  ap.status === 'PENDING'
+                                    ? '#FEF3C7'
+                                    : ap.status === 'APPROVED' || ap.status === 'EXECUTED'
+                                    ? '#ECFDF5'
+                                    : '#FEF2F2',
+                                color:
+                                  ap.status === 'PENDING'
+                                    ? '#B45309'
+                                    : ap.status === 'APPROVED' || ap.status === 'EXECUTED'
+                                    ? '#059669'
+                                    : '#DC2626',
+                              }}
+                            >
+                              {ap.status}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '11.5px', color: '#64748B' }}>
+                            {ap.project_name} • {ap.client_name || ap.requested_by}
+                          </span>
+                        </div>
+
+                        {ap.reason && (
+                          <div style={{ fontSize: '12.5px', color: '#334155' }}>
+                            {ap.reason}
+                          </div>
+                        )}
+
+                        {isPending && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => handleDecideApproval(ap.id, 'APPROVED')}
+                              style={{
+                                height: '30px',
+                                padding: '0 12px',
+                                borderRadius: '6px',
+                                backgroundColor: '#059669',
+                                color: '#FFFFFF',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                cursor: busy ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              <Check size={13} />
+                              <span>{busy ? 'Saving...' : 'Approve'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => handleDecideApproval(ap.id, 'REJECTED')}
+                              style={{
+                                height: '30px',
+                                padding: '0 12px',
+                                borderRadius: '6px',
+                                backgroundColor: '#FFFFFF',
+                                border: '1px solid #FECACA',
+                                color: '#DC2626',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                cursor: busy ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              <XCircle size={13} />
+                              <span>Reject</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Live MCP 2025 Protocol Resources & Playbooks */}
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #EAECF0',
+                borderRadius: '12px',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Server size={16} color="#4F46E5" />
+                  <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+                    MCP 2025 Resources, Prompts &amp; Capabilities
+                  </h2>
+                </div>
+                <span style={{ fontSize: '12px', color: '#64748B' }}>
+                  {manifestInfo?.tools_count ?? '—'} tools
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {[
+                  'OAuth 2.1 + PKCE (S256)',
+                  'MCP Resources',
+                  'Playbook Prompts',
+                  'Autocomplete Completions',
+                  'Tool Annotations',
+                  'SSE Progress Streaming',
+                  'Cryptographic Approvals',
+                ].map((cap) => (
+                  <span
+                    key={cap}
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      backgroundColor: '#EEF2FF',
+                      color: '#4338CA',
+                      border: '1px solid #C7D2FE',
+                    }}
+                  >
+                    {cap}
+                  </span>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Live Resource URIs
+                </div>
+                {(manifestInfo?.resources || []).concat(manifestInfo?.resource_templates || []).map((resItem: any) => (
+                  <div
+                    key={resItem.uri || resItem.uriTemplate}
+                    style={{
+                      padding: '8px 10px',
+                      backgroundColor: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: '#0F172A' }}>
+                      {resItem.uri || resItem.uriTemplate}
+                    </code>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>
+                      {resItem.description}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {Array.isArray(manifestInfo?.prompts) && manifestInfo.prompts.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Security Playbook Prompts
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {manifestInfo.prompts.map((pr: any) => (
+                      <code
+                        key={pr.name}
+                        title={pr.description}
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '11.5px',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: '#F1F5F9',
+                          border: '1px solid #CBD5E1',
+                          color: '#0F172A',
+                        }}
+                      >
+                        /{pr.name}
+                      </code>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

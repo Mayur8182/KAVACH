@@ -296,6 +296,14 @@ from app.models.code_audit_models import (
     CodeAuditTechnicalDebtReport,
     CodeAuditAutofixProposal,
 )
+from app.models.mcp_security import (  # noqa: F401
+    MCPUpstreamServer,
+    MCPToolSnapshot,
+    MCPFirewallRule,
+    MCPRuntimeEvent,
+    MCPSecretVaultEntry,
+    MCPSimulationRun,
+)
 
 __all__ = [
     "Base",
@@ -401,5 +409,11 @@ __all__ = [
     "CodeAuditTechnicalDebtReport",
     "CodeAuditAutofixProposal",
     "HubspotSyncLog",
+    "MCPUpstreamServer",
+    "MCPToolSnapshot",
+    "MCPFirewallRule",
+    "MCPRuntimeEvent",
+    "MCPSecretVaultEntry",
+    "MCPSimulationRun",
 ]
 

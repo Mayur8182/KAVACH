@@ -5951,6 +5951,187 @@ class ThingApiClient {
       });
       return res.data;
     },
+    getApprovals: async (): Promise<{ pending_count: number; items: any[] }> => {
+      const res = await this.request<{ pending_count: number; items: any[] }>('/api/v1/mcp/approvals', {
+        bypassCache: true,
+      });
+      return res.data;
+    },
+    decideApproval: async (
+      approvalId: string,
+      decision: 'APPROVED' | 'REJECTED',
+      notes?: string,
+    ): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/mcp/approvals/${encodeURIComponent(approvalId)}/decide`, {
+        method: 'POST',
+        body: JSON.stringify({ decision, notes }),
+      });
+      apiCache.invalidate('/api/v1/mcp/approvals');
+      apiCache.invalidate('/api/v1/mcp/activity');
+      return res.data;
+    },
+    getActivity: async (limit: number = 25): Promise<{ total: number; items: any[] }> => {
+      const res = await this.request<{ total: number; items: any[] }>(`/api/v1/mcp/activity?limit=${limit}`, {
+        bypassCache: true,
+      });
+      return res.data;
+    },
+    suite: {
+      overview: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/overview', { bypassCache: true });
+        return res.data;
+      },
+      servers: async (): Promise<{ total: number; items: any[] }> => {
+        const res = await this.request<{ total: number; items: any[] }>('/api/v1/mcp/suite/servers', { bypassCache: true });
+        return res.data;
+      },
+      registerServer: async (payload: {
+        name: string;
+        server_url: string;
+        transport?: string;
+        category?: string;
+        auth_mode?: string;
+        firewall_mode?: string;
+        vault_secret_id?: string;
+        auto_discover?: boolean;
+      }): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/servers', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      },
+      discoverServer: async (serverId: string): Promise<any> => {
+        const res = await this.request<any>(`/api/v1/mcp/suite/servers/${encodeURIComponent(serverId)}/discover`, {
+          method: 'POST',
+        });
+        return res.data;
+      },
+      updateServer: async (serverId: string, payload: Record<string, any>): Promise<any> => {
+        const res = await this.request<any>(`/api/v1/mcp/suite/servers/${encodeURIComponent(serverId)}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      },
+      deleteServer: async (serverId: string): Promise<any> => {
+        const res = await this.request<any>(`/api/v1/mcp/suite/servers/${encodeURIComponent(serverId)}`, {
+          method: 'DELETE',
+        });
+        return res.data;
+      },
+      firewall: async (): Promise<{ total: number; items: any[] }> => {
+        const res = await this.request<{ total: number; items: any[] }>('/api/v1/mcp/suite/firewall', { bypassCache: true });
+        return res.data;
+      },
+      createFirewallRule: async (payload: Record<string, any>): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/firewall', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      },
+      deleteFirewallRule: async (ruleId: string): Promise<any> => {
+        const res = await this.request<any>(`/api/v1/mcp/suite/firewall/${encodeURIComponent(ruleId)}`, {
+          method: 'DELETE',
+        });
+        return res.data;
+      },
+      simulatePolicy: async (payload: Record<string, any>): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/policies/simulate', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      },
+      scanner: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/scanner', { bypassCache: true });
+        return res.data;
+      },
+      runScanner: async (payload: { source_path?: string; server_id?: string } = {}): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/scanner/run', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      },
+      runtime: async (limit: number = 40, decision?: string): Promise<any> => {
+        const q = decision ? `?limit=${limit}&decision=${encodeURIComponent(decision)}` : `?limit=${limit}`;
+        const res = await this.request<any>(`/api/v1/mcp/suite/runtime${q}`, { bypassCache: true });
+        return res.data;
+      },
+      threats: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/threats', { bypassCache: true });
+        return res.data;
+      },
+      dlp: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/dlp', { bypassCache: true });
+        return res.data;
+      },
+      inspectDlp: async (payload: { payload: any; stage?: string; redact?: boolean }): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/dlp/inspect', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      },
+      analytics: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/analytics', { bypassCache: true });
+        return res.data;
+      },
+      secrets: async (): Promise<{ total: number; items: any[] }> => {
+        const res = await this.request<{ total: number; items: any[] }>('/api/v1/mcp/suite/secrets', { bypassCache: true });
+        return res.data;
+      },
+      createSecret: async (payload: { name: string; provider: string; scope: string; secret_value: string }): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/secrets', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      },
+      rotateSecret: async (secretId: string, secretValue: string): Promise<any> => {
+        const res = await this.request<any>(`/api/v1/mcp/suite/secrets/${encodeURIComponent(secretId)}/rotate`, {
+          method: 'POST',
+          body: JSON.stringify({ secret_value: secretValue }),
+        });
+        return res.data;
+      },
+      deleteSecret: async (secretId: string): Promise<any> => {
+        const res = await this.request<any>(`/api/v1/mcp/suite/secrets/${encodeURIComponent(secretId)}`, {
+          method: 'DELETE',
+        });
+        return res.data;
+      },
+      sandboxExecute: async (payload: {
+        tool_name: string;
+        arguments: Record<string, any>;
+        client_name?: string;
+        mock_response?: Record<string, any> | null;
+      }): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/sandbox/execute', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      },
+      simulations: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/simulations', { bypassCache: true });
+        return res.data;
+      },
+      runSimulation: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/simulations/run', { method: 'POST' });
+        return res.data;
+      },
+      compliance: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/compliance', { bypassCache: true });
+        return res.data;
+      },
+      marketplace: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/mcp/suite/marketplace', { bypassCache: true });
+        return res.data;
+      },
+    },
   };
 
   // =========================================================================

@@ -44,6 +44,7 @@ class MCPApprovalManager:
                     "tool_name": tool.name,
                     "agent_id": str(context.identity.agent_id),
                     "agent_name": context.identity.agent_name,
+                    "authenticated_principal": context.identity.authenticated_principal,
                     "arguments": arguments,
                 },
             )
@@ -54,7 +55,7 @@ class MCPApprovalManager:
         approval = SecurityApproval(
             decision_id=policy_decision_id,
             status="PENDING",
-            requested_by=context.identity.authenticated_principal or str(context.identity.agent_id),
+            requested_by=f"ai_client:{context.client_name}"[:100],
             reason=f"Approval required for tool '{tool.name}': {reason}",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
