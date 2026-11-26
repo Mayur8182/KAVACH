@@ -25,3 +25,21 @@ export async function POST(
   return proxyToBackend(req, path);
 }
 
+export async function PATCH(
+  req: NextRequest,
+  context: { params: Promise<{ slug: string[] }> | { slug: string[] } }
+) {
+  const resolved = await context.params;
+  const path = `/oauth/${(resolved?.slug || []).join('/')}`;
+  return proxyToBackend(req, path);
+}
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ slug: string[] }> | { slug: string[] } }
+) {
+  const resolved = await context.params;
+  const path = `/oauth/${(resolved?.slug || []).join('/')}`;
+  return proxyToBackend(req, path);
+}
+

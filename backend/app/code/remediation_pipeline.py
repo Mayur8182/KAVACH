@@ -55,11 +55,11 @@ class RemediationPipeline:
         return await self.db.get(SecurityFinding, finding_id)
 
     async def get_repository_context(self, repo_id: uuid.UUID) -> Dict[str, Any]:
-        """Collects repository metadata, default branch, stack, and active policies."""
+        """Collects repository metadata, architecture context, frameworks, and active policies."""
         repo = await self.db.get(GitHubRepository, repo_id)
         if not repo:
             return {}
-        return {
+        base_ctx = {
             "repository_id": str(repo.id),
             "name": repo.name,
             "full_name": repo.full_name,
@@ -67,6 +67,15 @@ class RemediationPipeline:
             "owner": repo.owner,
             "clone_url": repo.clone_url,
         }
+        try:
+            from app.services.repository_intelligence_service import RepositoryIntelligenceService
+            intel = RepositoryIntelligenceService(self.db)
+            rich_ctx = await intel.get_repository_context(repo_id)
+            if rich_ctx and rich_ctx.get("status") == "READY":
+                base_ctx.update(rich_ctx)
+        except Exception as e:
+            logger.warning(f"Could not load rich repository intelligence context for remediation: {e}")
+        return base_ctx
 
     async def get_file(self, repo_id: uuid.UUID, file_path: str) -> Optional[str]:
         """Reads file content from the repository's verified local workspace."""

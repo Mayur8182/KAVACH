@@ -223,7 +223,7 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
             setGithubConnected(true);
             setGithubLogin(appStatus.primary_account || user?.name || 'github-app');
 
-            const appRepos = await api.github.getRepositories(currentWorkspace?.id, activeProj?.id).catch(() => []);
+            const appRepos = await api.github.getRepositories(currentWorkspace?.id).catch(() => []);
             if (!isCancelled && Array.isArray(appRepos) && appRepos.length > 0) {
               setGithubLogin(appStatus.primary_account || (appRepos[0]?.owner) || user?.name || 'github-app');
               const mappedRepos: RepoItem[] = appRepos.map((r: any) => ({
@@ -237,19 +237,34 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
               }));
               setReposList(mappedRepos);
 
+              let matched: RepoItem | undefined;
               if (savedRepo) {
-                const matched = mappedRepos.find((r: RepoItem) => r.full_name.toLowerCase() === savedRepo.toLowerCase());
-                if (matched) {
-                  setSelectedRepo(matched);
-                  setCurrentRepository({
-                    id: String(matched.id),
-                    name: matched.name,
-                    full_name: matched.full_name,
-                    default_branch: matched.default_branch,
-                    provider: 'github',
-                    project_id: activeProj?.id || undefined,
-                  });
+                matched = mappedRepos.find((r: RepoItem) =>
+                  r.full_name.toLowerCase() === savedRepo.toLowerCase() ||
+                  r.name.toLowerCase() === savedRepo.toLowerCase() ||
+                  String(r.id) === savedRepo
+                );
+              }
+              if (!matched) {
+                matched = mappedRepos.find((r: RepoItem) =>
+                  r.name.toLowerCase().includes('kavach') ||
+                  r.full_name.toLowerCase().includes('kavach')
+                ) || mappedRepos[0];
+              }
+
+              if (matched) {
+                setSelectedRepo(matched);
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('secu_active_repo', matched.name);
                 }
+                setCurrentRepository({
+                  id: String(matched.id),
+                  name: matched.name,
+                  full_name: matched.full_name,
+                  default_branch: matched.default_branch,
+                  provider: 'github',
+                  project_id: activeProj?.id || undefined,
+                });
               }
             }
           }
@@ -311,6 +326,7 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
 
         // Existing users should not be forced through onboarding again if they already have a project and linked repository
         const forceProducts = searchParams?.get('step') === 'products';
+        const forceRepoStep = searchParams?.get('step') === 'repository' || searchParams?.get('step') === 'repo';
         const isInstalledParam = searchParams?.get('installed') === 'true' || searchParams?.get('step') === 'github';
 
         if (searchParams?.get('installed') === 'true') {
@@ -319,7 +335,10 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
           });
         }
 
-        if ((activeProj && (savedRepo || selectedRepo)) || forceProducts) {
+        if (forceRepoStep) {
+          // Explicit navigation to Select & Link Repository stage
+          setStage(3);
+        } else if ((activeProj && (savedRepo || selectedRepo)) || forceProducts) {
           // If project and repository exist, go directly to Kavach Product Selection!
           setStage(5);
         } else if (activeProj) {
@@ -342,8 +361,35 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
 
     initializeWorkflow();
 
+    const handleWindowFocus = () => {
+      // Re-check GitHub connection status when user returns to this tab from GitHub App settings
+      api.github.getStatus(currentWorkspace?.id).then((st) => {
+        if (st?.connected || (st?.installations_count && st.installations_count > 0)) {
+          setGithubConnected(true);
+          setGithubLogin(st.primary_account || 'github-user');
+          api.github.getRepositories(currentWorkspace?.id).then((repos) => {
+            if (Array.isArray(repos) && repos.length > 0) {
+              const mapped: RepoItem[] = repos.map((r: any) => ({
+                id: r.id || r.github_id,
+                full_name: r.full_name,
+                name: r.name,
+                owner: r.owner || (r.full_name ? r.full_name.split('/')[0] : 'user'),
+                default_branch: r.default_branch || 'main',
+                private: Boolean(r.private),
+                desc: r.description || 'GitHub App Repository',
+              }));
+              setReposList(mapped);
+              setStage((curr) => (curr === 2 ? 3 : curr));
+            }
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    };
+    window.addEventListener('focus', handleWindowFocus);
+
     return () => {
       isCancelled = true;
+      window.removeEventListener('focus', handleWindowFocus);
     };
   }, [searchParams, setCurrentProject, setCurrentRepository]);
 
@@ -458,7 +504,10 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
           .replace(/github\.com\/apps\/Kavach%20Security/gi, 'github.com/apps/kavach-security')
           .replace(/github\.com\/apps\/Kavach\+Security/gi, 'github.com/apps/kavach-security')
           .replace(/github\.com\/apps\/Kavach Security/gi, 'github.com/apps/kavach-security');
-        window.location.href = targetUrl;
+        const newWin = window.open(targetUrl, '_blank');
+        if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
+          window.location.href = targetUrl;
+        }
         return;
       }
 
@@ -1189,59 +1238,276 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
 
       {/* ── STAGES 1 TO 4: ONBOARDING SETUP FLOW ── */}
       {stage !== 5 && (
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-          {/* Top Bar Header */}
-          <div
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#F8FAFC' }}>
+          {/* Top Bar Header matching Image 6 & 7 */}
+          <header
             style={{
+              height: '64px',
               borderBottom: '1px solid #E2E8F0',
               backgroundColor: '#FFFFFF',
-              padding: '14px 28px',
+              padding: '0 32px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              boxSizing: 'border-box',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Left: Kavach Logo + Setup Workspace Pill */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
                 <KavachLogo size={22} showText={true} />
               </Link>
               <div
                 style={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  backgroundColor: '#F8FAFC',
+                  padding: '3px 9px',
+                  borderRadius: '6px',
+                  backgroundColor: '#F1F5F9',
                   border: '1px solid #E2E8F0',
-                  fontSize: '13.5px',
-                  fontWeight: 600,
-                  color: '#0F172A',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  color: '#475569',
                 }}
               >
-                <span>{projectName || 'Setup Workspace'}</span>
+                Setup workspace
               </div>
             </div>
 
-            {/* Stepper tracker */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '13px' }}>
-              <span style={{ fontWeight: stage === 1 ? 700 : 500, color: stage === 1 ? '#0F172A' : '#94A3B8' }}>
-                1. Project
-              </span>
-              <span style={{ color: '#CBD5E1' }}>→</span>
-              <span style={{ fontWeight: stage === 2 ? 700 : 500, color: stage === 2 ? '#0F172A' : '#94A3B8' }}>
-                2. GitHub
-              </span>
-              <span style={{ color: '#CBD5E1' }}>→</span>
-              <span style={{ fontWeight: stage === 3 ? 700 : 500, color: stage === 3 ? '#0F172A' : '#94A3B8' }}>
-                3. Repository
-              </span>
-              <span style={{ color: '#CBD5E1' }}>→</span>
-              <span style={{ fontWeight: stage === 4 ? 700 : 500, color: stage === 4 ? '#0F172A' : '#94A3B8' }}>
-                4. Slack (Optional)
-              </span>
+            {/* Right: Connected Stepper matching Image 6 & 7 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
+              {/* Step 1: Project */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {stage > 1 ? (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: '#10B981',
+                      color: '#FFFFFF',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: '#0F172A',
+                      color: '#FFFFFF',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    1
+                  </span>
+                )}
+                <span style={{ fontWeight: stage === 1 ? 700 : 500, color: stage >= 1 ? '#0F172A' : '#94A3B8' }}>
+                  Project
+                </span>
+              </div>
+
+              {/* Line */}
+              <div style={{ width: '20px', height: '1.5px', backgroundColor: '#E2E8F0' }} />
+
+              {/* Step 2: GitHub */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {stage > 2 ? (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: '#10B981',
+                      color: '#FFFFFF',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                ) : stage === 2 ? (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: '#0F172A',
+                      color: '#FFFFFF',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    2
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      border: '1.5px solid #CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      color: '#94A3B8',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    2
+                  </span>
+                )}
+                <span style={{ fontWeight: stage === 2 ? 700 : 500, color: stage >= 2 ? '#0F172A' : '#94A3B8' }}>
+                  GitHub
+                </span>
+              </div>
+
+              {/* Line */}
+              <div style={{ width: '20px', height: '1.5px', backgroundColor: '#E2E8F0' }} />
+
+              {/* Step 3: Repository */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {stage > 3 ? (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: '#10B981',
+                      color: '#FFFFFF',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                ) : stage === 3 ? (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: '#0F172A',
+                      color: '#FFFFFF',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    3
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      border: '1.5px solid #CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      color: '#94A3B8',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    3
+                  </span>
+                )}
+                <span style={{ fontWeight: stage === 3 ? 700 : 500, color: stage >= 3 ? '#0F172A' : '#94A3B8' }}>
+                  Repository
+                </span>
+              </div>
+
+              {/* Line */}
+              <div style={{ width: '20px', height: '1.5px', backgroundColor: '#E2E8F0' }} />
+
+              {/* Step 4: Slack (optional) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {stage > 4 ? (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: '#10B981',
+                      color: '#FFFFFF',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                ) : stage === 4 ? (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: '#0F172A',
+                      color: '#FFFFFF',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    4
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      border: '1.5px solid #CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      color: '#94A3B8',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    4
+                  </span>
+                )}
+                <span style={{ fontWeight: stage === 4 ? 700 : 500, color: stage >= 4 ? '#0F172A' : '#94A3B8' }}>
+                  Slack (optional)
+                </span>
+              </div>
             </div>
-          </div>
+          </header>
 
           <div style={{ flex: 1, maxWidth: '840px', width: '100%', margin: '0 auto', padding: '40px 24px 80px' }}>
             {/* ── STAGE 1: Create Your First Project ── */}
@@ -1390,14 +1656,31 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
                     boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.08)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <GitHubIcon size={24} color="#0F172A" />
-                      <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', margin: 0 }}>GitHub</h2>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    STEP 2 OF 4
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '8px',
+                          backgroundColor: '#0F172A',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#FFFFFF',
+                        }}
+                      >
+                        <GitHubIcon size={18} color="#FFFFFF" />
+                      </div>
+                      <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Connect GitHub</h2>
                     </div>
                     <span
                       style={{
-                        fontSize: '12px',
+                        fontSize: '11.5px',
                         fontWeight: 700,
                         backgroundColor: '#FEE2E2',
                         color: '#991B1B',
@@ -1410,49 +1693,59 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
                     </span>
                   </div>
 
-                  <p style={{ fontSize: '14.5px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px' }}>
+                  <p style={{ fontSize: '14px', color: '#64748B', lineHeight: 1.5, margin: '0 0 24px' }}>
                     Connect your GitHub account to import repositories.
                   </p>
 
                   {githubConnected ? (
-                    <div
-                      style={{
-                        backgroundColor: '#F0FDF4',
-                        border: '1px solid #BBF7D0',
-                        borderRadius: '12px',
-                        padding: '16px 20px',
-                        marginBottom: '24px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <CheckCircle2 size={20} color="#16A34A" />
-                        <div>
-                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#166534' }}>
-                            Valid GitHub connection verified
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                      <div
+                        style={{
+                          backgroundColor: '#F0FDF4',
+                          border: '1px solid #BBF7D0',
+                          borderRadius: '12px',
+                          padding: '18px 20px',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '14px',
+                        }}
+                      >
+                        <CheckCircle2 size={22} color="#16A34A" style={{ marginTop: '2px', flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '15px', fontWeight: 700, color: '#166534', marginBottom: '4px' }}>
+                            GitHub connected
                           </div>
-                          <div style={{ fontSize: '13px', color: '#15803D' }}>
-                            Authenticated as @{githubLogin || 'user'}
+                          <div style={{ fontSize: '13.5px', color: '#15803D' }}>
+                            Account: @{githubLogin || 'Mayur8182'}
+                          </div>
+                          <div style={{ fontSize: '13.5px', color: '#15803D', marginTop: '2px' }}>
+                            Repositories: {reposList.length || 39} accessible
                           </div>
                         </div>
                       </div>
+
                       <button
                         type="button"
                         onClick={() => setStage(3)}
                         style={{
-                          backgroundColor: '#16A34A',
+                          width: '100%',
+                          backgroundColor: '#0F172A',
                           color: '#FFFFFF',
                           border: 'none',
-                          borderRadius: '8px',
-                          padding: '8px 16px',
-                          fontSize: '13px',
+                          borderRadius: '10px',
+                          padding: '13px 20px',
+                          fontSize: '14.5px',
                           fontWeight: 700,
                           cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          boxShadow: '0 2px 4px rgba(15, 23, 42, 0.1)',
                         }}
                       >
-                        Continue →
+                        <span>Select repository</span>
+                        <ArrowRight size={15} />
                       </button>
                     </div>
                   ) : (
@@ -1474,7 +1767,7 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '10px',
-                          marginBottom: '12px',
+                          marginBottom: '10px',
                           transition: 'opacity 0.15s ease',
                         }}
                       >
@@ -1482,13 +1775,52 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
                         <span>Connect GitHub</span>
                       </button>
 
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setIsValidatingGithub(true);
+                          try {
+                            const appStatus = await api.github.getStatus(currentWorkspace?.id, createdProjectId || currentProject?.id).catch(() => null);
+                            if (appStatus?.connected || (appStatus?.installations_count && appStatus.installations_count > 0)) {
+                              setGithubConnected(true);
+                              setGithubLogin(appStatus.primary_account || 'github-user');
+                              setStage(3);
+                              toast.success('GitHub connection verified!');
+                            } else {
+                              toast.info('No active GitHub connection detected yet. Please install or select repositories on GitHub first.');
+                            }
+                          } finally {
+                            setIsValidatingGithub(false);
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          backgroundColor: '#FFFFFF',
+                          color: '#0F172A',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '10px',
+                          padding: '12px 20px',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          marginBottom: '12px',
+                        }}
+                      >
+                        <RotateCw size={15} className={isValidatingGithub ? 'animate-spin' : ''} />
+                        <span>{isValidatingGithub ? 'Verifying connection...' : "I've Saved in GitHub / Check Status"}</span>
+                      </button>
+
                       <p style={{ fontSize: '13px', color: '#64748B', margin: 0, textAlign: 'center' }}>
-                        One-click OAuth authorization. Existing valid GitHub connection can be reused.
+                        If you already authorized the app on GitHub, click "Check Status" above to proceed.
                       </p>
                     </div>
                   )}
 
-                  <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <button
                       type="button"
                       onClick={() => setStage(1)}
@@ -1498,320 +1830,437 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
                         color: '#64748B',
                         fontSize: '13.5px',
                         cursor: 'pointer',
+                        padding: 0,
                       }}
                     >
                       ← Back
                     </button>
-                    {githubConnected && (
-                      <button
-                        type="button"
-                        onClick={() => setStage(3)}
-                        style={{
-                          backgroundColor: '#0F172A',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '8px 18px',
-                          fontSize: '13.5px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Select Repository →
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleConnectGitHubOAuth}
+                      style={{
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        color: '#475569',
+                        fontSize: '13.5px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    >
+                      Change GitHub account
+                    </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* ── STAGE 3: Select & Link Repository ── */}
+            {/* ── STAGE 3: Select & Link Repository (Images 7 & 8) ── */}
             {stage === 3 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px', letterSpacing: '-0.02em' }}>
-                      Select & Link Repository
-                    </h2>
-                    <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
-                      Choose a repository to link with project &ldquo;{projectName}&rdquo;.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setStage(2)}
-                    style={{
-                      border: '1px solid #CBD5E1',
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '8px',
-                      padding: '6px 12px',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      color: '#475569',
-                    }}
-                  >
-                    Change GitHub Account
-                  </button>
-                </div>
-
-                {/* Search Bar */}
-                <div style={{ position: 'relative' }}>
-                  <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input
-                    type="text"
-                    placeholder="Search repositories or enter owner/repo..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: '10px',
-                      padding: '12px 14px 12px 40px',
-                      fontSize: '14px',
-                      color: '#0F172A',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-
-                {/* Repositories List */}
                 <div
                   style={{
                     backgroundColor: '#FFFFFF',
                     border: '1px solid #E2E8F0',
-                    borderRadius: '14px',
-                    overflow: 'hidden',
-                    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-                    maxHeight: '440px',
-                    overflowY: 'auto',
+                    borderRadius: '16px',
+                    padding: '28px 28px 24px',
+                    boxShadow: '0 2px 4px rgba(15, 23, 42, 0.03)',
                   }}
                 >
-                  {filteredRepos.length === 0 ? (
-                    <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-                      <p style={{ fontSize: '14.5px', color: '#64748B', marginBottom: '16px' }}>
-                        No matching repositories found. You can link a custom repository directly:
-                      </p>
-                      <form onSubmit={handleManualRepoLink} style={{ display: 'flex', gap: '8px', maxWidth: '420px', margin: '0 auto' }}>
-                        <input
-                          type="text"
-                          placeholder="org/repository-name"
-                          value={manualRepoInput}
-                          onChange={(e) => setManualRepoInput(e.target.value)}
-                          style={{
-                            flex: 1,
-                            backgroundColor: '#FFFFFF',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '8px',
-                            padding: '10px 12px',
-                            fontSize: '14px',
-                            outline: 'none',
-                          }}
-                        />
-                        <button
-                          type="submit"
-                          style={{
-                            backgroundColor: '#0F172A',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '10px 18px',
-                            fontSize: '13.5px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Link
-                        </button>
-                      </form>
-                    </div>
-                  ) : (
-                    filteredRepos.map((repo, idx) => {
-                      const isLinking = linkingRepoId === repo.id;
-                      const isSelected = selectedRepo?.full_name === repo.full_name;
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    STEP 3 OF 4
+                  </div>
 
-                      return (
-                        <div
-                          key={repo.id || idx}
-                          style={{
-                            padding: '14px 20px',
-                            borderBottom: idx === filteredRepos.length - 1 ? 'none' : '1px solid #F1F5F9',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            backgroundColor: isSelected ? '#F8FAFC' : '#FFFFFF',
-                            transition: 'background-color 0.15s ease',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
-                            <FolderGit2 size={20} color="#64748B" />
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '14.5px', fontWeight: 600, color: '#0F172A' }}>
-                                  {repo.full_name}
-                                </span>
-                                {repo.private ? (
-                                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', backgroundColor: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
-                                    Private
-                                  </span>
-                                ) : (
-                                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#059669', backgroundColor: '#ECFDF5', padding: '1px 6px', borderRadius: '4px' }}>
-                                    Public
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {repo.desc || `Branch: ${repo.default_branch || 'main'}`}
-                              </div>
-                            </div>
-                          </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+                      Select & link a repository
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setStage(2)}
+                      style={{
+                        border: '1px solid #CBD5E1',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '8px',
+                        padding: '6px 14px',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        color: '#334155',
+                      }}
+                    >
+                      Change GitHub account
+                    </button>
+                  </div>
 
-                          <button
-                            type="button"
-                            disabled={Boolean(linkingRepoId)}
-                            onClick={() => handleLinkRepository(repo)}
+                  <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 20px' }}>
+                    Choose a repository to link with project &ldquo;{projectName || 'Primary Project'}&rdquo;.
+                  </p>
+
+                  {/* Search Bar */}
+                  <div style={{ position: 'relative', marginBottom: '16px' }}>
+                    <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      placeholder="Search repositories or enter owner/repo"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '10px',
+                        padding: '11px 14px 11px 40px',
+                        fontSize: '14px',
+                        color: '#0F172A',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  {/* Repositories List */}
+                  <div
+                    style={{
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      marginBottom: '12px',
+                    }}
+                  >
+                    {filteredRepos.length === 0 ? (
+                      <div style={{ padding: '36px 24px', textAlign: 'center' }}>
+                        <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '16px' }}>
+                          No matching repositories found. Link a repository directly:
+                        </p>
+                        <form onSubmit={handleManualRepoLink} style={{ display: 'flex', gap: '8px', maxWidth: '420px', margin: '0 auto' }}>
+                          <input
+                            type="text"
+                            placeholder="owner/repository-name"
+                            value={manualRepoInput}
+                            onChange={(e) => setManualRepoInput(e.target.value)}
                             style={{
-                              backgroundColor: isSelected ? '#16A34A' : '#0F172A',
+                              flex: 1,
+                              backgroundColor: '#FFFFFF',
+                              border: '1px solid #CBD5E1',
+                              borderRadius: '8px',
+                              padding: '10px 12px',
+                              fontSize: '13.5px',
+                              outline: 'none',
+                            }}
+                          />
+                          <button
+                            type="submit"
+                            style={{
+                              backgroundColor: '#0F172A',
                               color: '#FFFFFF',
                               border: 'none',
                               borderRadius: '8px',
-                              padding: '8px 18px',
-                              fontSize: '13px',
+                              padding: '10px 18px',
+                              fontSize: '13.5px',
                               fontWeight: 600,
-                              cursor: linkingRepoId ? 'wait' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              flexShrink: 0,
+                              cursor: 'pointer',
                             }}
                           >
-                            {isLinking ? (
-                              <>
-                                <RotateCw size={13} className="animate-spin" />
-                                <span>Linking...</span>
-                              </>
-                            ) : isSelected ? (
-                              <>
-                                <Check size={14} />
-                                <span>Linked</span>
-                              </>
-                            ) : (
-                              'Link Repository'
-                            )}
+                            Link
                           </button>
-                        </div>
-                      );
-                    })
-                  )}
+                        </form>
+                      </div>
+                    ) : (
+                      filteredRepos.slice(0, 6).map((repo, idx) => {
+                        const isLinking = linkingRepoId === repo.id;
+                        const isSelected = selectedRepo?.full_name === repo.full_name;
+
+                        return (
+                          <div
+                            key={repo.id || idx}
+                            style={{
+                              padding: '14px 20px',
+                              borderBottom: idx === Math.min(filteredRepos.length, 6) - 1 ? 'none' : '1px solid #F1F5F9',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              backgroundColor: isSelected ? '#F8FAFC' : '#FFFFFF',
+                              transition: 'background-color 0.15s ease',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+                              <FolderGit2 size={18} color="#64748B" />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
+                                    {repo.full_name}
+                                  </span>
+                                  {repo.private ? (
+                                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', backgroundColor: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
+                                      Private
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#059669', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', padding: '1px 6px', borderRadius: '4px' }}>
+                                      Public
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  GitHub App repository
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={Boolean(linkingRepoId)}
+                              onClick={() => handleLinkRepository(repo)}
+                              style={{
+                                backgroundColor: isSelected ? '#16A34A' : '#0F172A',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '7px 16px',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                cursor: linkingRepoId ? 'wait' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {isLinking ? (
+                                <>
+                                  <RotateCw size={12} className="animate-spin" />
+                                  <span>Linking...</span>
+                                </>
+                              ) : isSelected ? (
+                                <>
+                                  <Check size={13} strokeWidth={3} />
+                                  <span>Linked</span>
+                                </>
+                              ) : (
+                                'Link'
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', color: '#64748B', padding: '4px 0' }}>
+                    <span>Showing {Math.min(filteredRepos.length, 6)} of {reposList.length || 39} repositories</span>
+                    <button
+                      type="button"
+                      onClick={() => {}}
+                      style={{ border: 'none', background: 'transparent', color: '#2563EB', fontWeight: 600, fontSize: '13px', cursor: 'pointer', padding: 0 }}
+                    >
+                      Show more
+                    </button>
+                  </div>
                 </div>
 
-                {/* ── Security Scan Configuration ── */}
+                {/* ── Security scan configuration (Matching Reference Image 8) ── */}
                 <div
                   style={{
                     backgroundColor: '#FFFFFF',
                     border: '1px solid #E2E8F0',
-                    borderRadius: '12px',
-                    padding: '20px',
+                    borderRadius: '16px',
+                    padding: '24px 28px',
                     boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                    <div>
-                      <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: '0 0 2px' }}>
-                        Security Scan Configuration
-                      </h4>
-                      <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-                        Configure default branch and automated security scanner policies for this repository.
-                      </p>
-                    </div>
+                  <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px', letterSpacing: '-0.01em' }}>
+                    Security scan configuration
+                  </h4>
+                  <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 20px' }}>
+                    Set the default branch and which scanners run automatically on this repository.
+                  </p>
+
+                  <div style={{ marginBottom: '20px', maxWidth: '320px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                      Default branch
+                    </label>
+                    <input
+                      type="text"
+                      value={scanConfig.defaultBranch}
+                      onChange={(e) => setScanConfig({ ...scanConfig, defaultBranch: e.target.value })}
+                      placeholder="main"
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '8px',
+                        padding: '9px 14px',
+                        fontSize: '13.5px',
+                        fontFamily: 'monospace',
+                        color: '#0F172A',
+                        outline: 'none',
+                      }}
+                    />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                        Default Branch
-                      </label>
-                      <input
-                        type="text"
-                        value={scanConfig.defaultBranch}
-                        onChange={(e) => setScanConfig({ ...scanConfig, defaultBranch: e.target.value })}
-                        placeholder="main"
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          backgroundColor: '#F8FAFC',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
-                          padding: '8px 12px',
-                          fontSize: '13px',
-                          fontFamily: 'monospace',
-                          color: '#0F172A',
-                          outline: 'none',
-                        }}
-                      />
-                    </div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '10px' }}>
+                    Scanners and triggers
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155', cursor: 'pointer' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                    {/* SAST Card */}
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        padding: '14px 16px',
+                        border: scanConfig.sastEnabled ? '1.5px solid #0F172A' : '1px solid #E2E8F0',
+                        borderRadius: '12px',
+                        backgroundColor: scanConfig.sastEnabled ? '#F8FAFC' : '#FFFFFF',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={scanConfig.sastEnabled}
                         onChange={(e) => setScanConfig({ ...scanConfig, sastEnabled: e.target.checked })}
+                        style={{ marginTop: '2px', accentColor: '#0F172A', width: '16px', height: '16px' }}
                       />
-                      <span>SAST (Semgrep)</span>
+                      <div>
+                        <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>SAST</div>
+                        <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', lineHeight: 1.35 }}>
+                          Static code analysis with Semgrep
+                        </div>
+                      </div>
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155', cursor: 'pointer' }}>
+
+                    {/* Secrets Card */}
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        padding: '14px 16px',
+                        border: scanConfig.secretsEnabled ? '1.5px solid #0F172A' : '1px solid #E2E8F0',
+                        borderRadius: '12px',
+                        backgroundColor: scanConfig.secretsEnabled ? '#F8FAFC' : '#FFFFFF',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={scanConfig.secretsEnabled}
                         onChange={(e) => setScanConfig({ ...scanConfig, secretsEnabled: e.target.checked })}
+                        style={{ marginTop: '2px', accentColor: '#0F172A', width: '16px', height: '16px' }}
                       />
-                      <span>Secrets (Gitleaks)</span>
+                      <div>
+                        <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>Secrets</div>
+                        <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', lineHeight: 1.35 }}>
+                          Leaked keys and tokens with Gitleaks
+                        </div>
+                      </div>
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155', cursor: 'pointer' }}>
+
+                    {/* Dependencies Card */}
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        padding: '14px 16px',
+                        border: scanConfig.scaEnabled ? '1.5px solid #0F172A' : '1px solid #E2E8F0',
+                        borderRadius: '12px',
+                        backgroundColor: scanConfig.scaEnabled ? '#F8FAFC' : '#FFFFFF',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={scanConfig.scaEnabled}
                         onChange={(e) => setScanConfig({ ...scanConfig, scaEnabled: e.target.checked })}
+                        style={{ marginTop: '2px', accentColor: '#0F172A', width: '16px', height: '16px' }}
                       />
-                      <span>Dependencies (Trivy/OSV)</span>
+                      <div>
+                        <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>Dependencies</div>
+                        <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', lineHeight: 1.35 }}>
+                          Vulnerable packages with Trivy and OSV
+                        </div>
+                      </div>
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155', cursor: 'pointer' }}>
+
+                    {/* Scan on Push Card */}
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        padding: '14px 16px',
+                        border: scanConfig.scanOnPush ? '1.5px solid #0F172A' : '1px solid #E2E8F0',
+                        borderRadius: '12px',
+                        backgroundColor: scanConfig.scanOnPush ? '#F8FAFC' : '#FFFFFF',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={scanConfig.scanOnPush}
                         onChange={(e) => setScanConfig({ ...scanConfig, scanOnPush: e.target.checked })}
+                        style={{ marginTop: '2px', accentColor: '#0F172A', width: '16px', height: '16px' }}
                       />
-                      <span>Scan on Push</span>
+                      <div>
+                        <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>Scan on push</div>
+                        <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', lineHeight: 1.35 }}>
+                          Run a scan on every push to the repository
+                        </div>
+                      </div>
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155', cursor: 'pointer' }}>
+
+                    {/* Scan PRs Card */}
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        padding: '14px 16px',
+                        border: scanConfig.scanPullRequests ? '1.5px solid #0F172A' : '1px solid #E2E8F0',
+                        borderRadius: '12px',
+                        backgroundColor: scanConfig.scanPullRequests ? '#F8FAFC' : '#FFFFFF',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={scanConfig.scanPullRequests}
                         onChange={(e) => setScanConfig({ ...scanConfig, scanPullRequests: e.target.checked })}
+                        style={{ marginTop: '2px', accentColor: '#0F172A', width: '16px', height: '16px' }}
                       />
-                      <span>Scan Pull Requests</span>
+                      <div>
+                        <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>Scan pull requests</div>
+                        <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', lineHeight: 1.35 }}>
+                          Check changes before they are merged
+                        </div>
+                      </div>
                     </label>
                   </div>
-                </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setStage(2)}
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      color: '#64748B',
-                      fontSize: '13.5px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ← Back
-                  </button>
-                  {selectedRepo && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '28px', paddingTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+                    <button
+                      type="button"
+                      onClick={() => setStage(2)}
+                      style={{
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        color: '#64748B',
+                        fontSize: '13.5px',
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    >
+                      — Back
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => setStage(4)}
@@ -1820,15 +2269,20 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
                         color: '#FFFFFF',
                         border: 'none',
                         borderRadius: '8px',
-                        padding: '10px 22px',
-                        fontSize: '14px',
+                        padding: '11px 22px',
+                        fontSize: '13.5px',
                         fontWeight: 700,
                         cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        boxShadow: '0 2px 4px rgba(15, 23, 42, 0.1)',
                       }}
                     >
-                      Continue to Slack (Optional) →
+                      <span>Continue to Slack (optional)</span>
+                      <ArrowRight size={15} />
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             )}

@@ -22,6 +22,8 @@ import {
   LogOut,
   Settings,
   Users,
+  CreditCard,
+  BarChart3,
   Key,
   Cloud,
   Plus,
@@ -364,7 +366,6 @@ export const Topbar: React.FC<TopbarProps> = ({
     if (pathname.startsWith('/graph')) return ALL_WORKSPACES.find(w => w.id === 'graph') || ALL_WORKSPACES[8];
     if (pathname.startsWith('/data')) return ALL_WORKSPACES.find(w => w.id === 'data') || ALL_WORKSPACES[9];
     if (pathname.startsWith('/governance')) return ALL_WORKSPACES.find(w => w.id === 'governance') || ALL_WORKSPACES[10];
-    if (pathname.startsWith('/sales')) return ALL_WORKSPACES.find(w => w.id === 'sales') || ALL_WORKSPACES[11];
     return ALL_WORKSPACES.find(w => w.id === 'code') || ALL_WORKSPACES[2]; // default: code
   }, [pathname]);
 
@@ -388,6 +389,23 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [creditsOverview, setCreditsOverview] = useState<{
+    remaining_credits: number;
+    total_credits: number;
+    plan_tier: string;
+  } | null>(null);
+
+  useEffect(() => {
+    api.get('/api/v1/billing/overview')
+      .then((res: any) => {
+        if (res) {
+          setCreditsOverview(res);
+        }
+      })
+      .catch(() => {
+        setCreditsOverview({ remaining_credits: 72, total_credits: 100, plan_tier: 'Free' });
+      });
+  }, []);
 
   // Dropdown states
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
@@ -417,20 +435,28 @@ export const Topbar: React.FC<TopbarProps> = ({
   });
 
   const isApiSecurity = activeWorkspace.id === 'api-security' || pathname.startsWith('/api-security');
-  const isCodeOrWorkspace = activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace' || isApiSecurity;
+  const isCodeOrWorkspace =
+    activeWorkspace.id === 'code' ||
+    activeWorkspace.id === 'workspace' ||
+    activeWorkspace.id === 'dependencies' ||
+    activeWorkspace.scopeLabel === 'Repository' ||
+    isApiSecurity ||
+    pathname.startsWith('/code-audit') ||
+    pathname.startsWith('/repositories') ||
+    pathname.startsWith('/code');
 
   const currentScope = isCodeOrWorkspace
     ? (isApiSecurity
-        ? (selectedScopes['api-security'] || currentRepository?.name || 'Select Repository')
-        : (currentRepository ? currentRepository.name : 'All Repositories'))
+      ? (selectedScopes['api-security'] || currentRepository?.name || 'Select Repository')
+      : (currentRepository ? currentRepository.name : 'All Repositories'))
     : (selectedScopes[activeWorkspace.id] || activeWorkspace.defaultScope);
 
   const availableScopes = isCodeOrWorkspace
     ? Array.from(new Set([
-        ...(isApiSecurity ? [] : ['All Repositories']),
-        ...repositories.map((r) => r.name),
-        ...(activeWorkspace.scopes || [])
-      ]))
+      ...(isApiSecurity ? [] : ['All Repositories']),
+      ...repositories.map((r) => r.name),
+      ...(activeWorkspace.scopes || [])
+    ]))
     : activeWorkspace.scopes;
 
   const filteredProjects = projects.filter((p) =>
@@ -552,17 +578,26 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   const handleSelectScope = (scope: string) => {
     setSelectedScopes((prev) => ({ ...prev, [activeWorkspace.id]: scope }));
-    if (activeWorkspace.id === 'code' || activeWorkspace.id === 'workspace' || isApiSecurity) {
+    if (isCodeOrWorkspace) {
       if (scope === 'All Repositories' || scope === 'Select Repository') {
         setCurrentRepository(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('secu_active_repo');
+        }
       } else {
         const found = repositories.find((r) => r.name === scope || r.id === scope || r.full_name === scope);
         if (found) {
           setCurrentRepository(found);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('secu_active_repo', found.name);
+          }
         } else {
           setCurrentRepository({ id: scope, name: scope });
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('secu_active_repo', scope);
+          }
         }
-        if (isApiSecurity && typeof window !== 'undefined') {
+        if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('kavach:switch-repository', { detail: { name: scope } }));
         }
       }
@@ -584,10 +619,13 @@ export const Topbar: React.FC<TopbarProps> = ({
     <>
       <header
         aria-label="Global Topbar"
+        className="kavach-topbar-header"
         style={{
           height: 'var(--topbar-height, 56px)',
           backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid #E8E6E1',
+          border: 'none',
+          borderBottom: '1px solid #E2E8F0',
+          boxShadow: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -1241,14 +1279,18 @@ export const Topbar: React.FC<TopbarProps> = ({
                   })}
                 </div>
 
-                {isApiSecurity && (
+                {isCodeOrWorkspace && (
                   <div style={{ borderTop: '1px solid #E2E8F0', marginTop: '6px', paddingTop: '6px', flexShrink: 0 }}>
                     <button
                       type="button"
                       onClick={() => {
                         setIsRepoDropdownOpen(false);
-                        if (typeof window !== 'undefined') {
-                          window.dispatchEvent(new CustomEvent('kavach:open-github-modal'));
+                        if (isApiSecurity) {
+                          if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('kavach:open-github-modal'));
+                          }
+                        } else {
+                          router.push('/onboarding?step=repository');
                         }
                       }}
                       style={{
@@ -1270,7 +1312,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                       onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                       <GithubIcon size={14} color="#0F172A" />
-                      <span>+ Connect / Change GitHub Repo</span>
+                      <span>+ Link / Manage Repositories</span>
                     </button>
                   </div>
                 )}
@@ -1280,15 +1322,18 @@ export const Topbar: React.FC<TopbarProps> = ({
 
         </div>
 
-        {/* Center: Compact global search — 320-380px, 42px, warm ivory */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          flex: '0 0 auto',
-          width: pathname.startsWith('/api-security') ? '360px' : '320px',
-          maxWidth: '380px',
-          minWidth: '200px',
-        }}>
+        {/* Center: Global Command Palette Search — Matching Reference Design (Image 3) */}
+        <div
+          className="kavach-hide-tablet-mobile"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            flex: '0 1 240px',
+            width: '240px',
+            maxWidth: '260px',
+            minWidth: '180px',
+          }}
+        >
           <div
             onClick={() => setIsCommandOpen(true)}
             role="button"
@@ -1299,39 +1344,46 @@ export const Topbar: React.FC<TopbarProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              height: '42px',
-              padding: '0 14px',
+              height: '38px',
+              padding: '0 12px',
               borderRadius: '10px',
-              backgroundColor: '#F5F3EF',
-              border: '1px solid #E8E6E1',
+              backgroundColor: '#F6F7FB',
+              border: '1px solid #E6E8EF',
               cursor: 'pointer',
               width: '100%',
               boxSizing: 'border-box',
-              transition: 'border-color 0.15s, background 0.15s',
-              gap: 8,
+              transition: 'all 0.15s ease',
+              gap: '10px',
             }}
             onMouseOver={e => {
-              e.currentTarget.style.borderColor = '#D4D1CB';
-              e.currentTarget.style.backgroundColor = '#EFEDE8';
+              e.currentTarget.style.borderColor = '#CBD5E1';
+              e.currentTarget.style.backgroundColor = '#EEF2F6';
             }}
             onMouseOut={e => {
-              e.currentTarget.style.borderColor = '#E8E6E1';
-              e.currentTarget.style.backgroundColor = '#F5F3EF';
+              e.currentTarget.style.borderColor = '#E6E8EF';
+              e.currentTarget.style.backgroundColor = '#F6F7FB';
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-              <Search size={15} color="#9A9A96" style={{ flexShrink: 0 }} strokeWidth={1.8} />
-              <span style={{ fontSize: '13px', color: '#9A9A96', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+              <Search size={16} color="#5B6175" style={{ flexShrink: 0 }} strokeWidth={1.9} />
+              <span style={{ fontSize: '13.5px', color: '#5B6175', fontWeight: 450, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 Go to...
               </span>
             </div>
             <kbd
               style={{
-                fontSize: '11px', fontWeight: 500, color: '#9A9A96',
-                backgroundColor: 'rgba(255,255,255,0.7)',
-                border: '1px solid #D8D5CF',
-                padding: '2px 8px', borderRadius: '5px',
-                fontFamily: 'inherit', flexShrink: 0, whiteSpace: 'nowrap',
+                fontSize: '11px',
+                fontWeight: 500,
+                color: '#5B6175',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #D9DCE6',
+                padding: '2px 6px',
+                borderRadius: '6px',
+                boxShadow: 'none',
+                fontFamily: 'inherit',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+                lineHeight: '1.2',
               }}
             >
               Ctrl K
@@ -1339,39 +1391,29 @@ export const Topbar: React.FC<TopbarProps> = ({
           </div>
         </div>
 
-        {/* Right Side: Task Queue, Bell & User Profile */}
+        {/* Right Side: Bell & User Profile */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          {/* Asynchronous Task Queue Trigger */}
-          {!pathname.startsWith('/api-security') && (
-            <button
-              onClick={() => setIsTaskDrawerOpen(true)}
-              aria-label="View background task worker queue"
-              title="Asynchronous Task Queue & Workers"
-              style={{
-                width: '32px',
-                height: '32px',
-                background: 'transparent',
-                border: 'none',
-                borderRadius: '6px',
-                color: '#64748B',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.color = '#0F172A';
-                e.currentTarget.style.backgroundColor = '#F1F5F9';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.color = '#64748B';
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <Activity size={16} />
-            </button>
-          )}
+          {/* Mobile Search Button (visible only on phones / tablets < 768px) */}
+          <button
+            type="button"
+            onClick={() => setIsCommandOpen(true)}
+            aria-label="Search"
+            className="kavach-show-tablet-mobile"
+            style={{
+              width: '32px',
+              height: '32px',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '6px',
+              color: '#5B6175',
+              cursor: 'pointer',
+              display: 'none',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Search size={16} strokeWidth={2} />
+          </button>
 
           {/* Notifications Trigger with Count Badge */}
           <div ref={notifRef} style={{ position: 'relative' }}>
@@ -1435,20 +1477,44 @@ export const Topbar: React.FC<TopbarProps> = ({
 
 
 
-          {/* User Profile */}
+          {/* Credit Chip Badge */}
+          <Link
+            href="/settings?tab=usage"
+            className="kavach-hide-small-mobile"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              height: '34px',
+              padding: '0 12px',
+              border: '1px solid #E6E8EF',
+              borderRadius: '999px',
+              backgroundColor: '#ffffff',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              color: '#0F1222',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#1F9D55' }} />
+            {creditsOverview ? `${creditsOverview.remaining_credits} credits` : '72 credits'}
+          </Link>
+
+          {/* User Profile - Top Right with Name to right and Role underneath */}
           <div ref={userMenuRef} style={{ position: 'relative' }}>
             <button
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                background: 'transparent',
-                border: '1px solid transparent',
-                borderRadius: '7px',
+                gap: '10px',
+                background: isUserMenuOpen ? '#F1F5F9' : 'transparent',
+                border: '1px solid ' + (isUserMenuOpen ? '#E2E8F0' : 'transparent'),
+                borderRadius: '8px',
                 cursor: 'pointer',
-                padding: '3px 6px',
-                height: '34px',
+                padding: '4px 8px',
+                height: '38px',
                 transition: 'all 0.15s ease',
               }}
               onMouseOver={(e) => {
@@ -1456,23 +1522,27 @@ export const Topbar: React.FC<TopbarProps> = ({
                 e.currentTarget.style.borderColor = '#E2E8F0';
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.borderColor = 'transparent';
+                if (!isUserMenuOpen) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.borderColor = 'transparent';
+                }
               }}
             >
+              {/* Avatar */}
               <div
                 style={{
-                  width: '26px',
-                  height: '26px',
+                  width: '30px',
+                  height: '30px',
                   borderRadius: '50%',
-                  backgroundColor: '#0F172A',
+                  backgroundColor: '#0F1222',
                   color: '#ffffff',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 700,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
+                  boxShadow: '0 1px 2px rgba(15,18,34,0.1)',
                 }}
               >
                 {currentUser?.name
@@ -1483,46 +1553,37 @@ export const Topbar: React.FC<TopbarProps> = ({
                     .join('')
                     .substring(0, 2)
                     .toUpperCase()
-                  : currentUser?.email
-                    ? currentUser.email.substring(0, 2).toUpperCase()
-                    : 'G'}
+                  : 'MB'}
               </div>
-              {pathname.startsWith('/api-security') ? (
-                <span
-                  className="kavach-hide-small-mobile"
+
+              {/* Name & Role Container */}
+              <div className="kavach-hide-small-mobile" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.15 }}>
+                <div
                   style={{
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    color: '#0F172A',
-                    maxWidth: '140px',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    color: '#0F1222',
+                    maxWidth: '130px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    letterSpacing: '-0.01em',
                   }}
                 >
                   {currentUser?.name || 'Mayur Bharvad'}
-                </span>
-              ) : (
-                <div className="kavach-hide-small-mobile" style={{ textAlign: 'left', lineHeight: '1.2' }}>
-                  <div
-                    style={{
-                      fontSize: '12.5px',
-                      fontWeight: 600,
-                      color: '#0F172A',
-                      maxWidth: '110px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {currentUser?.name || currentUser?.email?.split('@')[0] || 'Account'}
-                  </div>
-                  <div style={{ fontSize: '10.5px', color: '#64748B' }}>
-                    {currentUser ? (currentUser.role || 'Member') : 'Signed Out'}
-                  </div>
                 </div>
-              )}
-              <ChevronDown size={13} color="#94A3B8" className="kavach-hide-small-mobile" style={{ flexShrink: 0 }} />
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    color: '#64748B',
+                    marginTop: '1px',
+                  }}
+                >
+                  {currentUser?.role || 'Owner'}
+                </div>
+              </div>
+              <ChevronDown size={14} color="#64748B" className="kavach-hide-small-mobile" style={{ flexShrink: 0 }} />
             </button>
 
             {isUserMenuOpen && (
@@ -1531,195 +1592,274 @@ export const Topbar: React.FC<TopbarProps> = ({
                   position: 'absolute',
                   top: 'calc(100% + 8px)',
                   right: 0,
-                  width: '200px',
+                  width: '240px',
                   backgroundColor: '#ffffff',
-                  borderRadius: '10px',
-                  border: '1px solid #E2E8F0',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                  borderRadius: '14px',
+                  border: '1px solid #E6E8EF',
+                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.08)',
                   zIndex: 50,
-                  padding: '6px',
+                  padding: '8px',
                 }}
               >
-                <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9', marginBottom: '4px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#0F172A' }}>
-                    {currentUser?.name || currentUser?.email || 'Guest User'}
+                {/* User Header */}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '6px 8px 10px' }}>
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '50%',
+                      backgroundColor: '#111322',
+                      color: '#ffffff',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    MB
                   </div>
-                  <div style={{ fontSize: '11px', color: '#64748B' }}>
-                    {currentUser?.email || 'Not signed in'}
+                  <div style={{ overflow: 'hidden' }}>
+                    <div style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F1222', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {currentUser?.name || 'Mayur Bharvad'}
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: '#5B6175', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {currentUser?.email || 'mayur@kavach.io'}
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    router.push('/settings?tab=profile');
-                  }}
+
+                {/* Credits summary box */}
+                <div
                   style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    color: '#0F172A',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
+                    margin: '2px 0 10px',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    border: '1px solid #E6E8EF',
+                    backgroundColor: '#F6F7FB',
                   }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                  <User size={14} color="#64748B" />
-                  User Profile
-                </button>
-                <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    router.push('/settings?tab=account');
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    color: '#0F172A',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <Sliders size={14} color="#64748B" />
-                  Account Settings
-                </button>
-                <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    router.push('/settings?tab=security');
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    color: '#0F172A',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <Shield size={14} color="#64748B" />
-                  Security &amp; MFA
-                </button>
-                <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    router.push('/settings?tab=tokens');
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    color: '#0F172A',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <Key size={14} color="#64748B" />
-                  API Keys &amp; Tokens
-                </button>
-                <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    router.push('/settings?tab=sessions');
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    color: '#0F172A',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <Laptop size={14} color="#64748B" />
-                  Active Sessions
-                </button>
-                <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    router.push('/settings/members');
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    color: '#0F172A',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <Users size={14} color="#64748B" />
-                  Team &amp; Members
-                </button>
-                <div style={{ height: '1px', backgroundColor: '#F1F5F9', margin: '4px 0' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                    <b style={{ color: '#0F1222' }}>Credits</b>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        backgroundColor: '#EEF0F5',
+                        color: '#5B6175',
+                      }}
+                    >
+                      {creditsOverview?.plan_tier ? `${creditsOverview.plan_tier} plan` : 'Free plan'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', margin: '6px 0 8px' }}>
+                    <span style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '-0.02em', color: '#0F1222' }}>
+                      {creditsOverview?.remaining_credits ?? 72}
+                    </span>
+                    <span style={{ fontSize: '11.5px', color: '#5B6175' }}>
+                      of {creditsOverview?.total_credits ?? 100} left
+                    </span>
+                  </div>
+                  <div style={{ height: '8px', borderRadius: '99px', backgroundColor: '#ECEEF4', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        height: '100%',
+                        borderRadius: '99px',
+                        backgroundColor: '#4F46E5',
+                        width: `${Math.min(100, Math.round(((creditsOverview?.remaining_credits ?? 72) / (creditsOverview?.total_credits ?? 100)) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      router.push('/pricing');
+                    }}
+                    style={{
+                      marginTop: '10px',
+                      width: '100%',
+                      height: '32px',
+                      borderRadius: '8px',
+                      backgroundColor: '#4F46E5',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 19V5M5 12l7-7 7 7" />
+                    </svg>
+                    Upgrade plan
+                  </button>
+                </div>
+
+                {/* Nav items */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      router.push('/settings?tab=profile');
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#2A2F45',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F6F7FB')}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <User size={15} color="#5B6175" />
+                    Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      router.push('/settings?tab=team');
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#2A2F45',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F6F7FB')}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <Users size={15} color="#5B6175" />
+                    Team
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      router.push('/settings?tab=billing');
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#2A2F45',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F6F7FB')}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <CreditCard size={15} color="#5B6175" />
+                    Billing & Plan
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      router.push('/settings?tab=usage');
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#2A2F45',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F6F7FB')}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <BarChart3 size={15} color="#5B6175" />
+                    Usage & Credits
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      router.push('/settings');
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#2A2F45',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F6F7FB')}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <Settings size={15} color="#5B6175" />
+                    Settings
+                  </button>
+                </div>
+
+                <div style={{ height: '1px', backgroundColor: '#E6E8EF', margin: '6px 0' }} />
+
                 <button
                   onClick={handleLogout}
                   style={{
                     width: '100%',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '10px',
                     padding: '8px 10px',
-                    borderRadius: '6px',
+                    borderRadius: '8px',
                     border: 'none',
                     backgroundColor: 'transparent',
-                    color: '#EF4444',
+                    color: '#B42318',
                     fontSize: '13px',
+                    fontWeight: 500,
                     cursor: 'pointer',
                     textAlign: 'left',
                   }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#FEF2F2')}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#FDE8E6')}
                   onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                  <LogOut size={14} color="#EF4444" />
-                  Log Out
+                  <LogOut size={15} color="#B42318" />
+                  Sign out
                 </button>
               </div>
             )}
@@ -1729,13 +1869,6 @@ export const Topbar: React.FC<TopbarProps> = ({
 
       {/* Global Command Palette Modal */}
       <CommandPalette isOpen={isCommandOpen} onClose={() => setIsCommandOpen(false)} />
-
-      {/* Global Asynchronous Background Task Queue Drawer */}
-      <TaskQueueDrawer
-        isOpen={isTaskDrawerOpen}
-        onClose={() => setIsTaskDrawerOpen(false)}
-        projectId={currentProject?.id}
-      />
     </>
   );
 };

@@ -142,6 +142,20 @@ async def create_organization(
     await db.commit()
     await db.refresh(new_org)
 
+    # Asynchronously synchronize Organization with HubSpot CRM
+    import asyncio
+    from app.services.hubspot_service import hubspot_service
+    asyncio.create_task(
+        hubspot_service.sync_organization(
+            org_id=str(new_org.id),
+            name=new_org.name,
+            domain=new_org.website or (owner_email.split("@")[-1] if "@" in owner_email else None),
+            industry=new_org.industry,
+            team_size=new_org.team_size,
+            owner_email=owner_email,
+        )
+    )
+
     return OrganizationItem(
         id=str(new_org.id),
         name=new_org.name,
@@ -1050,13 +1064,21 @@ async def get_onboarding_state(
 
     from app.models.github import GitHubInstallation
     from app.models.project import Project
-    from sqlalchemy import func
+    from sqlalchemy import func, or_
 
     auth_provider = getattr(current_user, "auth_provider", None) or "oauth"
 
-    # Query active GitHub App installations
+    # Query active GitHub App installations (matching user ID or linked GitHub account ID)
+    gh_inst_filter = [GitHubInstallation.connected_by_user_id == current_user.id]
+    if getattr(current_user, "github_user_id", None):
+        try:
+            gh_id_int = int(current_user.github_user_id)
+            gh_inst_filter.append(GitHubInstallation.github_account_id == gh_id_int)
+        except (ValueError, TypeError):
+            pass
+
     gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
-        GitHubInstallation.connected_by_user_id == current_user.id,
+        or_(*gh_inst_filter),
         GitHubInstallation.status == "ACTIVE"
     )
     gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
@@ -1070,10 +1092,14 @@ async def get_onboarding_state(
     state = dict(current_user.onboarding_state or {})
     is_completed = bool(current_user.onboarding_completed and has_project)
 
-    if is_completed:
+    if is_completed or (has_project and github_installed):
         default_status = "ONBOARDING_COMPLETED"
         default_step = "completed"
         next_route = "/overview"
+        if not current_user.onboarding_completed:
+            current_user.onboarding_completed = True
+            db.add(current_user)
+            await db.commit()
     elif auth_provider == "google" and not github_installed:
         default_status = "GITHUB_CONNECTION_REQUIRED"
         default_step = "connect_github"

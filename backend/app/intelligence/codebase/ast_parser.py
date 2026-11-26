@@ -68,6 +68,11 @@ class CodeFileAST:
     functions: List[ASTFunction] = field(default_factory=list)
     top_level_calls: List[ASTCall] = field(default_factory=list)
     endpoints: List[ASTFunction] = field(default_factory=list)
+    env_references: List[str] = field(default_factory=list)
+    database_models: List[str] = field(default_factory=list)
+    is_middleware: bool = False
+    is_auth_related: bool = False
+    is_config: bool = False
 
 
 SQL_SINKS = {"execute", "cursor.execute", "raw", "query", "exec", "executemany", "select"}
@@ -128,6 +133,8 @@ class MultiLanguageASTParser:
             elif isinstance(node, ast.ClassDef):
                 cls_obj = cls._extract_python_class(node, file.relative_path)
                 res.classes.append(cls_obj)
+                if any(b in ("Base", "Model", "DeclarativeBase", "Document", "SQLModel") or "model" in b.lower() for b in cls_obj.base_classes):
+                    res.database_models.append(cls_obj.name)
                 for m in cls_obj.methods:
                     if m.is_endpoint:
                         res.endpoints.append(m)
@@ -144,6 +151,21 @@ class MultiLanguageASTParser:
                 call = cls._extract_python_call(node.value)
                 if call:
                     res.top_level_calls.append(call)
+
+        # Check environment references across Python file
+        env_pattern = re.compile(r"""(?:os\.(?:environ(?:\[['"](\w+)['"]\]|\.get\(['"](\w+)['"]\))|getenv\(['"](\w+)['"]\)))""")
+        for m in env_pattern.finditer(file.content):
+            ref = m.group(1) or m.group(2) or m.group(3)
+            if ref and ref not in res.env_references:
+                res.env_references.append(ref)
+
+        low_path = file.relative_path.lower()
+        if "middleware" in low_path:
+            res.is_middleware = True
+        if any(a in low_path for a in ("auth", "login", "jwt", "session", "oauth", "security")):
+            res.is_auth_related = True
+        if any(c in low_path for c in ("config", "settings", "env")):
+            res.is_config = True
 
         return res
 
@@ -319,6 +341,47 @@ class MultiLanguageASTParser:
                 res.functions.append(fn)
                 res.endpoints.append(fn)
 
+        # 2b. Next.js App Router route handlers: export async function GET(request: Request)
+        next_route_re = re.compile(r"""export\s+(?:async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH|HEAD)\s*\(([^)]*)\)""")
+        for i, line in enumerate(lines, 1):
+            m = next_route_re.search(line)
+            if m:
+                verb, params_raw = m.groups()
+                rel_path = file.relative_path.replace("\\", "/")
+                derived_path = rel_path
+                if "api/" in rel_path:
+                    derived_path = "/" + rel_path.split("api/", 1)[1]
+                    derived_path = re.sub(r"/route\.[jt]sx?$", "", derived_path)
+                    derived_path = f"/api/{derived_path}".rstrip("/")
+                fn = ASTFunction(
+                    name=f"{verb} {derived_path}",
+                    file_path=file.relative_path,
+                    line_start=i,
+                    line_end=min(i + 30, len(lines)),
+                    parameters=[p.strip() for p in params_raw.split(",") if p.strip()],
+                    is_endpoint=True,
+                    endpoint_method=verb,
+                    endpoint_path=derived_path,
+                )
+                res.functions.append(fn)
+                res.endpoints.append(fn)
+
+        # 2c. Arrow function Express / Controller handlers: const loginHandler = async (req, res) => ...
+        arrow_ep_re = re.compile(r"""(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\(\s*(?:req|request|ctx)\b[^)]*\)\s*=>""")
+        for i, line in enumerate(lines, 1):
+            m = arrow_ep_re.search(line)
+            if m:
+                fname = m.group(1)
+                fn = ASTFunction(
+                    name=fname,
+                    file_path=file.relative_path,
+                    line_start=i,
+                    line_end=min(i + 30, len(lines)),
+                    parameters=["req", "res"],
+                    is_endpoint=("handler" in fname.lower() or "controller" in fname.lower() or "route" in fname.lower()),
+                )
+                res.functions.append(fn)
+
         # 3. Class definitions: class UserService extends BaseService {
         class_re = re.compile(r"""\bclass\s+(\w+)(?:\s+extends\s+(\w+))?""")
         for i, line in enumerate(lines, 1):
@@ -361,6 +424,26 @@ class MultiLanguageASTParser:
                         arguments=[a.strip() for a in raw_args.split(",") if a.strip()],
                         is_tainted_sink=True,
                     ))
+
+        # 6. Mongoose / Prisma models
+        mongoose_re = re.compile(r"""mongoose\.model\(\s*['"](\w+)['"]""")
+        for m in mongoose_re.finditer(content):
+            res.database_models.append(m.group(1))
+
+        # 7. Environment variable references: process.env.XYZ
+        env_js_re = re.compile(r"""process\.env\.(\w+)""")
+        for m in env_js_re.finditer(content):
+            ref = m.group(1)
+            if ref and ref not in res.env_references:
+                res.env_references.append(ref)
+
+        low_path = file.relative_path.lower()
+        if "middleware" in low_path:
+            res.is_middleware = True
+        if any(a in low_path for a in ("auth", "login", "jwt", "session", "oauth", "security")):
+            res.is_auth_related = True
+        if any(c in low_path for c in ("config", "settings", ".env")):
+            res.is_config = True
 
         return res
 

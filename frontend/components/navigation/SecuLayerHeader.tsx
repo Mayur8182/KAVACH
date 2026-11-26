@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import { getAuthToken, clearAuthToken } from '@/lib/auth/token';
 import { toast } from '@/lib/toast';
 import {
@@ -66,18 +67,23 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
   const [bookDemoOpen, setBookDemoOpen] = useState(false);
   const [currentHash, setCurrentHash] = useState('');
+  const [headerActiveBtn, setHeaderActiveBtn] = useState<'get-started' | 'book-demo' | null>(null);
+  const [headerHoveredBtn, setHeaderHoveredBtn] = useState<'get-started' | 'book-demo' | null>(null);
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    const handleOpenBookDemo = () => {
+    const handleOpenBookDemo = (event?: Event) => {
+      if (event?.cancelable) {
+        event.preventDefault();
+      }
       if (onOpenExpert) {
         onOpenExpert();
       } else {
         setBookDemoOpen(true);
       }
     };
-    window.addEventListener('kavach:open-book-demo', handleOpenBookDemo);
+    window.addEventListener('kavach:open-book-demo', handleOpenBookDemo as EventListener);
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('book-demo') === 'true') {
@@ -88,7 +94,7 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
         }
       }
     }
-    return () => window.removeEventListener('kavach:open-book-demo', handleOpenBookDemo);
+    return () => window.removeEventListener('kavach:open-book-demo', handleOpenBookDemo as EventListener);
   }, [onOpenExpert]);
 
   useEffect(() => {
@@ -188,7 +194,8 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
     router.push('/login?logged_out=1');
   };
 
-  // Products hover dropdown state & timeout
+  // Navbar hover & dropdown state
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const [isProductsDropdownOpen, setIsProductsDropdownOpen] = useState(false);
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -196,12 +203,35 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
     if (dropdownTimeoutRef.current) {
       clearTimeout(dropdownTimeoutRef.current);
     }
+    setHoveredNav('Products');
+    setIsSolutionsDropdownOpen(false);
+    setIsCompanyDropdownOpen(false);
     setIsProductsDropdownOpen(true);
   };
 
   const handleMouseLeaveProducts = () => {
     dropdownTimeoutRef.current = setTimeout(() => {
       setIsProductsDropdownOpen(false);
+    }, 180);
+  };
+
+  // Solutions hover dropdown state & timeout
+  const [isSolutionsDropdownOpen, setIsSolutionsDropdownOpen] = useState(false);
+  const solutionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnterSolutions = () => {
+    if (solutionsTimeoutRef.current) {
+      clearTimeout(solutionsTimeoutRef.current);
+    }
+    setHoveredNav('Solutions');
+    setIsProductsDropdownOpen(false);
+    setIsCompanyDropdownOpen(false);
+    setIsSolutionsDropdownOpen(true);
+  };
+
+  const handleMouseLeaveSolutions = () => {
+    solutionsTimeoutRef.current = setTimeout(() => {
+      setIsSolutionsDropdownOpen(false);
     }, 180);
   };
 
@@ -215,6 +245,9 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
     if (companyTimeoutRef.current) {
       clearTimeout(companyTimeoutRef.current);
     }
+    setHoveredNav('Company');
+    setIsProductsDropdownOpen(false);
+    setIsSolutionsDropdownOpen(false);
     setIsCompanyDropdownOpen(true);
   };
 
@@ -227,6 +260,7 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
   useEffect(() => {
     return () => {
       if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
+      if (solutionsTimeoutRef.current) clearTimeout(solutionsTimeoutRef.current);
       if (companyTimeoutRef.current) clearTimeout(companyTimeoutRef.current);
     };
   }, []);
@@ -369,17 +403,18 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
     label: string;
     href: string;
     hasDropdown?: boolean;
+    hasSolutionsDropdown?: boolean;
     hasCompanyDropdown?: boolean;
     external?: boolean;
     isModalAction?: boolean;
   }> = [
-    { label: 'Products', href: '/products', hasDropdown: true },
-    { label: 'Solutions', href: '/solutions' },
-    { label: 'Pricing', href: '/pricing' },
-    { label: 'Resources', href: '/resources' },
-    { label: 'Docs', href: '/docs' },
-    { label: 'Company', href: '/contact', hasCompanyDropdown: true },
-  ];
+      { label: 'Products', href: '/products', hasDropdown: true },
+      { label: 'Solutions', href: '/solutions', hasSolutionsDropdown: true },
+      { label: 'Pricing', href: '/pricing' },
+      { label: 'Resources', href: '/resources' },
+      { label: 'Docs', href: '/docs' },
+      { label: 'Company', href: '/contact', hasCompanyDropdown: true },
+    ];
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -398,767 +433,780 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
   return (
     <>
       <header
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #E2E8F0',
-        width: '100%',
-        backdropFilter: 'blur(8px)',
-      }}
-    >
-      <div
         style={{
-          maxWidth: '1380px',
-          margin: '0 auto',
-          padding: '0 24px',
-          height: '68px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          backgroundColor: 'rgba(255, 255, 255, 0.86)',
+          borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
+          boxShadow: 'none',
+          width: '100%',
+          backdropFilter: 'blur(14px)',
         }}
       >
-        {/* Brand Logo */}
-        <Link href="/" style={{ display: 'flex', alignItems: 'center' }}>
-          <SecuLayerHexLogo />
-        </Link>
-
-        {!isMinimal && (
-          <>
-            {/* Desktop Navigation Links */}
-            <nav
+        <div
           style={{
-            display: 'none',
+            maxWidth: '1380px',
+            margin: '0 auto',
+            padding: '0 24px',
+            height: '68px',
+            display: 'flex',
             alignItems: 'center',
-            gap: '28px',
+            justifyContent: 'space-between',
           }}
-          className="desktop-nav"
         >
-          {navLinks.map((link) => {
-            const active = isActive(link.href);
+          {/* Brand Logo */}
+          <Link href="/" style={{ display: 'flex', alignItems: 'center' }}>
+            <SecuLayerHexLogo />
+          </Link>
 
-            // Handle Products with hover dropdown
-            if (link.hasDropdown) {
-              return (
-                <div
-                  key={link.label}
-                  onMouseEnter={handleMouseEnterProducts}
-                  onMouseLeave={handleMouseLeaveProducts}
-                  style={{ position: 'relative', padding: '16px 0' }}
-                >
-                  <Link
-                    href={link.href}
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: active ? 600 : 500,
-                      color: active ? '#0F172A' : '#475569',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      position: 'relative',
-                      padding: '6px 0',
-                      transition: 'color 0.15s ease',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span>{link.label}</span>
-                    <ChevronDown
-                      size={14}
-                      style={{
-                        transform: isProductsDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s ease',
-                        opacity: 0.7,
-                      }}
-                    />
-                    {active && (
+          {!isMinimal && (
+            <>
+              {/* Desktop Navigation Links — Minimalist Glass & Subtle Hover Slash */}
+              <nav
+                onMouseLeave={() => setHoveredNav(null)}
+                style={{
+                  display: 'none',
+                  alignItems: 'center',
+                  gap: '10px',
+                }}
+                className="desktop-nav"
+              >
+                {navLinks.map((link) => {
+                  const active = isActive(link.href);
+                  const isHovered = hoveredNav === link.label;
+
+                  const navItemPill = (
+                    <span className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors duration-150">
+                      {isHovered && (
+                        <motion.span
+                          layoutId="kavachNavHoverPill"
+                          transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                          className="pointer-events-none absolute inset-0 rounded-lg bg-slate-100/85"
+                        />
+                      )}
+                      {isHovered && (
+                        <motion.span
+                          layoutId="kavachNavHoverSlash"
+                          transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+                          aria-hidden="true"
+                          className="relative z-10 inline-block w-[2px] h-3.5 bg-[#EA580C] rotate-[16deg] rounded-full shrink-0"
+                        />
+                      )}
                       <span
-                        style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: '2px',
-                          backgroundColor: '#09090B',
-                          borderRadius: '2px',
-                        }}
-                      />
-                    )}
-                  </Link>
+                        className={`relative z-10 text-[14px] transition-colors ${
+                          active || isHovered
+                            ? 'font-semibold text-[#0F172A]'
+                            : 'font-medium text-slate-600'
+                        }`}
+                      >
+                        {link.label}
+                      </span>
+                    </span>
+                  );
 
-                  {/* Products Dropdown (Complete suite of Kavach Security Products) */}
-                  {isProductsDropdownOpen && (
-                    <div
+                  // 1. Products Dropdown Card
+                  if (link.hasDropdown) {
+                    return (
+                      <div
+                        key={link.label}
+                        onMouseEnter={handleMouseEnterProducts}
+                        onMouseLeave={handleMouseLeaveProducts}
+                        style={{ position: 'relative', padding: '10px 0' }}
+                      >
+                        <Link
+                          href={link.href}
+                          className="inline-flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <span className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg">
+                            {isHovered && (
+                              <motion.span
+                                layoutId="kavachNavHoverPill"
+                                transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                                className="pointer-events-none absolute inset-0 rounded-lg bg-slate-100/85"
+                              />
+                            )}
+                            {isHovered && (
+                              <motion.span
+                                layoutId="kavachNavHoverSlash"
+                                transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+                                aria-hidden="true"
+                                className="relative z-10 inline-block w-[2px] h-3.5 bg-[#EA580C] rotate-[16deg] rounded-full shrink-0"
+                              />
+                            )}
+                            <span
+                              className={`relative z-10 text-[14px] ${
+                                active || isHovered || isProductsDropdownOpen
+                                  ? 'font-semibold text-[#0F172A]'
+                                  : 'font-medium text-slate-600'
+                              }`}
+                            >
+                              {link.label}
+                            </span>
+                            <ChevronDown
+                              size={13}
+                              className="relative z-10 text-slate-500 transition-transform duration-200"
+                              style={{
+                                transform: isProductsDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                              }}
+                            />
+                          </span>
+                        </Link>
+
+                        <AnimatePresence>
+                          {isProductsDropdownOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                              transition={{ duration: 0.16, ease: 'easeOut' }}
+                              className="absolute top-full -left-4 w-[320px] rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-xl p-2.5 shadow-[0_22px_48px_-14px_rgba(15,23,42,0.16)] z-50"
+                            >
+                              <div className="divide-y divide-slate-100">
+                                {[
+                                  {
+                                    title: 'Code & Secrets Scanning',
+                                    desc: 'SAST, secret leaks & package checks',
+                                    href: '/code/sast',
+                                    Icon: Code2,
+                                  },
+                                  {
+                                    title: 'Verified Auto-Fix',
+                                    desc: 'Patch bugs and re-scan before opening PRs',
+                                    href: '/remediation',
+                                    Icon: Sparkles,
+                                  },
+                                  {
+                                    title: 'Cloud & IaC Posture',
+                                    desc: 'Audit AWS, Kubernetes, Terraform & Docker',
+                                    href: '/cloud',
+                                    Icon: Cloud,
+                                  },
+                                  {
+                                    title: 'Agent Governance & MCP',
+                                    desc: 'OPA safety rules & 23 gateway security tools',
+                                    href: '/agent',
+                                    Icon: Bot,
+                                  },
+                                ].map((item) => (
+                                  <Link
+                                    key={item.title}
+                                    href={item.href}
+                                    onClick={() => setIsProductsDropdownOpen(false)}
+                                    className="group flex items-start gap-3 p-2.5 rounded-xl hover:bg-[#FAF9F6] transition-colors"
+                                  >
+                                    <div className="w-9 h-9 rounded-lg border border-slate-200/80 bg-[#FAF9F6] group-hover:bg-white group-hover:border-orange-200 flex items-center justify-center shrink-0 text-slate-700 group-hover:text-[#EA580C] transition-colors">
+                                      <item.Icon size={16} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="text-[13.5px] font-semibold text-slate-900 leading-tight">
+                                        {item.title}
+                                      </div>
+                                      <div className="text-[12px] text-slate-600 mt-0.5 leading-snug">
+                                        {item.desc}
+                                      </div>
+                                    </div>
+                                  </Link>
+                                ))}
+                              </div>
+                              <div className="mt-1.5 pt-1.5 border-t border-slate-100">
+                                <Link
+                                  href="/products"
+                                  onClick={() => setIsProductsDropdownOpen(false)}
+                                  className="flex items-center justify-between px-3 py-2 rounded-xl text-[12.5px] font-semibold text-slate-800 hover:bg-slate-50 hover:text-[#EA580C] transition-colors"
+                                >
+                                  <span>Explore all security products</span>
+                                  <ArrowRight size={13} />
+                                </Link>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  }
+
+                  // 2. Solutions Dropdown Card
+                  if (link.hasSolutionsDropdown) {
+                    return (
+                      <div
+                        key={link.label}
+                        onMouseEnter={handleMouseEnterSolutions}
+                        onMouseLeave={handleMouseLeaveSolutions}
+                        style={{ position: 'relative', padding: '10px 0' }}
+                      >
+                        <Link href={link.href} className="inline-flex items-center cursor-pointer">
+                          <span className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg">
+                            {isHovered && (
+                              <motion.span
+                                layoutId="kavachNavHoverPill"
+                                transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                                className="pointer-events-none absolute inset-0 rounded-lg bg-slate-100/85"
+                              />
+                            )}
+                            {isHovered && (
+                              <motion.span
+                                layoutId="kavachNavHoverSlash"
+                                transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+                                aria-hidden="true"
+                                className="relative z-10 inline-block w-[2px] h-3.5 bg-[#EA580C] rotate-[16deg] rounded-full shrink-0"
+                              />
+                            )}
+                            <span
+                              className={`relative z-10 text-[14px] ${
+                                active || isHovered || isSolutionsDropdownOpen
+                                  ? 'font-semibold text-[#0F172A]'
+                                  : 'font-medium text-slate-600'
+                              }`}
+                            >
+                              {link.label}
+                            </span>
+                            <ChevronDown
+                              size={13}
+                              className="relative z-10 text-slate-500 transition-transform duration-200"
+                              style={{
+                                transform: isSolutionsDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                              }}
+                            />
+                          </span>
+                        </Link>
+
+                        <AnimatePresence>
+                          {isSolutionsDropdownOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                              transition={{ duration: 0.16, ease: 'easeOut' }}
+                              className="absolute top-full -left-4 w-[310px] rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-xl p-2.5 shadow-[0_22px_48px_-14px_rgba(15,23,42,0.16)] z-50"
+                            >
+                              <div className="divide-y divide-slate-100">
+                                {[
+                                  {
+                                    title: 'AI Engineering Teams',
+                                    desc: 'Guard coding agents & auto-test patches',
+                                    href: '/solutions',
+                                    Icon: Bot,
+                                  },
+                                  {
+                                    title: 'AppSec & DevSecOps',
+                                    desc: 'Replace scattered scanners in one pipeline',
+                                    href: '/code',
+                                    Icon: ShieldCheck,
+                                  },
+                                  {
+                                    title: 'Cloud Infrastructure',
+                                    desc: 'Verify IAM, Kubernetes & Terraform rules',
+                                    href: '/cloud',
+                                    Icon: Cloud,
+                                  },
+                                  {
+                                    title: 'Security Governance',
+                                    desc: 'PostgreSQL evidence & traceable PR checks',
+                                    href: '/governance',
+                                    Icon: Database,
+                                  },
+                                ].map((item) => (
+                                  <Link
+                                    key={item.title}
+                                    href={item.href}
+                                    onClick={() => setIsSolutionsDropdownOpen(false)}
+                                    className="group flex items-start gap-3 p-2.5 rounded-xl hover:bg-[#FAF9F6] transition-colors"
+                                  >
+                                    <div className="w-9 h-9 rounded-lg border border-slate-200/80 bg-[#FAF9F6] group-hover:bg-white group-hover:border-orange-200 flex items-center justify-center shrink-0 text-slate-700 group-hover:text-[#EA580C] transition-colors">
+                                      <item.Icon size={16} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="text-[13.5px] font-semibold text-slate-900 leading-tight">
+                                        {item.title}
+                                      </div>
+                                      <div className="text-[12px] text-slate-600 mt-0.5 leading-snug">
+                                        {item.desc}
+                                      </div>
+                                    </div>
+                                  </Link>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  }
+
+                  // 3. Company Dropdown Card
+                  if (link.hasCompanyDropdown) {
+                    return (
+                      <div
+                        key={link.label}
+                        onMouseEnter={handleMouseEnterCompany}
+                        onMouseLeave={handleMouseLeaveCompany}
+                        style={{ position: 'relative', padding: '10px 0' }}
+                      >
+                        <Link href={link.href} className="inline-flex items-center cursor-pointer">
+                          <span className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg">
+                            {isHovered && (
+                              <motion.span
+                                layoutId="kavachNavHoverPill"
+                                transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                                className="pointer-events-none absolute inset-0 rounded-lg bg-slate-100/85"
+                              />
+                            )}
+                            {isHovered && (
+                              <motion.span
+                                layoutId="kavachNavHoverSlash"
+                                transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+                                aria-hidden="true"
+                                className="relative z-10 inline-block w-[2px] h-3.5 bg-[#EA580C] rotate-[16deg] rounded-full shrink-0"
+                              />
+                            )}
+                            <span
+                              className={`relative z-10 text-[14px] ${
+                                active || isHovered || isCompanyDropdownOpen
+                                  ? 'font-semibold text-[#0F172A]'
+                                  : 'font-medium text-slate-600'
+                              }`}
+                            >
+                              {link.label}
+                            </span>
+                            <ChevronDown
+                              size={13}
+                              className="relative z-10 text-slate-500 transition-transform duration-200"
+                              style={{
+                                transform: isCompanyDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                              }}
+                            />
+                          </span>
+                        </Link>
+
+                        <AnimatePresence>
+                          {isCompanyDropdownOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                              transition={{ duration: 0.16, ease: 'easeOut' }}
+                              className="absolute top-full right-0 w-[235px] rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-xl p-2 shadow-[0_22px_48px_-14px_rgba(15,23,42,0.16)] z-50"
+                            >
+                              <div className="divide-y divide-slate-100">
+                                {[
+                                  { title: 'About Kavach', href: '/about', Icon: Users },
+                                  { title: 'Team', href: '/team', Icon: ShieldCheck },
+                                  { title: 'Careers', href: '/careers', Icon: Sparkles },
+                                  { title: 'Contact Us', href: '/contact', Icon: Mail },
+                                ].map((item) => (
+                                  <Link
+                                    key={item.title}
+                                    href={item.href}
+                                    onClick={() => setIsCompanyDropdownOpen(false)}
+                                    className="group flex items-center gap-2.5 p-2 rounded-xl hover:bg-[#FAF9F6] transition-colors"
+                                  >
+                                    <div className="w-7 h-7 rounded-lg border border-slate-200/80 bg-[#FAF9F6] group-hover:bg-white group-hover:border-orange-200 flex items-center justify-center shrink-0 text-slate-700 group-hover:text-[#EA580C] transition-colors">
+                                      <item.Icon size={14} />
+                                    </div>
+                                    <span className="text-[13.5px] font-medium text-slate-800">
+                                      {item.title}
+                                    </span>
+                                  </Link>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsCompanyDropdownOpen(false);
+                                    setFeedbackOpen(true);
+                                  }}
+                                  className="group w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-[#FAF9F6] transition-colors text-left cursor-pointer bg-transparent border-0"
+                                >
+                                  <div className="w-7 h-7 rounded-lg border border-slate-200/80 bg-[#FAF9F6] group-hover:bg-white group-hover:border-orange-200 flex items-center justify-center shrink-0 text-slate-700 group-hover:text-[#EA580C] transition-colors">
+                                    <MessageSquare size={14} />
+                                  </div>
+                                  <span className="text-[13.5px] font-medium text-slate-800">
+                                    Share Feedback
+                                  </span>
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={link.label}
+                      href={link.href}
+                      onMouseEnter={() => {
+                        setIsProductsDropdownOpen(false);
+                        setIsSolutionsDropdownOpen(false);
+                        setIsCompanyDropdownOpen(false);
+                        setHoveredNav(link.label);
+                      }}
+                      className="relative inline-flex items-center cursor-pointer py-2"
+                    >
+                      {navItemPill}
+                      {active && (
+                        <span
+                          className="absolute bottom-0.5 left-3 right-3 h-[2px] bg-[#0F172A] rounded-full"
+                        />
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              {/* Right Action Buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Auth State CTAs */}
+                {mounted && isLoggedIn ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Link
+                      href="/home"
+                      onClick={(e) => {
+                        void handleConsoleClick(e);
+                      }}
                       style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: '-20px',
-                        width: '280px',
-                        maxHeight: '480px',
-                        overflowY: 'auto',
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '16px',
-                        border: '1px solid #E2E8F0',
-                        boxShadow:
-                          '0 20px 35px -5px rgba(15, 23, 42, 0.12), 0 10px 15px -3px rgba(15, 23, 42, 0.06)',
-                        padding: '12px',
-                        zIndex: 100,
-                        animation: 'fadeInSlide 0.18s ease-out forwards',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 18px',
+                        minHeight: '42px',
+                        backgroundColor: '#09090B',
+                        color: '#FFFFFF',
+                        fontSize: '13.5px',
+                        fontWeight: 600,
+                        borderRadius: '12px',
+                        textDecoration: 'none',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#EA580C')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#09090B')}
+                    >
+                      <span>Console</span>
+                      <ArrowUpRight size={14} />
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="header-desktop-btn"
+                      style={{
+                        padding: '8px 14px',
+                        minHeight: '42px',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        color: '#64748B',
+                        backgroundColor: 'transparent',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#FEF2F2';
+                        e.currentTarget.style.color = '#EF4444';
+                        e.currentTarget.style.borderColor = '#FECACA';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '#64748B';
+                        e.currentTarget.style.borderColor = '#CBD5E1';
                       }}
                     >
-                      {/* Dropdown Header with Icon */}
+                      Sign Out
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeaderActiveBtn('book-demo');
+                        if (onOpenExpert) {
+                          onOpenExpert();
+                        } else {
+                          setBookDemoOpen(true);
+                        }
+                      }}
+                      className="header-desktop-btn"
+                      style={{
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '7px',
+                        padding: '8px 18px',
+                        minHeight: '42px',
+                        fontSize: '13.5px',
+                        fontWeight: 600,
+                        color: headerHoveredBtn === 'book-demo' || headerActiveBtn === 'book-demo' ? '#FFFFFF' : '#18181B',
+                        backgroundColor:
+                          headerHoveredBtn === 'book-demo'
+                            ? '#EA580C'
+                            : headerActiveBtn === 'book-demo'
+                            ? '#09090B'
+                            : '#FFFFFF',
+                        border:
+                          headerHoveredBtn === 'book-demo'
+                            ? '1px solid #EA580C'
+                            : headerActiveBtn === 'book-demo'
+                            ? '1px solid #09090B'
+                            : '1px solid #E4E4E7',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                        boxShadow:
+                          headerHoveredBtn === 'book-demo'
+                            ? '0 8px 20px -4px rgba(234, 88, 12, 0.38)'
+                            : headerActiveBtn === 'book-demo'
+                            ? '0 0 0 3px rgba(15, 23, 42, 0.14)'
+                            : '0 1px 2px rgba(0, 0, 0, 0.04)',
+                        transform: headerHoveredBtn === 'book-demo' ? 'translateY(-1px)' : 'scale(1)',
+                      }}
+                      onMouseDown={(e) => {
+                        e.currentTarget.style.transform = 'scale(0.96)';
+                      }}
+                      onMouseUp={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseEnter={() => setHeaderHoveredBtn('book-demo')}
+                      onMouseLeave={() => setHeaderHoveredBtn(null)}
+                    >
+                      <Calendar
+                        size={15}
+                        color={headerHoveredBtn === 'book-demo' || headerActiveBtn === 'book-demo' ? '#FFFFFF' : '#18181B'}
+                      />
+                      <span>Book Now</span>
+                    </button>
+
+                    <Link
+                      href="/signup"
+                      onClick={() => setHeaderActiveBtn('get-started')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '7px',
+                        padding: '8px 20px',
+                        minHeight: '42px',
+                        backgroundColor:
+                          headerHoveredBtn === 'get-started' ? '#EA580C' : '#09090B',
+                        color: '#FFFFFF',
+                        fontSize: '13.5px',
+                        fontWeight: 600,
+                        borderRadius: '12px',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                        boxShadow:
+                          headerHoveredBtn === 'get-started'
+                            ? '0 8px 20px -4px rgba(234, 88, 12, 0.42)'
+                            : headerActiveBtn === 'get-started'
+                            ? '0 0 0 3px rgba(15, 23, 42, 0.18)'
+                            : '0 2px 8px rgba(0, 0, 0, 0.10)',
+                        transform: headerHoveredBtn === 'get-started' ? 'translateY(-1px)' : 'scale(1)',
+                      }}
+                      onMouseDown={(e) => {
+                        e.currentTarget.style.transform = 'scale(0.96)';
+                      }}
+                      onMouseUp={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseEnter={() => setHeaderHoveredBtn('get-started')}
+                      onMouseLeave={() => setHeaderHoveredBtn(null)}
+                    >
+                      <span>Get Started</span>
+                      <ArrowRight size={15} color="#FFFFFF" />
+                    </Link>
+                  </div>
+                )}
+
+                {/* Mobile Menu Hamburger */}
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  style={{
+                    padding: '8px',
+                    borderRadius: '6px',
+                    color: '#475569',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  className="mobile-toggle"
+                  aria-label="Toggle navigation menu"
+                >
+                  {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+                </button>
+              </div>
+            </>
+          )}
+
+          {isMinimal && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span
+                style={{ fontSize: '13px', color: '#64748B' }}
+                className="auth-header-subtext"
+              >
+                {pathname === '/signup' || pathname === '/register'
+                  ? 'Already have an account?'
+                  : "Don't have an account?"}
+              </span>
+              <Link
+                href={pathname === '/signup' || pathname === '/register' ? '/login' : '/signup'}
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#0F172A',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '7px',
+                  padding: '6px 14px',
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                <span>{pathname === '/signup' || pathname === '/register' ? 'Sign in' : 'Create account'}</span>
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Drawer */}
+        {!isMinimal && mobileMenuOpen && (
+          <div
+            style={{
+              borderTop: '1px solid #E2E8F0',
+              backgroundColor: '#FFFFFF',
+              padding: '16px 20px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            {navLinks.map((link) => {
+              if (link.hasDropdown) {
+                return (
+                  <div key={link.label} style={{ display: 'flex', flexDirection: 'column' }}>
+                    <button
+                      type="button"
+                      onClick={() => setMobileProductsOpen(!mobileProductsOpen)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        color: isActive(link.href) ? '#2563EB' : '#1E293B',
+                        padding: '10px 0',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        width: '100%',
+                      }}
+                    >
+                      <span>{link.label}</span>
+                      <ChevronDown
+                        size={16}
+                        style={{
+                          transform: mobileProductsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s ease',
+                        }}
+                      />
+                    </button>
+
+                    {mobileProductsOpen && (
                       <div
                         style={{
+                          paddingLeft: '14px',
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '4px 8px 10px 8px',
-                          borderBottom: '1px solid #F1F5F9',
-                          marginBottom: '6px',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          borderLeft: '2px solid #E2E8F0',
+                          margin: '4px 0 10px 6px',
                         }}
                       >
-                        <ShieldAlert size={16} color="#09090B" />
-                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#09090B' }}>Products</span>
-                      </div>
-
-                      {/* Clean Vertical Products List */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        {[
-                          { title: 'SAST & Code Security', href: '/code' },
-                          { title: 'Secret Detection & Leaks', href: '/code/secrets' },
-                          { title: 'SCA & Software Supply Chain', href: '/code/dependencies' },
-                          { title: 'Container Security & Defense', href: '/protect/containers' },
-                          { title: 'Cloud Security & CSPM', href: '/cloud' },
-                          { title: 'IaC (Infrastructure as Code)', href: '/cloud/iac' },
-                          { title: 'Universal API Security (OWASP)', href: '/api-security' },
-                          { title: 'Model Security (AI / ML)', href: '/protect/models' },
-                          { title: 'AI Agent Governance & MCP', href: '/agent' },
-                          { title: 'Autonomous Sandbox AutoFix', href: '/remediation' },
-                          { title: 'Kavach MCP Server', href: '/protect/mcp' },
-                        ].map((prod) => (
+                        {productCategories.flatMap((c) => c.items).map((prod) => (
                           <Link
                             key={prod.title}
                             href={prod.href}
-                            onClick={() => setIsProductsDropdownOpen(false)}
+                            onClick={() => setMobileMenuOpen(false)}
                             style={{
-                              display: 'block',
-                              padding: '7px 10px',
-                              borderRadius: '8px',
-                              fontSize: '13px',
+                              fontSize: '14px',
                               fontWeight: 500,
-                              color: '#334155',
-                              textDecoration: 'none',
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#F8FAFC';
-                              e.currentTarget.style.color = '#09090B';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                              e.currentTarget.style.color = '#334155';
+                              color: '#475569',
+                              padding: '4px 0',
                             }}
                           >
                             {prod.title}
                           </Link>
                         ))}
-                      </div>
-
-                      {/* Dropdown Footer Link */}
-                      <div
-                        style={{
-                          marginTop: '6px',
-                          paddingTop: '6px',
-                          borderTop: '1px solid #F1F5F9',
-                        }}
-                      >
                         <Link
                           href="/products"
-                          onClick={() => setIsProductsDropdownOpen(false)}
+                          onClick={() => setMobileMenuOpen(false)}
                           style={{
-                            display: 'block',
-                            padding: '6px 10px',
-                            borderRadius: '8px',
-                            fontSize: '12.5px',
+                            fontSize: '13px',
                             fontWeight: 600,
-                            color: '#09090B',
-                            textDecoration: 'none',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#F8FAFC';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
+                            color: '#2563EB',
+                            padding: '6px 0 2px',
                           }}
                         >
-                          View all products →
+                          View All Products →
                         </Link>
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
-            }
+                    )}
+                  </div>
+                );
+              }
 
-            // Handle Company with hover dropdown
-            if (link.hasCompanyDropdown) {
-              return (
-                <div
-                  key={link.label}
-                  onMouseEnter={handleMouseEnterCompany}
-                  onMouseLeave={handleMouseLeaveCompany}
-                  style={{ position: 'relative', padding: '16px 0' }}
-                >
-                  <Link
-                    href={link.href}
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: active ? 600 : 500,
-                      color: active ? '#0F172A' : '#475569',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      position: 'relative',
-                      padding: '6px 0',
-                      transition: 'color 0.15s ease',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span>{link.label}</span>
-                    <ChevronDown
-                      size={14}
+              if (link.hasCompanyDropdown) {
+                return (
+                  <div key={link.label} style={{ display: 'flex', flexDirection: 'column' }}>
+                    <button
+                      type="button"
+                      onClick={() => setMobileCompanyOpen(!mobileCompanyOpen)}
                       style={{
-                        transform: isCompanyDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s ease',
-                        opacity: 0.7,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        color: isActive(link.href) ? '#2563EB' : '#1E293B',
+                        padding: '10px 0',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        width: '100%',
                       }}
-                    />
-                    {active && (
-                      <span
+                    >
+                      <span>{link.label}</span>
+                      <ChevronDown
+                        size={16}
                         style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: '2px',
-                          backgroundColor: '#09090B',
-                          borderRadius: '2px',
+                          transform: mobileCompanyOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s ease',
                         }}
                       />
-                    )}
-                  </Link>
+                    </button>
 
-                  {/* Company Dropdown Card (Exact match to reference design) */}
-                  {isCompanyDropdownOpen && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        right: '-20px',
-                        width: '210px',
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '16px',
-                        border: '1px solid #E2E8F0',
-                        boxShadow:
-                          '0 20px 35px -5px rgba(15, 23, 42, 0.12), 0 10px 15px -3px rgba(15, 23, 42, 0.06)',
-                        padding: '12px',
-                        zIndex: 100,
-                        animation: 'fadeInSlide 0.18s ease-out forwards',
-                      }}
-                    >
-                      {/* Dropdown Header with Users Icon */}
+                    {mobileCompanyOpen && (
                       <div
                         style={{
+                          paddingLeft: '14px',
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '4px 8px 10px 8px',
-                          borderBottom: '1px solid #F1F5F9',
-                          marginBottom: '6px',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          borderLeft: '2px solid #E2E8F0',
+                          margin: '4px 0 10px 6px',
                         }}
                       >
-                        <Users size={16} color="#09090B" />
-                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#09090B' }}>Company</span>
-                      </div>
-
-                      {/* Clean Vertical Company Links */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        {/* 1. About Kavach */}
                         <Link
                           href="/about"
-                          onClick={() => setIsCompanyDropdownOpen(false)}
-                          style={{
-                            display: 'block',
-                            padding: '7px 10px',
-                            borderRadius: '8px',
-                            fontSize: '13.5px',
-                            fontWeight: 500,
-                            color: '#334155',
-                            textDecoration: 'none',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#F8FAFC';
-                            e.currentTarget.style.color = '#09090B';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                            e.currentTarget.style.color = '#334155';
-                          }}
-                        >
-                          About Kavach
-                        </Link>
-
-                        {/* 2. Team */}
-                        <Link
-                          href="/team"
-                          onClick={() => setIsCompanyDropdownOpen(false)}
-                          style={{
-                            display: 'block',
-                            padding: '7px 10px',
-                            borderRadius: '8px',
-                            fontSize: '13.5px',
-                            fontWeight: 500,
-                            color: '#334155',
-                            textDecoration: 'none',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#F8FAFC';
-                            e.currentTarget.style.color = '#09090B';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                            e.currentTarget.style.color = '#334155';
-                          }}
-                        >
-                          Team
-                        </Link>
-
-                        {/* 3. Careers */}
-                        <Link
-                          href="/careers"
-                          onClick={() => setIsCompanyDropdownOpen(false)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '7px 10px',
-                            borderRadius: '8px',
-                            fontSize: '13.5px',
-                            fontWeight: 500,
-                            color: '#334155',
-                            textDecoration: 'none',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#F8FAFC';
-                            e.currentTarget.style.color = '#09090B';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                            e.currentTarget.style.color = '#334155';
-                          }}
-                        >
-                          <span>Careers</span>
-                        </Link>
-
-                        {/* 4. Contact Us */}
-                        <Link
-                          href="/contact"
-                          onClick={() => setIsCompanyDropdownOpen(false)}
-                          style={{
-                            display: 'block',
-                            padding: '7px 10px',
-                            borderRadius: '8px',
-                            fontSize: '13.5px',
-                            fontWeight: 500,
-                            color: '#334155',
-                            textDecoration: 'none',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#F8FAFC';
-                            e.currentTarget.style.color = '#09090B';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                            e.currentTarget.style.color = '#334155';
-                          }}
-                        >
-                          Contact Us
-                        </Link>
-
-                        {/* 5. Share Feedback (Interactive Modal) */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsCompanyDropdownOpen(false);
-                            setFeedbackOpen(true);
-                          }}
-                          style={{
-                            display: 'block',
-                            width: '100%',
-                            textAlign: 'left',
-                            padding: '7px 10px',
-                            borderRadius: '8px',
-                            fontSize: '13.5px',
-                            fontWeight: 500,
-                            color: '#334155',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#F8FAFC';
-                            e.currentTarget.style.color = '#09090B';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                            e.currentTarget.style.color = '#334155';
-                          }}
-                        >
-                          Share Feedback
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            return link.external ? (
-              <a
-                key={link.label}
-                href={link.href}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: '#475569',
-                  transition: 'color 0.15s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <span>{link.label}</span>
-                <ExternalLink size={12} style={{ opacity: 0.6 }} />
-              </a>
-            ) : link.isModalAction ? (
-              <button
-                key={link.label}
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (onOpenExpert) {
-                    onOpenExpert();
-                  } else {
-                    setBookDemoOpen(true);
-                  }
-                }}
-                style={{
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: '#475569',
-                  position: 'relative',
-                  padding: '6px 0',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'color 0.15s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#0F172A')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#475569')}
-              >
-                {link.label}
-              </button>
-            ) : (
-              <Link
-                key={link.label}
-                href={link.href}
-                style={{
-                  fontSize: '14px',
-                  fontWeight: active ? 600 : 500,
-                  color: active ? '#0F172A' : '#475569',
-                  position: 'relative',
-                  padding: '6px 0',
-                  transition: 'color 0.15s ease',
-                }}
-              >
-                {link.label}
-                {active && (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: '2px',
-                      backgroundColor: '#09090B',
-                      borderRadius: '2px',
-                    }}
-                  />
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Right Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* Auth State CTAs */}
-          {mounted && isLoggedIn ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Link
-                href="/home"
-                onClick={(e) => {
-                  void handleConsoleClick(e);
-                }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 18px',
-                  minHeight: '42px',
-                  backgroundColor: '#09090B',
-                  color: '#FFFFFF',
-                  fontSize: '13.5px',
-                  fontWeight: 600,
-                  borderRadius: '12px',
-                  textDecoration: 'none',
-                  transition: 'background-color 0.15s ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#27272A')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#09090B')}
-              >
-                <span>Console</span>
-                <ArrowUpRight size={14} />
-              </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="header-desktop-btn"
-                style={{
-                  padding: '8px 14px',
-                  minHeight: '42px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  color: '#64748B',
-                  backgroundColor: 'transparent',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FEF2F2';
-                  e.currentTarget.style.color = '#EF4444';
-                  e.currentTarget.style.borderColor = '#FECACA';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#64748B';
-                  e.currentTarget.style.borderColor = '#CBD5E1';
-                }}
-              >
-                Sign Out
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (onOpenExpert) {
-                    onOpenExpert();
-                  } else {
-                    setBookDemoOpen(true);
-                  }
-                }}
-                className="header-desktop-btn"
-                style={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '7px',
-                  padding: '8px 18px',
-                  minHeight: '42px',
-                  fontSize: '13.5px',
-                  fontWeight: 600,
-                  color: '#18181B',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #E4E4E7',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F4F4F5';
-                  e.currentTarget.style.borderColor = '#D4D4D8';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
-                  e.currentTarget.style.borderColor = '#E4E4E7';
-                }}
-              >
-                <Calendar size={15} color="#18181B" />
-                <span>Book a Demo</span>
-              </button>
-
-              <Link
-                href="/signup"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '7px',
-                  padding: '8px 20px',
-                  minHeight: '42px',
-                  backgroundColor: '#09090B',
-                  color: '#FFFFFF',
-                  fontSize: '13.5px',
-                  fontWeight: 600,
-                  borderRadius: '12px',
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.15s ease',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#27272A';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#09090B';
-                }}
-              >
-                <span>Get Started</span>
-                <ArrowRight size={15} color="#FFFFFF" />
-              </Link>
-            </div>
-          )}
-
-          {/* Mobile Menu Hamburger */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            style={{
-              padding: '8px',
-              borderRadius: '6px',
-              color: '#475569',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            className="mobile-toggle"
-            aria-label="Toggle navigation menu"
-          >
-            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
-        </div>
-        </>
-      )}
-
-      {isMinimal && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span
-              style={{ fontSize: '13px', color: '#64748B' }}
-              className="auth-header-subtext"
-            >
-              {pathname === '/signup' || pathname === '/register'
-                ? 'Already have an account?'
-                : "Don't have an account?"}
-            </span>
-            <Link
-              href={pathname === '/signup' || pathname === '/register' ? '/login' : '/signup'}
-              style={{
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#0F172A',
-                backgroundColor: '#F8FAFC',
-                border: '1px solid #CBD5E1',
-                borderRadius: '7px',
-                padding: '6px 14px',
-                textDecoration: 'none',
-                transition: 'all 0.15s ease',
-                display: 'inline-flex',
-                alignItems: 'center',
-              }}
-            >
-              <span>{pathname === '/signup' || pathname === '/register' ? 'Sign in' : 'Create account'}</span>
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* Mobile Drawer */}
-      {!isMinimal && mobileMenuOpen && (
-        <div
-          style={{
-            borderTop: '1px solid #E2E8F0',
-            backgroundColor: '#FFFFFF',
-            padding: '16px 20px 24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            maxHeight: '85vh',
-            overflowY: 'auto',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          }}
-        >
-          {navLinks.map((link) => {
-            if (link.hasDropdown) {
-              return (
-                <div key={link.label} style={{ display: 'flex', flexDirection: 'column' }}>
-                  <button
-                    type="button"
-                    onClick={() => setMobileProductsOpen(!mobileProductsOpen)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      fontSize: '15px',
-                      fontWeight: 600,
-                      color: isActive(link.href) ? '#2563EB' : '#1E293B',
-                      padding: '10px 0',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      width: '100%',
-                    }}
-                  >
-                    <span>{link.label}</span>
-                    <ChevronDown
-                      size={16}
-                      style={{
-                        transform: mobileProductsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s ease',
-                      }}
-                    />
-                  </button>
-
-                  {mobileProductsOpen && (
-                    <div
-                      style={{
-                        paddingLeft: '14px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px',
-                        borderLeft: '2px solid #E2E8F0',
-                        margin: '4px 0 10px 6px',
-                      }}
-                    >
-                      {productCategories.flatMap((c) => c.items).map((prod) => (
-                        <Link
-                          key={prod.title}
-                          href={prod.href}
                           onClick={() => setMobileMenuOpen(false)}
                           style={{
                             fontSize: '14px',
@@ -1167,136 +1215,182 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                             padding: '4px 0',
                           }}
                         >
-                          {prod.title}
+                          About Kavach
                         </Link>
-                      ))}
-                      <Link
-                        href="/products"
-                        onClick={() => setMobileMenuOpen(false)}
-                        style={{
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          color: '#2563EB',
-                          padding: '6px 0 2px',
-                        }}
-                      >
-                        View All Products →
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              );
-            }
+                        <Link
+                          href="/about#team"
+                          onClick={() => setMobileMenuOpen(false)}
+                          style={{
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            color: '#475569',
+                            padding: '4px 0',
+                          }}
+                        >
+                          Team
+                        </Link>
+                        <Link
+                          href="/contact"
+                          onClick={() => setMobileMenuOpen(false)}
+                          style={{
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            color: '#475569',
+                            padding: '4px 0',
+                          }}
+                        >
+                          Contact Us
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            setFeedbackOpen(true);
+                          }}
+                          style={{
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            color: '#475569',
+                            padding: '4px 0',
+                            background: 'none',
+                            border: 'none',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Share Product Feedback
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
 
-            if (link.hasCompanyDropdown) {
-              return (
-                <div key={link.label} style={{ display: 'flex', flexDirection: 'column' }}>
+              if (link.isModalAction) {
+                return (
                   <button
+                    key={link.label}
                     type="button"
-                    onClick={() => setMobileCompanyOpen(!mobileCompanyOpen)}
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (onOpenExpert) {
+                        onOpenExpert();
+                      } else {
+                        setBookDemoOpen(true);
+                      }
+                    }}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
                       fontSize: '15px',
                       fontWeight: 600,
-                      color: isActive(link.href) ? '#2563EB' : '#1E293B',
+                      color: '#1E293B',
                       padding: '10px 0',
                       background: 'none',
                       border: 'none',
-                      cursor: 'pointer',
                       textAlign: 'left',
+                      cursor: 'pointer',
                       width: '100%',
                     }}
                   >
-                    <span>{link.label}</span>
-                    <ChevronDown
-                      size={16}
-                      style={{
-                        transform: mobileCompanyOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s ease',
-                      }}
-                    />
+                    {link.label}
                   </button>
+                );
+              }
 
-                  {mobileCompanyOpen && (
-                    <div
-                      style={{
-                        paddingLeft: '14px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px',
-                        borderLeft: '2px solid #E2E8F0',
-                        margin: '4px 0 10px 6px',
-                      }}
-                    >
-                      <Link
-                        href="/about"
-                        onClick={() => setMobileMenuOpen(false)}
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          color: '#475569',
-                          padding: '4px 0',
-                        }}
-                      >
-                        About Kavach
-                      </Link>
-                      <Link
-                        href="/about#team"
-                        onClick={() => setMobileMenuOpen(false)}
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          color: '#475569',
-                          padding: '4px 0',
-                        }}
-                      >
-                        Team
-                      </Link>
-                      <Link
-                        href="/contact"
-                        onClick={() => setMobileMenuOpen(false)}
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          color: '#475569',
-                          padding: '4px 0',
-                        }}
-                      >
-                        Contact Us
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMobileMenuOpen(false);
-                          setFeedbackOpen(true);
-                        }}
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          color: '#475569',
-                          padding: '4px 0',
-                          background: 'none',
-                          border: 'none',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Share Product Feedback
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            if (link.isModalAction) {
               return (
-                <button
+                <Link
                   key={link.label}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: isActive(link.href) ? '#2563EB' : '#1E293B',
+                    padding: '10px 0',
+                  }}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+
+            <div style={{ height: '1px', backgroundColor: '#E2E8F0', margin: '8px 0' }} />
+
+            {/* Mobile Auth Actions */}
+            {isLoggedIn ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <Link
+                  href="/home"
+                  onClick={(e) => {
+                    setMobileMenuOpen(false);
+                    void handleConsoleClick(e);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '12px 16px',
+                    backgroundColor: '#09090B',
+                    color: '#FFFFFF',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
+                >
+                  <span>Console</span>
+                  <ArrowUpRight size={15} />
+                </Link>
+                <button
                   type="button"
                   onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  style={{
+                    padding: '11px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    backgroundColor: '#FFFFFF',
+                    color: '#EF4444',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <Link
+                  href="/signup"
+                  onClick={() => {
+                    setHeaderActiveBtn('get-started');
+                    setMobileMenuOpen(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '12px 16px',
+                    backgroundColor: '#09090B',
+                    color: '#FFFFFF',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    boxShadow: headerActiveBtn === 'get-started' ? '0 0 0 3px rgba(15, 23, 42, 0.18)' : 'none',
+                  }}
+                >
+                  Get Started
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeaderActiveBtn('book-demo');
                     setMobileMenuOpen(false);
                     if (onOpenExpert) {
                       onOpenExpert();
@@ -1305,179 +1399,68 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                     }
                   }}
                   style={{
-                    fontSize: '15px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '11px 16px',
+                    borderRadius: '8px',
+                    border: headerActiveBtn === 'book-demo' ? '1px solid #09090B' : '1px solid #E4E4E7',
+                    backgroundColor: headerActiveBtn === 'book-demo' ? '#09090B' : '#F4F4F5',
+                    color: headerActiveBtn === 'book-demo' ? '#FFFFFF' : '#18181B',
                     fontWeight: 600,
-                    color: '#1E293B',
-                    padding: '10px 0',
-                    background: 'none',
-                    border: 'none',
-                    textAlign: 'left',
+                    fontSize: '14px',
                     cursor: 'pointer',
                     width: '100%',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    boxShadow: headerActiveBtn === 'book-demo' ? '0 0 0 3px rgba(15, 23, 42, 0.14)' : 'none',
                   }}
                 >
-                  {link.label}
+                  Book Now
                 </button>
-              );
-            }
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '11px 16px',
+                    borderRadius: '8px',
+                    color: '#0F172A',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Sign In
+                </Link>
+              </div>
+            )}
 
-            return (
-              <Link
-                key={link.label}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  color: isActive(link.href) ? '#2563EB' : '#1E293B',
-                  padding: '10px 0',
-                }}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (onOpenExpert) onOpenExpert();
+              }}
+              style={{
+                marginTop: '4px',
+                padding: '11px 16px',
+                borderRadius: '8px',
+                border: '1px solid #BFDBFE',
+                backgroundColor: '#EFF6FF',
+                color: '#1D4ED8',
+                fontWeight: 600,
+                fontSize: '14px',
+                textAlign: 'center',
+              }}
+            >
+              Talk to an Expert
+            </button>
+          </div>
+        )}
 
-          <div style={{ height: '1px', backgroundColor: '#E2E8F0', margin: '8px 0' }} />
-
-          {/* Mobile Auth Actions */}
-          {isLoggedIn ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <Link
-                href="/home"
-                onClick={(e) => {
-                  setMobileMenuOpen(false);
-                  void handleConsoleClick(e);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '12px 16px',
-                  backgroundColor: '#09090B',
-                  color: '#FFFFFF',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                }}
-              >
-                <span>Console</span>
-                <ArrowUpRight size={15} />
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleLogout();
-                }}
-                style={{
-                  padding: '11px 16px',
-                  borderRadius: '8px',
-                  border: '1px solid #CBD5E1',
-                  backgroundColor: '#FFFFFF',
-                  color: '#EF4444',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                Sign Out
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <Link
-                href="/signup"
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '12px 16px',
-                  backgroundColor: '#09090B',
-                  color: '#FFFFFF',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                }}
-              >
-                Get Started
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  if (onOpenExpert) {
-                    onOpenExpert();
-                  } else {
-                    setBookDemoOpen(true);
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '11px 16px',
-                  borderRadius: '8px',
-                  border: '1px solid #E4E4E7',
-                  backgroundColor: '#F4F4F5',
-                  color: '#18181B',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  width: '100%',
-                }}
-              >
-                Book Demo
-              </button>
-              <Link
-                href="/login"
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '11px 16px',
-                  borderRadius: '8px',
-                  color: '#0F172A',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  textDecoration: 'none',
-                }}
-              >
-                Sign In
-              </Link>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              setMobileMenuOpen(false);
-              if (onOpenExpert) onOpenExpert();
-            }}
-            style={{
-              marginTop: '4px',
-              padding: '11px 16px',
-              borderRadius: '8px',
-              border: '1px solid #BFDBFE',
-              backgroundColor: '#EFF6FF',
-              color: '#1D4ED8',
-              fontWeight: 600,
-              fontSize: '14px',
-              textAlign: 'center',
-            }}
-          >
-            Talk to an Expert
-          </button>
-        </div>
-      )}
-
-      <style>{`
+        <style>{`
         @keyframes fadeInSlide {
           from {
             opacity: 0;

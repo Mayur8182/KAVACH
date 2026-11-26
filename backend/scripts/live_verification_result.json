@@ -1,0 +1,300 @@
+{
+  "run_id": "fadb11f5",
+  "timestamp": "2026-11-21T10:07:32.946542+00:00",
+  "duration_seconds": 140.13,
+  "summary": {
+    "total": 22,
+    "passed": 22,
+    "failed": 0,
+    "blocked": 0,
+    "pass_rate_percent": 100.0
+  },
+  "hubspot_connection": {
+    "portal_id": "248081537",
+    "verified_scopes": [
+      "crm.objects.contacts.read",
+      "crm.objects.contacts.write",
+      "crm.objects.companies.read",
+      "crm.objects.companies.write",
+      "crm.objects.deals.read",
+      "crm.objects.deals.write",
+      "tickets"
+    ],
+    "status": "CONNECTED"
+  },
+  "created_record_ids": {
+    "contact_id": "604692910780",
+    "company_id": "372561470168",
+    "deal_id": "374666554091",
+    "ticket_id": "361425315548"
+  },
+  "test_results": [
+    {
+      "test_name": "HubSpot API Connectivity",
+      "category": "Pre-flight",
+      "status": "PASS",
+      "details": "Connected to Portal 248081537 (app-na2.hubspot.com). Timezone: US/Eastern, Currency: USD",
+      "api_response": {
+        "connected": true,
+        "status": "CONNECTED",
+        "portal_id": "248081537",
+        "hub_domain": "app-na2.hubspot.com",
+        "timezone": "US/Eastern",
+        "currency": "USD",
+        "account_type": "STANDARD",
+        "app_id": null,
+        "user_email": null,
+        "scopes_verified": [
+          "crm.objects.contacts.read",
+          "crm.objects.contacts.write",
+          "crm.objects.companies.read",
+          "crm.objects.companies.write",
+          "crm.objects.deals.read",
+          "crm.objects.deals.write",
+          "tickets"
+        ],
+        "missing_scopes": [],
+        "supports_tickets": true,
+        "scope_warning": null,
+        "message": "Successfully authenticated with HubSpot Portal 248081537."
+      },
+      "timestamp": "2026-11-21T10:05:17.331643+00:00"
+    },
+    {
+      "test_name": "OAuth / Private App Scopes",
+      "category": "Pre-flight",
+      "status": "PASS",
+      "details": "Verified 7 granted scopes: ['crm.objects.contacts.read', 'crm.objects.contacts.write', 'crm.objects.companies.read', 'crm.objects.companies.write', 'crm.objects.deals.read', 'crm.objects.deals.write', 'tickets']",
+      "api_response": {
+        "scopes": [
+          "crm.objects.contacts.read",
+          "crm.objects.contacts.write",
+          "crm.objects.companies.read",
+          "crm.objects.companies.write",
+          "crm.objects.deals.read",
+          "crm.objects.deals.write",
+          "tickets"
+        ]
+      },
+      "timestamp": "2026-11-21T10:05:17.331723+00:00"
+    },
+    {
+      "test_name": "Contact Creation",
+      "category": "Live CRM",
+      "status": "PASS",
+      "details": "Created contact ID 604692910780 (kavach.test.fadb11f5@kavachsecurity.me)",
+      "api_response": {
+        "id": "604692910780",
+        "status": "SUCCESS"
+      },
+      "timestamp": "2026-11-21T10:05:22.429285+00:00"
+    },
+    {
+      "test_name": "Contact Update",
+      "category": "Live CRM",
+      "status": "PASS",
+      "details": "Updated contact ID 604692910780 phone and lifecycle stage",
+      "api_response": null,
+      "timestamp": "2026-11-21T10:05:25.410846+00:00"
+    },
+    {
+      "test_name": "Company Creation",
+      "category": "Live CRM",
+      "status": "PASS",
+      "details": "Created company ID 372561470168 ([KAVACH-TEST] Test Corp fadb11f5)",
+      "api_response": {
+        "id": "372561470168",
+        "status": "SUCCESS"
+      },
+      "timestamp": "2026-11-21T10:05:27.853756+00:00"
+    },
+    {
+      "test_name": "Contact-to-Company Association",
+      "category": "Live CRM",
+      "status": "PASS",
+      "details": "Associated Contact 604692910780 with Company 372561470168",
+      "api_response": null,
+      "timestamp": "2026-11-21T10:05:29.225102+00:00"
+    },
+    {
+      "test_name": "Deal Creation",
+      "category": "Live CRM",
+      "status": "PASS",
+      "details": "Created deal ID 374666554091 ($60000) in default pipeline",
+      "api_response": {
+        "id": "374666554091",
+        "status": "SUCCESS"
+      },
+      "timestamp": "2026-11-21T10:05:34.678591+00:00"
+    },
+    {
+      "test_name": "Deal-to-Contact Association",
+      "category": "Live CRM",
+      "status": "PASS",
+      "details": "Associated Deal 374666554091 with Contact 604692910780",
+      "api_response": null,
+      "timestamp": "2026-11-21T10:05:34.678679+00:00"
+    },
+    {
+      "test_name": "Deal-to-Company Association",
+      "category": "Live CRM",
+      "status": "PASS",
+      "details": "Associated Deal 374666554091 with Company 372561470168",
+      "api_response": null,
+      "timestamp": "2026-11-21T10:05:34.678700+00:00"
+    },
+    {
+      "test_name": "Ticket Creation",
+      "category": "Live CRM",
+      "status": "PASS",
+      "details": "Created ticket ID 361425315548 (Service Hub active)",
+      "api_response": {
+        "id": "361425315548",
+        "status": "SUCCESS"
+      },
+      "timestamp": "2026-11-21T10:05:37.643408+00:00"
+    },
+    {
+      "test_name": "Record Read-Back & Properties Verification",
+      "category": "Live CRM",
+      "status": "PASS",
+      "details": "Retrieved and verified CRM object properties: Contact=604692910780, Company=372561470168, Deal=374666554091",
+      "api_response": {
+        "contact": {
+          "id": "604692910780",
+          "email": "kavach.test.fadb11f5@kavachsecurity.me",
+          "phone": "+1-555-9999",
+          "lifecyclestage": "opportunity"
+        },
+        "company": {
+          "id": "372561470168",
+          "name": "[KAVACH-TEST] Test Corp fadb11f5",
+          "domain": "testcorpfadb11f5.kavachsecurity.me"
+        },
+        "deal": {
+          "id": "374666554091",
+          "dealname": "[KAVACH-TEST] Enterprise Security Deal fadb11f5",
+          "dealstage": "qualifiedtobuy",
+          "amount": "60000.0"
+        }
+      },
+      "timestamp": "2026-11-21T10:05:44.348831+00:00"
+    },
+    {
+      "test_name": "Website Contact Inquiry Workflow",
+      "category": "Workflows & DB",
+      "status": "PASS",
+      "details": "Inquiry logged in hubspot_sync_logs (ID=ee666f8c-7bff-4eec-bfe8-c2dd92d35a6e, status=SUCCESS, HS_ID=604616728258)",
+      "api_response": {
+        "log_id": "ee666f8c-7bff-4eec-bfe8-c2dd92d35a6e",
+        "status": "SUCCESS",
+        "hs_id": "604616728258"
+      },
+      "timestamp": "2026-11-21T10:05:52.461821+00:00"
+    },
+    {
+      "test_name": "Demo Request Workflow & Persistence",
+      "category": "Workflows & DB",
+      "status": "PASS",
+      "details": "DemoRequest persisted with hubspot_contact_id=604591589070, hubspot_deal_id=374653920972",
+      "api_response": {
+        "demo_id": "demo_fadb11f5",
+        "contact_id": "604591589070",
+        "deal_id": "374653920972"
+      },
+      "timestamp": "2026-11-21T10:06:07.910078+00:00"
+    },
+    {
+      "test_name": "User Registration Workflow & DB Persistence",
+      "category": "Workflows & DB",
+      "status": "PASS",
+      "details": "User updated in DB: hubspot_contact_id=604940736212, status=SYNCED",
+      "api_response": {
+        "user_id": "7c14fbe5-0899-465f-9550-c65b732cc81a",
+        "hubspot_contact_id": "604940736212",
+        "sync_status": "SYNCED"
+      },
+      "timestamp": "2026-11-21T10:06:17.270898+00:00"
+    },
+    {
+      "test_name": "Organization Creation Workflow & DB Persistence",
+      "category": "Workflows & DB",
+      "status": "PASS",
+      "details": "Organization updated in DB: hubspot_company_id=372601000657, status=SYNCED",
+      "api_response": {
+        "org_id": "87caf5fb-2242-4143-a9f2-aeb71233f708",
+        "hubspot_company_id": "372601000657",
+        "sync_status": "SYNCED"
+      },
+      "timestamp": "2026-11-21T10:06:22.645008+00:00"
+    },
+    {
+      "test_name": "Stripe Billing Upgrade & Cancellation Workflow",
+      "category": "Workflows & DB",
+      "status": "PASS",
+      "details": "Recorded 3 billing sync audit logs in DB",
+      "api_response": {
+        "billing_logs_count": 3
+      },
+      "timestamp": "2026-11-21T10:06:39.691881+00:00"
+    },
+    {
+      "test_name": "Duplicate Prevention (Idempotency)",
+      "category": "Reliability",
+      "status": "PASS",
+      "details": "Upserting same email twice resolved to identical HubSpot ID 604616551101 without duplication",
+      "api_response": null,
+      "timestamp": "2026-11-21T10:06:48.747872+00:00"
+    },
+    {
+      "test_name": "Failed Sync Logging & Audit Traceability",
+      "category": "Reliability",
+      "status": "PASS",
+      "details": "Failed sync correctly persisted in DB with error message (Log ID: 7ce08605-eb4e-4323-86a6-4a6c6481a835)",
+      "api_response": null,
+      "timestamp": "2026-11-21T10:06:48.756921+00:00"
+    },
+    {
+      "test_name": "Sync Log Retry Mechanism",
+      "category": "Reliability",
+      "status": "PASS",
+      "details": "hubspot_service.retry_log executed deterministically: Operation successfully retried.",
+      "api_response": {
+        "success": true,
+        "hubspot_id": "604623451843",
+        "message": "Operation successfully retried."
+      },
+      "timestamp": "2026-11-21T10:06:53.236451+00:00"
+    },
+    {
+      "test_name": "Non-Blocking User & Billing Execution",
+      "category": "Reliability",
+      "status": "PASS",
+      "details": "HubSpot errors or offline status handled gracefully without blocking core platform flows",
+      "api_response": null,
+      "timestamp": "2026-11-21T10:07:07.803784+00:00"
+    },
+    {
+      "test_name": "Authentication & API Error Diagnostics",
+      "category": "Reliability",
+      "status": "PASS",
+      "details": "Clean diagnostic error mapping on invalid credentials: status=AUTHENTICATION_FAILED",
+      "api_response": {
+        "connected": false,
+        "status": "AUTHENTICATION_FAILED",
+        "error_code": 401,
+        "message": "HubSpot authentication failed. The token is invalid, expired, or lacks account read scopes."
+      },
+      "timestamp": "2026-11-21T10:07:10.704611+00:00"
+    },
+    {
+      "test_name": "Test Records Archival",
+      "category": "Cleanup",
+      "status": "PASS",
+      "details": "Cleaned up 7 of 7 created test artifacts. Customer records untouched.",
+      "api_response": null,
+      "timestamp": "2026-11-21T10:07:32.946498+00:00"
+    }
+  ],
+  "production_blockers": []
+}

@@ -9,7 +9,9 @@ export const CONFIG_SCHEMA_VERSION = 1;
 
 export const DEFAULT_AGENT_HOST = '127.0.0.1';
 export const DEFAULT_AGENT_PORT = 17382;
-export const DEFAULT_CLOUD_URL = process.env.KAVACH_CLOUD_URL || 'https://kavachsecurity.me';
+export const DEFAULT_CLOUD_URL =
+  process.env.KAVACH_SERVER_URL || process.env.KAVACH_CLOUD_URL || 'https://mcp.kavachsecurity.me';
+export const DEFAULT_CLI_OAUTH_CLIENT_ID = 'kavach-cli';
 
 // Global user directory: ~/.kavach
 export const GLOBAL_KAVACH_DIR = path.join(os.homedir(), '.kavach');

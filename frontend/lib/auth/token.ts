@@ -51,6 +51,15 @@ export function getAuthToken(): string | null {
   return inMemoryToken;
 }
 
+function getCookieDomainAttr(): string {
+  if (typeof window === 'undefined') return '';
+  const host = window.location.hostname.toLowerCase();
+  if (host === 'kavachsecurity.me' || host.endsWith('.kavachsecurity.me')) {
+    return '; domain=.kavachsecurity.me';
+  }
+  return '';
+}
+
 export function setAuthToken(token: string): void {
   inMemoryToken = token;
   apiCache.setToken(token);
@@ -59,7 +68,8 @@ export function setAuthToken(token: string): void {
       sessionStorage.setItem(STORAGE_KEY, token);
       localStorage.setItem(STORAGE_KEY, token);
       const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
-      document.cookie = `${STORAGE_KEY}=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Lax${secureFlag}`;
+      const domainAttr = getCookieDomainAttr();
+      document.cookie = `${STORAGE_KEY}=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Lax${secureFlag}${domainAttr}`;
     } catch {
       // Storage unavailable
     }
@@ -92,11 +102,37 @@ export function clearAuthToken(): void {
       keysToRemove.forEach((k) => localStorage.removeItem(k));
 
       const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+      const domainAttr = getCookieDomainAttr();
       document.cookie = `${STORAGE_KEY}=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
+      if (domainAttr) {
+        document.cookie = `${STORAGE_KEY}=; path=/; max-age=0; SameSite=Lax${secureFlag}${domainAttr}`;
+      }
     } catch {
       // Storage unavailable
     }
   }
+}
+
+export function resolveSafeRedirectTarget(target: string | null): string | null {
+  if (!target) return null;
+  if (target.startsWith('/') && !target.startsWith('//')) {
+    return target;
+  }
+  try {
+    const parsed = new URL(target);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === 'kavachsecurity.me' ||
+      host.endsWith('.kavachsecurity.me') ||
+      host === 'localhost' ||
+      host === '127.0.0.1'
+    ) {
+      return parsed.toString();
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 export function redirectToLogin(redirectPath?: string): void {

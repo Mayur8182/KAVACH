@@ -298,14 +298,35 @@ async def select_repository_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.models.github import GitHubRepository
+    from app.models.github import GitHubRepository, GitHubInstallation
+    from app.models.project import Project
+    from app.services.workspace_resolver import get_user_org_and_workspace_scope, user_can_access_project
+
     target_project_id = (payload.project_id if payload and payload.project_id else None) or project_id
     repo = await db.get(GitHubRepository, repository_id)
     if not repo:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
 
+    if not getattr(current_user, "is_superuser", False):
+        _, ws_map, _ = await get_user_org_and_workspace_scope(current_user, db)
+        repo_allowed = bool(repo.workspace_id and repo.workspace_id in ws_map)
+        if not repo_allowed and repo.installation_id:
+            inst = await db.get(GitHubInstallation, repo.installation_id)
+            if inst and inst.connected_by_user_id == current_user.id:
+                repo_allowed = True
+        if not repo_allowed and repo.project_id:
+            if await _check_project_access(repo.project_id, current_user, db):
+                repo_allowed = True
+        if not repo_allowed:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to repository")
+
     if target_project_id:
+        proj = await db.get(Project, target_project_id)
+        if not proj or not await user_can_access_project(current_user, proj, db):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to target project")
         repo.project_id = target_project_id
+        if proj.workspace_id:
+            repo.workspace_id = proj.workspace_id
         repo.updated_at = datetime.now(timezone.utc)
         await db.commit()
         await db.refresh(repo)

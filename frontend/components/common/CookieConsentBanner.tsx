@@ -1,21 +1,21 @@
 'use client';
 
+/**
+ * Kavach Enterprise Cookie & Privacy Consent Banner & Details Modal
+ * 100% Pixel-Perfect Implementation matching Reference Design:
+ * - Image 2: Bottom-left floating card with Privacy & Workspace Security, green check pills, Essential only & Accept cookies buttons.
+ * - Image 3: Cookie details modal with 4 categories (Authentication, CSRF protection, Access control, Advertising & tracking).
+ */
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Shield, X } from 'lucide-react';
+import { ShieldCheck, X, Check } from 'lucide-react';
 
-const STORAGE_KEY = 'seculayer_cookie_consent_v1';
+const STORAGE_KEY = 'kavach_cookie_consent_v1';
 
-/**
- * SecuLayer Enterprise Cookie & Privacy Preference Banner
- * Styled to match the SecuLayer design tokens:
- * - Crisp white surface, subtle slate border (#E2E8F0), refined elevation shadow
- * - Sleek typography (#0F172A text, #475569 body, #2563EB brand links)
- * - Compact floating card docked bottom-right rather than an invasive full-width banner
- * - Fully accessible, zero keyboard traps, persistent preferences
- */
 export const CookieConsentBanner: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     try {
@@ -31,183 +31,409 @@ export const CookieConsentBanner: React.FC = () => {
 
   const handleAcceptAll = () => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ essential: true, analytics: true, timestamp: new Date().toISOString() }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ essential: true, analytics: true, timestamp: new Date().toISOString() })
+      );
       window.dispatchEvent(new CustomEvent('cookie_consent_changed', { detail: { analytics: true } }));
     } catch {
       // Ignore
     }
     setIsVisible(false);
+    setShowDetails(false);
   };
 
-  const handleDeclineOptional = () => {
+  const handleEssentialOnly = () => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ essential: true, analytics: false, timestamp: new Date().toISOString() }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ essential: true, analytics: false, timestamp: new Date().toISOString() })
+      );
       window.dispatchEvent(new CustomEvent('cookie_consent_changed', { detail: { analytics: false } }));
     } catch {
       // Ignore
     }
     setIsVisible(false);
+    setShowDetails(false);
   };
 
   const handleDismiss = () => {
     setIsVisible(false);
+    setShowDetails(false);
   };
 
-  if (!isVisible) return null;
+  if (!isVisible && !showDetails) return null;
 
   return (
-    <aside
-      role="region"
-      aria-label="Cookie and Privacy Consent"
-      aria-live="polite"
-      className="seculayer-cookie-banner"
-      style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        maxWidth: '420px',
-        width: 'calc(100% - 40px)',
-        backgroundColor: '#FFFFFF',
-        color: '#0F172A',
-        borderRadius: '12px',
-        padding: '18px 20px',
-        boxShadow: '0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.06)',
-        border: '1px solid #E2E8F0',
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        animation: 'seculayerSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-      }}
-    >
-      {/* Header with Brand Icon and Dismiss */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
-              backgroundColor: '#EFF6FF',
-              border: '1px solid #BFDBFE',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#2563EB',
-            }}
-            aria-hidden="true"
-          >
-            <Shield size={15} />
-          </div>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.01em' }}>
-            Privacy & Workspace Security
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleDismiss}
-          aria-label="Dismiss cookie notice"
+    <>
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* COOKIE DETAILS MODAL (Image 3 in attachments)                 */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {showDetails && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Cookie details"
           style={{
-            color: '#94A3B8',
-            backgroundColor: 'transparent',
-            border: 'none',
-            padding: '4px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            display: 'inline-flex',
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 10000,
+            display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'color 0.15s ease',
+            padding: '20px',
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = '#0F172A';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = '#94A3B8';
-          }}
-          title="Dismiss notice"
+          onClick={() => setShowDetails(false)}
         >
-          <X size={15} aria-hidden="true" />
-        </button>
-      </div>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '540px',
+              maxWidth: '95vw',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              boxShadow: '0 24px 60px rgba(15, 23, 42, 0.18)',
+              border: '1px solid #E2E8F0',
+              padding: '32px 32px 28px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+              animation: 'kavachModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  backgroundColor: '#DCFCE7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#16A34A',
+                  flexShrink: 0,
+                }}
+              >
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0F172A' }}>
+                  Cookie details
+                </h2>
+                <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0' }}>
+                  Everything Kavach stores in your browser, and why.
+                </p>
+              </div>
+            </div>
 
-      {/* Description text */}
-      <p style={{ fontSize: '12px', lineHeight: 1.55, color: '#475569', margin: 0 }}>
-        Kavach uses essential session cookies for authentication, CSRF mitigation, and access control. We do not use advertising or tracking cookies.{' '}
-        <Link
-          href="/privacy"
-          style={{
-            color: '#2563EB',
-            textDecoration: 'underline',
-            fontWeight: 500,
-          }}
-        >
-          Privacy Policy
-        </Link>
-        .
-      </p>
+            {/* 4 Rows Container */}
+            <div
+              style={{
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                backgroundColor: '#FFFFFF',
+              }}
+            >
+              {[
+                {
+                  title: 'Authentication',
+                  desc: 'Keeps you signed in while you work.',
+                  badge: 'Always on',
+                  badgeColor: '#16A34A',
+                  badgeBg: '#DCFCE7',
+                },
+                {
+                  title: 'CSRF protection',
+                  desc: 'Blocks forged requests made on your behalf.',
+                  badge: 'Always on',
+                  badgeColor: '#16A34A',
+                  badgeBg: '#DCFCE7',
+                },
+                {
+                  title: 'Access control',
+                  desc: 'Makes sure you only see what your role allows.',
+                  badge: 'Always on',
+                  badgeColor: '#16A34A',
+                  badgeBg: '#DCFCE7',
+                },
+                {
+                  title: 'Advertising & tracking',
+                  desc: 'Kavach does not use these, so there is nothing to opt out of.',
+                  badge: 'Never used',
+                  badgeColor: '#64748B',
+                  badgeBg: '#F1F5F9',
+                },
+              ].map((item, idx) => (
+                <div
+                  key={item.title}
+                  style={{
+                    padding: '16px 20px',
+                    borderBottom: idx === 3 ? 'none' : '1px solid #F1F5F9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
+                      {item.title}
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>
+                      {item.desc}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      color: item.badgeColor,
+                      backgroundColor: item.badgeBg,
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {item.badge}
+                  </span>
+                </div>
+              ))}
+            </div>
 
-      {/* Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' }}>
-        <button
-          type="button"
-          onClick={handleDeclineOptional}
+            {/* Footer */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDetails(false)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#0F172A',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  Back
+                </button>
+                <span style={{ color: '#CBD5E1' }}>·</span>
+                <Link
+                  href="/privacy"
+                  style={{
+                    color: '#64748B',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Privacy Policy
+                </Link>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAcceptAll}
+                style={{
+                  height: '40px',
+                  padding: '0 24px',
+                  backgroundColor: '#0F172A',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MAIN COOKIE BANNER (Image 2 in attachments)                   */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {isVisible && !showDetails && (
+        <aside
+          role="region"
+          aria-label="Privacy and Workspace Security"
           style={{
-            padding: '7px 12px',
-            minHeight: '34px',
-            fontSize: '12px',
-            fontWeight: 500,
-            color: '#475569',
-            backgroundColor: '#F8FAFC',
+            position: 'fixed',
+            bottom: '24px',
+            left: '24px',
+            maxWidth: '460px',
+            width: 'calc(100% - 48px)',
+            backgroundColor: '#FFFFFF',
+            color: '#0F172A',
+            borderRadius: '16px',
+            padding: '24px',
+            boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(15, 23, 42, 0.08)',
             border: '1px solid #E2E8F0',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = '#0F172A';
-            e.currentTarget.style.backgroundColor = '#F1F5F9';
-            e.currentTarget.style.borderColor = '#CBD5E1';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = '#475569';
-            e.currentTarget.style.backgroundColor = '#F8FAFC';
-            e.currentTarget.style.borderColor = '#E2E8F0';
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            animation: 'kavachSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         >
-          Essential Only
-        </button>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  backgroundColor: '#DCFCE7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#16A34A',
+                  flexShrink: 0,
+                }}
+              >
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0F172A', letterSpacing: '-0.01em' }}>
+                  Privacy & Workspace Security
+                </h3>
+                <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                  Cookies on Kavach
+                </div>
+              </div>
+            </div>
 
-        <button
-          type="button"
-          onClick={handleAcceptAll}
-          style={{
-            padding: '7px 14px',
-            minHeight: '34px',
-            fontSize: '12px',
-            fontWeight: 600,
-            color: '#FFFFFF',
-            backgroundColor: '#0F172A',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            boxShadow: '0 1px 2px rgba(15, 23, 42, 0.1)',
-            transition: 'background-color 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#1E293B';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#0F172A';
-          }}
-        >
-          Accept Cookies
-        </button>
-      </div>
+            <button
+              type="button"
+              onClick={handleDismiss}
+              aria-label="Close cookie banner"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: '#94A3B8',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Description */}
+          <p style={{ fontSize: '13px', lineHeight: 1.5, color: '#475569', margin: 0 }}>
+            Kavach uses a small set of essential cookies to sign you in and protect your workspace.{' '}
+            <strong style={{ color: '#0F172A', fontWeight: 600 }}>No advertising. No tracking.</strong>
+          </p>
+
+          {/* 3 Pills matching screenshot */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {['Authentication', 'CSRF protection', 'Access control'].map((label) => (
+              <span
+                key={label}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#1F2937',
+                  backgroundColor: '#F3F4F6',
+                  border: '1px solid transparent',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                }}
+              >
+                <Check size={13} strokeWidth={3} color="#16A34A" />
+                <span>{label}</span>
+              </span>
+            ))}
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '10px', marginTop: '4px' }}>
+            <button
+              type="button"
+              onClick={handleEssentialOnly}
+              style={{
+                height: '40px',
+                backgroundColor: '#FFFFFF',
+                color: '#0F172A',
+                border: '1px solid #E2E8F0',
+                borderRadius: '10px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              Essential only
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAcceptAll}
+              style={{
+                height: '40px',
+                backgroundColor: '#0F172A',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '10px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(15, 23, 42, 0.12)',
+              }}
+            >
+              Accept cookies
+            </button>
+          </div>
+
+          {/* Footer Links */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+            <button
+              type="button"
+              onClick={() => setShowDetails(true)}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: '#0F172A',
+                fontWeight: 600,
+                textDecoration: 'underline',
+                cursor: 'pointer',
+                padding: 0,
+                fontSize: '12px',
+              }}
+            >
+              Manage details
+            </button>
+            <span style={{ color: '#CBD5E1' }}>·</span>
+            <Link
+              href="/privacy"
+              style={{
+                color: '#0F172A',
+                textDecoration: 'underline',
+                fontWeight: 600,
+              }}
+            >
+              Privacy Policy
+            </Link>
+          </div>
+        </aside>
+      )}
 
       <style>{`
-        @keyframes seculayerSlideUp {
+        @keyframes kavachSlideUp {
           from {
             transform: translateY(12px) scale(0.98);
             opacity: 0;
@@ -217,16 +443,17 @@ export const CookieConsentBanner: React.FC = () => {
             opacity: 1;
           }
         }
-        @media (max-width: 640px) {
-          .seculayer-cookie-banner {
-            left: 16px !important;
-            right: 16px !important;
-            bottom: 16px !important;
-            max-width: none !important;
-            width: auto !important;
+        @keyframes kavachModalFadeIn {
+          from {
+            transform: scale(0.96);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
           }
         }
       `}</style>
-    </aside>
+    </>
   );
 };

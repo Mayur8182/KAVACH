@@ -4,7 +4,7 @@
  * Implements Section 13: base URL, auth, headers, request ID, timeout, error normalization, retry policy.
  */
 
-import { getAuthToken, clearAuthToken, redirectToLogin } from '@/lib/auth/token';
+import { getAuthToken, isTokenExpired, clearAuthToken, redirectToLogin } from '@/lib/auth/token';
 import { generateCorrelationId, recordTelemetry } from '@/lib/telemetry/correlation';
 import { normalizeHttpError, normalizeNetworkError } from '@/lib/errors/normalizedError';
 import { apiCache } from '@/lib/api/cache';
@@ -14,6 +14,9 @@ import type {
   UpdateCapabilitiesPayload,
   CentralConnectPayload,
   IntegrationHealthResponse,
+  HubspotStatusResponse,
+  HubspotSyncLogItem,
+  HubspotSettingsResponse,
 } from '@/types/api/integrations';
 import type { Project, ProjectCreatePayload } from '@/types/api/projects';
 import type { Organization } from '@/types/api/organizations';
@@ -428,6 +431,218 @@ import type {
   RuntimePolicyRow,
 } from '@/types/api/container';
 
+export interface OAuthScopeMetadata {
+  scope: string;
+  category: string;
+  label: string;
+  description: string;
+}
+
+export interface OAuthConsentClientInfo {
+  client_id: string;
+  client_name: string;
+  client_type: string;
+  client_uri?: string | null;
+  is_verified: boolean;
+  redirect_uri: string;
+}
+
+export interface OAuthOrganizationOption {
+  id: string;
+  name: string;
+  slug?: string | null;
+  org_type?: string | null;
+}
+
+export interface OAuthWorkspaceOption {
+  id: string;
+  name: string;
+  slug?: string | null;
+  workspace_type?: string | null;
+  organization_id?: string | null;
+}
+
+export interface OAuthProjectOption {
+  id: string;
+  name: string;
+  workspace_id?: string | null;
+  organization_id?: string | null;
+  repository_url?: string | null;
+  environment?: string | null;
+  is_default: boolean;
+}
+
+export interface OAuthGitHubRepositoryOption {
+  id: string;
+  full_name: string;
+  html_url: string;
+  project_id?: string | null;
+  workspace_id?: string | null;
+}
+
+export interface OAuthConsentContextResponse {
+  authenticated: boolean;
+  transaction_token: string;
+  client: OAuthConsentClientInfo;
+  requested_scopes: OAuthScopeMetadata[];
+  error_message?: string | null;
+  login_providers?: {
+    github: boolean;
+    google: boolean;
+    openai_siwc?: boolean;
+  };
+  user?: {
+    id: string;
+    email: string;
+    name?: string | null;
+    avatar_url?: string | null;
+    auth_provider?: string | null;
+    default_workspace_id?: string | null;
+    default_project_id?: string | null;
+  };
+  organizations?: OAuthOrganizationOption[];
+  workspaces?: OAuthWorkspaceOption[];
+  projects?: OAuthProjectOption[];
+  github_installations_count?: number;
+  github_repositories?: OAuthGitHubRepositoryOption[];
+}
+
+export interface OAuthConsentCreateProjectPayload {
+  tx: string;
+  name: string;
+  workspace_id?: string | null;
+  repository_url?: string | null;
+  github_repository_id?: string | null;
+  environment?: string;
+}
+
+export interface OAuthConsentApprovePayload {
+  tx: string;
+  workspace_id?: string | null;
+  project_id?: string | null;
+  approved_scopes?: string[];
+  set_as_default?: boolean;
+}
+
+export interface OAuthConsentDenyPayload {
+  tx: string;
+}
+
+export interface OAuthConsentRedirectResponse {
+  redirect_to: string;
+}
+
+export interface OAuthConnectedClient {
+  client_id: string;
+  client_name: string;
+  client_type: string;
+  client_uri?: string | null;
+  is_verified: boolean;
+  status: 'ACTIVE' | 'REVOKED' | string;
+  active_tokens_count: number;
+  scopes: string[];
+  active_project?: {
+    id: string;
+    name: string;
+    repository_url?: string | null;
+  } | null;
+  workspace?: {
+    id: string;
+    name: string;
+  } | null;
+  matched_git_remote?: string | null;
+  connected_at?: string | null;
+  last_used_at?: string | null;
+  expires_at?: string | null;
+}
+
+export interface OAuthSecurityControlsSummary {
+  oauth_authentication: { enabled: boolean; standard: string };
+  project_isolation: { enabled: boolean; mode: string };
+  opa_policy_enforcement: { enabled: boolean; engine: string };
+  audit_logging: { enabled: boolean; backend: string };
+}
+
+export interface OAuthActivityItem {
+  id: string;
+  action: string;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  status: string;
+  metadata: Record<string, any>;
+  created_at?: string | null;
+}
+
+export interface OAuthConnectionsResponse {
+  user: {
+    id: string;
+    email: string;
+    name?: string | null;
+    auth_provider?: string | null;
+    default_workspace_id?: string | null;
+    default_project_id?: string | null;
+  };
+  connected_clients: OAuthConnectedClient[];
+  active_clients_count: number;
+  organizations: OAuthOrganizationOption[];
+  workspaces: OAuthWorkspaceOption[];
+  projects: OAuthProjectOption[];
+  security_controls: OAuthSecurityControlsSummary;
+  recent_activity: OAuthActivityItem[];
+}
+
+export interface OAuthDisconnectResponse {
+  status: string;
+  client_id: string;
+  revoked_tokens: number;
+}
+
+export interface OAuthPreferencesPayload {
+  default_workspace_id?: string | null;
+  default_project_id?: string | null;
+  client_id?: string | null;
+  client_project_id?: string | null;
+}
+
+export interface OAuthPreferencesResponse {
+  status: string;
+  default_workspace_id?: string | null;
+  default_project_id?: string | null;
+}
+
+export interface McpResolveProjectPayload {
+  git_remote: string;
+  client_id?: string | null;
+}
+
+export interface McpResolveProjectResponse {
+  matched: boolean;
+  normalized_remote?: string | null;
+  project?: {
+    id: string;
+    name: string;
+    repository_url?: string | null;
+    environment?: string | null;
+    workspace_id?: string | null;
+    organization_id?: string | null;
+  } | null;
+  workspace?: {
+    id: string;
+    name: string;
+  } | null;
+  repository?: {
+    id: string;
+    full_name: string;
+    html_url: string;
+  } | null;
+  candidates: Array<{
+    id: string;
+    name: string;
+    repository_url?: string | null;
+    environment?: string | null;
+  }>;
+}
+
 export interface ScopeHeaders {
   organizationId?: string | null;
   projectId?: string | null;
@@ -438,6 +653,7 @@ export interface RequestOptions extends RequestInit {
   timeoutMs?: number;
   retries?: number;
   skipAuth?: boolean;
+  skipAuthRedirect?: boolean;
   ttlMs?: number;
   bypassCache?: boolean;
 }
@@ -588,12 +804,29 @@ class ThingApiClient {
       timeoutMs = 30000,
       retries = 1,
       skipAuth = false,
+      skipAuthRedirect = false,
       headers: customHeaders = {},
       ...fetchOptions
     } = options;
 
     const correlationId = generateCorrelationId();
-    const token = getAuthToken();
+    let token = getAuthToken();
+    if (!token && !skipAuth && typeof document !== 'undefined') {
+      const cookieEntry = document.cookie
+        .split(';')
+        .map((c) => c.trim())
+        .find((c) => c.startsWith('seculayer_auth_token='));
+      if (cookieEntry) {
+        try {
+          const cookieToken = decodeURIComponent(cookieEntry.slice('seculayer_auth_token='.length));
+          if (cookieToken && !isTokenExpired(cookieToken)) {
+            token = cookieToken;
+          }
+        } catch {
+          // Ignore malformed auth cookie
+        }
+      }
+    }
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -632,6 +865,7 @@ class ThingApiClient {
 
         const res = await fetch(url, {
           ...fetchOptions,
+          credentials: fetchOptions.credentials ?? 'include',
           headers,
           signal: controller.signal,
         });
@@ -647,8 +881,8 @@ class ThingApiClient {
             correlation_id: correlationId,
           });
 
-          // Session invalid or expired: purge tokens and redirect immediately to login
-          if (res.status === 401 || apiError.status_code === 401) {
+          // Session invalid or expired: purge tokens and redirect immediately to login unless explicitly skipped
+          if ((res.status === 401 || apiError.status_code === 401) && !skipAuth && !skipAuthRedirect) {
             redirectToLogin();
           }
 
@@ -1657,6 +1891,60 @@ class ThingApiClient {
       const qs = q.toString() ? `?${q.toString()}` : '';
       const res = await this.request<any>(`/api/v1/integrations/overview${qs}`);
       return res.data;
+    },
+
+    hubspot: {
+      getStatus: async (): Promise<HubspotStatusResponse> => {
+        const res = await this.request<HubspotStatusResponse>('/api/v1/integrations/hubspot/status');
+        return res.data;
+      },
+      connect: async (payload: { access_token: string; portal_id?: string; event_settings?: Record<string, boolean> }): Promise<any> => {
+        const res = await this.request<any>('/api/v1/integrations/hubspot/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      },
+      disconnect: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/integrations/hubspot/disconnect', {
+          method: 'POST',
+        });
+        return res.data;
+      },
+      test: async (): Promise<any> => {
+        const res = await this.request<any>('/api/v1/integrations/hubspot/test', {
+          method: 'POST',
+        });
+        return res.data;
+      },
+      getLogs: async (params?: { limit?: number; status?: string; entity?: string }): Promise<HubspotSyncLogItem[]> => {
+        const q = new URLSearchParams();
+        if (params?.limit) q.append('limit', params.limit.toString());
+        if (params?.status) q.append('status', params.status);
+        if (params?.entity) q.append('entity', params.entity);
+        const qs = q.toString() ? `?${q.toString()}` : '';
+        const res = await this.request<HubspotSyncLogItem[]>(`/api/v1/integrations/hubspot/logs${qs}`);
+        return res.data;
+      },
+      retryLog: async (logId: string): Promise<any> => {
+        const res = await this.request<any>(`/api/v1/integrations/hubspot/retry/${encodeURIComponent(logId)}`, {
+          method: 'POST',
+        });
+        return res.data;
+      },
+      getSettings: async (): Promise<HubspotSettingsResponse> => {
+        const res = await this.request<HubspotSettingsResponse>('/api/v1/integrations/hubspot/settings');
+        return res.data;
+      },
+      updateSettings: async (payload: { event_settings: Record<string, boolean>; custom_field_mappings?: Record<string, string> }): Promise<any> => {
+        const res = await this.request<any>('/api/v1/integrations/hubspot/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      },
     },
 
     getProviderStatus: async (provider: string): Promise<any> => {
@@ -5558,8 +5846,70 @@ class ThingApiClient {
   };
 
   // =========================================================================
-  // KAVACH MCP GATEWAY — Public Discovery, Manifest & Deterministic Sandbox Invocation
+  // KAVACH MCP GATEWAY & UNIVERSAL OAUTH 2.1
   // =========================================================================
+  public oauth = {
+    getConsentContext: async (tx: string): Promise<OAuthConsentContextResponse> => {
+      const res = await this.request<OAuthConsentContextResponse>(
+        `/api/v1/oauth/consent/context?tx=${encodeURIComponent(tx)}`,
+        {
+          bypassCache: true,
+          skipAuthRedirect: true,
+          retries: 0,
+        }
+      );
+      return res.data;
+    },
+    createOnboardingProject: async (
+      payload: OAuthConsentCreateProjectPayload
+    ): Promise<OAuthProjectOption> => {
+      const res = await this.request<OAuthProjectOption>('/api/v1/oauth/consent/onboarding/project', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+    approveConsent: async (
+      payload: OAuthConsentApprovePayload
+    ): Promise<OAuthConsentRedirectResponse> => {
+      const res = await this.request<OAuthConsentRedirectResponse>('/api/v1/oauth/consent/approve', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+    denyConsent: async (payload: OAuthConsentDenyPayload): Promise<OAuthConsentRedirectResponse> => {
+      const res = await this.request<OAuthConsentRedirectResponse>('/api/v1/oauth/consent/deny', {
+        method: 'POST',
+        skipAuthRedirect: true,
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+    getConnections: async (): Promise<OAuthConnectionsResponse> => {
+      const res = await this.request<OAuthConnectionsResponse>('/api/v1/oauth/connections', {
+        bypassCache: true,
+      });
+      return res.data;
+    },
+    disconnectClient: async (clientId: string): Promise<OAuthDisconnectResponse> => {
+      const res = await this.request<OAuthDisconnectResponse>('/api/v1/oauth/connections/disconnect', {
+        method: 'POST',
+        body: JSON.stringify({ client_id: clientId }),
+      });
+      apiCache.invalidate('/api/v1/oauth/connections');
+      return res.data;
+    },
+    updatePreferences: async (payload: OAuthPreferencesPayload): Promise<OAuthPreferencesResponse> => {
+      const res = await this.request<OAuthPreferencesResponse>('/api/v1/oauth/preferences', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      apiCache.invalidate('/api/v1/oauth/connections');
+      return res.data;
+    },
+  };
+
   public mcp = {
     getStatus: async (): Promise<any> => {
       const res = await this.request<any>('/api/v1/mcp/status');
@@ -5572,6 +5922,22 @@ class ThingApiClient {
     getTools: async (): Promise<any[]> => {
       const res = await this.request<any[]>('/api/v1/mcp/tools');
       return res.data;
+    },
+    resolveProject: async (payload: McpResolveProjectPayload): Promise<McpResolveProjectResponse> => {
+      const res = await this.request<McpResolveProjectResponse>('/api/v1/mcp/resolve-project', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+    getConnections: async (): Promise<OAuthConnectionsResponse> => {
+      return this.oauth.getConnections();
+    },
+    disconnectClient: async (clientId: string): Promise<OAuthDisconnectResponse> => {
+      return this.oauth.disconnectClient(clientId);
+    },
+    updatePreferences: async (payload: OAuthPreferencesPayload): Promise<OAuthPreferencesResponse> => {
+      return this.oauth.updatePreferences(payload);
     },
     sandboxCall: async (payload: {
       tool_name: string;
@@ -13135,6 +13501,129 @@ class ThingApiClient {
         body: JSON.stringify(data),
       });
       this.invalidateCache('/api/v1/superadmin/internal-access/requests');
+      return res.data;
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FOUNDER CONTROL CENTER EXTENSIONS
+    // ─────────────────────────────────────────────────────────────────────────
+    getOverviewStats: async (): Promise<any> => {
+      const res = await this.request<any>('/api/v1/superadmin/overview/stats', { bypassCache: true });
+      return res.data;
+    },
+
+    getOverviewActivity: async (limit: number = 25): Promise<{ activity: any[] }> => {
+      const res = await this.request<any>(`/api/v1/superadmin/overview/activity?limit=${limit}`, { bypassCache: true });
+      return res.data;
+    },
+
+    listCustomers: async (params?: { search?: string; status_filter?: string; page?: number; page_size?: number }): Promise<any> => {
+      const q = new URLSearchParams();
+      if (params?.search) q.append('search', params.search);
+      if (params?.status_filter) q.append('status_filter', params.status_filter);
+      if (params?.page) q.append('page', String(params.page));
+      if (params?.page_size) q.append('page_size', String(params.page_size));
+      const res = await this.request<any>(`/api/v1/superadmin/customers${q.toString() ? '?' + q.toString() : ''}`, { bypassCache: true });
+      return res.data;
+    },
+
+    getCustomerDetails: async (customerId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/superadmin/customers/${encodeURIComponent(customerId)}`, { bypassCache: true });
+      return res.data;
+    },
+
+    getSecurityIncidents: async (params?: { status_filter?: string; limit?: number }): Promise<any> => {
+      const q = new URLSearchParams();
+      if (params?.status_filter) q.append('status_filter', params.status_filter);
+      if (params?.limit) q.append('limit', String(params.limit));
+      const res = await this.request<any>(`/api/v1/superadmin/security-ops/incidents${q.toString() ? '?' + q.toString() : ''}`, { bypassCache: true });
+      return res.data;
+    },
+
+    getSecurityAlerts: async (): Promise<{ alerts: any[] }> => {
+      const res = await this.request<any>('/api/v1/superadmin/security-ops/alerts', { bypassCache: true });
+      return res.data;
+    },
+
+    getAiAgentsOverview: async (): Promise<any> => {
+      const res = await this.request<any>('/api/v1/superadmin/ai-agents/overview', { bypassCache: true });
+      return res.data;
+    },
+
+    getAiAgentRegistry: async (): Promise<{ agents: any[] }> => {
+      const res = await this.request<any>('/api/v1/superadmin/ai-agents/registry', { bypassCache: true });
+      return res.data;
+    },
+
+    listAgentExecutions: async (params?: { status_filter?: string; limit?: number }): Promise<{ executions: any[] }> => {
+      const q = new URLSearchParams();
+      if (params?.status_filter) q.append('status_filter', params.status_filter);
+      if (params?.limit) q.append('limit', String(params.limit));
+      const res = await this.request<any>(`/api/v1/superadmin/ai-agents/executions${q.toString() ? '?' + q.toString() : ''}`, { bypassCache: true });
+      return res.data;
+    },
+
+    killAgentExecution: async (executionId: string, reason: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/superadmin/ai-agents/executions/${encodeURIComponent(executionId)}/kill`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    getApiSecuritySummary: async (): Promise<any> => {
+      const res = await this.request<any>('/api/v1/superadmin/api-security/summary', { bypassCache: true });
+      return res.data;
+    },
+
+    listApiSecurityTargets: async (limit: number = 25): Promise<{ targets: any[] }> => {
+      const res = await this.request<any>(`/api/v1/superadmin/api-security/targets?limit=${limit}`, { bypassCache: true });
+      return res.data;
+    },
+
+    getScansQueue: async (params?: { status_filter?: string; limit?: number }): Promise<{ scans: any[] }> => {
+      const q = new URLSearchParams();
+      if (params?.status_filter) q.append('status_filter', params.status_filter);
+      if (params?.limit) q.append('limit', String(params.limit));
+      const res = await this.request<any>(`/api/v1/superadmin/scans/queue${q.toString() ? '?' + q.toString() : ''}`, { bypassCache: true });
+      return res.data;
+    },
+
+    cancelScan: async (scanId: string): Promise<any> => {
+      const res = await this.request<any>(`/api/v1/superadmin/scans/${encodeURIComponent(scanId)}/cancel`, {
+        method: 'POST',
+      });
+      return res.data;
+    },
+
+    getVulnerabilitiesAggregate: async (params?: { severity?: string; limit?: number }): Promise<{ total: number; vulnerabilities: any[] }> => {
+      const q = new URLSearchParams();
+      if (params?.severity) q.append('severity', params.severity);
+      if (params?.limit) q.append('limit', String(params.limit));
+      const res = await this.request<any>(`/api/v1/superadmin/vulnerabilities/aggregate${q.toString() ? '?' + q.toString() : ''}`, { bypassCache: true });
+      return res.data;
+    },
+
+    listAnnouncements: async (limit: number = 25): Promise<{ announcements: any[] }> => {
+      const res = await this.request<any>(`/api/v1/superadmin/support/announcements?limit=${limit}`, { bypassCache: true });
+      return res.data;
+    },
+
+    createAnnouncement: async (data: { title: string; message: string; priority?: string; target_audience?: string }): Promise<any> => {
+      const res = await this.request<any>('/api/v1/superadmin/support/announcements', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      return res.data;
+    },
+
+    getEmailLogs: async (limit: number = 50): Promise<{ email_logs: any[] }> => {
+      const res = await this.request<any>(`/api/v1/superadmin/notifications/email-logs?limit=${limit}`, { bypassCache: true });
+      return res.data;
+    },
+
+    getAnalyticsSummary: async (): Promise<any> => {
+      const res = await this.request<any>('/api/v1/superadmin/analytics/usage-summary', { bypassCache: true });
       return res.data;
     },
   };

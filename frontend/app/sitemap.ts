@@ -7,7 +7,7 @@ import type { MetadataRoute } from 'next';
  * Rules & Exclusions:
  * - Excludes private platform workspaces: /(platform)/*, /code/*, /cloud/*, /attack/*, /qa/*, /settings/*, etc.
  * - Excludes authentication-only routes: /login, /signup, /mfa, /verify-email, /logout, /reset-password, /forgot-password, /auth/*
- * - Excludes private onboarding and internal portals: /onboarding/*, /projects/create, /sales/contract, /sales/proposal, etc.
+ * - Excludes private onboarding and internal portals: /onboarding/*, /projects/create, /workspace/*, etc.
  * - Excludes API routes: /api/*, /health, /healthz
  * - Includes only canonical, publicly accessible marketing, product, and legal pages
  */
@@ -81,52 +81,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified,
       changeFrequency: 'weekly',
       priority: 0.75,
-    },
-
-    // -------------------------------------------------------------------------
-    // Sales & Lead Generation Pages
-    // -------------------------------------------------------------------------
-    {
-      url: `${baseUrl}/sales`,
-      lastModified,
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/sales/book-demo`,
-      lastModified,
-      changeFrequency: 'weekly',
-      priority: 0.85,
-    },
-    {
-      url: `${baseUrl}/sales/request-demo`,
-      lastModified,
-      changeFrequency: 'weekly',
-      priority: 0.85,
-    },
-    {
-      url: `${baseUrl}/sales/contact`,
-      lastModified,
-      changeFrequency: 'monthly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/sales/security-expert`,
-      lastModified,
-      changeFrequency: 'monthly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/sales/enterprise-inquiry`,
-      lastModified,
-      changeFrequency: 'monthly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/sales/guided-demo`,
-      lastModified,
-      changeFrequency: 'weekly',
-      priority: 0.8,
     },
 
     // -------------------------------------------------------------------------

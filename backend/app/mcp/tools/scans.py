@@ -128,12 +128,21 @@ async def execute_get_scan(
             error_code="MCP_RESOURCE_NOT_FOUND",
         )
 
-    # Project ownership and tenant isolation check
-    is_superuser = bool(context.metadata.get("is_superuser", False))
-    from sqlalchemy import select
-    project_stmt = select(Project).where(Project.id == scan.project_id)
-    scan_project = (await db.execute(project_stmt)).scalar_one_or_none()
-    if scan_project and scan_project.owner_id != context.identity.agent_id and not is_superuser:
+    # Project ownership and tenant isolation check (supports OrganizationMembers & org scoping)
+    from app.services.workspace_resolver import user_can_access_project
+    from app.mcp.tools.context_helper import _extract_token_uuid
+
+    scan_project = await db.get(Project, scan.project_id)
+    user_obj = await db.get(User, context.identity.agent_id)
+    scoped_org_id = _extract_token_uuid(context.metadata, "org_id")
+    if scan_project and user_obj:
+        if not await user_can_access_project(user_obj, scan_project, db, scoped_org_id=scoped_org_id):
+            return ToolExecutionResult(
+                status="DENIED",
+                message=f"Access denied: Security scan '{scan_uuid}' belongs to another tenant. Cross-tenant access is blocked.",
+                error_code="MCP_TENANT_ACCESS_DENIED",
+            )
+    elif scan_project and scan_project.owner_id != context.identity.agent_id and not bool(context.metadata.get("is_superuser", False)):
         return ToolExecutionResult(
             status="DENIED",
             message=f"Access denied: Security scan '{scan_uuid}' belongs to another tenant. Cross-tenant access is blocked.",

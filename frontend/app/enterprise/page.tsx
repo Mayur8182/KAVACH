@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
+import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
 import { api } from '@/lib/api/client';
 
 export default function EnterprisePage() {
@@ -301,6 +302,7 @@ export default function EnterprisePage() {
           </form>
         </div>
       </section>
+      <EnterpriseFooter />
     </div>
   );
 }

@@ -301,7 +301,7 @@ class GitHubRepositoryDB:
             select(GitHubSecurityJob)
             .where(GitHubSecurityJob.id == job_id)
             .options(
-                selectinload(GitHubSecurityJob.repository),
+                selectinload(GitHubSecurityJob.repository).selectinload(GitHubRepository.installation),
                 selectinload(GitHubSecurityJob.project),
             )
         )

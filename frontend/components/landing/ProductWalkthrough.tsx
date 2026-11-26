@@ -369,7 +369,7 @@ export function ProductWalkthrough() {
         .pw-eyebrow {
           font: 700 12.5px/1.4 Inter, sans-serif;
           letter-spacing: 0.12em;
-          color: #2563eb;
+          color: #059669;
           display: flex;
           align-items: center;
           gap: 10px;
@@ -447,7 +447,7 @@ export function ProductWalkthrough() {
         }
         .pw-tabs button[aria-selected='true'] {
           color: #0f172a;
-          border-color: #2563eb;
+          border-color: #0f172a;
           font-weight: 700;
         }
         .pw-demo {
@@ -531,9 +531,9 @@ export function ProductWalkthrough() {
           transition: all 0.15s ease;
         }
         .pw-step-list > button.active {
-          background: #eff6ff;
-          border-color: #bfdbfe;
-          color: #1e40af;
+          background: #f1f5f9;
+          border-color: #cbd5e1;
+          color: #0f172a;
         }
         .pw-step-list > button.complete {
           color: #047857;
@@ -551,9 +551,9 @@ export function ProductWalkthrough() {
           flex-shrink: 0;
         }
         .pw-step-list > button.active i {
-          border-color: #3b82f6;
-          background: #dbeafe;
-          color: #1d4ed8;
+          border-color: #0f172a;
+          background: #0f172a;
+          color: #ffffff;
         }
         .pw-step-list > button.complete i {
           border-color: #10b981;

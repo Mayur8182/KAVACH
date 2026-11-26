@@ -5,9 +5,12 @@ $ROOT = $PSScriptRoot
 $BACKEND = Join-Path $ROOT "backend"
 $FRONTEND = Join-Path $ROOT "frontend"
 
-$PYTHON = "C:\Users\USER\AppData\Local\Programs\Python\Python313\python.exe"
 $NODE_PATH = "C:\Program Files\nodejs"
-$NPM = "C:\Program Files\nodejs\npm.cmd"
+$PYTHON_DIR = "C:\Users\USER\AppData\Local\Programs\Python\Python313"
+$PYTHON_SCRIPTS = "C:\Users\USER\AppData\Local\Programs\Python\Python313\Scripts"
+$SCANNERS = "C:\tools\scanners"
+$SYS32 = "C:\WINDOWS\system32"
+$WIN = "C:\WINDOWS"
 
 Write-Host "===================================================" -ForegroundColor Cyan
 Write-Host "   Starting SecureAI Control Plane (Full Stack)    " -ForegroundColor Cyan
@@ -15,11 +18,13 @@ Write-Host "===================================================" -ForegroundColo
 
 # Start Backend in new PowerShell window
 Write-Host "[1/2] Starting FastAPI Backend on http://localhost:8000 ..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$env:PATH = '$NODE_PATH;C:\Users\USER\AppData\Local\Programs\Python\Python313;C:\Users\USER\AppData\Local\Programs\Python\Python313\Scripts;C:\tools\scanners;`$env:PATH'; Set-Location '$BACKEND'; Write-Host 'FastAPI Backend running on http://localhost:8000' -ForegroundColor Green; & '$PYTHON' -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app"
+$backendCmd = "`$env:COMSPEC = '$SYS32\cmd.exe'; `$env:PATH = '$NODE_PATH;$PYTHON_DIR;$PYTHON_SCRIPTS;$SCANNERS;$SYS32;$WIN;' + `$env:PATH; Set-Location '$BACKEND'; Write-Host 'FastAPI Backend running on http://localhost:8000' -ForegroundColor Green; if (Get-Command py -ErrorAction SilentlyContinue) { py -3.13 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app } else { python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app }"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd
 
 # Start Frontend in new PowerShell window
 Write-Host "[2/2] Starting Next.js Frontend on http://localhost:3002 ..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$env:PATH = '$NODE_PATH;`$env:PATH'; Set-Location '$FRONTEND'; Write-Host 'Next.js Frontend running on http://localhost:3002' -ForegroundColor Green; & '$NPM' run dev"
+$frontendCmd = "`$env:COMSPEC = '$SYS32\cmd.exe'; `$env:PATH = '$NODE_PATH;$SYS32;$WIN;' + `$env:PATH; Set-Location '$FRONTEND'; Write-Host 'Next.js Frontend running on http://localhost:3002' -ForegroundColor Green; npm run dev"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd
 
 Start-Sleep -Seconds 4
 Write-Host ""

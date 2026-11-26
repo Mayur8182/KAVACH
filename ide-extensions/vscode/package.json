@@ -1,62 +1,62 @@
 {
-  "name": "thing-security",
-  "displayName": "Thing Security",
-  "description": "Real-time pre-code and during-code security for Thing",
-  "version": "0.1.0",
+  "name": "kavach-security",
+  "displayName": "Kavach Security",
+  "publisher": "kavach",
+  "description": "Universal OAuth 2.1, automatic Git repository resolution, and MCP security scanning for VS Code, Cursor, and Windsurf",
+  "version": "0.2.0",
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Linters",
-    "Security"
+    "Security",
+    "Other"
   ],
   "activationEvents": [
     "onStartupFinished"
   ],
   "main": "./extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Kavach Security",
+      "properties": {
+        "kavach.serverUrl": {
+          "type": "string",
+          "default": "https://mcp.kavachsecurity.me",
+          "description": "Base URL of the Kavach MCP & OAuth 2.1 Security Gateway (e.g. https://mcp.kavachsecurity.me or http://localhost:8000)."
+        },
+        "kavach.autoResolveProject": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically resolve and activate the Kavach Cloud project matching the workspace Git remote on sign-in and startup."
+        }
+      }
+    },
     "commands": [
       {
-        "command": "thing.scan",
-        "title": "Thing Security: Scan Project"
+        "command": "kavach.signIn",
+        "title": "Kavach: Sign In with OAuth 2.1"
       },
       {
-        "command": "thing.fix",
-        "title": "Thing Security: AI Fix"
+        "command": "kavach.connectProject",
+        "title": "Kavach: Connect / Auto-Detect Repository"
       },
       {
-        "command": "thing.scanApi",
-        "title": "Kavach: Scan API Security (OWASP API Top 10)"
+        "command": "kavach.switchProject",
+        "title": "Kavach: Switch Active Project"
       },
       {
-        "command": "thing.fixFinding",
-        "title": "Kavach: Apply API Security Patch & Verify"
+        "command": "kavach.configureMcp",
+        "title": "Kavach: Configure MCP Server (.vscode/mcp.json)"
+      },
+      {
+        "command": "kavach.scanWorkspace",
+        "title": "Kavach: Run Security Scan via MCP"
+      },
+      {
+        "command": "kavach.signOut",
+        "title": "Kavach: Sign Out"
       }
-    ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "thing-security-explorer",
-          "title": "Thing Security",
-          "icon": "resources/shield.svg"
-        }
-      ]
-    },
-    "views": {
-      "thing-security-explorer": [
-        {
-          "id": "thing.views.status",
-          "name": "Status"
-        },
-        {
-          "id": "thing.views.findings",
-          "name": "Findings"
-        },
-        {
-          "id": "thing.views.contracts",
-          "name": "Contracts"
-        }
-      ]
-    }
+    ]
   }
 }

@@ -2,65 +2,29 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence, useScroll, useSpring } from 'framer-motion';
 import {
   ArrowRight,
-  CheckCircle2,
-  Code2,
-  ShieldAlert,
-  ShieldCheck,
-  Shield,
-  Zap,
-  Lock,
-  GitBranch,
-  Terminal,
-  Activity,
-  Check,
-  Copy,
-  ExternalLink,
-  Sparkles,
-  Server,
-  Layers,
-  Cpu,
-  AlertTriangle,
   Calendar,
+  Check,
+  Code2,
+  ShieldCheck,
+  KeyRound,
+  Container,
+  Package,
+  GitPullRequest,
+  Shield,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
-import { KavachLogo, KavachMark } from '@/components/common/KavachLogo';
 import { ProductShowcase } from '@/components/landing/ProductShowcase';
+import { KavachFeatureDiagrams } from '@/components/landing/KavachFeatureDiagrams';
 import { KavachSecurityPipelineFlow } from '@/components/pipeline/KavachSecurityPipelineFlow';
-import { KavachHeroSkeleton } from '@/components/landing/KavachHeroSkeleton';
-import { KavachHeroDashboardCard } from '@/components/landing/KavachHeroDashboardCard';
 import { KavachMcpConnectWidget } from '@/components/landing/KavachMcpConnectWidget';
+import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
+import { ScrollRevealText } from '@/components/landing/ScrollRevealText';
 import '@/styles/kavach-home.css';
 
-// Official SVG Icons for Social Profiles
-const LinkedinIcon: React.FC<{ size?: number; className?: string }> = ({ size = 15, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-    <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.6 1.6 0 0 0 1.6-1.6 1.6 1.6 0 0 0-1.6-1.6 1.6 1.6 0 0 0-1.6 1.6c0 .88.72 1.6 1.6 1.6m1.4 9.74v-8.37H5.06v8.37h2.8z" />
-  </svg>
-);
-
-const XIcon: React.FC<{ size?: number; className?: string }> = ({ size = 13, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-  </svg>
-);
-
-const YoutubeIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.5 12 3.5 12 3.5s-7.505 0-9.377.55a3.016 3.016 0 0 0-2.122 2.136C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.55 9.376.55 9.376.55s7.505 0 9.377-.55a3.016 3.016 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-  </svg>
-);
-
-const InstagramIcon: React.FC<{ size?: number; className?: string }> = ({ size = 15, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-  </svg>
-);
-
-// Lazy-loaded modals & drawers
 const SearchModal = dynamic(
   () => import('@/components/common/SearchModal').then((mod) => mod.SearchModal),
   { ssr: false }
@@ -71,160 +35,81 @@ const BookDemoModal = dynamic(
   { ssr: false }
 );
 
-// 9 Workspaces
-const WORKSPACES = [
-  {
-    num: '01',
-    category: 'CODE & BUILD',
-    name: 'Code Security',
-    description: 'SAST, SCA, exposed secrets, SBOM and supply chain security.',
-    scope: 'GIT REPOSITORIES',
-    href: '/code',
-  },
-  {
-    num: '02',
-    category: 'CLOUD & INFRASTRUCTURE',
-    name: 'Cloud Security',
-    description: 'Multi-cloud CSPM across AWS, GCP, Azure and K8s posture.',
-    scope: 'CLOUD ACCOUNTS',
-    href: '/cloud',
-  },
-  {
-    num: '03',
-    category: 'CLOUD & INFRASTRUCTURE',
-    name: 'Attack Surface',
-    description: 'Attack surface management, DAST and pentest campaigns.',
-    scope: 'TARGET DOMAINS',
-    href: '/attack',
-  },
-  {
-    num: '04',
-    category: 'RUNTIME & AI GOVERNANCE',
-    name: 'Runtime Defense',
-    description: 'eBPF runtime defense and MCP tool execution gateway.',
-    scope: 'CLUSTERS & RUNTIMES',
-    href: '/protect',
-  },
-  {
-    num: '05',
-    category: 'RUNTIME & AI GOVERNANCE',
-    name: 'AI Agent Security',
-    description: 'Autonomous AI agent identity and tool policy control.',
-    scope: 'AI AGENT FLEETS',
-    href: '/agent',
-  },
-  {
-    num: '06',
-    category: 'RUNTIME & AI GOVERNANCE',
-    name: 'Security Operations',
-    description: 'Incident triage queue, alert correlation and playbooks.',
-    scope: 'ALERT QUEUES',
-    href: '/soc',
-  },
-  {
-    num: '07',
-    category: 'KNOWLEDGE & POSTURE',
-    name: 'Security Graph',
-    description: 'Authority knowledge graph, edges and blast radius.',
-    scope: 'GRAPH TOPOLOGY',
-    href: '/graph',
-  },
-  {
-    num: '08',
-    category: 'KNOWLEDGE & POSTURE',
-    name: 'Data Security',
-    description: 'DSPM, S3/RDS invariant verification and real-time DLP.',
-    scope: 'DATA STORES',
-    href: '/data',
-  },
-  {
-    num: '09',
-    category: 'KNOWLEDGE & POSTURE',
-    name: 'Governance & Compliance',
-    description: 'Declarative OPA Rego policies and SOC 2 compliance.',
-    scope: 'COMPLIANCE SUITES',
-    href: '/governance',
-  },
+const INTEGRATED_ENGINES = [
+  { name: 'Semgrep', role: 'Code Scanning', icon: Code2 },
+  { name: 'Gitleaks', role: 'Secret Checks', icon: KeyRound },
+  { name: 'Trivy', role: 'Container Scans', icon: Container },
+  { name: 'OSV', role: 'Package Risks', icon: Package },
+  { name: 'Checkov', role: 'Cloud Config', icon: Shield },
+  { name: 'OPA Policy', role: 'Security Rules', icon: ShieldCheck },
+  { name: 'GitHub PRs', role: 'Safe Fixes', icon: GitPullRequest },
 ];
 
-// 4 Deep Capability Sections
-const SOLUTIONS = [
-  {
-    num: '01',
-    title: 'Autonomous AI Agent Governance',
-    subtitle: 'Safeguard agentic coding assistants without hindering development velocity.',
-    description:
-      'Autonomous coding agents make multi-file modifications and invoke command-line tools. Kavach wraps every agent with deterministic OPA contracts, sandboxed syscall execution, and human-in-the-loop approvals for privileged operations.',
-    linkText: 'Explore Agent Governance',
-    linkHref: '/agent',
-    capabilities: [
-      'MCP tool-level authorization gateway',
-      'Immutable cryptographic audit events for every patch',
-      'Automated semantic diff inspection before merge',
-      'Zero unauthorized cloud infrastructure modifications',
-    ],
-  },
-  {
-    num: '02',
-    title: 'Software Supply Chain & SLSA Provenance',
-    subtitle: 'Cryptographic proof of origin from commit to container registry.',
-    description:
-      'Verify the integrity of third-party open-source dependencies and internal build artifacts. Automatically generate CycloneDX SBOMs and enforce SLSA Level 3 provenance checks on every container build.',
-    linkText: 'View Build Security',
-    linkHref: '/code/dependencies',
-    capabilities: [
-      'Automated SBOM generation (Syft & CycloneDX)',
-      'Known CVE discovery via OSV & Trivy',
-      'Dependency confusion & typosquatting detection',
-      'Cryptographic signature validation on deployment',
-    ],
-  },
-  {
-    num: '03',
-    title: 'Multi-Cloud Infrastructure & IaC Security',
-    subtitle: 'Detect misconfigurations and privilege escalation paths before production deployment.',
-    description:
-      'Scan Terraform, AWS CloudFormation, Helm charts, and Kubernetes manifests against CIS benchmarks. Reconcile runtime state against declared security blueprints to eliminate configuration drift.',
-    linkText: 'Explore Cloud Security',
-    linkHref: '/cloud',
-    capabilities: [
-      'Static IaC policy evaluation via Checkov & OPA',
-      'IAM blast radius analysis and excessive permission pruning',
-      'Automated S3 bucket and firewall remediations',
-      'Unified visibility across AWS, Azure, GCP, and Kubernetes',
-    ],
-  },
-  {
-    num: '04',
-    title: 'Continuous Compliance & Audit Readiness',
-    subtitle: 'Pass SOC2 Type II, ISO 27001, and HIPAA audits without manual screenshot gathering.',
-    description:
-      'Turn dynamic runtime evidence into audit-ready compliance packages. Every policy decision, vulnerability scan, and deployment gate is immutably persisted with traceable timestamps and actor verification.',
-    linkText: 'View Compliance Blueprint',
-    linkHref: '/governance',
-    capabilities: [
-      'Continuous compliance control mapping',
-      'Single-click exportable auditor evidence packets',
-      'Automated change management audit trails',
-      'Separation of duties & least-privilege verification',
-    ],
-  },
+const HERO_SCROLL_WORDS = [
+  'AI Agents.',
+  'Pull Requests.',
+  'Cloud Apps.',
+  'MCP Tools.',
+];
+
+const KITA_GUARANTEES = [
+  { num: 'i.', title: 'Never AI-only decisions', desc: 'Rules and scanners hold final allow/block authority.' },
+  { num: 'ii.', title: 'Zero unverified diffs', desc: 'Every fix is re-scanned cleanly before opening a PR.' },
+  { num: 'iii.', title: 'Scoped MCP gateway', desc: 'Coding agents pass identity and permission checks.' },
+  { num: 'iv.', title: 'Real CLI engines', desc: 'Semgrep, Gitleaks, Trivy, OSV & Checkov run live.' },
+  { num: 'v.', title: 'PostgreSQL evidence', desc: 'Rule matches, diffs, and approvals log permanently.' },
 ];
 
 export default function KavachHomePage() {
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [expertOpen, setExpertOpen] = useState(false);
+  const [activeCta, setActiveCta] = useState<'get-started' | 'book-now' | null>(null);
+  const [wordIndex, setWordIndex] = useState(0);
+  const [systemStatus, setSystemStatus] = useState<'checking' | 'operational' | 'offline'>('checking');
+
+  const { scrollYProgress } = useScroll();
+  const smoothProgress = useSpring(scrollYProgress, { stiffness: 280, damping: 32, restDelta: 0.001 });
 
   useEffect(() => {
-    setMounted(true);
+    const wordTimer = window.setInterval(() => {
+      setWordIndex((prev) => (prev + 1) % HERO_SCROLL_WORDS.length);
+    }, 3200);
+    return () => window.clearInterval(wordTimer);
+  }, []);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('book-demo') === 'true') {
-        setExpertOpen(true);
+        const t = window.setTimeout(() => setExpertOpen(true), 0);
+        return () => window.clearTimeout(t);
       }
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkSystemStatus() {
+      try {
+        const res = await fetch('/api/v1/health', { cache: 'no-store' });
+        if (!cancelled) {
+          if (res.ok) {
+            const json = (await res.json()) as { status?: string };
+            setSystemStatus(json.status === 'operational' ? 'operational' : 'offline');
+          } else {
+            setSystemStatus('offline');
+          }
+        }
+      } catch {
+        if (!cancelled) setSystemStatus('offline');
+      }
+    }
+    void checkSystemStatus();
+    const timer = window.setInterval(checkSystemStatus, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
   return (
@@ -239,623 +124,431 @@ export default function KavachHomePage() {
         WebkitFontSmoothing: 'antialiased',
       }}
     >
-      {/* ── Official Navigation Header with Kavach Logo ── */}
+      {/* Top Minimalist Hairline Scroll Progress Track */}
+      <motion.div
+        style={{ scaleX: smoothProgress }}
+        aria-hidden="true"
+        className="fixed top-0 left-0 right-0 h-[1.5px] bg-slate-900/75 origin-left z-[60] pointer-events-none"
+      />
+
       <SecuLayerHeader
         onOpenSearch={() => setSearchOpen(true)}
         onOpenExpert={() => setExpertOpen(true)}
       />
 
       <main id="main-content" style={{ flex: 1, width: '100%', overflowX: 'hidden' }}>
-
         {/* ========================================================= */}
-        {/* SECTION 1: HERO & DASHBOARD PREVIEW                       */}
+        {/* 1. SPLIT HERO + PRODUCT DEMO STAGE                        */}
         {/* ========================================================= */}
-        {!mounted ? (
-          <KavachHeroSkeleton />
-        ) : (
-          <section
-            style={{
-              maxWidth: '1380px',
-              margin: '0 auto',
-              padding: 'clamp(40px, 6vw, 68px) clamp(20px, 4vw, 48px) 32px',
-              width: '100%',
-              boxSizing: 'border-box',
-              textAlign: 'center',
-            }}
-          >
-            {/* 1. Green Pulse Badge from Image 3 */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 mb-6 shadow-xs select-none">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>SECURITY FOR CODE, CLOUD &amp; AI</span>
-            </div>
-
-            {/* 2. Bold Headline from Image 3 */}
-            <h1
-              style={{
-                fontSize: 'clamp(38px, 6vw, 68px)',
-                lineHeight: 1.08,
-                letterSpacing: '-0.04em',
-                fontWeight: 800,
-                color: '#0F172A',
-                margin: '0 auto 18px',
-                maxWidth: '820px',
-              }}
-            >
-              Secure Code, Cloud<br />&amp; AI Agents.
-            </h1>
-
-            {/* 3. Value Proposition Checkmarks from Image 3 */}
-            <div className="flex items-center justify-center gap-4 sm:gap-6 text-sm sm:text-base font-semibold text-gray-800 mb-8 select-none">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
-                <span>Detect</span>
-              </div>
-              <span className="text-gray-300 font-light select-none">|</span>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
-                <span>Fix</span>
-              </div>
-              <span className="text-gray-300 font-light select-none">|</span>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
-                <span>Prevent</span>
-              </div>
-            </div>
-
-            {/* 4. Action Buttons from Image 3 */}
-            <div className="flex flex-wrap items-center justify-center gap-3.5 mb-4">
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl bg-[#0F172A] hover:bg-black text-white font-semibold text-sm transition-all shadow-sm hover:shadow-md cursor-pointer"
-              >
-                <span>Get Started</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <button
-                type="button"
-                onClick={() => setExpertOpen(true)}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-gray-50 text-gray-800 border border-gray-300 font-semibold text-sm transition-all shadow-sm hover:shadow-md cursor-pointer"
-              >
-                <Calendar className="w-4 h-4 text-gray-700" />
-                <span>Book a Demo</span>
-              </button>
-            </div>
-
-            {/* 5. Security Overview Dashboard Card Directly Underneath (Image 2) */}
-            <KavachHeroDashboardCard />
-          </section>
-        )}
-
-        {/* ========================================================= */}
-        {/* SECTION 2: SIMPLIFIED AUTONOMOUS AI AGENT & MCP GATEWAY    */}
-        {/* ========================================================= */}
-        <section
-          id="autonomous-mcp"
-          style={{
-            maxWidth: '1380px',
-            margin: '0 auto',
-            padding: 'clamp(20px, 4vw, 40px) clamp(20px, 4vw, 48px) clamp(32px, 5vw, 56px)',
-            width: '100%',
-            boxSizing: 'border-box',
-          }}
-        >
-          <KavachMcpConnectWidget />
-        </section>
-
-        {/* ========================================================= */}
-        {/* TRUST BADGES & METRICS BAR (Rule #2 Trust Signals)        */}
-        {/* ========================================================= */}
-        <section
-          style={{
-            maxWidth: '1380px',
-            margin: '0 auto',
-            padding: '0 clamp(20px, 4vw, 48px) 44px',
-            width: '100%',
-            boxSizing: 'border-box',
-          }}
-        >
-          <div className="kavach-trust-metrics-card">
-            {/* 4 Quantitative Proof Stats */}
-            <div className="kavach-stats-row">
-              <div className="stat-box">
-                <span className="stat-val">140+</span>
-                <span className="stat-lbl">Automated Security Checks</span>
-              </div>
-              <div className="stat-divider" />
-              <div className="stat-box">
-                <span className="stat-val">100%</span>
-                <span className="stat-lbl">Deterministic Evidence</span>
-              </div>
-              <div className="stat-divider" />
-              <div className="stat-box">
-                <span className="stat-val">0</span>
-                <span className="stat-lbl">Hallucinated Patches</span>
-              </div>
-              <div className="stat-divider" />
-              <div className="stat-box">
-                <span className="stat-val">&lt; 60s</span>
-                <span className="stat-lbl">Mean Time to First Finding</span>
-              </div>
-            </div>
-
-            {/* Enterprise Compliance Standards */}
-            <div className="kavach-badges-row">
-              <span className="badges-label">ENTERPRISE COMPLIANCE &amp; STANDARDS:</span>
-              <div className="badges-list">
-                <div className="badge-pill">
-                  <ShieldCheck size={13} color="#2563EB" />
-                  <span>SOC 2 Type II Aligned</span>
-                </div>
-                <div className="badge-pill">
-                  <CheckCircle2 size={13} color="#2563EB" />
-                  <span>ISO 27001 Controls</span>
-                </div>
-                <div className="badge-pill">
-                  <Lock size={13} color="#2563EB" />
-                  <span>Open Policy Agent (OPA)</span>
-                </div>
-                <div className="badge-pill">
-                  <Activity size={13} color="#2563EB" />
-                  <span>SLSA Level 3 Provenance</span>
-                </div>
-                <div className="badge-pill">
-                  <Cpu size={13} color="#2563EB" />
-                  <span>Zero LLM Authority</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ========================================================= */}
-        {/* SECTION 2: ANIMATED SECURITY PIPELINE DAG FLOW            */}
-        {/* ========================================================= */}
-        <section
-          id="security-pipeline"
-          style={{
-            maxWidth: '1380px',
-            margin: '0 auto',
-            padding: '0 clamp(20px, 4vw, 48px) 48px',
-            width: '100%',
-            boxSizing: 'border-box',
-          }}
-        >
-          <KavachSecurityPipelineFlow theme="light" />
-        </section>
-
-        {/* ========================================================= */}
-        {/* SECTION 3: INTERACTIVE HANDS-ON PRODUCT SHOWCASE          */}
-        {/* ========================================================= */}
-        <section id="product-demo">
-          <ProductShowcase />
-        </section>
-
-        {/* ========================================================= */}
-        {/* SECTION 4: NINE WORKSPACES GRID                           */}
-        {/* ========================================================= */}
-        <section
-          id="workspaces"
-          style={{
-            maxWidth: '1380px',
-            margin: '0 auto',
-            padding: 'clamp(24px, 4vw, 32px) clamp(16px, 3vw, 24px) clamp(40px, 6vw, 80px)',
-            width: '100%',
-            boxSizing: 'border-box',
-          }}
-        >
+        <section className="relative overflow-hidden">
           <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-[520px] opacity-35"
             style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-              gap: '16px',
-              marginBottom: '36px',
+              backgroundImage: 'radial-gradient(#CBD5E1 1px, transparent 1px)',
+              backgroundSize: '24px 24px',
+              maskImage: 'radial-gradient(ellipse 75% 70% at 50% 25%, #000 40%, transparent 100%)',
+              WebkitMaskImage: 'radial-gradient(ellipse 75% 70% at 50% 25%, #000 40%, transparent 100%)',
             }}
-          >
-            <div className="kavach-section-tag">ISOLATED SECURITY DOMAINS</div>
-            <h2
-              style={{
-                fontSize: 'clamp(30px, 4vw, 42px)',
-                fontWeight: 800,
-                color: '#0F172A',
-                letterSpacing: '-0.03em',
-                lineHeight: 1.15,
-                margin: 0,
-                maxWidth: '680px',
-              }}
-            >
-              Nine workspaces, each an<br />isolated security perimeter.
-            </h2>
-            <p style={{ fontSize: '15px', color: '#64748B', margin: 0, maxWidth: '600px' }}>
-              Every domain is strictly isolated with its own policies, scanners, authorization boundaries, and audit logging.
-            </p>
-          </div>
+          />
 
-          {/* 3x3 Grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
-              gap: '16px',
-            }}
-          >
-            {WORKSPACES.map((ws) => (
-              <Link
-                key={ws.num}
-                href={ws.href}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  padding: '26px',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '10px',
-                  textDecoration: 'none',
-                  minHeight: '210px',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#0F172A';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(15, 23, 42, 0.06)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#E2E8F0';
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
+          <div className="relative max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-10 pt-10 sm:pt-14 pb-12 sm:pb-16">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+              {/* LEFT HERO COLUMN */}
+              <motion.div
+                initial={{ y: 10 }}
+                animate={{ y: 0 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="lg:col-span-7 text-left"
               >
-                <div>
-                  <span
-                    style={{
-                      display: 'block',
-                      fontSize: '11px',
-                      fontFamily: 'monospace',
-                      fontWeight: 700,
-                      letterSpacing: '0.06em',
-                      color: '#64748B',
-                      marginBottom: '10px',
-                    }}
-                  >
-                    {ws.num} · {ws.category}
-                  </span>
-                  <h3
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: 700,
-                      color: '#0F172A',
-                      margin: '0 0 8px 0',
-                    }}
-                  >
-                    {ws.name}
-                  </h3>
-                  <p
-                    style={{
-                      fontSize: '13px',
-                      color: '#64748B',
-                      lineHeight: 1.5,
-                      margin: 0,
-                    }}
-                  >
-                    {ws.description}
-                  </p>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold tracking-[0.08em] uppercase bg-white text-slate-700 border border-slate-200 shadow-sm mb-5 select-none">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Code, Cloud &amp; AI Security</span>
                 </div>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingTop: '20px',
-                    borderTop: '1px solid #F1F5F9',
-                  }}
+                <h1
+                  className="text-[#0F172A] font-extrabold tracking-[-0.035em] leading-[1.08] mb-4"
+                  style={{ fontSize: 'clamp(38px, 5vw, 62px)' }}
                 >
-                  <span
-                    style={{
-                      fontSize: '11.5px',
-                      fontFamily: 'monospace',
-                      fontWeight: 700,
-                      letterSpacing: '0.04em',
-                      color: '#475569',
-                    }}
-                  >
-                    SCOPE · {ws.scope}
+                  <span>Secure Code, Cloud</span>
+                  <br />
+                  <span className="inline-flex items-baseline gap-x-2.5 flex-wrap">
+                    <span>&amp;</span>
+                    <span
+                      aria-live="polite"
+                      className="relative inline-block overflow-hidden align-bottom h-[1.18em] min-w-[230px] sm:min-w-[390px]"
+                    >
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.span
+                          key={HERO_SCROLL_WORDS[wordIndex]}
+                          initial={{ y: '48%', opacity: 0 }}
+                          animate={{ y: '0%', opacity: 1 }}
+                          exit={{ y: '-48%', opacity: 0 }}
+                          transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
+                          className="inline-block text-slate-600 whitespace-nowrap"
+                        >
+                          {HERO_SCROLL_WORDS[wordIndex]}
+                        </motion.span>
+                      </AnimatePresence>
+                    </span>
                   </span>
-                  <ArrowRight size={13} color="#94A3B8" />
+                </h1>
+
+                <p className="text-[17px] sm:text-[18.5px] text-slate-600 leading-[1.55] max-w-[540px] mb-8">
+                  Find security bugs in your code and cloud, test every AI fix automatically, and ship safe pull requests.
+                </p>
+
+                {/* CTAs — Clean Charcoal at Rest, Vibrant Orange (#EA580C) on Hover */}
+                <div className="flex flex-wrap items-center gap-3.5">
+                  <Link
+                    href="/signup"
+                    onClick={() => setActiveCta('get-started')}
+                    className={`group inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all duration-200 shadow-sm cursor-pointer active:scale-95 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C]/60 ${
+                      activeCta === 'get-started'
+                        ? 'bg-[#09090B] hover:bg-[#EA580C] text-white border border-[#09090B] hover:border-[#EA580C] shadow-[0_10px_24px_-6px_rgba(15,23,42,0.32)] hover:shadow-[0_12px_28px_-6px_rgba(234,88,12,0.38)]'
+                        : 'bg-[#0F172A] hover:bg-[#EA580C] text-white border border-[#0F172A] hover:border-[#EA580C] hover:shadow-[0_12px_28px_-6px_rgba(234,88,12,0.38)]'
+                    }`}
+                  >
+                    <span>Get Started</span>
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveCta('book-now');
+                      setExpertOpen(true);
+                    }}
+                    className={`group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all duration-200 shadow-sm cursor-pointer active:scale-95 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C]/60 ${
+                      activeCta === 'book-now'
+                        ? 'bg-[#09090B] hover:bg-[#EA580C] text-white border border-[#09090B] hover:border-[#EA580C] shadow-[0_10px_24px_-6px_rgba(15,23,42,0.28)] hover:shadow-[0_12px_28px_-6px_rgba(234,88,12,0.35)]'
+                        : 'bg-white hover:bg-[#EA580C] hover:text-white hover:border-[#EA580C] text-slate-900 border border-slate-300 hover:shadow-[0_12px_28px_-6px_rgba(234,88,12,0.28)]'
+                    }`}
+                  >
+                    <Calendar
+                      className={`w-4 h-4 transition-colors ${
+                        activeCta === 'book-now' ? 'text-white' : 'text-slate-700 group-hover:text-slate-950'
+                      }`}
+                    />
+                    <span>Book Now</span>
+                  </button>
                 </div>
-              </Link>
-            ))}
+              </motion.div>
+
+              {/* RIGHT HERO COLUMN: Crisp Fuse-Style Inline MCP Gateway */}
+              <motion.div
+                id="autonomous-mcp"
+                initial={{ y: 12 }}
+                animate={{ y: 0 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="lg:col-span-5"
+              >
+                <KavachMcpConnectWidget />
+              </motion.div>
+            </div>
+
+            {/* PLANE.SO + GLASSMORPHISM VIDEO STAGE DIRECTLY BENEATH HERO */}
+            <div id="product-demo">
+              <ProductShowcase embeddedHero />
+            </div>
           </div>
         </section>
 
         {/* ========================================================= */}
-        {/* SECTION 5: WHY TEAMS CHOOSE KAVACH (Comparison Proof)     */}
+        {/* 2. KINETIC INTEGRATED SCANNERS MARQUEE                    */}
         {/* ========================================================= */}
-        <section
-          style={{
-            maxWidth: '1380px',
-            margin: '0 auto',
-            padding: 'clamp(32px, 5vw, 64px) clamp(16px, 3vw, 24px)',
-            width: '100%',
-            boxSizing: 'border-box',
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#F8FAFC',
-              border: '1px solid #E2E8F0',
-              borderRadius: '16px',
-              padding: 'clamp(32px, 5vw, 56px) clamp(20px, 4vw, 48px)',
-            }}
-          >
-            <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 40px' }}>
-              <div className="kavach-section-tag" style={{ justifyContent: 'center' }}>
-                DETERMINISTIC DIFFERENCE
-              </div>
-              <h2
-                style={{
-                  fontSize: 'clamp(28px, 4vw, 38px)',
-                  fontWeight: 800,
-                  color: '#0F172A',
-                  letterSpacing: '-0.025em',
-                  margin: '12px 0 10px',
-                }}
+        <section className="border-y border-slate-200 bg-[#FAF9F6] overflow-hidden">
+          <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-10 py-9">
+            <p className="text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600 mb-5">
+              Powered by Trusted Open-Source Security Tools
+            </p>
+            <div className="relative overflow-hidden py-1">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 left-0 w-14 sm:w-24 bg-gradient-to-r from-[#FAF9F6] to-transparent z-10"
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 right-0 w-14 sm:w-24 bg-gradient-to-l from-[#FAF9F6] to-transparent z-10"
+              />
+
+              <motion.div
+                className="flex items-center gap-3.5 w-max"
+                animate={{ x: ['0%', '-50%'] }}
+                transition={{ duration: 24, repeat: Infinity, ease: 'linear' }}
               >
-                Why Leading Engineering Teams Choose Kavach
-              </h2>
-              <p style={{ fontSize: '15px', color: '#64748B', lineHeight: 1.6, margin: 0 }}>
-                Traditional scanners dump thousands of unprioritized alerts and hallucinate risky code fixes. Kavach enforces deterministic proofs and commits verified patches.
-              </p>
+                {[...INTEGRATED_ENGINES, ...INTEGRATED_ENGINES].map((engine, index) => {
+                  const Icon = engine.icon;
+                  return (
+                    <motion.div
+                      key={`${engine.name}-${index}`}
+                      whileHover={{ y: -3, scale: 1.02 }}
+                      transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+                      className="group shrink-0 w-[184px] rounded-xl border border-slate-200/90 bg-white px-3.5 py-3 flex items-center gap-3 shadow-sm hover:border-[#EA580C]/50 hover:shadow-[0_10px_24px_-8px_rgba(234,88,12,0.22)] hover:-translate-y-0.5 transition-all"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center shrink-0">
+                        <Icon size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-bold text-slate-900 truncate">
+                          {engine.name}
+                        </div>
+                        <div className="text-[11px] text-slate-600 truncate">
+                          {engine.role}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================= */}
+        {/* 3. FUSE + GLASSMORPHISM INTERACTIVE FEATURE DIAGRAMS      */}
+        {/* ========================================================= */}
+        <KavachFeatureDiagrams />
+
+        {/* ========================================================= */}
+        {/* 4. LIVE SECURITY PIPELINE WORKBENCH                       */}
+        {/* ========================================================= */}
+        <section id="security-pipeline" className="border-t border-slate-200 bg-white">
+          <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-10 py-14 sm:py-20">
+            <div className="mb-8 max-w-xl">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.25 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="inline-flex items-center gap-2 text-xs font-bold tracking-[0.12em] uppercase text-slate-600 mb-2.5"
+              >
+                <span className="w-2 h-2 rounded-[2px] bg-[#EA580C]" />
+                <span>Live Pipeline</span>
+              </motion.div>
+              <ScrollRevealText
+                as="h2"
+                className="text-[#0F172A] font-extrabold tracking-[-0.03em] leading-[1.12] mb-2"
+                style={{ fontSize: 'clamp(28px, 3.8vw, 42px)' }}
+                segments={[
+                  { text: 'Watch every check' },
+                  { text: 'decide live.', className: 'text-slate-500' },
+                ]}
+              />
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.25 }}
+                transition={{ duration: 0.4, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+                className="text-[15.5px] text-slate-600"
+              >
+                Click any stage below to trace every security check.
+              </motion.p>
             </div>
 
-            {/* Comparison Grid */}
-            <div className="kavach-comparison-grid">
-              {/* Traditional Tools Column */}
-              <div className="comparison-col traditional">
-                <div className="col-header">
-                  <AlertTriangle size={18} color="#EF4444" />
-                  <h3>Traditional Legacy Scanners</h3>
-                </div>
-                <ul className="comparison-list">
-                  <li>
-                    <span className="cross">✕</span>
-                    <span>Noisy alert fatigue: thousands of unprioritized false positives.</span>
+            <KavachSecurityPipelineFlow theme="light" />
+          </div>
+        </section>
+
+        {/* ========================================================= */}
+        {/* 5. MINIMALIST ARCHITECTURAL PERIMETER STRIP (i - v)       */}
+        {/* ========================================================= */}
+        <section className="border-t border-slate-200 bg-white">
+          <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-10 py-14 sm:py-20">
+            <div className="mb-10 max-w-2xl">
+              <ScrollRevealText
+                as="h2"
+                className="text-[#0F172A] font-extrabold tracking-[-0.03em] leading-[1.12] mb-2.5"
+                style={{ fontSize: 'clamp(28px, 3.8vw, 42px)' }}
+                segments={[
+                  { text: 'Kavach fits inside your workflow,' },
+                  { text: 'not around it.', className: 'text-slate-500' },
+                ]}
+              />
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.25 }}
+                transition={{ duration: 0.4, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+                className="text-[15.5px] text-slate-600"
+              >
+                Security rules, scanners, and audit logs running directly with your code and AI tools.
+              </motion.p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 border-t border-slate-200 divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
+              {KITA_GUARANTEES.map((item, idx) => (
+                <motion.div
+                  key={item.num}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.4, delay: idx * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                  whileHover={{ y: -2, backgroundColor: 'rgba(255, 247, 237, 0.72)' }}
+                  className="pt-6 pb-5 sm:px-5 first:sm:pl-0 last:sm:pr-0 transition-colors rounded-xl hover:[&>span:first-child]:text-[#EA580C]"
+                >
+                  <span className="block font-mono text-[12px] font-semibold text-slate-500 mb-3">
+                    {item.num}
+                  </span>
+                  <h3 className="text-[15px] font-bold text-slate-900 mb-1.5">
+                    {item.title}
+                  </h3>
+                  <p className="text-[13px] text-slate-600 leading-relaxed">
+                    {item.desc}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================= */}
+        {/* 6. SIMPLE COMPARISON (WITHOUT vs WITH KAVACH)             */}
+        {/* ========================================================= */}
+        <section id="why-kavach" className="border-t border-slate-200 bg-[#FAF9F6]">
+          <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-10 py-14 sm:py-20">
+            <div className="mb-8 max-w-xl">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.25 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="inline-flex items-center gap-2 text-xs font-bold tracking-[0.12em] uppercase text-slate-600 mb-2.5"
+              >
+                <span className="w-2 h-2 rounded-[2px] bg-[#EA580C]" />
+                <span>Why Kavach</span>
+              </motion.div>
+              <ScrollRevealText
+                as="h2"
+                className="text-[#0F172A] font-extrabold tracking-[-0.03em] leading-[1.12]"
+                style={{ fontSize: 'clamp(28px, 3.8vw, 42px)' }}
+                segments={[
+                  { text: 'Tested fixes,' },
+                  { text: 'not alert noise.', className: 'text-slate-500' },
+                ]}
+              />
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+              className="grid grid-cols-1 md:grid-cols-2 border border-slate-200 rounded-2xl overflow-hidden divide-y md:divide-y-0 md:divide-x divide-slate-200 bg-white shadow-sm"
+            >
+              <div className="p-7 sm:p-8 bg-slate-50/70">
+                <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600 mb-2">
+                  Without Kavach
+                </h3>
+                <ul className="space-y-3.5 text-[15px] text-slate-600">
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" className="text-slate-500 font-bold mt-0.5">—</span>
+                    <span>Disconnected scanners for code, containers, and cloud.</span>
                   </li>
-                  <li>
-                    <span className="cross">✕</span>
-                    <span>Hallucinated AI fixes without compiler validation or rescan proof.</span>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" className="text-slate-500 font-bold mt-0.5">—</span>
+                    <span>AI patches shipped with zero scanner re-testing.</span>
                   </li>
-                  <li>
-                    <span className="cross">✕</span>
-                    <span>Fragmented tools: separate SAST, DAST, SCA, CSPM silos.</span>
-                  </li>
-                  <li>
-                    <span className="cross">✕</span>
-                    <span>LLM decides policy with no deterministic verification.</span>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" className="text-slate-500 font-bold mt-0.5">—</span>
+                    <span>Coding agents running tools without rule checks.</span>
                   </li>
                 </ul>
               </div>
 
-              {/* Kavach Column */}
-              <div className="comparison-col kavach">
-                <div className="col-header">
-                  <ShieldCheck size={18} color="#10B981" />
-                  <h3>Kavach Autonomous Defense</h3>
-                </div>
-                <ul className="comparison-list">
-                  <li>
-                    <span className="check">✓</span>
-                    <span>Source-to-sink AST data flow proofs with root-cause clustering.</span>
+              <div className="p-7 sm:p-8 bg-white">
+                <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-slate-900 mb-2">
+                  With Kavach
+                </h3>
+                <ul className="space-y-3.5 text-[15px] text-slate-800 font-medium">
+                  <li className="flex items-start gap-3">
+                    <Check size={17} className="text-emerald-600 shrink-0 mt-1" />
+                    <span>Semgrep, Gitleaks, Trivy, OSV, and Checkov in one flow.</span>
                   </li>
-                  <li>
-                    <span className="check">✓</span>
-                    <span>Verified unified diff patches tested against deterministic scanners.</span>
+                  <li className="flex items-start gap-3">
+                    <Check size={17} className="text-emerald-600 shrink-0 mt-1" />
+                    <span>Every AI fix verified by scanners before opening a PR.</span>
                   </li>
-                  <li>
-                    <span className="check">✓</span>
-                    <span>Unified SDLC coverage: Code, Cloud, Attack Surface &amp; AI Agents.</span>
-                  </li>
-                  <li>
-                    <span className="check">✓</span>
-                    <span>OPA Rego deterministic engine is the sole authoritative decision maker.</span>
+                  <li className="flex items-start gap-3">
+                    <Check size={17} className="text-emerald-600 shrink-0 mt-1" />
+                    <span>Hard policy gates and PostgreSQL logs on every action.</span>
                   </li>
                 </ul>
               </div>
-            </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ========================================================= */}
+        {/* 7. CLOSING CTA BANNER (MINIMALIST MONOCHROME + LIFT)      */}
+        {/* ========================================================= */}
+        <section className="bg-white py-12 sm:py-16">
+          <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-10">
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="rounded-2xl bg-[#FAF9F6] border border-slate-200 px-7 py-9 sm:px-12 sm:py-12 flex flex-col lg:flex-row lg:items-center justify-between gap-6"
+            >
+              <div className="max-w-lg">
+                <ScrollRevealText
+                  as="h2"
+                  className="text-[#0F172A] font-extrabold tracking-[-0.03em] leading-[1.12] mb-2"
+                  style={{ fontSize: 'clamp(26px, 3.6vw, 38px)' }}
+                  segments={[
+                    { text: 'Start securing' },
+                    { text: 'your code today.', className: 'text-slate-600' },
+                  ]}
+                />
+                <p className="text-[15px] text-slate-600">
+                  Connect GitHub, Google, or link Kavach directly to your agent.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3.5 shrink-0">
+                <Link
+                  href="/signup"
+                  onClick={() => setActiveCta('get-started')}
+                  className={`group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all duration-200 shadow-sm cursor-pointer active:scale-95 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C]/60 ${
+                    activeCta === 'get-started'
+                      ? 'bg-[#09090B] hover:bg-[#EA580C] text-white border border-[#09090B] hover:border-[#EA580C] hover:shadow-[0_12px_28px_-6px_rgba(234,88,12,0.35)]'
+                      : 'bg-[#0F172A] hover:bg-[#EA580C] text-white border border-[#0F172A] hover:border-[#EA580C] hover:shadow-[0_12px_28px_-6px_rgba(234,88,12,0.35)]'
+                  }`}
+                >
+                  <span>Get Started</span>
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveCta('book-now');
+                    setExpertOpen(true);
+                  }}
+                  className={`group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all duration-200 shadow-sm cursor-pointer active:scale-95 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C]/60 ${
+                    activeCta === 'book-now'
+                      ? 'bg-[#09090B] hover:bg-[#EA580C] text-white border border-[#09090B] hover:border-[#EA580C] hover:shadow-[0_12px_28px_-6px_rgba(234,88,12,0.32)]'
+                      : 'bg-white hover:bg-[#EA580C] hover:text-white hover:border-[#EA580C] text-slate-900 border border-slate-300 hover:shadow-[0_12px_28px_-6px_rgba(234,88,12,0.28)]'
+                  }`}
+                >
+                  <Calendar
+                    className={`w-4 h-4 transition-colors ${
+                      activeCta === 'book-now' ? 'text-white' : 'text-slate-700 group-hover:text-slate-950'
+                    }`}
+                  />
+                  <span>Book Now</span>
+                </button>
+              </div>
+            </motion.div>
           </div>
         </section>
       </main>
 
-      {/* ========================================================= */}
-      {/* SECTION 7: FULL KAVACH FOOTER (Anatomy of a Landing Page) */}
-      {/* ========================================================= */}
-      <footer
-        style={{
-          borderTop: '1px solid #E2E8F0',
-          backgroundColor: '#FFFFFF',
-          padding: 'clamp(40px, 6vw, 64px) clamp(16px, 3vw, 24px) 32px',
-          width: '100%',
-          boxSizing: 'border-box',
-        }}
-      >
-        <div style={{ maxWidth: '1380px', margin: '0 auto' }}>
-          {/* 4-Column Footer Grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1.4fr) repeat(3, minmax(0, 1fr))',
-              gap: '48px',
-              marginBottom: '56px',
-            }}
-            className="footer-grid"
-          >
-            {/* Col 1: Brand & Thesis */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <KavachLogo size={26} />
-              </div>
-              <p
-                style={{
-                  fontSize: '13px',
-                  color: '#475569',
-                  lineHeight: 1.55,
-                  margin: 0,
-                  maxWidth: '280px',
-                }}
-              >
-                LLM proposes. Deterministic security systems decide. Runtime evidence proves.
-              </p>
-              <div style={{ fontSize: '13px', color: '#64748B', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-                <a href="mailto:security@kavachsecurity.me" style={{ color: '#64748B', textDecoration: 'none' }}>
-                  security@kavachsecurity.me
-                </a>
-                <a href="tel:+918780378086" style={{ color: '#64748B', textDecoration: 'none' }}>
-                  +91 8780378086
-                </a>
-              </div>
-              {/* Official Social Links */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                <a
-                  href="https://www.linkedin.com/company/kavach-security/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="footer-social-btn"
-                  title="Kavach on LinkedIn"
-                  aria-label="Kavach on LinkedIn"
-                >
-                  <LinkedinIcon size={15} />
-                </a>
-                <a
-                  href="https://x.com/Kavach_Secure"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="footer-social-btn"
-                  title="Kavach on X"
-                  aria-label="Kavach on X"
-                >
-                  <XIcon size={13} />
-                </a>
-                <a
-                  href="https://www.youtube.com/@kavachsecurity/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="footer-social-btn"
-                  title="Kavach on YouTube"
-                  aria-label="Kavach on YouTube"
-                >
-                  <YoutubeIcon size={16} />
-                </a>
-                <a
-                  href="https://www.instagram.com/kavach_secure/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="footer-social-btn"
-                  title="Kavach on Instagram"
-                  aria-label="Kavach on Instagram"
-                >
-                  <InstagramIcon size={15} />
-                </a>
-              </div>
-            </div>
+      {/* Unified Pure-Black Kira-Motion Architectural Footer */}
+      <EnterpriseFooter
+        onOpenDemo={() => setExpertOpen(true)}
+        systemStatus={systemStatus}
+      />
 
-            {/* Col 2: Workspaces */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <span className="footer-col-header">WORKSPACES</span>
-              <Link href="/code" className="footer-link">Code Security</Link>
-              <Link href="/cloud" className="footer-link">Cloud Security</Link>
-              <Link href="/attack" className="footer-link">Attack Surface</Link>
-              <Link href="/protect" className="footer-link">Runtime Defense</Link>
-              <Link href="/agent" className="footer-link">AI Agent Security</Link>
-              <Link href="/soc" className="footer-link">Security Operations</Link>
-            </div>
-
-            {/* Col 3: Platform & Docs */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <span className="footer-col-header">PLATFORM &amp; DOCS</span>
-              <Link href="/api-security" className="footer-link">API Security</Link>
-              <Link href="/blueprints" className="footer-link">Dynamic Blueprints</Link>
-              <Link href="/docs" className="footer-link">Documentation &amp; API</Link>
-              <Link href="/trust" className="footer-link">Trust Center</Link>
-              <button
-                type="button"
-                onClick={() => setExpertOpen(true)}
-                className="footer-link"
-                style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', font: 'inherit' }}
-              >
-                Book a Live Demo
-              </button>
-            </div>
-
-            {/* Col 4: Trust & Legal */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <span className="footer-col-header">TRUST &amp; COMPLIANCE</span>
-              <Link href="/privacy" className="footer-link">Privacy Policy</Link>
-              <Link href="/terms" className="footer-link">Terms of Service</Link>
-              <Link href="/dpa" className="footer-link">DPA &amp; SCCs</Link>
-              <Link href="/subprocessors" className="footer-link">Subprocessors</Link>
-              <Link href="/contact" className="footer-link">Contact Support</Link>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
-                <span className="live-dot" />
-                <span style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>All Systems Operational</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Copyright & Social Sublinks */}
-          <div className="footer-bottom-bar">
-            <span>© 2026 Kavach Security. All rights reserved. Ahmedabad, Gujarat, India.</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-              <a
-                href="https://www.linkedin.com/company/kavach-security/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="footer-sublink"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-              >
-                <LinkedinIcon size={13} />
-                <span>LinkedIn</span>
-              </a>
-              <a
-                href="https://www.youtube.com/@kavachsecurity/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="footer-sublink"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-              >
-                <YoutubeIcon size={13} />
-                <span>YouTube</span>
-              </a>
-              <a
-                href="https://www.instagram.com/kavach_secure/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="footer-sublink"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-              >
-                <InstagramIcon size={13} />
-                <span>Instagram</span>
-              </a>
-              <a
-                href="https://x.com/Kavach_Secure"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="footer-sublink"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-              >
-                <XIcon size={12} />
-                <span>X</span>
-              </a>
-              <Link href="/privacy" className="footer-sublink">Privacy</Link>
-              <Link href="/terms" className="footer-sublink">Terms</Link>
-              <Link href="/trust" className="footer-sublink">Trust</Link>
-              <Link href="/contact" className="footer-sublink">Support</Link>
-            </div>
-          </div>
-        </div>
-      </footer>
-
-      {/* Global Interactive Modals & Drawers */}
       {searchOpen && <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />}
       {expertOpen && (
         <BookDemoModal isOpen={expertOpen} onClose={() => setExpertOpen(false)} />

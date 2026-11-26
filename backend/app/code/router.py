@@ -5,9 +5,9 @@ All data is sourced from CodeService which queries real backend state.
 """
 
 import uuid
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union, Any, Dict
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, Query, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, HTTPException, status, BackgroundTasks, Body
 from sqlalchemy import select, desc, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -4131,6 +4131,149 @@ async def get_pipeline_configuration_endpoint(
         project_id=project_id,
         repository=repository,
     )
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# P1: RECURRING SCAN SCHEDULING (CRON) ENDPOINTS
+# ═════════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/repositories/{repository_id}/schedules",
+    summary="List Recurring Scan Schedules",
+    description="Returns all active and paused recurring scan schedules for a repository.",
+)
+async def list_repository_schedules_endpoint(
+    repository_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CodeService(db, current_user=current_user)
+    return await service.get_repository_schedules(repository_id)
+
+
+@router.post(
+    "/repositories/{repository_id}/schedules",
+    summary="Create Recurring Scan Schedule",
+    description="Configures and persists a new recurring scan schedule (Daily, Weekly, Monthly, Interval).",
+)
+async def create_repository_schedule_endpoint(
+    repository_id: str,
+    payload: Dict[str, Any] = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CodeService(db, current_user=current_user)
+    return await service.create_repository_schedule(repository_id, payload)
+
+
+@router.patch(
+    "/schedules/{schedule_id}/toggle",
+    summary="Toggle Schedule Active/Paused",
+    description="Switches a schedule between Active and Paused.",
+)
+async def toggle_schedule_endpoint(
+    schedule_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CodeService(db, current_user=current_user)
+    return await service.toggle_schedule(schedule_id)
+
+
+@router.delete(
+    "/schedules/{schedule_id}",
+    summary="Delete Recurring Schedule",
+    description="Permanently deletes a recurring scan schedule.",
+)
+async def delete_schedule_endpoint(
+    schedule_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CodeService(db, current_user=current_user)
+    return await service.delete_schedule(schedule_id)
+
+
+@router.post(
+    "/schedules/{schedule_id}/run-now",
+    summary="Run Scheduled Scan Immediately",
+    description="Dispatches an immediate manual execution of a scheduled configuration.",
+)
+async def run_schedule_now_endpoint(
+    schedule_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CodeService(db, current_user=current_user)
+    return await service.run_schedule_now(schedule_id)
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# P1: CI/CD & GITHUB WEBHOOK TRIGGERS
+# ═════════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/repositories/{repository_id}/triggers",
+    summary="Get Automated CI/CD & Webhook Triggers",
+    description="Returns active webhook trigger toggles (Scan on Git Push, Scan on Pull Request, PR Gates).",
+)
+async def get_repository_triggers_endpoint(
+    repository_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CodeService(db, current_user=current_user)
+    return await service.get_repository_triggers(repository_id)
+
+
+@router.post(
+    "/repositories/{repository_id}/triggers",
+    summary="Update Automated CI/CD & Webhook Triggers",
+    description="Persists changes to automated git push, PR gate, and inline annotation trigger settings.",
+)
+async def update_repository_triggers_endpoint(
+    repository_id: str,
+    payload: Dict[str, Any] = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CodeService(db, current_user=current_user)
+    return await service.update_repository_triggers(repository_id, payload)
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# P1: GITHUB INLINE PR REVIEW BOT (DIFF ANNOTATIONS)
+# ═════════════════════════════════════════════════════════════════════════
+
+@router.post(
+    "/repositories/{repository_id}/pulls/{pr_number}/review-comments",
+    summary="Post Inline PR Review Bot Annotations",
+    description="Submits line-by-line security findings directly on a GitHub Pull Request diff.",
+)
+async def post_inline_pr_review_endpoint(
+    repository_id: str,
+    pr_number: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CodeService(db, current_user=current_user)
+    return await service.post_inline_pr_review(repository_id, pr_number, current_user=current_user)
+
+
+@router.get(
+    "/repositories/{repository_id}/pulls/{pr_number}/review-status",
+    summary="Get GitHub PR Review Bot Status",
+    description="Returns current status of inline bot annotations and GitHub check runs for a PR.",
+)
+async def get_pr_review_status_endpoint(
+    repository_id: str,
+    pr_number: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CodeService(db, current_user=current_user)
+    return await service.get_pr_review_status(repository_id, pr_number)
+
 
 
 

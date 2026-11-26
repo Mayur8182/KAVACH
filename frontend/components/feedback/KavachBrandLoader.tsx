@@ -187,7 +187,7 @@ export const KavachBrandLoader: React.FC<KavachBrandLoaderProps> = ({
           }}
         >
           <img
-            src={isDark ? '/kavach-cube-white.png' : '/kavach-cube.png'}
+            src={isDark ? '/kavach-cube-white-ui.webp' : '/kavach-cube-ui.webp'}
             alt="Kavach Emblem"
             width={dimensions.cube}
             height={Math.round(dimensions.cube * 1.07)}
@@ -211,12 +211,13 @@ export const KavachBrandLoader: React.FC<KavachBrandLoaderProps> = ({
       {showWordmark && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <img
-            src={isDark ? '/kavach-logo-white.png' : '/kavach-logo.png'}
+            src={isDark ? '/kavach-logo-white-ui.webp' : '/kavach-logo-ui.webp'}
             alt="Kavach"
+            width={Math.round(dimensions.wordmark * (579 / 158))}
             height={dimensions.wordmark}
             style={{
               height: `${dimensions.wordmark}px`,
-              width: 'auto',
+              width: `${Math.round(dimensions.wordmark * (579 / 158))}px`,
               objectFit: 'contain',
               opacity: 0.95,
               display: 'block',

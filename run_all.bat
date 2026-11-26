@@ -6,13 +6,18 @@ echo ===================================================
 echo.
 
 set ROOT=%~dp0
-set PATH=C:\Program Files\nodejs;C:\Users\USER\AppData\Local\Programs\Python\Python313;C:\Users\USER\AppData\Local\Programs\Python\Python313\Scripts;C:\tools\scanners;%PATH%
+set PATH=C:\Program Files\nodejs;C:\Users\USER\AppData\Local\Programs\Python\Python313;C:\Users\USER\AppData\Local\Programs\Python\Python313\Scripts;C:\tools\scanners;C:\WINDOWS\system32;C:\WINDOWS;%PATH%
+if "%COMSPEC%"=="" set COMSPEC=C:\WINDOWS\system32\cmd.exe
 
 echo [1/2] Starting FastAPI Backend on http://localhost:8000 ...
-start "SecureAI Backend (:8000)" cmd /k "cd /d "%ROOT%backend" && "C:\Users\USER\AppData\Local\Programs\Python\Python313\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app"
+pushd "%ROOT%backend"
+start "SecureAI Backend (:8000)" cmd /k "py -3.13 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app"
+popd
 
 echo [2/2] Starting Next.js Frontend on http://localhost:3002 ...
-start "SecureAI Frontend (:3002)" cmd /k "cd /d "%ROOT%frontend" && "C:\Program Files\nodejs\npm.cmd" run dev"
+pushd "%ROOT%frontend"
+start "SecureAI Frontend (:3002)" cmd /k "npm run dev"
+popd
 
 echo.
 echo Waiting for servers to initialize...

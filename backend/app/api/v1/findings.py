@@ -89,7 +89,15 @@ async def create_remediation_pull_request(
     sug_id = payload.suggestion_id if payload else None
     title = payload.title if payload else None
     branch = payload.branch if payload else None
-    return await service.create_pr(finding_id, sug_id, title, branch, current_user)
+    try:
+        return await service.create_pr(finding_id, sug_id, title, branch, current_user)
+    except Exception as e:
+        return CreateRemediationPRResponse(
+            success=False,
+            pr_number=0,
+            pr_url="",
+            message=f"Failed to create remediation PR: {str(e)}"
+        )
 
 
 @router.post(
@@ -108,7 +116,15 @@ async def create_remediation_pull_request_alias(
     sug_id = payload.suggestion_id if payload else None
     title = payload.title if payload else None
     branch = payload.branch if payload else None
-    return await service.create_pr(finding_id, sug_id, title, branch, current_user)
+    try:
+        return await service.create_pr(finding_id, sug_id, title, branch, current_user)
+    except Exception as e:
+        return CreateRemediationPRResponse(
+            success=False,
+            pr_number=0,
+            pr_url="",
+            message=f"Failed to create remediation PR: {str(e)}"
+        )
 
 
 @router.post(

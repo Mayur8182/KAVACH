@@ -1,7 +1,12 @@
 import json
 import logging
 from typing import Any, List, Optional
-from mcp.server import Server as MCPServer
+try:
+    from mcp.server import Server as MCPServer
+except ImportError:
+    class MCPServer:
+        def __init__(self, name: str = "mock-mcp"):
+            self.name = name
 
 from app.core.database import get_session_factory
 from app.mcp.gateway import MCPGateway

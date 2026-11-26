@@ -31,6 +31,11 @@ SENSITIVE_ENDPOINTS: Dict[str, int] = {
     "/api/v1/auth/mfa/recovery": 10,
     "/api/v1/account/password": 15,
     "/api/v1/account/change-password": 15,
+    "/oauth/token": 30,
+    "/oauth/register": 15,
+    "/oauth/authorize": 30,
+    "/oauth/consent": 30,
+    "/oauth/revoke": 30,
 }
 
 # Paths completely excluded from rate limiting

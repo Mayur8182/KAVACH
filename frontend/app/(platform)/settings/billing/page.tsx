@@ -147,7 +147,7 @@ export default function BillingSettingsPage() {
               Change Tier
             </Link>
             <Link
-              href="/sales/contact"
+              href="/contact"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',

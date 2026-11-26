@@ -156,6 +156,7 @@ class FindingsModuleService:
         project_id: Optional[str] = None,
         organization_id: Optional[str] = None,
         repository: Optional[str] = None,
+        repository_id: Optional[str] = None,
         branch: Optional[str] = None,
         severity: Optional[str] = None,
         status: Optional[str] = None,
@@ -193,10 +194,27 @@ class FindingsModuleService:
             except Exception:
                 pass
 
+        if repository_id and repository_id != "all":
+            clean_rid = repository_id.replace("-", "")
+            id_conds = [
+                SecurityFinding.repository_id == clean_rid,
+                SecurityFinding.repository_id == repository_id,
+            ]
+            try:
+                rid_u = uuid.UUID(repository_id)
+                id_conds.append(SecurityFinding.repository_id == rid_u)
+            except Exception:
+                pass
+            conditions.append(or_(*id_conds))
+
         if repository and repository != "all":
             repo_list = [r.strip() for r in repository.split(",") if r.strip() and r.strip() != "all"]
             if repo_list:
-                repo_conds = [SecurityFinding.repository.ilike(f"%{r}%") for r in repo_list]
+                repo_conds = []
+                for r in repo_list:
+                    repo_conds.append(SecurityFinding.repository.ilike(f"%{r}%"))
+                    if "/" in r:
+                        repo_conds.append(SecurityFinding.repository.ilike(f"%{r.split('/')[-1]}%"))
                 conditions.append(or_(*repo_conds))
 
         if branch and branch != "all":
@@ -329,6 +347,7 @@ class FindingsModuleService:
         project_id: Optional[str] = None,
         organization_id: Optional[str] = None,
         repository: Optional[str] = None,
+        repository_id: Optional[str] = None,
         branch: Optional[str] = None,
         severity: Optional[str] = None,
         status: Optional[str] = None,
@@ -349,6 +368,7 @@ class FindingsModuleService:
             project_id=project_id,
             organization_id=organization_id,
             repository=repository,
+            repository_id=repository_id,
             branch=branch,
             severity=severity,
             status=status,
@@ -391,7 +411,16 @@ class FindingsModuleService:
         items_res = await self.db.execute(items_stmt)
         findings = items_res.scalars().all()
 
-        items = [self._serialize_finding(f, idx=offset + i + 1) for i, f in enumerate(findings)]
+        # Deduplicate occurrences across multiple scan runs by fingerprint or rule+file+line
+        unique_findings = []
+        seen_fingerprints = set()
+        for f in findings:
+            fp = f.fingerprint or f"{f.rule_id}:{f.file_path}:{f.line_number}"
+            if fp not in seen_fingerprints:
+                seen_fingerprints.add(fp)
+                unique_findings.append(f)
+
+        items = [self._serialize_finding(f, idx=offset + i + 1) for i, f in enumerate(unique_findings)]
 
         return FindingListResponse(
             items=items,
@@ -411,6 +440,7 @@ class FindingsModuleService:
         project_id: Optional[str] = None,
         organization_id: Optional[str] = None,
         repository: Optional[str] = None,
+        repository_id: Optional[str] = None,
         branch: Optional[str] = None,
         severity: Optional[str] = None,
         status: Optional[str] = None,
@@ -423,6 +453,7 @@ class FindingsModuleService:
             project_id=project_id,
             organization_id=organization_id,
             repository=repository,
+            repository_id=repository_id,
             branch=branch,
             severity=severity,
             status=status,

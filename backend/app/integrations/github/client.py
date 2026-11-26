@@ -362,3 +362,53 @@ class GitHubClient:
             return await self._request_with_retry("PATCH", update_url, headers=headers, json_body={"body": full_body})
         else:
             return await self._request_with_retry("POST", comments_url, headers=headers, json_body={"body": full_body})
+
+    # -------------------------------------------------------------------------
+    # Inline Pull Request Review Bot (Code Annotations & Line Comments)
+    # -------------------------------------------------------------------------
+
+    async def create_pull_request_review(
+        self,
+        owner: str,
+        repo: str,
+        pr_number: int,
+        commit_sha: str,
+        body: str,
+        event: str = "COMMENT",  # COMMENT, REQUEST_CHANGES, APPROVE
+        comments: Optional[List[Dict[str, Any]]] = None,
+        installation_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Submits an inline Pull Request Review with line-by-line security annotations/comments
+        directly on the PR diff (like SonarQube / Snyk PR review bots).
+        Each item in `comments` must have:
+          - path: relative file path (e.g. "src/controllers/user.controller.ts")
+          - line: line number in diff (positive integer)
+          - body: markdown explanation of finding and proposed fix
+          - side: "RIGHT" (default for new code additions)
+        """
+        if not installation_id:
+            raise ValueError("installation_id is required to create a PR review")
+
+        headers = await self._get_installation_headers(installation_id)
+        reviews_url = f"{self.GITHUB_API_BASE}/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
+
+        payload: Dict[str, Any] = {
+            "commit_id": commit_sha,
+            "body": body,
+            "event": event,
+        }
+        if comments:
+            sanitized_comments = []
+            for c in comments:
+                if c.get("path") and c.get("line"):
+                    sanitized_comments.append({
+                        "path": c["path"],
+                        "line": int(c["line"]),
+                        "side": c.get("side", "RIGHT"),
+                        "body": c.get("body", "Security finding detected on this line."),
+                    })
+            if sanitized_comments:
+                payload["comments"] = sanitized_comments
+
+        return await self._request_with_retry("POST", reviews_url, headers=headers, json_body=payload)

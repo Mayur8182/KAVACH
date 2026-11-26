@@ -35,6 +35,7 @@ from app.models.sales_demo_models import (
 from app.models.scan import SecurityFinding
 from app.services.audit_service import AuditService
 from app.services.cal_service import cal_service
+from app.services.hubspot_service import hubspot_service
 
 router = APIRouter(prefix="/sales", tags=["Sales, Demo & Enterprise Onboarding"])
 
@@ -526,6 +527,10 @@ async def book_demo(
     )
     await db.commit()
 
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
+
     return {
         "status": "success",
         "booking_id": req_id,
@@ -635,6 +640,10 @@ async def request_demo(
     )
     await db.commit()
 
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
+
     return {
         "status": "success",
         "request_id": req_id,
@@ -709,6 +718,10 @@ async def contact_sales(
         metadata={"company": payload.company, "lead_score": score},
     )
     await db.commit()
+
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
 
     return {
         "status": "success",
@@ -807,6 +820,10 @@ async def enterprise_inquiry(
         },
     )
     await db.commit()
+
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
 
     return {
         "status": "success",
@@ -939,6 +956,10 @@ async def talk_to_security_expert(
         },
     )
     await db.commit()
+
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
 
     return {
         "status": "success",
@@ -1116,6 +1137,10 @@ async def qualify_lead(
     )
     await db.commit()
 
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
+
     return {
         "status": "success",
         "qualification_id": qual_id,
@@ -1272,6 +1297,10 @@ async def run_demo_simulation(
         session.simulated_events = events
         await db.commit()
 
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
+
     return {
         "status": "success",
         "scenario_id": payload.scenario_id,
@@ -1412,6 +1441,10 @@ async def request_customer_poc(
     )
     await db.commit()
 
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
+
     return {
         "status": "success",
         "poc_id": poc_id,
@@ -1497,6 +1530,10 @@ async def verify_poc_milestone(
     poc.scans_run_count += 1
 
     await db.commit()
+
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
 
     return {
         "status": "success",
@@ -1666,6 +1703,10 @@ async def create_proposal_quote(
     )
     await db.commit()
 
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
+
     return {
         "status": "success",
         "quote_id": quote_id,
@@ -1821,6 +1862,10 @@ Customer agrees to pay the Annual Contract Value of **${arr:,.2f} USD** payable 
     )
     await db.commit()
 
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
+
     return {
         "status": "success",
         "contract_id": contract_id,
@@ -1922,6 +1967,10 @@ async def sign_contract(
 
     await db.commit()
 
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
+
     return {
         "status": "success",
         "contract_id": contract_id,
@@ -2016,6 +2065,10 @@ async def start_enterprise_onboarding(
     )
     await db.commit()
 
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
+
     return {
         "status": "success",
         "onboarding_id": onboard_id,
@@ -2074,6 +2127,10 @@ async def update_onboarding_step(
         record.status = "COMPLETED"
 
     await db.commit()
+
+    # Synchronize demo booking with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_demo_request(req_id, payload.model_dump()))
 
     return {
         "status": "success",

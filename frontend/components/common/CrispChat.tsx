@@ -2,112 +2,132 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { X } from 'lucide-react';
-import { Crisp } from 'crisp-sdk-web';
+
+type CrispClient = (typeof import('crisp-sdk-web'))['Crisp'];
 
 /**
  * Custom Kavach-Branded Crisp Live Chat Integration
- *
- * 1. Initializes Crisp once via `Crisp.configure()` with strict SSR guards.
- * 2. Hides the default Crisp floating bubble launcher using official `Crisp.chat.hide()`.
- * 3. Renders a custom Kavach-branded floating launcher:
- *    - Squircle/square-rounded clean white background
- *    - Authentic Kavach 3D geometric cube emblem
- *    - Subtle border, elevation shadow, and vibrant blue live support accent dot
- *    - Accessible labels, full keyboard interaction, and mobile-responsive layout.
- * 4. Toggles Crisp chat smoothly via official `Crisp.chat.open()` and `Crisp.chat.close()`.
+ * Dynamically loads crisp-sdk-web during idle callback so it never impacts initial PageSpeed TBT.
  */
 export function CrispChat(): React.ReactElement | null {
   const isInitialized = useRef<boolean>(false);
+  const crispRef = useRef<CrispClient | null>(null);
   const [isConfigured, setIsConfigured] = useState<boolean>(false);
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
   useEffect(() => {
-    // SSR guard
     if (typeof window === 'undefined') {
       return;
     }
 
     const websiteId = process.env.NEXT_PUBLIC_CRISP_WEBSITE_ID;
-
-    // Fail gracefully if Website ID is not configured
     if (!websiteId || websiteId.trim() === '') {
       return;
     }
 
-    // Initialize Crisp only once
-    if (!isInitialized.current && !Crisp.isCrispInjected()) {
+    let isCancelled = false;
+    let initTimeoutId: number | null = null;
+    let idleCallbackId: number | null = null;
+
+    const initCrisp = async () => {
+      if (isCancelled) return;
       try {
-        Crisp.configure(websiteId.trim());
-        isInitialized.current = true;
+        const mod = await import('crisp-sdk-web');
+        const Crisp = mod.Crisp;
+        crispRef.current = Crisp;
+        if (isCancelled) return;
+
+        if (!isInitialized.current && !Crisp.isCrispInjected()) {
+          Crisp.configure(websiteId.trim());
+          isInitialized.current = true;
+        } else {
+          isInitialized.current = true;
+        }
+
+        if (isCancelled) return;
+        setIsConfigured(true);
+
+        try {
+          Crisp.chat.hide();
+        } catch {
+          if (Array.isArray((window as any).$crisp)) {
+            (window as any).$crisp.push(['do', 'chat:hide']);
+          }
+        }
+
+        const handleChatOpened = () => {
+          setIsOpen(true);
+          setUnreadCount(0);
+        };
+
+        const handleChatClosed = () => {
+          setIsOpen(false);
+          try {
+            Crisp.chat.hide();
+          } catch {
+            // Fallback
+          }
+        };
+
+        const handleMessageReceived = () => {
+          try {
+            const count = Crisp.chat.unreadCount() || 0;
+            setUnreadCount(count);
+          } catch {
+            // Fallback
+          }
+        };
+
+        try {
+          Crisp.chat.onChatOpened(handleChatOpened);
+          Crisp.chat.onChatClosed(handleChatClosed);
+          Crisp.message.onMessageReceived(handleMessageReceived);
+        } catch {
+          // Ignore if event listeners are buffering
+        }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
-          console.warn('[Crisp] Failed to configure chat SDK:', error);
+          console.warn('[Crisp] Failed to load chat SDK:', error);
         }
-        return;
       }
+    };
+
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (typeof w.requestIdleCallback === 'function') {
+      idleCallbackId = w.requestIdleCallback(() => void initCrisp(), { timeout: 2200 });
     } else {
-      isInitialized.current = true;
-    }
-
-    setIsConfigured(true);
-
-    // Immediately hide the default Crisp launcher bubble
-    try {
-      Crisp.chat.hide();
-    } catch {
-      // Buffer command safely
-      if (Array.isArray((window as any).$crisp)) {
-        (window as any).$crisp.push(['do', 'chat:hide']);
-      }
-    }
-
-    // Handlers for chat open/close events
-    const handleChatOpened = () => {
-      setIsOpen(true);
-      setUnreadCount(0);
-    };
-
-    const handleChatClosed = () => {
-      setIsOpen(false);
-      // Ensure default launcher remains hidden when user closes chat window
-      try {
-        Crisp.chat.hide();
-      } catch {
-        // Fallback
-      }
-    };
-
-    const handleMessageReceived = () => {
-      try {
-        const count = Crisp.chat.unreadCount() || 0;
-        setUnreadCount(count);
-      } catch {
-        // Fallback
-      }
-    };
-
-    try {
-      Crisp.chat.onChatOpened(handleChatOpened);
-      Crisp.chat.onChatClosed(handleChatClosed);
-      Crisp.message.onMessageReceived(handleMessageReceived);
-    } catch {
-      // Ignore if event listeners are buffering
+      initTimeoutId = window.setTimeout(() => void initCrisp(), 1500);
     }
 
     return () => {
-      try {
-        Crisp.chat.offChatOpened();
-        Crisp.chat.offChatClosed();
-        Crisp.message.offMessageReceived();
-      } catch {
-        // Cleanup fallback
+      isCancelled = true;
+      if (idleCallbackId !== null && typeof w.cancelIdleCallback === 'function') {
+        w.cancelIdleCallback(idleCallbackId);
+      }
+      if (initTimeoutId !== null) {
+        window.clearTimeout(initTimeoutId);
+      }
+      const Crisp = crispRef.current;
+      if (Crisp) {
+        try {
+          Crisp.chat.offChatOpened();
+          Crisp.chat.offChatClosed();
+          Crisp.message.offMessageReceived();
+        } catch {
+          // Cleanup fallback
+        }
       }
     };
   }, []);
 
   const handleToggleChat = useCallback(() => {
-    if (!isConfigured) return;
+    const Crisp = crispRef.current;
+    if (!isConfigured || !Crisp) return;
 
     try {
       if (isOpen) {
@@ -188,12 +208,12 @@ export function CrispChat(): React.ReactElement | null {
         />
       ) : (
         <img
-          src="/kavach-cube.png"
+          src="/kavach-cube-ui.webp"
           alt="Kavach Security"
           width={28}
           height={30}
           className="w-7 h-7 object-contain transition-transform duration-200 group-hover:scale-110 drop-shadow-xs"
-          loading="eager"
+          loading="lazy"
           decoding="async"
         />
       )}

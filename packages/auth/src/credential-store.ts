@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import {
@@ -15,7 +14,7 @@ const ACCOUNT_NAME = 'kavach-developer';
 export class CredentialStore {
   /**
    * Save credentials securely using OS native store where possible,
-   * falling back to user-isolated AES-256-GCM encrypted local store.
+   * and encrypted AES-256-GCM local store.
    */
   public static save(creds: AuthCredentials): void {
     const serialized = JSON.stringify(creds);
@@ -25,7 +24,6 @@ export class CredentialStore {
 
     if (platform === 'darwin') {
       try {
-        // macOS Keychain via /usr/bin/security
         const res = spawnSync('security', [
           'add-generic-password',
           '-U',
@@ -34,29 +32,27 @@ export class CredentialStore {
           '-w', serialized,
         ]);
         if (res.status === 0) savedToNative = true;
-      } catch {}
-    } else if (platform === 'win32') {
-      try {
-        // Windows: Test cmdkey / Credential Manager integration or use DPAPI-backed encrypted store
-        // We ensure encrypted fallback is always maintained as well
-      } catch {}
+      } catch {
+        savedToNative = false;
+      }
     }
 
-    // Always maintain the AES-256-GCM user-isolated encrypted store
     try {
       fs.mkdirSync(GLOBAL_KAVACH_DIR, { recursive: true, mode: 0o700 });
       const encrypted = encryptLocalData(serialized);
       fs.writeFileSync(GLOBAL_CREDENTIALS_FILE, encrypted, {
         encoding: 'utf8',
-        mode: 0o600, // Read/Write for owner only
+        mode: 0o600,
       });
-    } catch (err) {
-      console.error('Failed to write encrypted credentials:', err);
+    } catch (err: any) {
+      if (!savedToNative) {
+        throw new Error(`Failed to persist credentials to ${GLOBAL_CREDENTIALS_FILE}: ${err?.message || err}`);
+      }
     }
   }
 
   /**
-   * Load credentials from native store or encrypted fallback.
+   * Load credentials from native store or encrypted local store.
    */
   public static load(): AuthCredentials | null {
     const platform = os.platform();
@@ -76,14 +72,12 @@ export class CredentialStore {
       } catch {}
     }
 
-    // Read from AES-256-GCM encrypted store
     if (fs.existsSync(GLOBAL_CREDENTIALS_FILE)) {
       try {
         const raw = fs.readFileSync(GLOBAL_CREDENTIALS_FILE, 'utf8');
         const decrypted = decryptLocalData(raw);
         return JSON.parse(decrypted);
-      } catch (err) {
-        // Corrupted or machine key mismatch
+      } catch {
         return null;
       }
     }
@@ -114,14 +108,25 @@ export class CredentialStore {
     } catch {}
   }
 
+  public static isAccessTokenExpired(creds: AuthCredentials | null, skewMs: number = 60_000): boolean {
+    if (!creds || !creds.accessToken) return true;
+    if (!creds.expiresAt) return false;
+    return Date.now() >= creds.expiresAt - skewMs;
+  }
+
   public static hasValidCredentials(): boolean {
     const creds = this.load();
     if (!creds || !creds.accessToken) return false;
-    // Check expiration (if expiresAt timestamp is in the future)
-    if (creds.expiresAt && Date.now() > creds.expiresAt) {
-      return false; // Expired
+    if (creds.expiresAt && Date.now() >= creds.expiresAt) {
+      return false;
     }
     return true;
   }
-}
 
+  public static hasRefreshableSession(): boolean {
+    const creds = this.load();
+    if (!creds || !creds.accessToken) return false;
+    if (!creds.expiresAt || Date.now() < creds.expiresAt) return true;
+    return Boolean(creds.refreshToken);
+  }
+}

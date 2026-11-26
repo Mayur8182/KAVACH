@@ -26,7 +26,7 @@ export const KavachMark: React.FC<{
   className?: string;
   style?: React.CSSProperties;
 }> = ({ size = 26, invert = false, className, style }) => {
-  const cubeSrc = invert ? '/kavach-cube-white.png' : '/kavach-cube.png';
+  const cubeSrc = invert ? '/kavach-cube-white-ui.webp' : '/kavach-cube-ui.webp';
 
   return (
     <img
@@ -67,9 +67,10 @@ export const KavachLogo: React.FC<KavachLogoProps> = ({
   style,
 }) => {
   const effectiveSize = height || size;
-  const brandLogoSrc = invert ? '/kavach-logo-white.png' : '/kavach-logo.png';
+  const brandLogoSrc = invert ? '/kavach-logo-white-ui.webp' : '/kavach-logo-ui.webp';
   // Compute height for the kavach wordmark: proportionate to the cube size
   const wordmarkHeight = Math.round(effectiveSize * 0.78);
+  const wordmarkWidth = Math.round(wordmarkHeight * (579 / 158));
 
   return (
     <div
@@ -91,10 +92,11 @@ export const KavachLogo: React.FC<KavachLogoProps> = ({
         <img
           src={brandLogoSrc}
           alt="Kavach"
+          width={wordmarkWidth}
           height={wordmarkHeight}
           style={{
             height: `${wordmarkHeight}px`,
-            width: 'auto',
+            width: `${wordmarkWidth}px`,
             objectFit: 'contain',
             display: 'inline-block',
             verticalAlign: 'middle',

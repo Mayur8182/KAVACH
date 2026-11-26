@@ -454,7 +454,7 @@ async def _handle_sast_scan_execution(
 
         verification_result = await verification_engine.execute_scan(
             target=scan_target,
-            selected_scanners=["semgrep", "seculayer-builtin"],
+            selected_scanners=["seculayer-builtin"],
         )
 
         # Step 4: Record ScannerExecutions

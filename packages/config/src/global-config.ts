@@ -27,14 +27,22 @@ export class GlobalConfigManager {
   }
 
   public load(): GlobalConfig {
+    const envUrl = process.env.KAVACH_SERVER_URL || process.env.KAVACH_CLOUD_URL;
     try {
       if (fs.existsSync(GLOBAL_CONFIG_FILE)) {
         const raw = fs.readFileSync(GLOBAL_CONFIG_FILE, 'utf8');
         const parsed = JSON.parse(raw);
-        return { ...DEFAULT_GLOBAL_CONFIG, ...parsed };
+        return {
+          ...DEFAULT_GLOBAL_CONFIG,
+          ...parsed,
+          ...(envUrl ? { cloudUrl: envUrl } : {}),
+        };
       }
     } catch {}
-    return { ...DEFAULT_GLOBAL_CONFIG };
+    return {
+      ...DEFAULT_GLOBAL_CONFIG,
+      ...(envUrl ? { cloudUrl: envUrl } : {}),
+    };
   }
 
   public save(newConfig?: Partial<GlobalConfig>): GlobalConfig {
@@ -54,7 +62,11 @@ export class GlobalConfigManager {
   }
 
   public get(): GlobalConfig {
-    return { ...this.config };
+    const envUrl = process.env.KAVACH_SERVER_URL || process.env.KAVACH_CLOUD_URL;
+    return {
+      ...this.config,
+      ...(envUrl ? { cloudUrl: envUrl } : {}),
+    };
   }
 
   public set<K extends keyof GlobalConfig>(key: K, value: GlobalConfig[K]): GlobalConfig {

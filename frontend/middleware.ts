@@ -12,6 +12,18 @@ export function middleware(request: NextRequest) {
   const hostname = host.toLowerCase().split(':')[0];
 
   // 1. Enterprise Subdomain Routing
+  if (hostname.startsWith('mcp.')) {
+    if (
+      pathname.startsWith('/.well-known') ||
+      pathname.startsWith('/mcp') ||
+      pathname.startsWith('/sse') ||
+      pathname.startsWith('/oauth') ||
+      pathname.startsWith('/api')
+    ) {
+      return NextResponse.next();
+    }
+  }
+
   if (hostname.startsWith('docs.')) {
     if (pathname === '/') {
       return NextResponse.rewrite(new URL('/docs', request.url));
@@ -119,7 +131,8 @@ export function middleware(request: NextRequest) {
 
   if (!token || token.trim() === '' || token === 'undefined' || token === 'null' || isExpired) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', effectivePath);
+    const fullRedirect = `${effectivePath}${request.nextUrl.search || ''}`;
+    loginUrl.searchParams.set('redirect', fullRedirect);
     const response = NextResponse.redirect(loginUrl);
     response.cookies.delete('seculayer_auth_token');
     return response;

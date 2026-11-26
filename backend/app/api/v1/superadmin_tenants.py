@@ -18,49 +18,13 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_superadmin_user
 from app.models.user import User
 from app.services.superadmin_tenant_service import SuperAdminTenantService
 
 logger = logging.getLogger("superadmin-tenants")
 
 router = APIRouter(prefix="/superadmin/tenants", tags=["SuperAdmin — Tenant Management"])
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Founder SuperAdmin Authorization Dependency
-# ─────────────────────────────────────────────────────────────────────────────
-FOUNDER_SUPERADMIN_EMAILS = {
-    "admin@kavachsecurity.me",
-    "mkbharvad7174@gmail.com",
-    "mkbharvad534@gmail.com",
-    "mkbharvad8080@gmail.com",
-    "mayurbharvad7174@gmail.com",
-    "mayur.k@seculayer.io",
-    "mayur.k.bharvad@gmail.com",
-    "dev@antigravity.security",
-}
-
-
-async def require_superadmin_user(
-    current_user: User = Depends(get_current_user),
-) -> User:
-    """Enforces deterministic platform-level founder superadmin authorization."""
-    user_email = (current_user.email or "").lower().strip()
-    is_founder = current_user.is_superuser or user_email in FOUNDER_SUPERADMIN_EMAILS
-    if not is_founder:
-        logger.warning(
-            f"SuperAdmin Access Denied: User '{current_user.email}' lacks platform is_superuser authority."
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "error": "FOUNDER_SUPERADMIN_REQUIRED",
-                "message": "Access restricted to Platform Founder SuperAdmin.",
-                "user_email": current_user.email,
-            },
-        )
-    return current_user
 
 
 # ─────────────────────────────────────────────────────────────────────────────

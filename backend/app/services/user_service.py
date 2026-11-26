@@ -178,6 +178,28 @@ class UserService:
 
         await self.db.commit()
         await self.db.refresh(created_user)
+
+        # Asynchronously synchronize User & Organization with HubSpot CRM
+        import asyncio
+        from app.services.hubspot_service import hubspot_service
+        asyncio.create_task(
+            hubspot_service.sync_user_registration(
+                user_id=str(created_user.id),
+                email=created_user.email,
+                name=created_user.name,
+                auth_provider=created_user.auth_provider or "registration",
+            )
+        )
+        asyncio.create_task(
+            hubspot_service.sync_organization(
+                org_id=str(org_id),
+                name=user_org.name,
+                domain=created_user.email.split("@")[-1] if "@" in created_user.email else None,
+                industry=user_org.industry,
+                owner_email=created_user.email,
+            )
+        )
+
         return created_user
 
     async def authenticate(self, email: str, password: str) -> Optional[User]:

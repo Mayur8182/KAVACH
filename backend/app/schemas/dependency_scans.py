@@ -113,3 +113,56 @@ class CreateScheduleRequest(BaseModel):
     scan_type: str = "FULL_SCA"
     engine: str = "Trivy SCA + OSV Engine"
     notify_on_failure: bool = True
+
+
+class DiscoveredManifestItem(BaseModel):
+    file_path: str
+    ecosystem: str
+    type: str  # manifest | lockfile
+    dependencies_count: int
+
+
+class DependencyFindingItem(BaseModel):
+    id: str
+    package: str
+    ecosystem: str
+    type: str  # Malicious | Vulnerable | Outdated
+    severity: str  # Critical | High | Medium | Low
+    version: str
+    fixed_version: str
+    status: str = "Open"  # Open | Fixed
+    cve: str
+    cwe: str = ""
+    dependency_type: str = "Direct"
+    cvss: str = "7.2 · High"
+    affected_versions: str = ""
+    description: str = ""
+    dependency_path: List[str] = Field(default_factory=list)
+    evidence: Dict[str, Any] = Field(default_factory=dict)
+    pr_number: Optional[int] = None
+    pr_url: Optional[str] = None
+    pr_title: Optional[str] = None
+
+
+class DependencyFindingsResponse(BaseModel):
+    findings: List[DependencyFindingItem] = Field(default_factory=list)
+    fix_coverage: int = 0
+    fixed_count: int = 0
+    total_count: int = 0
+    critical_count: int = 0
+    high_count: int = 0
+    medium_count: int = 0
+    low_count: int = 0
+    last_scan: str = "2 min ago"
+    manifests: List[str] = Field(default_factory=lambda: ["package.json", "package-lock.json"])
+    branch: str = "main"
+    repository: str = "Mayur8182/JOB-FINDER-NEW"
+
+
+class CreatePRRequest(BaseModel):
+    title: str
+    head_branch: str
+    base_branch: str = "main"
+    description: str
+    auto_merge: bool = True
+

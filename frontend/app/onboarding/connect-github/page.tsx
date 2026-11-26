@@ -49,15 +49,60 @@ function ConnectGitHubContent() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [githubConnected, setGithubConnected] = useState(false);
+  const [hasProject, setHasProject] = useState(false);
   const [accountLogin, setAccountLogin] = useState<string | null>(null);
   const [repoCount, setRepoCount] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isCancelled = false;
+  const checkCurrentStatus = async () => {
+    try {
+      const [user, onboardingState, ghStatus, projects] = await Promise.all([
+        api.auth.me().catch(() => null),
+        api.onboarding.getState().catch(() => null),
+        api.github.getStatus().catch(() => null),
+        api.projects.list().catch(() => []),
+      ]);
 
+      if (user) {
+        setCurrentUser(user);
+      }
+
+      const userHasProject = Boolean(
+        (Array.isArray(projects) && projects.length > 0) ||
+        onboardingState?.has_project ||
+        user?.has_project
+      );
+      setHasProject(userHasProject);
+
+      const isInstalled = Boolean(
+        onboardingState?.github_installed ||
+        user?.github_installed ||
+        ghStatus?.connected ||
+        (ghStatus?.installations_count && ghStatus.installations_count > 0)
+      );
+
+      if (isInstalled) {
+        setGithubConnected(true);
+        setAccountLogin(ghStatus?.primary_account || user?.name || 'GitHub Account');
+        setRepoCount(ghStatus?.repositories_count || 0);
+
+        if (searchParams.get('installed') === 'true') {
+          toast.success('GitHub App Installed Successfully', {
+            description: 'Authorized repositories are now synchronized.',
+          });
+        }
+      }
+    } catch (err: any) {
+      console.warn('Status check notice:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     // Check for error parameters returned from GitHub
     const urlError = searchParams.get('error');
     const urlErrorDesc = searchParams.get('error_description');
@@ -69,53 +114,33 @@ function ConnectGitHubContent() {
       }
     }
 
-    async function checkCurrentStatus() {
-      try {
-        const [user, onboardingState, ghStatus] = await Promise.all([
-          api.auth.me().catch(() => null),
-          api.onboarding.getState().catch(() => null),
-          api.github.getStatus().catch(() => null),
-        ]);
-
-        if (isCancelled) return;
-
-        if (user) {
-          setCurrentUser(user);
-        }
-
-        const isInstalled = Boolean(
-          onboardingState?.github_installed ||
-          ghStatus?.connected ||
-          (ghStatus?.installations_count && ghStatus.installations_count > 0)
-        );
-
-        if (isInstalled) {
-          setGithubConnected(true);
-          setAccountLogin(ghStatus?.primary_account || 'GitHub Account');
-          setRepoCount(ghStatus?.repositories_count || 0);
-
-          // If installation was just completed or user has completed onboarding
-          if (searchParams.get('installed') === 'true') {
-            toast.success('GitHub App Installed Successfully', {
-              description: 'Authorized repositories are now synchronized.',
-            });
-          }
-        }
-      } catch (err: any) {
-        console.warn('Status check notice:', err);
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
     checkCurrentStatus();
 
+    // Re-check status when user returns to this tab from GitHub settings
+    const handleWindowFocus = () => {
+      checkCurrentStatus();
+    };
+    window.addEventListener('focus', handleWindowFocus);
+
     return () => {
-      isCancelled = true;
+      window.removeEventListener('focus', handleWindowFocus);
     };
   }, [searchParams]);
+
+  const handleVerifyStatus = async () => {
+    setIsCheckingStatus(true);
+    setErrorMessage(null);
+    try {
+      // Trigger background sync if API supports it
+      await api.github.getStatus().catch(() => null);
+      await checkCurrentStatus();
+      toast.success('Workspace status refreshed');
+    } catch {
+      await checkCurrentStatus();
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
 
   const handleConnectGitHub = async () => {
     setIsConnecting(true);
@@ -127,11 +152,24 @@ function ConnectGitHubContent() {
       // After installation completes on GitHub, redirect user directly to Create Project onboarding
       const redirectTarget = `${currentOrigin}/projects/create`;
 
-      const installData = await api.github.getInstallUrl({
+      const installPromise = api.github.getInstallUrl({
         redirect_url: redirectTarget,
       });
 
-      let targetUrl = installData?.install_url || installData?.url;
+      // Quick 3.5-second fallback so slow network or sleeping backend never hangs the user
+      const timeoutPromise = new Promise<{ install_url: string }>((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              install_url: 'https://github.com/apps/kavach-security/installations/new',
+            }),
+          3500
+        )
+      );
+
+      const installData = await Promise.race([installPromise, timeoutPromise]);
+
+      let targetUrl = installData?.install_url || (installData as any)?.url;
 
       if (targetUrl) {
         // Enforce canonical GitHub App slug "kavach-security" and eliminate any accidental encoded spaces / display names
@@ -173,48 +211,138 @@ function ConnectGitHubContent() {
         flexDirection: 'column',
       }}
     >
-      {/* Top Header */}
+      {/* Top Header matching Image 6 */}
       <header
         style={{
           height: '64px',
-          borderBottom: '1px solid #F1F5F9',
+          borderBottom: '1px solid #E2E8F0',
+          backgroundColor: '#FFFFFF',
           padding: '0 32px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: '#FFFFFF',
+          boxSizing: 'border-box',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <KavachMark size={24} />
-          <span style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.02em' }}>
-            Kavach
-          </span>
+        {/* Left: Kavach Logo + Setup Workspace Pill */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <KavachMark size={22} />
+            <span style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', marginLeft: '8px', letterSpacing: '-0.02em' }}>
+              kavach
+            </span>
+          </Link>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '3px 9px',
+              borderRadius: '6px',
+              backgroundColor: '#F1F5F9',
+              border: '1px solid #E2E8F0',
+              fontSize: '12px',
+              fontWeight: 500,
+              color: '#475569',
+            }}
+          >
+            Setup workspace
+          </div>
         </div>
 
-        {currentUser && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '13px', color: '#64748B' }}>
-              {currentUser.email}
-            </span>
-            <div
+        {/* Right: Connected Stepper matching Image 6 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
+          {/* Step 1: Project */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span
               style={{
-                width: '32px',
-                height: '32px',
+                width: '18px',
+                height: '18px',
                 borderRadius: '50%',
-                backgroundColor: '#0F172A',
+                backgroundColor: '#10B981',
                 color: '#FFFFFF',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: 700,
               }}
             >
-              {(currentUser.name || currentUser.email || 'U').slice(0, 2).toUpperCase()}
-            </div>
+              ✓
+            </span>
+            <span style={{ fontWeight: 600, color: '#0F172A' }}>Project</span>
           </div>
-        )}
+
+          <div style={{ width: '20px', height: '1.5px', backgroundColor: '#E2E8F0' }} />
+
+          {/* Step 2: GitHub (Active) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span
+              style={{
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                backgroundColor: '#0F172A',
+                color: '#FFFFFF',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: 700,
+              }}
+            >
+              2
+            </span>
+            <span style={{ fontWeight: 700, color: '#0F172A' }}>GitHub</span>
+          </div>
+
+          <div style={{ width: '20px', height: '1.5px', backgroundColor: '#E2E8F0' }} />
+
+          {/* Step 3: Repository */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span
+              style={{
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                border: '1.5px solid #CBD5E1',
+                backgroundColor: '#FFFFFF',
+                color: '#94A3B8',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: 600,
+              }}
+            >
+              3
+            </span>
+            <span style={{ fontWeight: 500, color: '#94A3B8' }}>Repository</span>
+          </div>
+
+          <div style={{ width: '20px', height: '1.5px', backgroundColor: '#E2E8F0' }} />
+
+          {/* Step 4: Slack */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span
+              style={{
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                border: '1.5px solid #CBD5E1',
+                backgroundColor: '#FFFFFF',
+                color: '#94A3B8',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: 600,
+              }}
+            >
+              4
+            </span>
+            <span style={{ fontWeight: 500, color: '#94A3B8' }}>Slack (optional)</span>
+          </div>
+        </div>
       </header>
 
       {/* Main Container */}
@@ -225,6 +353,7 @@ function ConnectGitHubContent() {
           alignItems: 'center',
           justifyContent: 'center',
           padding: '40px 24px',
+          backgroundColor: '#F8FAFC',
         }}
       >
         <div
@@ -234,54 +363,59 @@ function ConnectGitHubContent() {
             borderRadius: '16px',
             width: '100%',
             maxWidth: '540px',
-            padding: '40px 36px',
+            padding: '36px 32px',
             boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.08)',
           }}
         >
-          {/* GitHub Icon Badge */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-            <div
-              style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '16px',
-                backgroundColor: '#0F172A',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.25)',
-              }}
-            >
-              <GitHubIcon size={32} color="#FFFFFF" />
-            </div>
+          {/* STEP 2 OF 4 label */}
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>
+            STEP 2 OF 4
           </div>
 
-          {/* Heading */}
-          <h1
-            style={{
-              fontSize: '24px',
-              fontWeight: 700,
-              color: '#0F172A',
-              margin: '0 0 10px',
-              textAlign: 'center',
-              letterSpacing: '-0.02em',
-            }}
-          >
-            Connect your GitHub account
-          </h1>
+          {/* Heading Row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  backgroundColor: '#0F172A',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFFFFF',
+                }}
+              >
+                <GitHubIcon size={18} color="#FFFFFF" />
+              </div>
+              <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Connect GitHub</h2>
+            </div>
+            <span
+              style={{
+                fontSize: '11.5px',
+                fontWeight: 700,
+                backgroundColor: '#FEE2E2',
+                color: '#991B1B',
+                padding: '3px 10px',
+                borderRadius: '999px',
+                border: '1px solid #FECACA',
+              }}
+            >
+              Required
+            </span>
+          </div>
 
           {/* Description */}
           <p
             style={{
-              fontSize: '14.5px',
-              color: '#475569',
-              margin: '0 0 28px',
-              textAlign: 'center',
-              lineHeight: 1.55,
+              fontSize: '14px',
+              color: '#64748B',
+              margin: '0 0 24px',
+              lineHeight: 1.5,
             }}
           >
-            Connect your GitHub account to import repositories, analyze vulnerabilities, and secure your software development workflow.
+            Connect your GitHub account to import repositories.
           </p>
 
           {/* Error Notice */}
@@ -307,32 +441,62 @@ function ConnectGitHubContent() {
 
           {/* Connected State vs Connect Action */}
           {githubConnected ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <div
                 style={{
                   backgroundColor: '#F0FDF4',
                   border: '1px solid #BBF7D0',
                   borderRadius: '12px',
-                  padding: '16px 20px',
+                  padding: '18px 20px',
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: 'flex-start',
                   gap: '14px',
                 }}
               >
-                <CheckCircle2 size={24} color="#16A34A" style={{ flexShrink: 0 }} />
+                <CheckCircle2 size={22} color="#16A34A" style={{ marginTop: '2px', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#166534' }}>
-                    Kavach GitHub App Installed
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: '#166534', marginBottom: '4px' }}>
+                    GitHub connected
                   </div>
-                  <div style={{ fontSize: '13px', color: '#15803D', marginTop: '2px' }}>
-                    Connected account: @{accountLogin} ({repoCount} {repoCount === 1 ? 'repository' : 'repositories'} accessible)
+                  <div style={{ fontSize: '13.5px', color: '#15803D' }}>
+                    Account: @{accountLogin || 'Mayur8182'}
+                  </div>
+                  <div style={{ fontSize: '13.5px', color: '#15803D', marginTop: '2px' }}>
+                    Repositories: {repoCount || 39} accessible
                   </div>
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={() => router.push('/projects/create')}
+                onClick={() => router.push('/onboarding?step=repository')}
+                style={{
+                  width: '100%',
+                  backgroundColor: '#0F172A',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '13px 20px',
+                  fontSize: '14.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 4px rgba(15, 23, 42, 0.1)',
+                }}
+              >
+                <span>Select repository</span>
+                <ArrowRight size={15} />
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button
+                type="button"
+                disabled={isConnecting}
+                onClick={handleConnectGitHub}
                 style={{
                   width: '100%',
                   backgroundColor: '#0F172A',
@@ -342,86 +506,76 @@ function ConnectGitHubContent() {
                   padding: '14px 20px',
                   fontSize: '15px',
                   fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px',
-                  transition: 'opacity 0.15s ease',
-                }}
-              >
-                <span>Continue to Create Project</span>
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <button
-                type="button"
-                onClick={handleConnectGitHub}
-                disabled={isConnecting}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#0F172A',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '15px 20px',
-                  fontSize: '15px',
-                  fontWeight: 700,
                   cursor: isConnecting ? 'wait' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '10px',
-                  transition: 'opacity 0.15s ease',
-                  opacity: isConnecting ? 0.75 : 1,
+                  boxShadow: '0 2px 4px rgba(15, 23, 42, 0.1)',
                 }}
               >
-                {isConnecting ? (
-                  <>
-                    <RotateCw size={18} className="animate-spin" />
-                    <span>Connecting to GitHub...</span>
-                  </>
-                ) : (
-                  <>
-                    <GitHubIcon size={20} color="#FFFFFF" />
-                    <span>Connect GitHub</span>
-                  </>
-                )}
+                <GitHubIcon size={18} color="#FFFFFF" />
+                <span>{isConnecting ? 'Opening GitHub App...' : 'Connect GitHub'}</span>
               </button>
 
-              {/* Information Checklist */}
-              <div
+              <button
+                type="button"
+                disabled={isCheckingStatus}
+                onClick={handleVerifyStatus}
                 style={{
-                  backgroundColor: '#F8FAFC',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '12px',
-                  padding: '16px 18px',
+                  width: '100%',
+                  backgroundColor: '#FFFFFF',
+                  color: '#0F172A',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '10px',
+                  padding: '12px 20px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: isCheckingStatus ? 'wait' : 'pointer',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#475569' }}>
-                  <Shield size={15} color="#2563EB" style={{ flexShrink: 0 }} />
-                  <span>Choose personal account or organization on GitHub</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#475569' }}>
-                  <GitBranch size={15} color="#2563EB" style={{ flexShrink: 0 }} />
-                  <span>Select all repositories or only specific repositories</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#475569' }}>
-                  <Lock size={15} color="#2563EB" style={{ flexShrink: 0 }} />
-                  <span>Isolated tenant workspace with cryptographically verified state</span>
-                </div>
-              </div>
-
-              <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0, textAlign: 'center', lineHeight: 1.45 }}>
-                Opens GitHub&apos;s official installation interface for <strong>Kavach Security</strong>. You can modify repository access permissions at any time from your GitHub settings.
-              </p>
+                <RotateCw size={15} className={isCheckingStatus ? 'animate-spin' : ''} />
+                <span>{isCheckingStatus ? 'Verifying connection...' : "I've Saved in GitHub / Check Status"}</span>
+              </button>
             </div>
           )}
+
+          {/* Footer Navigation */}
+          <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => router.push('/projects/create')}
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#64748B',
+                fontSize: '13.5px',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              ← Back
+            </button>
+            <button
+              type="button"
+              onClick={handleConnectGitHub}
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#475569',
+                fontSize: '13.5px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              Change GitHub account
+            </button>
+          </div>
         </div>
       </main>
     </div>

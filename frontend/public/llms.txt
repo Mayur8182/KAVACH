@@ -1,0 +1,19 @@
+# Kavach Security
+
+> Autonomous code, cloud, and AI agent security platform combining static/cloud scanners, deterministic OPA policy enforcement, verified patch remediation, and immutable PostgreSQL audit evidence.
+
+## Platform Overview
+
+Kavach separates AI investigation from security authority:
+- **Deterministic Decision Engine**: Open Policy Agent (OPA Rego), Semgrep, Gitleaks, Trivy, OSV-Scanner, and Checkov authorize actions and verify patches.
+- **Scoped MCP Gateway**: AI coding tools connect over the Model Context Protocol with per-agent identity, ABAC permissions, and auditable policy checks.
+
+## Documentation & Public Resources
+
+- [Documentation & API Reference](/docs): Platform architecture, SDK guides, and API documentation.
+- [Code Security Workspace](/products/codebase-scanning): SAST, secret scanning, and automated PR verification.
+- [API Security](/api-security): Runtime route discovery and automated DAST coverage.
+- [Trust Center](/trust): Security controls, architecture principles, and compliance posture.
+- [System Status](/status): Live health status for API and security scanner services.
+- [MCP Gateway Manifest](/api/v1/mcp/manifest): Machine-readable Model Context Protocol tool manifest.
+

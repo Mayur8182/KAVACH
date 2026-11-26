@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 3002 --turbopack",
-    "dev:webpack": "next dev -p 3002",
+    "dev": "node -e \"const fs=require('fs');if(fs.existsSync('.next/BUILD_ID'))fs.rmSync('.next',{recursive:true,force:true});\" && next dev -p 3002",
+    "dev:turbo": "node -e \"const fs=require('fs');if(fs.existsSync('.next/BUILD_ID'))fs.rmSync('.next',{recursive:true,force:true});\" && next dev -p 3002 --turbopack",
     "clean": "node -e \"const fs=require('fs'); fs.rmSync('.next', {recursive:true, force:true}); console.log('.next cleaned');\"",
     "build": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build",
     "build:clean": "npm run clean && node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build",

@@ -43,7 +43,6 @@ const PUBLIC_ELIGIBLE_PAGES = [
   '/solutions',
   '/contact',
   '/demo',
-  '/sales',
 ];
 
 const DISMISS_KEY = 'kavach_onetap_dismissed';
@@ -74,6 +73,8 @@ export const GoogleOneTap: React.FC = () => {
   useEffect(() => {
     // 1. SSR check
     if (typeof window === 'undefined') return;
+    // Skip automated headless browsers (Lighthouse / PageSpeed / Playwright) to avoid unregistered-origin 403 errors
+    if (typeof navigator !== 'undefined' && navigator.webdriver) return;
 
     // 2. Do not trigger for already authenticated users
     const currentToken = getAuthToken();
@@ -168,34 +169,35 @@ export const GoogleOneTap: React.FC = () => {
               if (authRes?.access_token) {
                 setAuthToken(authRes.access_token);
                 trackLogin({ method: 'google_one_tap' });
+                toast.dismiss('google-onetap');
                 toast.success(
-                  `Welcome back, ${authRes.user?.name || authRes.email || 'Developer'}!`,
-                  { id: 'google-onetap' }
+                  `Welcome back, ${authRes.user?.name || authRes.email || 'Developer'}!`
                 );
 
-                // Determine target workspace routing
+                // Authoritative workspace destination routing
+                const targetRoute =
+                  authRes.next_route ||
+                  (authRes.is_new_user ? '/onboarding/connect-github' : '/overview');
+
                 try {
                   const userProjects = await api.projects.list().catch(() => []);
                   const hasProject = Array.isArray(userProjects) && userProjects.length > 0;
                   if (hasProject) {
                     localStorage.setItem('secu_active_project_id', userProjects[0].id);
                   }
-
-                  if (authRes.is_new_user || !hasProject) {
-                    router.push('/onboarding');
-                  } else {
-                    router.push('/repositories');
-                  }
                 } catch {
-                  router.push(authRes.is_new_user ? '/onboarding' : '/repositories');
+                  // Fallback without active project set
                 }
+
+                // Hard navigation to reset client authentication state cleanly
+                window.location.href = targetRoute;
               } else {
                 throw new Error('Authentication succeeded but server returned no access token.');
               }
             } catch (err: any) {
+              toast.dismiss('google-onetap');
               const msg = err?.message || 'Google One Tap authentication failed.';
               toast.error('Google Sign-in Failed', {
-                id: 'google-onetap',
                 description: msg,
               });
             }
@@ -229,10 +231,27 @@ export const GoogleOneTap: React.FC = () => {
       }
     };
 
-    setupOneTap();
+    let timerId: number | null = null;
+    let idleId: number | null = null;
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (typeof w.requestIdleCallback === 'function') {
+      idleId = w.requestIdleCallback(setupOneTap, { timeout: 2200 });
+    } else {
+      timerId = window.setTimeout(setupOneTap, 1400);
+    }
 
     return () => {
       isMounted = false;
+      if (idleId !== null && typeof w.cancelIdleCallback === 'function') {
+        w.cancelIdleCallback(idleId);
+      }
+      if (timerId !== null) {
+        window.clearTimeout(timerId);
+      }
       if (typeof window !== 'undefined' && window.google?.accounts?.id?.cancel) {
         try {
           window.google.accounts.id.cancel();

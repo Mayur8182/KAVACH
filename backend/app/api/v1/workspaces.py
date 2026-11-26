@@ -384,12 +384,16 @@ async def list_workspaces(
                 break
 
         ws_stmt = select(Workspace).where(
-            and_(Workspace.organization_id == org.id, Workspace.status == "ACTIVE")
+            and_(
+                Workspace.organization_id == org.id,
+                Workspace.status == "ACTIVE",
+                Workspace.workspace_type != "PERSONAL",
+            )
         ).order_by(Workspace.created_at.asc())
         workspaces = (await db.execute(ws_stmt)).scalars().all()
 
-        # If an organization has no workspaces yet, provision a default workspace for it
-        if not workspaces:
+        # Skip auto-provisioning an extra ORG workspace for a Personal org unless none exist at all
+        if not workspaces and str(org.id) != str(personal_ws.organization_id):
             default_ws = Workspace(
                 id=uuid.uuid4(),
                 organization_id=org.id,
@@ -438,15 +442,16 @@ async def list_workspaces(
             ws_items.append(item)
             flat_items.append(item)
 
-        org_groups.append(
-            OrganizationWorkspacesGroup(
-                id=str(org.id),
-                name=org.name,
-                slug=org.slug,
-                role=role,
-                workspaces=ws_items,
+        if ws_items:
+            org_groups.append(
+                OrganizationWorkspacesGroup(
+                    id=str(org.id),
+                    name=org.name,
+                    slug=org.slug,
+                    role=role,
+                    workspaces=ws_items,
+                )
             )
-        )
 
     return WorkspaceListResponse(
         personal=personal_items,
@@ -636,7 +641,7 @@ async def check_workspace_access(ws: Workspace, current_user: Optional[User], db
     if getattr(current_user, "is_superuser", False):
         return
     if ws.workspace_type == "PERSONAL":
-        if ws.owner_id and ws.owner_id != current_user.id:
+        if not ws.owner_id or ws.owner_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to personal workspace")
         return
     # For ORGANIZATION workspaces: check organization membership or org ownership
@@ -799,11 +804,6 @@ async def delete_workspace(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     stmt = select(Workspace).where(Workspace.id == workspace_id)
-    ws = (await db.execute(stmt)).scalar_one_or_none()
-    if not ws:
-        raise HTTPException(status_code=404, detail=f"Workspace '{workspace_id}' not found")
-
-    await check_workspace_access(ws, current_user, db, write=True)
     ws = (await db.execute(stmt)).scalar_one_or_none()
     if not ws:
         raise HTTPException(status_code=404, detail=f"Workspace '{workspace_id}' not found")
@@ -1072,11 +1072,28 @@ async def assign_repository_to_project(
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
 
+    from app.services.workspace_resolver import get_user_org_and_workspace_scope, user_can_access_project
+    from app.models.github import GitHubInstallation
+
+    if not getattr(current_user, "is_superuser", False):
+        _, accessible_ws, _ = await get_user_org_and_workspace_scope(current_user, db)
+        repo_allowed = bool(repo.workspace_id and repo.workspace_id in accessible_ws)
+        if not repo_allowed and repo.installation_id:
+            inst = await db.get(GitHubInstallation, repo.installation_id)
+            if inst and inst.connected_by_user_id == current_user.id:
+                repo_allowed = True
+        if not repo_allowed and repo.project_id:
+            existing_proj = await db.get(Project, repo.project_id)
+            if existing_proj and await user_can_access_project(current_user, existing_proj, db):
+                repo_allowed = True
+        if not repo_allowed:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant access denied to repository")
+
     proj = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    if proj.owner_id != current_user.id and not getattr(current_user, "is_superuser", False):
+    if not await user_can_access_project(current_user, proj, db):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant access denied to project")
 
     repo.project_id = proj.id
@@ -1106,6 +1123,9 @@ async def remove_repository_from_workspace(
     repo = (await db.execute(select(GitHubRepository).where(GitHubRepository.id == repo_id))).scalar_one_or_none()
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
+
+    if not getattr(current_user, "is_superuser", False) and repo.workspace_id != workspace_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Repository does not belong to this workspace")
 
     audit = AuditService(db)
     repo_name = repo.name

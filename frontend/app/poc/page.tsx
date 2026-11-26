@@ -41,6 +41,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { SecuLayerHeader } from '@/components/navigation/SecuLayerHeader';
+import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
 import { api } from '@/lib/api/client';
 
 function POCWorkspaceContent() {
@@ -196,7 +197,7 @@ function POCWorkspaceContent() {
               <span>{showRequestForm ? 'Close Form' : '+ New POC Request'}</span>
             </button>
             <Link
-              href="/sales/quote"
+              href="/contact"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -210,7 +211,7 @@ function POCWorkspaceContent() {
                 textDecoration: 'none',
               }}
             >
-              <span>Proceed to Quote (CPQ)</span>
+              <span>Request Enterprise Quote</span>
               <ArrowRight size={14} />
             </Link>
           </div>
@@ -564,7 +565,7 @@ function POCWorkspaceContent() {
                         Recommended Next Step: <strong>{pocResults.next_step}</strong>
                       </div>
                       <Link
-                        href={`/sales/quote?poc_id=${encodeURIComponent(currentPoc.id)}&company=${encodeURIComponent(currentPoc.company_name)}&email=${encodeURIComponent(currentPoc.contact_email)}`}
+                        href="/contact"
                         style={{
                           padding: '10px 20px',
                           backgroundColor: '#2563EB',
@@ -578,7 +579,7 @@ function POCWorkspaceContent() {
                           gap: '6px',
                         }}
                       >
-                        <span>Generate Proposal & Quote</span>
+                        <span>Request Enterprise Proposal</span>
                         <ArrowRight size={14} />
                       </Link>
                     </div>
@@ -596,6 +597,7 @@ function POCWorkspaceContent() {
         </div>
 
       </main>
+      <EnterpriseFooter />
     </div>
   );
 }

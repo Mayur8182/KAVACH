@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.audit_event import AuditEvent
 from app.services.audit_service import AuditService
+from app.services.hubspot_service import hubspot_service
 
 router = APIRouter(prefix="/contact", tags=["Contact & Inquiries"])
 
@@ -100,6 +101,10 @@ async def submit_contact_inquiry(
         },
     )
     await db.commit()
+
+    # Asynchronously synchronize contact inquiry with HubSpot CRM
+    import asyncio
+    asyncio.create_task(hubspot_service.sync_contact_inquiry(payload.model_dump(), inquiry_id))
 
     return ContactInquiryResponse(
         status="success",

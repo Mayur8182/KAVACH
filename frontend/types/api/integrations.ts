@@ -3,7 +3,53 @@
  * Single authoritative type definitions for Kavach platform integrations.
  */
 
-export type ProviderCategory = 'scm' | 'cloud' | 'cicd' | 'registry' | 'alerts';
+export type ProviderCategory = 'scm' | 'cloud' | 'cicd' | 'registry' | 'alerts' | 'crm';
+
+export interface HubspotStatusResponse {
+  success: boolean;
+  provider: string;
+  name: string;
+  category: string;
+  connected: boolean;
+  portal_id?: string | null;
+  health: 'HEALTHY' | 'DEGRADED' | 'NOT_CONFIGURED';
+  total_operations: number;
+  successful_operations: number;
+  failed_operations: number;
+  pending_operations: number;
+  last_synced_at?: string | null;
+}
+
+export interface HubspotSyncLogItem {
+  id: string;
+  organization_id?: string | null;
+  entity_type: 'CONTACT' | 'COMPANY' | 'DEAL' | 'TICKET';
+  internal_id: string;
+  hubspot_id?: string | null;
+  operation: string;
+  status: 'SUCCESS' | 'FAILED' | 'PENDING';
+  error_message?: string | null;
+  retry_count: number;
+  payload_snapshot?: Record<string, any>;
+  created_at?: string | null;
+}
+
+export interface HubspotSettingsResponse {
+  event_settings: {
+    sync_leads: boolean;
+    sync_users: boolean;
+    sync_organizations: boolean;
+    sync_billing: boolean;
+    sync_demos: boolean;
+    sync_support: boolean;
+  };
+  mappings: {
+    contacts: Array<{ kavach_field: string; hubspot_property: string; required: boolean }>;
+    companies: Array<{ kavach_field: string; hubspot_property: string; required: boolean }>;
+    deals: Array<{ kavach_field: string; hubspot_property: string; required: boolean }>;
+    tickets: Array<{ kavach_field: string; hubspot_property: string; required: boolean }>;
+  };
+}
 
 export interface ProviderCatalogItem {
   provider: string;

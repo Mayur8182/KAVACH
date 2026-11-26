@@ -49,7 +49,11 @@ export interface ProjectMetadata {
   updatedAt: string;
   connectedCloud: boolean;
   cloudProjectId?: string;
+  cloudProjectName?: string;
+  cloudWorkspaceId?: string;
+  cloudWorkspaceName?: string;
   cloudOrganizationId?: string;
+  cloudRepositoryUrl?: string;
 }
 
 export interface ProjectConfig {
@@ -90,13 +94,24 @@ export interface GlobalConfig {
 export interface AuthCredentials {
   accessToken: string;
   refreshToken?: string;
+  idToken?: string;
+  tokenType?: string;
+  scope?: string;
   expiresAt: number;
+  serverUrl?: string;
+  clientId?: string;
+  organizationId?: string;
+  workspaceId?: string;
+  projectId?: string;
+  projectName?: string;
   user: {
     id: string;
     email: string;
     name?: string;
     organizationId?: string;
     organizationName?: string;
+    workspaceId?: string;
+    projectId?: string;
   };
   deviceId: string;
   authenticatedAt: string;

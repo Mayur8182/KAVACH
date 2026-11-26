@@ -21,7 +21,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_superadmin_user
 from app.models.audit_event import AuditEvent
 from app.models.organization import Organization
 from app.models.plan import FeatureCatalog, SubscriptionPlan
@@ -29,32 +29,6 @@ from app.models.tenant_plan import TenantPlanAssignment
 from app.models.user import User
 
 router = APIRouter(prefix="/superadmin", tags=["SuperAdmin — Platform Governance & Reality APIs"])
-
-FOUNDER_SUPERADMIN_EMAILS = {
-    "admin@kavachsecurity.me",
-    "mkbharvad7174@gmail.com",
-    "mkbharvad534@gmail.com",
-    "mkbharvad8080@gmail.com",
-    "mayurbharvad7174@gmail.com",
-    "mayur.k@seculayer.io",
-    "mayur.k.bharvad@gmail.com",
-    "dev@antigravity.security",
-}
-
-
-async def require_superadmin_user(current_user: User = Depends(get_current_user)) -> User:
-    user_email = (getattr(current_user, "email", "") or "").lower().strip()
-    is_super = getattr(current_user, "is_superuser", False) or user_email in FOUNDER_SUPERADMIN_EMAILS
-    if not is_super:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "error": "FOUNDER_SUPERADMIN_REQUIRED",
-                "message": "Access restricted to Platform Founder SuperAdmin.",
-                "user_email": user_email,
-            },
-        )
-    return current_user
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -75,8 +49,7 @@ async def get_access_users(
     active_count = 0
 
     for u in users:
-        is_founder = (u.email or "").lower() in FOUNDER_SUPERADMIN_EMAILS
-        is_super = bool(u.is_superuser or is_founder)
+        is_super = bool(u.is_superuser)
         if is_super:
             super_count += 1
         if u.is_active:

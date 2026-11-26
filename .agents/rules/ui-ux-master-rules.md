@@ -12,21 +12,33 @@ Never create UI merely because “the page needs something there.”
 
 ---
 
-## 2. Visual Language
+## 2. Visual Language & Dashboard Consistency
+
+### GLOBAL DASHBOARD THEME MANDATE (NO DARK/LIGHT TOGGLES, EXACT DASHBOARD STYLE ONLY):
+- ALL platform views must strictly match the existing Kavach dashboard design:
+  - Base Platform Background: `#F8FAFC` (Slate 50)
+  - Content Cards, Containers, and Modals: White (`#ffffff`) with border `1px solid #EAECF0` (or `border-slate-200`) and border-radius `12px` (or `8px`).
+  - Text Colors: Primary `#0F172A` (Slate 900), Secondary `#64748B` (Slate 500), Muted `#94A3B8` (Slate 400).
+  - Navigation Tabs & Pills: Neutral `#ffffff` or `#F1F5F9` background, slate borders `#E2E8F0`, slate text `#475569`, active tab `#0F172A` or `#2563EB` with bold contrast.
+  - Buttons: Primary button `#0F172A` (or `#2563EB`) with text `#ffffff`; Secondary button `#ffffff` with border `#E2E8F0` and text `#1E293B`.
+  - Tables: Header `#F8FAFC` with border `#EAECF0`, body `#ffffff` with row divider `#F1F5F9`, hover `#F8FAFC`.
+  - NEVER introduce arbitrary dark mode (`bg-zinc-950`, `bg-zinc-900`, `text-zinc-100`) or separate dark/light theme options.
 
 ### Use:
-- White / off-white backgrounds
-- Black / dark-gray primary text
-- Gray borders
+- White / off-white backgrounds (#F8FAFC / #FFFFFF)
+- Black / dark-gray primary text (#0F172A / #1E293B)
+- Gray borders (#EAECF0 / #E2E8F0)
 - Neutral surfaces
-- Subtle shadows
-- Minimal rounded corners
+- Subtle shadows (0 1px 2px rgba(0, 0, 0, 0.02))
+- Minimal rounded corners (8px - 12px)
 - Professional typography
 - Dense but readable enterprise layouts
 - Consistent spacing
 - Clear hierarchy
 
 ### Avoid:
+- ❌ Dark black / dark zinc arbitrary styling (bg-zinc-950, bg-zinc-900)
+- ❌ Dark / light theme toggling or separate themes
 - ❌ Blue-heavy SaaS designs
 - ❌ Neon colors
 - ❌ Purple AI gradients

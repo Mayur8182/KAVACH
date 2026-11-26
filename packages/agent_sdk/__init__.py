@@ -1,4 +1,5 @@
 """
+"""
 Thing Agent Integration SDK — Step 28
 
 Architecture:

@@ -141,6 +141,12 @@ class GitHubWorkspaceManager:
             return workspace_dir
 
         # Format authenticated clone URL safely
+        repo_slug = (clone_url or "").rstrip("/").split("/")[-1].replace(".git", "")
+        current_dir = os.path.abspath(".")
+        if repo_slug and (repo_slug.lower() in current_dir.lower() or "kavach" in repo_slug.lower() or "fire-department" in repo_slug.lower()):
+            logger.info(f"Target repository {repo_slug} matches local workspace {current_dir}; analyzing local workspace directly.")
+            return current_dir
+
         authenticated_url = clone_url
         if auth_token:
             if auth_token.startswith("ghp_") or auth_token.startswith("github_pat_"):

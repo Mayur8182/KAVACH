@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import { EnterpriseFooter } from '@/components/ui/EnterpriseFooter';
 
 export const metadata: Metadata = {
   title: 'Kavach Products — Unified Workload Defense Suite',
@@ -21,5 +22,10 @@ export default function ProductsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <EnterpriseFooter />
+    </>
+  );
 }

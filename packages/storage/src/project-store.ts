@@ -20,6 +20,8 @@ export class ProjectStore {
         git_branch = excluded.git_branch,
         git_remote = excluded.git_remote,
         stack_json = excluded.stack_json,
+        connected_cloud = excluded.connected_cloud,
+        cloud_project_id = excluded.cloud_project_id,
         updated_at = excluded.updated_at;
     `);
 

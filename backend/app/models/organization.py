@@ -99,6 +99,21 @@ class Organization(Base, TimestampMixin):
         default=90,
         nullable=False,
     )
+    # HubSpot CRM Synchronization
+    hubspot_company_id: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+    )
+    hubspot_sync_status: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        default="PENDING",
+    )
+    last_hubspot_sync_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     metadata_json: Mapped[Optional[dict]] = mapped_column(
         JSON,
         nullable=True,

@@ -69,6 +69,8 @@ class DemoRequest(Base, TimestampMixin):
         String(50),
         default="TIER_2_MIDMARKET",  # TIER_1_ENTERPRISE, TIER_2_MIDMARKET, TIER_3_GROWTH
     )
+    hubspot_contact_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    hubspot_deal_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     metadata_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True, default=dict)
 
 
@@ -268,6 +270,9 @@ class Lead(Base, TimestampMixin):
     assigned_sales_user: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     lead_score: Mapped[int] = mapped_column(Integer, default=50)
     qualification_tier: Mapped[str] = mapped_column(String(50), default="TIER_2_MIDMARKET")
+    hubspot_contact_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    hubspot_deal_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    hubspot_sync_status: Mapped[Optional[str]] = mapped_column(String(50), default="PENDING")
     metadata_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True, default=dict)
 
 

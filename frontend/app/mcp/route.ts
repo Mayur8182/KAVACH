@@ -19,3 +19,7 @@ export async function HEAD(req: NextRequest) {
   return proxyToBackend(req, '/mcp');
 }
 
+export async function DELETE(req: NextRequest) {
+  return proxyToBackend(req, '/mcp');
+}
+

@@ -1467,6 +1467,19 @@ class IntegrationsService:
                     {"key": "token", "label": "Atlassian API Token", "type": "password", "placeholder": "••••••••", "required": True},
                 ],
             },
+            # ── CRM & Customer Lifecycle ──
+            {
+                "provider": "hubspot",
+                "name": "HubSpot CRM",
+                "category": "crm",
+                "category_label": "CRM & Customer Lifecycle",
+                "description": "Bi-directional customer lifecycle synchronization, marketing leads, demo requests, enterprise pipeline deals, and support tickets.",
+                "supported_capabilities": ["Contact Sync", "Company Mapping", "Enterprise Deals", "Support Tickets", "Stripe Sync"],
+                "config_fields": [
+                    {"key": "token", "label": "Private App Access Token", "type": "password", "placeholder": "pat-na1-...", "required": True},
+                    {"key": "account_name", "label": "HubSpot Portal ID", "type": "text", "placeholder": "12345678", "required": False},
+                ],
+            },
         ]
 
         results: List[ProviderCatalogItem] = []
@@ -1926,6 +1939,30 @@ class IntegrationsService:
                 cicd_cfg.jenkins_token_encrypted = integ.access_token_encrypted
                 cicd_cfg.is_enabled = True
 
+            await self.db.commit()
+
+        # 4. CRM & Customer Lifecycle (HubSpot)
+        elif prov == "hubspot":
+            integ = await self._get_or_create_integration(
+                provider="hubspot",
+                organization_id=organization_id,
+                name="HubSpot CRM",
+            )
+            raw_token = payload.token or (payload.credentials.get("token") if payload.credentials else None)
+            portal_id = payload.account_name or (payload.credentials.get("portal_id") if payload.credentials else None)
+            if raw_token:
+                integ.access_token_encrypted = encrypt_secret(raw_token.strip())
+            if portal_id:
+                integ.external_account_id = portal_id.strip()
+                integ.external_account_name = f"Portal {portal_id.strip()}"
+            integ.status = "connected"
+            integ.last_connected_at = now
+            integ.last_sync_at = now
+            integ.last_sync_status = "SUCCESS"
+            integ.integration_metadata = {
+                "portal_id": portal_id,
+                "connected_at": now.isoformat(),
+            }
             await self.db.commit()
 
         # 4. Alerts & Notifications (Slack, Jira)

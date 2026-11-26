@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export function getBackendBaseUrl(): string {
-  const backend = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://kavach-backend-3hdm.onrender.com';
-  return backend.replace(/\/+$/, '');
+  const isProduction =
+    process.env.NODE_ENV === 'production' ||
+    !!process.env.RENDER ||
+    !!process.env.VERCEL;
+  const backendPort = process.env.BACKEND_PORT || '8000';
+  const localUrl = `http://127.0.0.1:${backendPort}`;
+  const productionBackend = 'https://kavach-backend-3hdm.onrender.com';
+
+  let backend = (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '').trim();
+  if (!backend) {
+    backend = isProduction ? productionBackend : localUrl;
+  } else if (
+    !isProduction &&
+    backend.includes('kavach-backend-3hdm.onrender.com') &&
+    !process.env.FORCE_REMOTE_BACKEND
+  ) {
+    backend = localUrl;
+  }
+
+  return backend.replace(/\/+$/, '').replace(/\/api(\/v1)?$/, '');
 }
 
 export function handleCorsPreflight(req: NextRequest): NextResponse {
@@ -11,7 +29,7 @@ export function handleCorsPreflight(req: NextRequest): NextResponse {
     status: 200,
     headers: {
       'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD',
       'Access-Control-Allow-Headers': req.headers.get('access-control-request-headers') || '*',
       'Access-Control-Allow-Credentials': 'true',
       'Access-Control-Max-Age': '86400',
@@ -53,7 +71,7 @@ export async function proxyToBackend(req: NextRequest, targetPath: string): Prom
 
     resHeaders.set('Access-Control-Allow-Origin', origin);
     resHeaders.set('Access-Control-Allow-Credentials', 'true');
-    resHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
+    resHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
 
     return new NextResponse(backendRes.body, {
       status: backendRes.status,

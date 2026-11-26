@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,11 @@ from app.models.user import User
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.services.audit_service import AuditService
+from app.services.workspace_resolver import (
+    ensure_user_workspace_provisioned,
+    get_accessible_projects,
+    user_can_access_project,
+)
 
 
 class ProjectService:
@@ -24,8 +30,24 @@ class ProjectService:
         current_user: User,
         request_id: Optional[str] = None,
     ) -> Project:
+        orgs, workspaces = await ensure_user_workspace_provisioned(current_user, self.db)
+        target_ws_id = payload.workspace_id or getattr(current_user, "default_workspace_id", None) or (workspaces[0].id if workspaces else None)
+        target_org_id = payload.organization_id or (workspaces[0].organization_id if workspaces else None) or (orgs[0].id if orgs else None)
+
+        if payload.workspace_id:
+            matched_ws = next((w for w in workspaces if w.id == payload.workspace_id), None)
+            if not matched_ws and not current_user.is_superuser:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cross-tenant access denied: You do not have access to the specified workspace.",
+                )
+            if matched_ws:
+                target_org_id = matched_ws.organization_id or target_org_id
+
         project = Project(
             owner_id=current_user.id,
+            workspace_id=target_ws_id,
+            organization_id=target_org_id,
             name=payload.name.strip(),
             description=payload.description,
             repository_url=payload.repository_url,
@@ -35,11 +57,14 @@ class ProjectService:
             cloud_provider=payload.cloud_provider,
             environment=payload.environment,
             application_type=payload.application_type,
+            default_branch=payload.default_branch or "main",
         )
         created = await self.repo.create(project)
 
-        # Ensure user's onboarding is marked complete upon successful project creation
+        # Ensure user's onboarding is marked complete and default_project_id is initialized
         current_user.onboarding_completed = True
+        if not getattr(current_user, "default_project_id", None):
+            current_user.default_project_id = created.id
         self.db.add(current_user)
 
         # Record PROJECT_CREATED audit event
@@ -100,8 +125,7 @@ class ProjectService:
                 detail=f"Project '{project_id}' not found",
             )
 
-        # Enforce strict ownership authorization
-        if project.owner_id != current_user.id and not current_user.is_superuser:
+        if not await user_can_access_project(current_user, project, self.db):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have authorization to access this project",
@@ -115,11 +139,8 @@ class ProjectService:
         limit: int = 100,
         offset: int = 0,
     ) -> List[Project]:
-        return await self.repo.list_by_owner(
-            owner_id=current_user.id,
-            limit=limit,
-            offset=offset,
-        )
+        projects = await get_accessible_projects(current_user, self.db)
+        return projects[offset : offset + limit]
 
     async def update_project(
         self,

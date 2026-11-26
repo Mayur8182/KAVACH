@@ -2,38 +2,63 @@
 
 /**
  * /auth/callback/github — GitHub OAuth 2.0 Authorization Callback Handler
- * Receives authorization code from GitHub, securely exchanges it with backend
- * POST /api/v1/auth/github/callback, persists JWT session token, and routes to workspace.
- *
- * Production Engineering & UI Principles:
- * - 100% real authentication with real error handling
- * - Clean, minimal, modern light-theme design with white card and background
- * - Cohesive typography and smooth animated progress indicator
+ * Pixel-Perfect Implementation matching:
+ * - Image 1: "Connecting to GitHub" modal with 2 connected icons, STEP 2 OF 3, 3-step timeline, and read-only notice.
+ * - Image 5: "Verifying security session (motion)" with 3D wireframe cube and rotating green orbital ring.
  */
 
 import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { Check, Lock, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api/client';
-import { setAuthToken } from '@/lib/auth/token';
+import { setAuthToken, resolveSafeRedirectTarget } from '@/lib/auth/token';
 import { trackGitHubConnect, trackLogin } from '@/lib/analytics/gtag';
+import { SecuritySessionVerification } from '@/components/auth/SecuritySessionVerification';
 
-const GithubIcon = ({ size = 24 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-  </svg>
-);
+function GitHubIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+    </svg>
+  );
+}
+
+function KavachIconMark({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 2L3 7L12 12L21 7L12 2Z"
+        stroke="#FFFFFF"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3 7V17L12 22V12L3 7Z"
+        stroke="#FFFFFF"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M21 7V17L12 22V12L21 7Z"
+        stroke="#FFFFFF"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function GitHubCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [stage, setStage] = useState<'connecting' | 'verifying' | 'error'>('connecting');
+  const [stepIndex, setStepIndex] = useState<number>(1); // 0 = account verified, 1 = authorizing, 2 = syncing
   const [error, setError] = useState<string | null>(null);
-  const [errorSubtitle, setErrorSubtitle] = useState<string>(
-    'The authorization code received from GitHub is invalid or has expired. Please try signing in again.'
-  );
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
-  const [retrying, setRetrying] = useState(false);
   const processedRef = useRef(false);
 
   useEffect(() => {
@@ -42,412 +67,462 @@ function GitHubCallbackContent() {
 
     const token = searchParams.get('token');
     const code = searchParams.get('code');
-    const state = searchParams.get('state');
     const oauthError = searchParams.get('error');
     const oauthDesc = searchParams.get('error_description');
 
     if (oauthError) {
-      if (oauthError === 'incorrect_client_credentials' || oauthDesc?.toLowerCase().includes('client_secret') || oauthDesc?.toLowerCase().includes('incorrect')) {
-        setError('GitHub App Credentials Mismatch');
-        setErrorSubtitle('The GitHub App Client Secret in your backend does not match Client ID Iv23liqai7qjzsE9RllD.');
-        setErrorDetails('Please generate a new Client Secret in GitHub Developer Settings (GitHub Apps > Kavach Security > Client secrets) and paste it into backend/.env under GITHUB_CLIENT_SECRET.');
-      } else {
-        setError('GitHub authorization declined');
-        setErrorSubtitle('The authorization request was declined by GitHub or cancelled.');
-        setErrorDetails(oauthDesc || `OAuth error: ${oauthError}`);
-      }
+      setStage('error');
+      setError('GitHub authorization declined');
+      setErrorDetails(oauthDesc || `OAuth error: ${oauthError}`);
       return;
     }
 
-    // Direct token redirect from backend unified callback
-    if (token) {
-      setAuthToken(token);
+    const proceedWithToken = (jwtToken: string) => {
+      setAuthToken(jwtToken);
       trackGitHubConnect({ context: 'oauth_callback' });
       trackLogin({ method: 'github' });
 
-      const nextParam = searchParams.get('next');
+      // Move step to Authorizing -> Syncing
+      setStepIndex(2);
 
-      Promise.all([
-        api.onboarding.getState().catch(() => null),
-        api.projects.list().catch(() => []),
-      ]).then(([onboardingState, projs]: [any, any]) => {
-        const hasProject = Array.isArray(projs) && projs.length > 0;
-        if (hasProject && typeof window !== 'undefined') {
-          localStorage.setItem('secu_active_project_id', projs[0].id);
-        }
+      // Transition to Image 5: Verifying Security Session
+      setTimeout(() => {
+        setStage('verifying');
 
-        if (nextParam && nextParam.startsWith('/')) {
-          if (nextParam.includes('/oauth')) {
-            const sep = nextParam.includes('?') ? '&' : '?';
-            window.location.href = `${nextParam}${sep}token=${encodeURIComponent(token)}&auto_approve=1`;
-            return;
+        // Resolve onboarding & project state
+        Promise.all([
+          api.onboarding.getState().catch(() => null),
+          api.projects.list().catch(() => []),
+        ]).then(([onboardingState, projs]: [any, any]) => {
+          const hasProject = Array.isArray(projs) && projs.length > 0;
+          if (hasProject && typeof window !== 'undefined') {
+            localStorage.setItem('secu_active_project_id', projs[0].id);
           }
-          if (nextParam.includes('overview') || nextParam.includes('dashboard')) {
-            if (onboardingState?.onboarding_completed && hasProject) {
-              router.push('/overview');
-              return;
-            }
-          } else {
-            router.push(nextParam);
-            return;
-          }
-        }
 
-        // Rule G & H: Only go to overview if onboarding is complete AND project exists
-        if (onboardingState?.onboarding_completed && hasProject) {
-          router.push('/overview');
-        } else {
-          router.push('/onboarding');
-        }
-      }).catch(() => {
-        router.push('/onboarding');
-      });
-      return;
-    }
+          const safeNext = resolveSafeRedirectTarget(searchParams.get('next'));
 
-    if (!code) {
-      setError('Missing Authorization Code');
-      setErrorSubtitle('No authorization code was provided in the GitHub callback redirect.');
-      setErrorDetails('No authorization code parameter found in callback URL.');
-      return;
-    }
-
-    const exchangeCode = async () => {
-      try {
-        const res = await api.auth.githubCallback({ code, state: state || undefined });
-        if (res.access_token) {
-          setAuthToken(res.access_token);
-          trackGitHubConnect({ context: 'oauth_callback' });
-          trackLogin({ method: 'github' });
-
-          try {
-            const nextParam = res.next_route || searchParams.get('next');
-
-            const [onboardingState, userProjects] = await Promise.all([
-              api.onboarding.getState().catch(() => null),
-              api.projects.list().catch(() => []),
-            ]);
-
-            const hasProject = Array.isArray(userProjects) && userProjects.length > 0;
-
-            if (hasProject) {
-              const activeProj = userProjects[0];
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('secu_active_project_id', activeProj.id);
-              }
-            }
-
-            if (nextParam && nextParam.startsWith('/')) {
-              if (nextParam.includes('/oauth')) {
-                const sep = nextParam.includes('?') ? '&' : '?';
-                window.location.href = `${nextParam}${sep}token=${encodeURIComponent(res.access_token)}&auto_approve=1`;
-                return;
-              }
-              if (nextParam.includes('overview') || nextParam.includes('dashboard')) {
-                if (!res.is_new_user && onboardingState?.onboarding_completed && hasProject) {
-                  router.push('/overview');
-                  return;
-                }
+          setTimeout(() => {
+            if (safeNext) {
+              if (safeNext.includes('/oauth') || safeNext.startsWith('http')) {
+                window.location.assign(safeNext);
               } else {
-                router.push(nextParam);
-                return;
+                router.push(safeNext);
               }
-            }
-
-            if (!res.is_new_user && onboardingState?.onboarding_completed && hasProject) {
+            } else if (onboardingState?.onboarding_completed && hasProject) {
               router.push('/overview');
             } else {
               router.push('/onboarding');
             }
-          } catch {
-            router.push(res.is_new_user ? '/onboarding' : '/overview');
-          }
+          }, 1200);
+        }).catch(() => {
+          router.push('/onboarding');
+        });
+      }, 900);
+    };
+
+    if (token) {
+      proceedWithToken(token);
+      return;
+    }
+
+    if (!code) {
+      setStage('error');
+      setError('Missing Authorization Code');
+      setErrorDetails('No authorization code was returned from GitHub. Please try signing in again.');
+      return;
+    }
+
+    // Exchange code with backend API
+    const exchangeCode = async () => {
+      try {
+        const res = await api.request<any>('/api/v1/auth/github/callback', {
+          method: 'POST',
+          body: JSON.stringify({ code }),
+        });
+
+        const receivedToken = res?.data?.access_token || res?.access_token || res?.token;
+        if (receivedToken) {
+          proceedWithToken(receivedToken);
         } else {
-          throw new Error('Authentication succeeded but no access token was returned.');
+          setStage('error');
+          setError('Authentication Failed');
+          setErrorDetails('Could not obtain session token from GitHub exchange.');
         }
       } catch (err: any) {
-        console.error('GitHub authentication exchange failed:', err);
+        setStage('error');
         setError('GitHub Authentication Failed');
-        let msg = err?.message || 'Authentication exchange failed.';
-        if (!msg || msg === 'signal is aborted without reason' || msg.includes('aborted') || msg.includes('timed out') || msg.includes('timeout')) {
-          setErrorSubtitle('The connection to GitHub authorization servers timed out. Please click "Retry with GitHub" to reconnect.');
-          msg = 'Connection to GitHub authorization servers timed out. Please retry signing in.';
-        } else if (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('bad_verification_code')) {
-          setErrorSubtitle('The authorization code received from GitHub has expired or was already used. Please click "Retry with GitHub" to sign in again.');
-        } else {
-          setErrorSubtitle('An error occurred while authenticating with GitHub. Please try signing in again.');
-        }
-        setErrorDetails(msg);
+        setErrorDetails(err?.message || 'Server error exchanging code with GitHub.');
       }
     };
 
     exchangeCode();
-  }, [searchParams, router]);
+  }, [router, searchParams]);
 
-  const handleRetryGithub = async () => {
-    setRetrying(true);
-    try {
-      const data = await api.auth.getGithubAuthUrl();
-      if (data?.url) {
-        window.location.href = data.url;
-        return;
-      }
-    } catch (err: any) {
-      console.warn('Backend GitHub authorization URL generation notice:', err);
-    }
-    setErrorSubtitle('Unable to launch GitHub authorization. Please ensure backend services are running.');
-    setRetrying(false);
-  };
+  // Stage 2: Verifying security session (motion) - Image 5
+  if (stage === 'verifying') {
+    return (
+      <SecuritySessionVerification
+        statusMessage="Verifying security session"
+        subMessage="Checking workspace permissions"
+      />
+    );
+  }
 
+  // Stage 3: Error State
+  if (stage === 'error') {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          width: '100%',
+          backgroundColor: '#F8FAFC',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          fontFamily: 'Inter, -apple-system, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '460px',
+            width: '100%',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '16px',
+            border: '1px solid #E2E8F0',
+            padding: '36px 32px',
+            textAlign: 'center',
+            boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.08)',
+          }}
+        >
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              backgroundColor: '#FEE2E2',
+              color: '#DC2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}
+          >
+            <AlertCircle size={24} />
+          </div>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 8px' }}>
+            {error || 'Connection Failed'}
+          </h2>
+          <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 24px', lineHeight: 1.5 }}>
+            {errorDetails || 'An unexpected error occurred while connecting your GitHub account.'}
+          </p>
+          <Link
+            href="/login"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              backgroundColor: '#0F172A',
+              color: '#FFFFFF',
+              fontSize: '13.5px',
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            <ArrowLeft size={14} />
+            <span>Return to Login</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Stage 1: Connecting to GitHub - Image 1 in attachments
   return (
     <div
       style={{
         minHeight: '100vh',
         width: '100%',
-        backgroundColor: '#F8FAFC',
-        fontFamily: "var(--font-sans, 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif)",
-        color: '#0F172A',
+        backgroundColor: '#F5F5F3',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '24px 16px',
+        padding: '24px',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         boxSizing: 'border-box',
       }}
     >
-      <style>{`
-        @keyframes blueProgressLine {
-          0% {
-            left: -35%;
-            width: 35%;
-            opacity: 0.7;
-          }
-          50% {
-            left: 30%;
-            width: 50%;
-            opacity: 1;
-          }
-          100% {
-            left: 100%;
-            width: 35%;
-            opacity: 0.7;
-          }
-        }
-      `}</style>
-
-      {/* Main Clean Card (Light / White Theme) */}
       <div
         style={{
-          width: '100%',
-          maxWidth: 440,
+          width: '460px',
+          maxWidth: '95vw',
           backgroundColor: '#FFFFFF',
-          border: '1px solid #E2E8F0',
-          borderRadius: 16,
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02)',
-          padding: '40px 32px',
+          borderRadius: '24px',
+          padding: '36px 36px 32px',
+          boxShadow: '0 20px 45px -10px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
           textAlign: 'center',
-          boxSizing: 'border-box',
         }}
       >
-        {!error ? (
-          /* Loading State: Clean GitHub icon + Sleek Blue Progress Line */
-          <div>
+        {/* Top Connected Icons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
+          {/* Kavach Logo in black rounded square */}
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
+              backgroundColor: '#0F172A',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+            }}
+          >
+            <KavachIconMark size={22} />
+          </div>
+
+          {/* Dotted connecting line with green central dot */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '44px',
+              position: 'relative',
+            }}
+          >
             <div
               style={{
-                width: 54,
-                height: 54,
-                borderRadius: 14,
-                backgroundColor: '#F1F5F9',
-                border: '1px solid #E2E8F0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 20px',
-                color: '#0F172A',
-              }}
-            >
-              <GithubIcon size={28} />
-            </div>
-
-            <h1
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                letterSpacing: '-0.015em',
-                color: '#0F172A',
-                margin: '0 0 8px',
-              }}
-            >
-              Connecting your GitHub account
-            </h1>
-
-            <p
-              style={{
-                fontSize: 13,
-                color: '#64748B',
-                margin: '0 0 28px',
-                lineHeight: 1.5,
-              }}
-            >
-              Verifying credentials and completing authorization...
-            </p>
-
-            {/* Blue Progress Line Track */}
-            <div
-              style={{
-                position: 'relative',
                 width: '100%',
-                maxWidth: 280,
-                height: 3,
-                backgroundColor: '#E2E8F0',
-                borderRadius: 9999,
-                overflow: 'hidden',
-                margin: '0 auto',
+                borderBottom: '2px dotted #CBD5E1',
+                position: 'absolute',
               }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  bottom: 0,
-                  borderRadius: 9999,
-                  background: 'linear-gradient(90deg, transparent, #2563EB 50%, transparent)',
-                  boxShadow: '0 0 8px rgba(37, 99, 235, 0.5)',
-                  animation: 'blueProgressLine 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-                }}
-              />
-            </div>
-          </div>
-        ) : (
-          /* Error State: Clean, Minimal Error Display with Light Alert Box */
-          <div>
+            />
             <div
               style={{
-                width: 52,
-                height: 52,
-                borderRadius: 14,
-                backgroundColor: '#FEF2F2',
-                border: '1px solid #FECACA',
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                backgroundColor: '#16A34A',
+                position: 'relative',
+                zIndex: 1,
+              }}
+            />
+          </div>
+
+          {/* GitHub Logo in white rounded square */}
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#0F172A',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+            }}
+          >
+            <GitHubIcon size={24} />
+          </div>
+        </div>
+
+        {/* STEP 2 OF 3 tag */}
+        <div
+          style={{
+            fontSize: '11px',
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            color: '#16A34A',
+            textTransform: 'uppercase',
+            marginBottom: '8px',
+          }}
+        >
+          STEP 2 OF 3
+        </div>
+
+        {/* Heading & Subtitle */}
+        <h1
+          style={{
+            fontSize: '22px',
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            color: '#0F172A',
+            margin: '0 0 8px 0',
+          }}
+        >
+          Connecting to GitHub
+        </h1>
+        <p
+          style={{
+            fontSize: '13px',
+            color: '#64748B',
+            lineHeight: 1.5,
+            margin: '0 0 28px 0',
+          }}
+        >
+          Hang tight. This usually takes a few seconds, and you can leave this tab open.
+        </p>
+
+        {/* Vertical 3-step checklist */}
+        <div
+          style={{
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px',
+            textAlign: 'left',
+            marginBottom: '24px',
+          }}
+        >
+          {/* Step 1: Account verified */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+            <div
+              style={{
+                width: '22px',
+                height: '22px',
+                borderRadius: '50%',
+                backgroundColor: '#16A34A',
+                color: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0 auto 18px',
-                color: '#DC2626',
+                marginTop: '1px',
+                flexShrink: 0,
               }}
             >
-              <AlertCircle size={26} />
+              <Check size={13} strokeWidth={3} />
             </div>
-
-            <h1
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                letterSpacing: '-0.015em',
-                color: '#0F172A',
-                margin: '0 0 8px',
-              }}
-            >
-              {error}
-            </h1>
-
-            <p
-              style={{
-                fontSize: 13,
-                color: '#64748B',
-                margin: '0 0 20px',
-                lineHeight: 1.5,
-              }}
-            >
-              {errorSubtitle}
-            </p>
-
-            {/* Error Diagnostic Box */}
-            {errorDetails && (
-              <div
-                style={{
-                  backgroundColor: '#FEF2F2',
-                  border: '1px solid #FECACA',
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  fontSize: 12,
-                  color: '#991B1B',
-                  fontFamily: "var(--font-mono, 'JetBrains Mono', ui-monospace, monospace)",
-                  marginBottom: 24,
-                  textAlign: 'left',
-                  wordBreak: 'break-word',
-                  lineHeight: 1.5,
-                }}
-              >
-                {errorDetails}
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
+                Account verified
               </div>
-            )}
-
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button
-                type="button"
-                onClick={handleRetryGithub}
-                disabled={retrying}
-                style={{
-                  width: '100%',
-                  minHeight: 42,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  backgroundColor: '#0F172A',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: retrying ? 'not-allowed' : 'pointer',
-                  transition: 'background-color 0.15s ease',
-                  opacity: retrying ? 0.7 : 1,
-                }}
-                onMouseOver={(e) => {
-                  if (!retrying) e.currentTarget.style.backgroundColor = '#1E293B';
-                }}
-                onMouseOut={(e) => {
-                  if (!retrying) e.currentTarget.style.backgroundColor = '#0F172A';
-                }}
-              >
-                <GithubIcon size={16} />
-                <span>{retrying ? 'Redirecting to GitHub...' : 'Retry with GitHub'}</span>
-              </button>
-
-              <Link
-                href="/login"
-                style={{
-                  width: '100%',
-                  minHeight: 42,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  backgroundColor: '#FFFFFF',
-                  color: '#334155',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                  boxSizing: 'border-box',
-                  transition: 'background-color 0.15s ease',
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F8FAFC';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
-                }}
-              >
-                <ArrowLeft size={14} />
-                <span>Back to Sign In</span>
-              </Link>
+              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                Your GitHub sign-in checked out.
+              </div>
             </div>
           </div>
-        )}
+
+          {/* Step 2: Authorizing access */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+            <div
+              style={{
+                width: '22px',
+                height: '22px',
+                borderRadius: '50%',
+                backgroundColor: stepIndex >= 1 ? '#DCFCE7' : '#FFFFFF',
+                border: stepIndex >= 1 ? '2px solid #16A34A' : '1.5px solid #CBD5E1',
+                color: '#16A34A',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: '1px',
+                flexShrink: 0,
+              }}
+            >
+              {stepIndex >= 2 ? (
+                <Check size={13} strokeWidth={3} />
+              ) : (
+                <Loader2 size={13} strokeWidth={2.5} className="animate-spin" />
+              )}
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
+                Authorizing access
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                Completing the handshake with GitHub.
+              </div>
+            </div>
+          </div>
+
+          {/* Step 3: Syncing your repositories */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+            <div
+              style={{
+                width: '22px',
+                height: '22px',
+                borderRadius: '50%',
+                backgroundColor: stepIndex >= 2 ? '#DCFCE7' : '#FFFFFF',
+                border: stepIndex >= 2 ? '2px solid #16A34A' : '1.5px solid #CBD5E1',
+                color: '#16A34A',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: '1px',
+                flexShrink: 0,
+              }}
+            >
+              {stepIndex >= 2 && <Loader2 size={13} strokeWidth={2.5} className="animate-spin" />}
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: stepIndex >= 2 ? '#0F172A' : '#94A3B8' }}>
+                Syncing your repositories
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                Only the ones you choose to share.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Security Note Card (Cream/Sand color matching Image 1) */}
+        <div
+          style={{
+            width: '100%',
+            backgroundColor: '#F7F5F0',
+            border: '1px solid #ECE7DD',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px',
+            textAlign: 'left',
+            boxSizing: 'border-box',
+          }}
+        >
+          <Lock size={16} color="#78716C" style={{ marginTop: '2px', flexShrink: 0 }} />
+          <p style={{ fontSize: '12px', lineHeight: 1.5, color: '#57534E', margin: 0 }}>
+            Read-only access. We never change your code, and you can revoke access any time from your GitHub settings.
+          </p>
+        </div>
+      </div>
+
+      {/* Bottom Links */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '20px', fontSize: '13px' }}>
+        <button
+          type="button"
+          onClick={() => router.push('/login')}
+          style={{
+            border: 'none',
+            background: 'transparent',
+            color: '#64748B',
+            textDecoration: 'underline',
+            cursor: 'pointer',
+            padding: 0,
+            fontSize: '13px',
+          }}
+        >
+          Cancel
+        </button>
+        <span style={{ color: '#CBD5E1' }}>·</span>
+        <a
+          href="mailto:support@kavachsecurity.me"
+          style={{
+            color: '#64748B',
+            textDecoration: 'underline',
+          }}
+        >
+          Trouble connecting?
+        </a>
       </div>
     </div>
   );
@@ -460,37 +535,15 @@ export default function GitHubCallbackPage() {
         <div
           style={{
             minHeight: '100vh',
-            width: '100%',
-            backgroundColor: '#F8FAFC',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#0F172A',
-            fontFamily: "var(--font-sans, 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif)",
+            backgroundColor: '#F5F5F3',
+            color: '#64748B',
+            fontFamily: 'Inter, sans-serif',
           }}
         >
-          <div
-            style={{
-              position: 'relative',
-              width: 240,
-              height: 3,
-              backgroundColor: '#E2E8F0',
-              borderRadius: 9999,
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                width: '40%',
-                borderRadius: 9999,
-                background: '#2563EB',
-                boxShadow: '0 0 8px rgba(37, 99, 235, 0.5)',
-              }}
-            />
-          </div>
+          Loading GitHub session...
         </div>
       }
     >

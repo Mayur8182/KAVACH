@@ -44,6 +44,7 @@ const CATEGORIES = [
   { id: 'cicd', label: 'CI/CD Pipelines' },
   { id: 'registry', label: 'Container Registries' },
   { id: 'alerts', label: 'Alerts & Issues' },
+  { id: 'crm', label: 'CRM & Customer Lifecycle' },
 ];
 
 export default function CentralIntegrationsPage() {

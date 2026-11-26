@@ -45,7 +45,7 @@ program
 
 program
   .command('login')
-  .description('Authenticate developer device with Kavach Cloud account via OAuth 2.0 PKCE')
+  .description('Authenticate developer device with Kavach Cloud account via OAuth 2.1 PKCE')
   .option('-t, --token <token>', 'Personal access token or API key for headless login')
   .action(async (opts) => {
     printBanner();

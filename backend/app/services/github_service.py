@@ -692,6 +692,12 @@ class GitHubService:
             scope_conditions.append(GitHubInstallation.project_id == project_id)
         if current_user and not getattr(current_user, "is_superuser", False):
             scope_conditions.append(GitHubInstallation.connected_by_user_id == current_user.id)
+            if getattr(current_user, "github_user_id", None):
+                try:
+                    gh_id_int = int(current_user.github_user_id)
+                    scope_conditions.append(GitHubInstallation.github_account_id == gh_id_int)
+                except (ValueError, TypeError):
+                    pass
             # Find projects owned by user
             user_projs = (await self.db.execute(select(Project.id).where(Project.owner_id == current_user.id))).scalars().all()
             if user_projs:
@@ -733,8 +739,19 @@ class GitHubService:
         installation_id: Optional[int] = None,
     ) -> List[GitHubRepository]:
         """Returns repositories accessible through authorized installations."""
-        from sqlalchemy import select
+        from sqlalchemy import select, or_, and_
         from app.models.project import Project
+
+        if workspace_id and isinstance(workspace_id, str):
+            try:
+                workspace_id = uuid.UUID(workspace_id)
+            except (ValueError, TypeError):
+                pass
+        if project_id and isinstance(project_id, str):
+            try:
+                project_id = uuid.UUID(project_id)
+            except (ValueError, TypeError):
+                pass
 
         conditions = []
         if installation_id:
@@ -746,15 +763,29 @@ class GitHubService:
         else:
             scope_conditions = []
             if workspace_id:
-                scope_conditions.append(GitHubRepository.workspace_id == workspace_id)
+                ws_filters = [GitHubRepository.workspace_id == workspace_id]
+                try:
+                    ws_projs = (await self.db.execute(select(Project.id).where(Project.workspace_id == workspace_id))).scalars().all()
+                    if ws_projs:
+                        ws_filters.append(GitHubRepository.project_id.in_(ws_projs))
+                except Exception:
+                    pass
+                scope_conditions.append(or_(*ws_filters))
             if project_id:
                 scope_conditions.append(GitHubRepository.project_id == project_id)
-            if current_user and not getattr(current_user, "is_superuser", False):
+            if current_user:
                 user_projs = (await self.db.execute(select(Project.id).where(Project.owner_id == current_user.id))).scalars().all()
                 if user_projs:
                     scope_conditions.append(GitHubRepository.project_id.in_(user_projs))
-                # Also include repositories belonging to installations connected by this user
-                user_insts = (await self.db.execute(select(GitHubInstallation.id).where(GitHubInstallation.connected_by_user_id == current_user.id))).scalars().all()
+                # Also include repositories belonging to installations connected by this user or matching GitHub account ID
+                user_inst_filter = [GitHubInstallation.connected_by_user_id == current_user.id]
+                if getattr(current_user, "github_user_id", None):
+                    try:
+                        gh_id_int = int(current_user.github_user_id)
+                        user_inst_filter.append(GitHubInstallation.github_account_id == gh_id_int)
+                    except (ValueError, TypeError):
+                        pass
+                user_insts = (await self.db.execute(select(GitHubInstallation.id).where(or_(*user_inst_filter)))).scalars().all()
                 if user_insts:
                     scope_conditions.append(GitHubRepository.installation_id.in_(user_insts))
 
@@ -1256,8 +1287,11 @@ class GitHubService:
         check_run_id = None
         installation_id_int = None
 
-        if repo.installation:
-            installation_id_int = repo.installation.github_installation_id
+        try:
+            if getattr(repo, "installation", None):
+                installation_id_int = repo.installation.github_installation_id
+        except Exception:
+            pass
 
         # 1. Create GitHub Check Run in 'in_progress' state if authenticated
         if installation_id_int and commit_sha and self.auth.is_configured():
@@ -1315,6 +1349,26 @@ class GitHubService:
             # 3. Resolve Blueprint
             blueprint = await self.blueprint_repo.get_latest_for_project(job.project_id)
             blueprint_id = blueprint.id if blueprint else None
+
+            # 3b. Resolve & Synchronize Persistent Repository Intelligence Context
+            try:
+                from app.services.repository_intelligence_service import RepositoryIntelligenceService
+                intel_service = RepositoryIntelligenceService(self.db)
+                repo_snapshot = await intel_service.index_repository(
+                    repository_id=repo.id,
+                    commit_sha=commit_sha,
+                    branch=job.branch,
+                    force_full=False,
+                )
+                if repo_snapshot:
+                    job.recent_logs = (job.recent_logs or []) + [
+                        f"Repository Intelligence Context ready: {repo_snapshot.architecture_type} "
+                        f"(Understanding Score: {repo_snapshot.understanding_score}%, "
+                        f"{repo_snapshot.total_files_indexed} files, {repo_snapshot.total_symbols_indexed} symbols)"
+                    ]
+                    await self.db.commit()
+            except Exception as intel_err:
+                logger.warning(f"Repository intelligence sync during scan execution: {intel_err}")
 
             # 4. Step 6: Execute Real Security Scanners & Verification Engine Stage-by-Stage
             scan_target = ScanTarget(

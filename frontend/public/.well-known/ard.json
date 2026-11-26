@@ -1,0 +1,26 @@
+{
+  "entries": [
+    {
+      "identifier": "urn:air:kavachsecurity.me:mcp:security-gateway",
+      "displayName": "Kavach Security MCP Gateway",
+      "description": "Policy-enforced Model Context Protocol security gateway exposing real CLI scanners, ABAC scopes, and verified code remediation workflows.",
+      "type": "application/mcp-server-card+json",
+      "url": "https://kavachsecurity.me/api/v1/mcp/manifest",
+      "representativeQueries": [
+        "Scan a repository with Kavach security scanners over MCP",
+        "Check OPA policy rules and verify an AI code remediation patch"
+      ]
+    },
+    {
+      "identifier": "urn:air:kavachsecurity.me:docs:llms",
+      "displayName": "Kavach Documentation Index",
+      "description": "Machine-readable architecture index for Kavach Security.",
+      "type": "text/markdown; profile=\"urn:air:agent-skills\"",
+      "url": "https://kavachsecurity.me/llms.txt",
+      "representativeQueries": [
+        "How does Kavach enforce deterministic security policies for AI agents",
+        "Kavach API security, trust center, and scanner documentation"
+      ]
+    }
+  ]
+}

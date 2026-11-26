@@ -1,7 +1,19 @@
 from app.models.base import Base, TimestampMixin
+from app.models.billing import (
+    CreditAccount,
+    CreditTransaction,
+    BillingInvoice,
+)
 from app.models.email_models import (
     EmailDeliveryLog,
     WorkspaceNotificationSettings,
+)
+from app.models.support_models import (
+    PlatformAnnouncement,
+    AnnouncementDeliveryLog,
+)
+from app.models.hubspot_models import (
+    HubspotSyncLog,
 )
 from app.models.user import User
 from app.models.project import Project
@@ -257,6 +269,15 @@ from app.models.ai_assistant import (
     AIMessage,
     AIActionExecution,
 )
+from app.models.repository_intelligence import (
+    RepositorySnapshot,
+    RepositoryFileIndex,
+    RepositoryCodeSymbol,
+    RepositoryApiEndpoint,
+    RepositoryArchitectureMap,
+    RepositoryDependencyRelation,
+    RepositorySyncEvent,
+)
 
 
 from app.models.oauth import (
@@ -264,6 +285,16 @@ from app.models.oauth import (
     OAuthAuthorizationCode,
     OAuthToken,
     OAuthPendingTransaction,
+    OAuthSigningKey,
+    MCPClientContext,
+)
+
+from app.models.code_audit_models import (
+    CodeAuditRun,
+    CodeAuditFinding,
+    CodeAuditScoreCard,
+    CodeAuditTechnicalDebtReport,
+    CodeAuditAutofixProposal,
 )
 
 __all__ = [
@@ -355,5 +386,20 @@ __all__ = [
     "OAuthAuthorizationCode",
     "OAuthToken",
     "OAuthPendingTransaction",
+    "OAuthSigningKey",
+    "MCPClientContext",
+    "RepositorySnapshot",
+    "RepositoryFileIndex",
+    "RepositoryCodeSymbol",
+    "RepositoryApiEndpoint",
+    "RepositoryArchitectureMap",
+    "RepositoryDependencyRelation",
+    "RepositorySyncEvent",
+    "CodeAuditRun",
+    "CodeAuditFinding",
+    "CodeAuditScoreCard",
+    "CodeAuditTechnicalDebtReport",
+    "CodeAuditAutofixProposal",
+    "HubspotSyncLog",
 ]
 

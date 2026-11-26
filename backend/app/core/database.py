@@ -134,7 +134,8 @@ def set_session_factory(factory):
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for providing an async database session per request."""
-    async with AsyncSessionLocal() as session:
+    session_factory = get_session_factory()
+    async with session_factory() as session:
         try:
             yield session
         except Exception as e:

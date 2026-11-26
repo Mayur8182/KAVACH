@@ -2011,6 +2011,93 @@ async def get_iac_reports_overview(
     )
 
 
+# ─────────────────────────────────────────────
+# 10-Step Kavach IaC Security Flow Endpoints
+# ─────────────────────────────────────────────
+
+from pydantic import BaseModel
+
+class IaCPasteCodeRequest(BaseModel):
+    file_name: str = "main.tf"
+    file_type: str = "Terraform"
+    content: str
+
+
+@router.post("/target/paste", summary="Analyze pasted IaC configuration code in real-time")
+async def analyze_pasted_iac_code(
+    payload: IaCPasteCodeRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = IaCService(db)
+    return await service.analyze_pasted_code(
+        file_name=payload.file_name,
+        file_type=payload.file_type,
+        content=payload.content,
+    )
+
+
+@router.post("/findings/{finding_id}/autofix/analyze", summary="Run AST and blast-radius analysis for IaC finding")
+async def autofix_analyze_finding(
+    finding_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = IaCService(db)
+    return await service.autofix_analyze(finding_id)
+
+
+@router.post("/findings/{finding_id}/autofix/generate", summary="Generate verified patch diff for IaC finding")
+async def autofix_generate_finding(
+    finding_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = IaCService(db)
+    return await service.autofix_generate(finding_id)
+
+
+@router.post("/findings/{finding_id}/autofix/test", summary="Run syntax validation and policy test on generated patch")
+async def autofix_test_finding(
+    finding_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = IaCService(db)
+    return await service.autofix_test(finding_id)
+
+
+@router.post("/findings/{finding_id}/autofix/create-pr", summary="Create remediation Pull Request for IaC finding")
+async def autofix_create_pr_finding(
+    finding_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = IaCService(db)
+    return await service.autofix_create_pr_detailed(finding_id, current_user=current_user)
+
+
+@router.post("/findings/{finding_id}/autofix/merge", summary="Execute auto-merge for IaC remediation PR")
+async def autofix_merge_finding(
+    finding_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = IaCService(db)
+    return await service.autofix_merge(finding_id, current_user=current_user)
+
+
+@router.post("/findings/{finding_id}/autofix/verify", summary="Verify and rescan fixed IaC configuration")
+async def autofix_verify_finding(
+    finding_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = IaCService(db)
+    return await service.autofix_verify(finding_id, current_user=current_user)
+
+
+
 
 
 

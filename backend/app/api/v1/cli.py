@@ -20,6 +20,9 @@ import hashlib
 import json
 
 from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import User
+from app.services.workspace_resolver import user_can_access_project
 from app.models.cli_models import (
     DeveloperDevice,
     RepositoryBinding,
@@ -168,27 +171,21 @@ def _compute_cache_key(project_id: str, scanner: str, scanner_version: str,
 # ─────────────────────────────────────────────
 
 @router.post("/auth", response_model=CLIAuthResponse, summary="Register developer device")
-async def authenticate_device(req: CLIAuthRequest, db: AsyncSession = Depends(get_db)):
+async def authenticate_device(
+    req: CLIAuthRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """
-    Register a developer device. In production this initiates a device-code OAuth flow.
-    The returned token must be stored in the OS credential store (Windows Credential Manager /
-    macOS Keychain / Linux Secret Service) — NEVER in plaintext files.
+    Register a developer device bound to the OAuth-authenticated Kavach user.
     """
-    from sqlalchemy import select
-    from app.models.user import User
-
-    result = await db.execute(select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=400, detail="No users exist in the system. Create a user first.")
-
     try:
         os_type_enum = OSType(req.os_type)
     except ValueError:
         os_type_enum = OSType.UNKNOWN
 
     device = DeveloperDevice(
-        user_id=user.id,
+        user_id=current_user.id,
         name=req.device_name,
         os_type=os_type_enum,
         hostname=req.hostname,
@@ -197,10 +194,11 @@ async def authenticate_device(req: CLIAuthRequest, db: AsyncSession = Depends(ge
     await db.commit()
     await db.refresh(device)
 
-    # In production: issue a short-lived JWT bound to device_id
-    token = f"thing_tk_{device.id}"
-
-    return CLIAuthResponse(device_id=str(device.id), token=token)
+    return CLIAuthResponse(
+        device_id=str(device.id),
+        token="oauth_managed_by_caller",
+        message="Developer device registered to authenticated Kavach user.",
+    )
 
 
 # ─────────────────────────────────────────────
@@ -208,10 +206,13 @@ async def authenticate_device(req: CLIAuthRequest, db: AsyncSession = Depends(ge
 # ─────────────────────────────────────────────
 
 @router.post("/bind", response_model=RepoBindResponse, summary="Bind repository to project")
-async def bind_repository(req: RepoBindRequest, db: AsyncSession = Depends(get_db)):
+async def bind_repository(
+    req: RepoBindRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """
-    Bind a local repository (identified by path hash) to a Thing project.
-    Validates device authenticity and project existence before binding.
+    Bind a local repository (identified by path hash) to an authorized Kavach project.
     """
     from sqlalchemy import select
 
@@ -221,11 +222,11 @@ async def bind_repository(req: RepoBindRequest, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=400, detail="Invalid device_id format.")
 
     device_result = await db.execute(
-        select(DeveloperDevice).where(DeveloperDevice.id == dev_uuid)
+        select(DeveloperDevice).where(DeveloperDevice.id == dev_uuid, DeveloperDevice.user_id == current_user.id)
     )
     device = device_result.scalar_one_or_none()
     if not device:
-        raise HTTPException(status_code=401, detail="Device not found. Run 'thing auth login' first.")
+        raise HTTPException(status_code=401, detail="Device not found or belongs to another user.")
 
     try:
         proj_uuid = uuid.UUID(req.project_id)
@@ -238,6 +239,8 @@ async def bind_repository(req: RepoBindRequest, db: AsyncSession = Depends(get_d
     project = project_result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
+    if not await user_can_access_project(current_user, project, db):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to project.")
 
     binding = RepositoryBinding(
         device_id=device.id,

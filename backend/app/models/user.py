@@ -89,6 +89,16 @@ class User(Base, TimestampMixin):
         nullable=True,
         default=list,
     )
+    default_workspace_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+    )
+    default_project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+    )
 
     # Email Verification
     is_verified: Mapped[bool] = mapped_column(
@@ -148,6 +158,22 @@ class User(Base, TimestampMixin):
         nullable=True,
     )
     password_reset_sent_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # HubSpot CRM Synchronization
+    hubspot_contact_id: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+    )
+    hubspot_sync_status: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        default="PENDING",
+    )
+    last_hubspot_sync_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

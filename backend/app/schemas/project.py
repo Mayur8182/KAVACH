@@ -15,6 +15,9 @@ class ProjectCreate(BaseModel):
     cloud_provider: Optional[str] = Field(default=None, description="Target deployment cloud (e.g., aws, gcp)")
     environment: str = Field(default="development", description="Lifecycle environment (development, staging, production)")
     application_type: str = Field(default="web_service", description="Application category (payment_api, saas, microservice)")
+    workspace_id: Optional[uuid.UUID] = Field(default=None, description="Optional workspace ID to attach project to")
+    organization_id: Optional[uuid.UUID] = Field(default=None, description="Optional organization ID")
+    default_branch: Optional[str] = Field(default="main", description="Default Git branch")
 
 
 class ProjectUpdate(BaseModel):
@@ -36,6 +39,8 @@ class ProjectResponse(BaseModel):
 
     id: uuid.UUID
     owner_id: uuid.UUID
+    workspace_id: Optional[uuid.UUID] = None
+    organization_id: Optional[uuid.UUID] = None
     name: str
     description: Optional[str]
     repository_url: Optional[str]
@@ -45,6 +50,7 @@ class ProjectResponse(BaseModel):
     cloud_provider: Optional[str]
     environment: str
     application_type: str
+    default_branch: Optional[str] = "main"
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime]

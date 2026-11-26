@@ -91,3 +91,69 @@ class AddCustomRepositoryRequest(BaseModel):
 class BatchDeleteRepositoriesRequest(BaseModel):
     repository_ids: List[str] = Field(..., min_length=1, description="List of repository IDs to permanently delete")
 
+
+class TriggerIndexRequest(BaseModel):
+    branch: Optional[str] = Field(default="main", description="Target git branch to index")
+    commit_sha: Optional[str] = Field(default=None, description="Exact Git commit SHA")
+    force_full: bool = Field(default=False, description="Whether to bypass incremental sync and force full re-indexing")
+
+
+class RepositoryContextResponse(BaseModel):
+    repository_id: str
+    repository_name: str
+    status: str
+    commit_sha: Optional[str] = None
+    branch: str = "main"
+    understanding_score: int = 0
+    project: str = ""
+    languages: List[str] = Field(default_factory=list)
+    frameworks: List[str] = Field(default_factory=list)
+    database: List[str] = Field(default_factory=list)
+    orm_libraries: List[str] = Field(default_factory=list)
+    auth_mechanisms: List[str] = Field(default_factory=list)
+    external_integrations: List[str] = Field(default_factory=list)
+    architecture: str = "Modular Application"
+    modules: List[str] = Field(default_factory=list)
+    entryPoints: List[str] = Field(default_factory=list)
+    total_files_indexed: int = 0
+    total_symbols_indexed: int = 0
+    total_endpoints_mapped: int = 0
+    total_dependencies_mapped: int = 0
+    total_modules_identified: int = 0
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+    last_indexed_at: Optional[str] = None
+
+
+class RepositoryArchitectureResponse(BaseModel):
+    project_purpose: str = ""
+    architecture_style: str = ""
+    frontend_frameworks: List[str] = Field(default_factory=list)
+    backend_frameworks: List[str] = Field(default_factory=list)
+    database_technologies: List[str] = Field(default_factory=list)
+    orm_libraries: List[str] = Field(default_factory=list)
+    auth_mechanisms: List[str] = Field(default_factory=list)
+    external_integrations: List[str] = Field(default_factory=list)
+    modules: List[Dict[str, Any]] = Field(default_factory=list)
+    execution_entry_points: List[str] = Field(default_factory=list)
+    understanding_metrics: Dict[str, Any] = Field(default_factory=dict)
+
+
+class RepositoryDependencyItem(BaseModel):
+    source: str
+    target: str
+    type: str
+    is_external: bool
+    file_path: str
+
+
+class RepositorySyncStatusResponse(BaseModel):
+    repository_id: str
+    repository_name: str
+    has_snapshot: bool
+    status: str
+    last_commit_sha: Optional[str] = None
+    understanding_score: int = 0
+    last_synced_at: Optional[str] = None
+    recent_sync_events: List[Dict[str, Any]] = Field(default_factory=list)
+
+

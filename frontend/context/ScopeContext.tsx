@@ -82,34 +82,82 @@ export const ScopeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadRepositories = useCallback(async (projectId?: string | null, workspaceId?: string | null) => {
     setIsLoadingRepositories(true);
     try {
+      let items: RepositoryScope[] = [];
+
+      // 1. Try workspace repositories if workspaceId is present
       if (workspaceId) {
         const wsRepos = await api.workspaces.getRepositories(workspaceId).catch(() => []);
         if (Array.isArray(wsRepos) && wsRepos.length > 0) {
-          const mapped: RepositoryScope[] = wsRepos.map((r: any) => ({
-            id: r.id,
+          items = wsRepos.map((r: any) => ({
+            id: String(r.id),
             name: r.name,
             full_name: r.full_name,
-            default_branch: r.default_branch,
+            default_branch: r.default_branch || 'main',
             provider: 'github',
             project_id: r.project_id || undefined,
           }));
-          setRepositories(mapped);
-          const savedRepoName = typeof window !== 'undefined' ? localStorage.getItem('secu_active_repo') : null;
-          let selected = savedRepoName ? mapped.find((r) => r.name === savedRepoName || r.id === savedRepoName) : undefined;
-          if (!selected) selected = mapped[0];
-          setCurrentRepositoryState(selected || null);
-          return;
         }
       }
 
-      const res = await api.code.repositories({ projectId: projectId || undefined, limit: 50 });
-      const items: RepositoryScope[] = Array.isArray(res?.items) ? res.items : [];
+      // 2. Query code repositories
+      if (items.length === 0) {
+        const res = await api.code.repositories({ projectId: projectId || undefined, limit: 100 }).catch(() => null);
+        if (Array.isArray(res?.items) && res.items.length > 0) {
+          items = res.items.map((r: any) => ({
+            id: String(r.id || r.repository_id || r.name),
+            name: r.name || r.repository_name || (r.full_name ? r.full_name.split('/').pop() : 'repository'),
+            full_name: r.full_name || r.name,
+            default_branch: r.default_branch || 'main',
+            provider: 'github',
+            project_id: r.project_id || projectId || undefined,
+          }));
+        }
+      }
+
+      // 3. Always merge with authorized GitHub App repositories so connected repos are never hidden
+      let ghRepos = await api.github.getRepositories(workspaceId || undefined).catch(() => []);
+      if (!Array.isArray(ghRepos) || ghRepos.length === 0) {
+        ghRepos = await api.github.getRepositories().catch(() => []);
+      }
+      if (Array.isArray(ghRepos) && ghRepos.length > 0) {
+        const existingNames = new Set(items.map((i) => (i.full_name || i.name).toLowerCase()));
+        for (const gr of ghRepos) {
+          const fn = gr.full_name || gr.name;
+          if (!existingNames.has(fn.toLowerCase())) {
+            items.push({
+              id: String(gr.id || gr.github_id || gr.name),
+              name: gr.name || (gr.full_name ? gr.full_name.split('/').pop() : 'repository'),
+              full_name: gr.full_name || gr.name,
+              default_branch: gr.default_branch || 'main',
+              provider: 'github',
+              project_id: gr.project_id || projectId || undefined,
+            });
+            existingNames.add(fn.toLowerCase());
+          }
+        }
+      }
+
       setRepositories(items);
 
       if (items.length > 0) {
         const savedRepoName = typeof window !== 'undefined' ? localStorage.getItem('secu_active_repo') : null;
-        let selected = savedRepoName ? items.find((r) => r.name === savedRepoName || r.id === savedRepoName) : undefined;
-        if (!selected) selected = items[0];
+        let selected: RepositoryScope | undefined;
+        if (savedRepoName) {
+          selected = items.find(
+            (r) =>
+              r.name.toLowerCase() === savedRepoName.toLowerCase() ||
+              (r.full_name && r.full_name.toLowerCase() === savedRepoName.toLowerCase()) ||
+              String(r.id) === savedRepoName
+          );
+        }
+        if (!selected) {
+          // Select KAVACH repo if present, or take first
+          selected = items.find(
+            (r) =>
+              r.name.toLowerCase().includes('kavach') ||
+              (r.full_name && r.full_name.toLowerCase().includes('kavach'))
+          ) || items[0];
+        }
         setCurrentRepositoryState(selected || null);
         if (selected && typeof window !== 'undefined') {
           localStorage.setItem('secu_active_repo', selected.name);

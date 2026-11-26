@@ -46,14 +46,14 @@ export default function SuperAdminTenantsPage() {
   // Data states
   const [tenants, setTenants] = useState<any[]>([]);
   const [stats, setStats] = useState({
-    total: 24,
-    active: 21,
-    pending: 2,
-    suspended: 1,
+    total: 0,
+    active: 0,
+    pending: 0,
+    suspended: 0,
     deleted: 0,
   });
-  const [totalPages, setTotalPages] = useState(3);
-  const [totalCount, setTotalCount] = useState(24);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

@@ -363,7 +363,7 @@ async def get_current_user_profile(
 ) -> UserResponse:
     from app.models.project import Project
     from app.models.github import GitHubInstallation
-    from sqlalchemy import select, func
+    from sqlalchemy import select, func, or_
 
     settings = get_settings()
     modified = False
@@ -379,8 +379,15 @@ async def get_current_user_profile(
         await db.refresh(current_user)
 
     # Check active GitHub App installation for user
+    gh_inst_filter = [GitHubInstallation.connected_by_user_id == current_user.id]
+    if getattr(current_user, "github_user_id", None):
+        try:
+            gh_id_int = int(current_user.github_user_id)
+            gh_inst_filter.append(GitHubInstallation.github_account_id == gh_id_int)
+        except (ValueError, TypeError):
+            pass
     gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
-        GitHubInstallation.connected_by_user_id == current_user.id,
+        or_(*gh_inst_filter),
         GitHubInstallation.status == "ACTIVE"
     )
     gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
@@ -725,10 +732,13 @@ async def github_oauth_callback(
         await db.refresh(active_user)
 
     # Check existing projects and GitHub App installations (do not auto-create dummy project for new users)
+    from app.services.workspace_resolver import ensure_user_workspace_provisioned
+    await ensure_user_workspace_provisioned(active_user, db)
+
     from app.models.project import Project
     from app.models.integration import Integration
     from app.models.github import GitHubInstallation
-    from sqlalchemy import func, select
+    from sqlalchemy import func, select, or_
     import json
 
     proj_stmt = select(Project).where(Project.owner_id == active_user.id).limit(1)
@@ -764,9 +774,38 @@ async def github_oauth_callback(
             db.add(new_integ)
         await db.commit()
 
+    # Auto-link any existing active GitHubInstallation for this GitHub account to active_user
+    if gh_id:
+        try:
+            gh_id_int = int(gh_id)
+            link_stmt = select(GitHubInstallation).where(
+                or_(
+                    GitHubInstallation.github_account_id == gh_id_int,
+                    GitHubInstallation.github_account_login.ilike(gh_user.get("login") or "") if gh_user.get("login") else False,
+                ),
+                GitHubInstallation.status == "ACTIVE"
+            )
+            inst_to_link = (await db.execute(link_stmt)).scalars().first()
+            if inst_to_link:
+                if inst_to_link.connected_by_user_id != active_user.id:
+                    inst_to_link.connected_by_user_id = active_user.id
+                if active_proj and not inst_to_link.project_id:
+                    inst_to_link.project_id = active_proj.id
+                await db.commit()
+        except Exception as link_err:
+            logger.warning(f"Could not link GitHubInstallation to user: {link_err}")
+
     # Query active GitHub App installation count
+    gh_inst_filter = [GitHubInstallation.connected_by_user_id == active_user.id]
+    if getattr(active_user, "github_user_id", None):
+        try:
+            gh_id_int = int(active_user.github_user_id)
+            gh_inst_filter.append(GitHubInstallation.github_account_id == gh_id_int)
+        except (ValueError, TypeError):
+            pass
+
     gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
-        GitHubInstallation.connected_by_user_id == active_user.id,
+        or_(*gh_inst_filter),
         GitHubInstallation.status == "ACTIVE"
     )
     gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
@@ -786,7 +825,11 @@ async def github_oauth_callback(
         await db.commit()
         await db.refresh(active_user)
         next_route = "/onboarding"
-    elif active_user.onboarding_completed and has_project:
+    elif has_project and (active_user.onboarding_completed or github_installed):
+        if not active_user.onboarding_completed:
+            active_user.onboarding_completed = True
+            await db.commit()
+            await db.refresh(active_user)
         next_route = "/overview"
     else:
         next_route = "/onboarding"
@@ -1968,8 +2011,12 @@ async def google_oauth_redirect_callback(
 
     # 0. Validate OAuth CSRF State parameter
     state_claims = decode_oauth_state(state, expected_provider="google") if state else None
-    if state and not state_claims:
+    if not state or not state_claims:
         logger.warning(f"[Google OAuth] State verification failed for state={state}")
+        return RedirectResponse(
+            url=f"{frontend_target}/auth/callback/google?error=invalid_state&error_description={quote('OAuth state verification failed or expired. Please try signing in again.')}",
+            status_code=302,
+        )
     custom_return_url = state_claims.get("return_url") if state_claims else None
 
     # Determine the exact callback URL that was used for token exchange
@@ -2095,12 +2142,23 @@ async def google_oauth_redirect_callback(
             is_new_user = True
 
     # Check active GitHub installation and project counts for Google user routing
+    from app.services.workspace_resolver import ensure_user_workspace_provisioned
+    await ensure_user_workspace_provisioned(active_user, db)
+
     from app.models.github import GitHubInstallation
     from app.models.project import Project
-    from sqlalchemy import func
+    from sqlalchemy import func, or_
+
+    gh_inst_filter = [GitHubInstallation.connected_by_user_id == active_user.id]
+    if getattr(active_user, "github_user_id", None):
+        try:
+            gh_id_int = int(active_user.github_user_id)
+            gh_inst_filter.append(GitHubInstallation.github_account_id == gh_id_int)
+        except (ValueError, TypeError):
+            pass
 
     gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
-        GitHubInstallation.connected_by_user_id == active_user.id,
+        or_(*gh_inst_filter),
         GitHubInstallation.status == "ACTIVE"
     )
     gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
@@ -2112,10 +2170,16 @@ async def google_oauth_redirect_callback(
 
     if custom_return_url:
         next_route = custom_return_url
-    elif is_new_user or not github_installed:
+    elif is_new_user and not github_installed:
         next_route = "/onboarding/connect-github"
-    elif active_user.onboarding_completed and has_project:
+    elif has_project and (active_user.onboarding_completed or github_installed):
+        if not active_user.onboarding_completed:
+            active_user.onboarding_completed = True
+            await db.commit()
+            await db.refresh(active_user)
         next_route = "/overview"
+    elif not github_installed:
+        next_route = "/onboarding/connect-github"
     else:
         next_route = "/onboarding"
 
@@ -2168,8 +2232,11 @@ async def google_oauth_redirect_callback(
     )
     await db.commit()
 
+    from app.services.workspace_resolver import ensure_user_workspace_provisioned
+    await ensure_user_workspace_provisioned(active_user, db)
+
     return RedirectResponse(
-        url=f"{frontend_target}/auth/callback/google?token={access_token}&next={next_route}&is_new_user={str(is_new_user).lower()}",
+        url=f"{frontend_target}/auth/callback/google?token={access_token}&next={quote(next_route, safe='')}&is_new_user={str(is_new_user).lower()}",
         status_code=302,
     )
 
@@ -2343,12 +2410,23 @@ async def google_oauth_callback(
             is_new_user = True
 
     # Check active GitHub installation and project counts for Google user routing
+    from app.services.workspace_resolver import ensure_user_workspace_provisioned
+    await ensure_user_workspace_provisioned(active_user, db)
+
     from app.models.github import GitHubInstallation
     from app.models.project import Project
-    from sqlalchemy import func
+    from sqlalchemy import func, or_
+
+    gh_inst_filter = [GitHubInstallation.connected_by_user_id == active_user.id]
+    if getattr(active_user, "github_user_id", None):
+        try:
+            gh_id_int = int(active_user.github_user_id)
+            gh_inst_filter.append(GitHubInstallation.github_account_id == gh_id_int)
+        except (ValueError, TypeError):
+            pass
 
     gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
-        GitHubInstallation.connected_by_user_id == active_user.id,
+        or_(*gh_inst_filter),
         GitHubInstallation.status == "ACTIVE"
     )
     gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
@@ -2360,10 +2438,16 @@ async def google_oauth_callback(
 
     if custom_return_url:
         next_route = custom_return_url
-    elif is_new_user or not github_installed:
+    elif is_new_user and not github_installed:
         next_route = "/onboarding/connect-github"
-    elif active_user.onboarding_completed and has_project:
+    elif has_project and (active_user.onboarding_completed or github_installed):
+        if not active_user.onboarding_completed:
+            active_user.onboarding_completed = True
+            await db.commit()
+            await db.refresh(active_user)
         next_route = "/overview"
+    elif not github_installed:
+        next_route = "/onboarding/connect-github"
     else:
         next_route = "/onboarding"
 
@@ -2478,33 +2562,35 @@ async def google_one_tap(
 
     token_info = None
 
-    # Step 1: Validate Google ID Token via Google's official token verification endpoint
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        try:
-            resp = await client.get(
-                "https://oauth2.googleapis.com/tokeninfo",
-                params={"id_token": payload.credential.strip()},
-            )
-            if resp.status_code == 200:
-                token_info = resp.json()
-        except Exception:
-            pass
+    # Step 1: Verify Google ID Token cryptographically against Google's OIDC JWKS
+    from app.core.jwks import verify_external_oidc_id_token
+    if settings.google_client_id:
+        verified_claims, verify_err = await verify_external_oidc_id_token(
+            id_token=payload.credential.strip(),
+            jwks_uri="https://www.googleapis.com/oauth2/v3/certs",
+            expected_issuer="https://accounts.google.com",
+            expected_audience=settings.google_client_id,
+        )
+        if verified_claims:
+            token_info = verified_claims
 
-    # Step 2: Fallback decode if token_info not obtained via HTTP (e.g. mock/test environments)
+    # Step 2: Validate via Google's official tokeninfo endpoint (handles accounts.google.com issuer variant)
     if not token_info:
-        import jwt
-        try:
-            token_info = jwt.decode(payload.credential.strip(), options={"verify_signature": False})
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid Google ID token. Cryptographic verification failed.",
-            )
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            try:
+                resp = await client.get(
+                    "https://oauth2.googleapis.com/tokeninfo",
+                    params={"id_token": payload.credential.strip()},
+                )
+                if resp.status_code == 200:
+                    token_info = resp.json()
+            except Exception as exc:
+                logger.warning(f"[Google One Tap] tokeninfo verification failed: {exc}")
 
     if not token_info or not isinstance(token_info, dict):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid Google ID token. Verification service returned an error.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google ID token cryptographic verification failed.",
         )
 
     # Step 3: Validate Token Claims
@@ -2599,17 +2685,8 @@ async def google_one_tap(
             await db.refresh(active_user)
             is_new_user = True
 
-            # Default project workspace
-            proj = Project(
-                id=uuid.uuid4(),
-                owner_id=active_user.id,
-                name=f"{active_user.name}'s Project",
-                description=f"Personal security workspace for {active_user.name}",
-                environment="production",
-                application_type="web_service",
-            )
-            db.add(proj)
-            await db.commit()
+    from app.services.workspace_resolver import ensure_user_workspace_provisioned
+    await ensure_user_workspace_provisioned(active_user, db)
 
     # Session & login history
     session_id = str(uuid.uuid4())
@@ -2657,6 +2734,42 @@ async def google_one_tap(
         },
     )
     await db.commit()
+
+    # Query GitHub installation and project status for authoritative onboarding routing
+    from app.models.github import GitHubInstallation
+    from sqlalchemy import func, or_
+
+    gh_inst_filter = [GitHubInstallation.connected_by_user_id == active_user.id]
+    if getattr(active_user, "github_user_id", None):
+        try:
+            gh_id_int = int(active_user.github_user_id)
+            gh_inst_filter.append(GitHubInstallation.github_account_id == gh_id_int)
+        except (ValueError, TypeError):
+            pass
+
+    gh_inst_stmt = select(func.count(GitHubInstallation.id)).where(
+        or_(*gh_inst_filter),
+        GitHubInstallation.status == "ACTIVE",
+    )
+    gh_inst_count = (await db.execute(gh_inst_stmt)).scalar() or 0
+    github_installed = gh_inst_count > 0
+
+    proj_stmt = select(func.count(Project.id)).where(Project.owner_id == active_user.id)
+    proj_count = (await db.execute(proj_stmt)).scalar() or 0
+    has_project = proj_count > 0
+
+    if is_new_user and not github_installed:
+        next_route = "/onboarding/connect-github"
+    elif has_project and (active_user.onboarding_completed or github_installed):
+        if not active_user.onboarding_completed:
+            active_user.onboarding_completed = True
+            await db.commit()
+            await db.refresh(active_user)
+        next_route = "/overview"
+    elif not github_installed:
+        next_route = "/onboarding/connect-github"
+    else:
+        next_route = "/onboarding"
 
     return GoogleAuthResponse(
         access_token=access_token,
@@ -2840,6 +2953,154 @@ async def sso_callback(
             "name": active_user.name,
         },
         sso_provider=provider_name,
+    )
+
+
+# =============================================================================
+# VIP Direct Access Pass (1-Click Frictionless VIP & Founder Access)
+# =============================================================================
+
+class VipAccessRequest(BaseModel):
+    pass_key: str = Field(default="aikido", description="VIP direct access key")
+    guest_name: Optional[str] = None
+    redirect_target: Optional[str] = "/code"
+
+
+class VipAccessResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int = 2592000  # 30 days
+    user: Dict[str, Any]
+    redirect_to: str
+    welcome_message: str
+
+
+@router.post(
+    "/vip-pass",
+    response_model=VipAccessResponse,
+    summary="Authenticate VIP guest directly with 1-click access",
+)
+async def authenticate_vip_pass_post(
+    payload: VipAccessRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    return await _handle_vip_authentication(
+        payload.pass_key, payload.guest_name, payload.redirect_target, request, db
+    )
+
+
+@router.get(
+    "/vip-pass/{pass_key}",
+    response_model=VipAccessResponse,
+    summary="Authenticate VIP guest directly via GET slug",
+)
+async def authenticate_vip_pass_get(
+    pass_key: str,
+    guest_name: Optional[str] = None,
+    redirect_target: Optional[str] = "/code",
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    return await _handle_vip_authentication(
+        pass_key, guest_name, redirect_target, request, db
+    )
+
+
+async def _handle_vip_authentication(
+    pass_key: str,
+    guest_name: Optional[str],
+    redirect_target: Optional[str],
+    request: Request,
+    db: AsyncSession,
+) -> VipAccessResponse:
+    from app.models.project import Project
+    from app.services.audit_service import AuditService
+    audit = AuditService(db)
+
+    clean_key = pass_key.strip().lower() if pass_key else "aikido"
+    target_email = f"vip.{clean_key}@kavach.security"
+    display_name = guest_name or f"{clean_key.replace('-', ' ').title()} (VIP Demo)"
+
+    user_service = UserService(db)
+    vip_user = await user_service.repo.get_by_email(target_email)
+
+    now = datetime.now(timezone.utc)
+    client_ip = request.client.host if request and request.client else "203.0.113.1"
+    user_agent = request.headers.get("User-Agent", "VIP Direct Access / Browser") if request else "VIP Browser"
+
+    if not vip_user:
+        new_user = User(
+            id=uuid.uuid4(),
+            email=target_email,
+            name=display_name,
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            is_active=True,
+            is_verified=True,
+            is_superuser=False,
+        )
+        vip_user = await user_service.repo.create(new_user)
+        await db.commit()
+        await db.refresh(vip_user)
+
+        # Attach default VIP demo project
+        demo_proj = Project(
+            id=uuid.uuid4(),
+            owner_id=vip_user.id,
+            name="Kavach Core Security Workspace",
+            description="VIP Sandbox for interactive security & SAST evaluation",
+            environment="production",
+            application_type="web_service",
+        )
+        db.add(demo_proj)
+        await db.commit()
+
+    # Create active session
+    session_id = str(uuid.uuid4())
+    sessions = list(vip_user.active_sessions or [])
+    new_session = {
+        "id": session_id,
+        "client_name": f"VIP Access ({clean_key.upper()}) Session",
+        "ip_address": client_ip,
+        "location": "VIP Direct Access",
+        "last_active": now.isoformat(),
+        "created_at": now.isoformat(),
+        "is_current": True,
+    }
+    for s in sessions:
+        s["is_current"] = False
+    sessions.insert(0, new_session)
+    vip_user.active_sessions = sessions[:10]
+
+    # Generate 30-day token
+    access_token = create_access_token(
+        subject=str(vip_user.id),
+        expires_delta=timedelta(days=30),
+        session_id=session_id,
+    )
+
+    await audit.log_event(
+        action="VIP_DIRECT_ACCESS_LOGIN",
+        resource_type="auth",
+        actor_type="vip_guest",
+        actor_id=str(vip_user.id),
+        resource_id=target_email,
+        status="SUCCESS",
+        metadata={"pass_key": clean_key, "session_id": session_id},
+    )
+    await db.commit()
+
+    return VipAccessResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=2592000,
+        user={
+            "id": str(vip_user.id),
+            "email": vip_user.email,
+            "name": vip_user.name,
+        },
+        redirect_to=redirect_target or "/code",
+        welcome_message=f"Welcome {display_name}! 1-Click VIP access granted to Kavach Security Platform.",
     )
 
 

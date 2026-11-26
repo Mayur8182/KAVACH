@@ -19,11 +19,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   // Auto-close mobile drawer when navigating to a new route
+  const prevPathnameRef = React.useRef(pathname);
   React.useEffect(() => {
-    setIsMobileOpen(false);
+    if (prevPathnameRef.current !== pathname) {
+      prevPathnameRef.current = pathname;
+      setIsMobileOpen(false);
+    }
   }, [pathname]);
 
-  // Prevent background scrolling while mobile navigation drawer is open (Phase 3)
+  // Prevent background scrolling while mobile navigation drawer is open
   React.useEffect(() => {
     if (typeof document !== 'undefined') {
       if (isMobileOpen) {
@@ -60,8 +64,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     setCurrentEnv(e || null);
   }, [setCurrentEnv]);
 
-  const isApiSecurityRoute = pathname?.startsWith('/api-security');
-  const sidebarWidth = isApiSecurityRoute ? '0px' : (isCollapsed ? '64px' : '240px');
+  // Fixed compact icon rail width (56px) matching Linear / Notion reference layout
+  const sidebarWidth = '56px';
 
   return (
     <div
@@ -75,17 +79,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         '--topbar-height': '56px',
       } as React.CSSProperties}
     >
-      {/* 1. Global SecuLayer Sidebar — hidden on API Security routes */}
-      {!isApiSecurityRoute && (
-        <Sidebar
-          isCollapsed={isCollapsed}
-          onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
-          isMobileOpen={isMobileOpen}
-          onCloseMobile={() => setIsMobileOpen(false)}
-        />
-      )}
+      {/* 1. Global Kavach Enterprise Sidebar */}
+      <Sidebar
+        isCollapsed={isCollapsed}
+        onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+        isMobileOpen={isMobileOpen}
+        onCloseMobile={() => setIsMobileOpen(false)}
+      />
 
-      {/* Main Column */}
+      {/* Main Single-Plane Column */}
       <div
         className="kavach-main-column"
         style={{
@@ -93,8 +95,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           flexDirection: 'column',
           flex: 1,
           minWidth: 0,
-          width: isApiSecurityRoute ? '100%' : `calc(100% - var(--sidebar-width, ${sidebarWidth}))`,
+          width: `calc(100% - var(--sidebar-width, ${sidebarWidth}))`,
           transition: 'width 200ms cubic-bezier(0.16, 1, 0.3, 1)',
+          backgroundColor: '#F8FAFC',
         }}
       >
         {/* 2. Global Topbar */}
@@ -106,10 +109,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           currentEnv={currentEnv || undefined}
           onSelectEnv={handleSelectEnv}
           onOpenMobile={() => setIsMobileOpen(true)}
-          showBrandLogo={isApiSecurityRoute}
+          showBrandLogo={false}
         />
 
-        {/* 3. Page Container with Dual-Layer RouteGuard */}
+        {/* 3. Page Container with Dual-Layer RouteGuard — Flat, Unified Single-Plane */}
         <main
           id="main-content"
           tabIndex={-1}
@@ -118,7 +121,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             display: 'flex',
             flexDirection: 'column',
             overflowY: 'auto',
-            backgroundColor: isApiSecurityRoute ? '#F8FAFC' : '#F8FAFC',
+            backgroundColor: '#F8FAFC',
             minHeight: 0,
             width: '100%',
           }}

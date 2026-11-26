@@ -1115,29 +1115,6 @@ export default function RepositoriesPage() {
             )}
           </div>
 
-          {/* Centralized Matrix Link */}
-          <Link
-            href="/repositories"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              borderRadius: '8px',
-              border: '1px solid #E2E8F0',
-              backgroundColor: '#F8FAFC',
-              color: '#3B82F6',
-              fontSize: '13px',
-              fontWeight: 600,
-              textDecoration: 'none',
-              cursor: 'pointer',
-            }}
-            title="View Centralized Repository Management Matrix across all security modules"
-          >
-            <ShieldCheck size={15} />
-            <span>Module Matrix</span>
-          </Link>
-
           {/* Multi-repo Bulk Delete Button */}
           {selectedIds.length > 0 && (
             <button

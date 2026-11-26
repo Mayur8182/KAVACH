@@ -38,12 +38,12 @@
   --color-primary-border:     #e4e4e7; /* Zinc 200 */
   --color-primary-text:       #ffffff;
 
-  /* --- Accent (Developer & Link Action: Cobalt Blue) --- */
-  --color-accent:             #2563eb; /* Blue 600 */
-  --color-accent-hover:       #1d4ed8; /* Blue 700 */
-  --color-accent-subtle:      #eff6ff; /* Blue 50 */
-  --color-accent-border:      #bfdbfe; /* Blue 200 */
-  --color-accent-text:        #1d4ed8;
+  /* --- Accent (Developer & Link Action: Slate & Emerald Palette) --- */
+  --color-accent:             #0f172a; /* Slate 900 */
+  --color-accent-hover:       #1e293b; /* Slate 800 */
+  --color-accent-subtle:      #f1f5f9; /* Slate 100 */
+  --color-accent-border:      #cbd5e1; /* Slate 300 */
+  --color-accent-text:        #0f172a;
 
   /* --- Semantic: Status & Health --- */
   --color-success:            #10b981;
@@ -109,8 +109,8 @@
   --severity-safe-dot:        #10b981;
 
   /* --- Typography Scale (Strict DevSecOps Ergonomic Hierarchy) --- */
-  --font-sans:                'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono:                'JetBrains Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+  --font-sans:                var(--font-next-sans, 'Plus Jakarta Sans'), 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:                var(--font-next-mono, 'JetBrains Mono'), 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
 
   --text-2xs:                 10px;
   --text-xs:                  11px;

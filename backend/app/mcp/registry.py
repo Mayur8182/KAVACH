@@ -1,6 +1,18 @@
 from typing import Any, Callable, Dict, List, Optional
 from app.mcp.schemas import ToolDefinition
-from app.mcp.tools.projects import execute_get_project, execute_list_projects
+from app.mcp.tools.projects import (
+    execute_connect_repository,
+    execute_create_project,
+    execute_get_active_project,
+    execute_get_available_permissions,
+    execute_get_connection_status,
+    execute_get_current_user,
+    execute_get_project,
+    execute_get_workspace,
+    execute_list_projects,
+    execute_list_workspaces,
+    execute_set_active_project,
+)
 from app.mcp.tools.security import (
     execute_check_security_policy,
     execute_get_security_blueprint,
@@ -126,6 +138,147 @@ class MCPToolRegistry:
                 },
             ),
             execute_get_project,
+        )
+
+        # 1b. Account, Workspace & Project Context Tools
+        self.register(
+            ToolDefinition(
+                name="get_current_user",
+                description="Identify the authenticated Kavach user account, default workspace/project, and active client scopes.",
+                version="1.0.0",
+                category="PROJECT",
+                required_permission="PROJECT_READ",
+                risk_level="LOW",
+                input_schema={"type": "object", "properties": {}},
+            ),
+            execute_get_current_user,
+        )
+        self.register(
+            ToolDefinition(
+                name="list_workspaces",
+                description="List all Personal and Organization workspaces accessible to the authenticated Kavach user.",
+                version="1.0.0",
+                category="PROJECT",
+                required_permission="PROJECT_READ",
+                risk_level="LOW",
+                input_schema={"type": "object", "properties": {}},
+            ),
+            execute_list_workspaces,
+        )
+        self.register(
+            ToolDefinition(
+                name="get_workspace",
+                description="Get details and projects for the active workspace (or specified workspace_id).",
+                version="1.0.0",
+                category="PROJECT",
+                required_permission="PROJECT_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {"workspace_id": {"type": "string", "description": "Optional workspace UUID"}},
+                },
+            ),
+            execute_get_workspace,
+        )
+        self.register(
+            ToolDefinition(
+                name="get_active_project",
+                description="Get the currently active or default Kavach project resolved for this AI client.",
+                version="1.0.0",
+                category="PROJECT",
+                required_permission="PROJECT_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {"git_remote": {"type": "string", "description": "Optional Git remote URL to auto-match"}},
+                },
+            ),
+            execute_get_active_project,
+        )
+        self.register(
+            ToolDefinition(
+                name="set_active_project",
+                description="Switch the active project for this AI client (and optionally update your shared default project).",
+                version="1.0.0",
+                category="PROJECT",
+                required_permission="PROJECT_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Authorized project UUID"},
+                        "git_remote": {"type": "string", "description": "Optional Git remote URL to match"},
+                        "set_as_default": {"type": "boolean", "description": "Also set as shared default project across clients", "default": False},
+                    },
+                },
+            ),
+            execute_set_active_project,
+        )
+        self.register(
+            ToolDefinition(
+                name="create_project",
+                description="Create a new project in your authorized Kavach workspace and set it as active.",
+                version="1.0.0",
+                category="PROJECT",
+                required_permission="PROJECT_WRITE",
+                risk_level="MEDIUM",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Project name"},
+                        "description": {"type": "string", "description": "Project description"},
+                        "workspace_id": {"type": "string", "description": "Optional workspace UUID"},
+                        "repository_url": {"type": "string", "description": "Optional Git repository URL"},
+                        "environment": {"type": "string", "description": "Environment (production, staging, development)", "default": "production"},
+                        "set_as_default": {"type": "boolean", "default": False},
+                    },
+                    "required": ["name"],
+                },
+            ),
+            execute_create_project,
+        )
+        self.register(
+            ToolDefinition(
+                name="connect_repository",
+                description="Associate an authorized GitHub repository or Git remote URL with a Kavach project.",
+                version="1.0.0",
+                category="GITHUB",
+                required_permission="PROJECT_WRITE",
+                risk_level="MEDIUM",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "repository": {"type": "string", "description": "Repository full name (owner/repo) or URL"},
+                        "project_id": {"type": "string", "description": "Target project UUID (defaults to active project)"},
+                    },
+                    "required": ["repository"],
+                },
+            ),
+            execute_connect_repository,
+        )
+        self.register(
+            ToolDefinition(
+                name="get_connection_status",
+                description="Check Kavach MCP authentication status, active project, granted scopes, and GitHub connection status.",
+                version="1.0.0",
+                category="PROJECT",
+                required_permission="PROJECT_READ",
+                risk_level="LOW",
+                input_schema={"type": "object", "properties": {}},
+            ),
+            execute_get_connection_status,
+        )
+        self.register(
+            ToolDefinition(
+                name="get_available_permissions",
+                description="Return granted OAuth scopes and per-tool authorization capabilities for this connection.",
+                version="1.0.0",
+                category="PROJECT",
+                required_permission="PROJECT_READ",
+                risk_level="LOW",
+                input_schema={"type": "object", "properties": {}},
+            ),
+            execute_get_available_permissions,
         )
 
         # 2. get_security_blueprint

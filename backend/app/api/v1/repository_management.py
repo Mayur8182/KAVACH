@@ -22,6 +22,11 @@ from app.schemas.repository_management import (
     UpdateRepositoryModulesRequest,
     AddCustomRepositoryRequest,
     BatchDeleteRepositoriesRequest,
+    TriggerIndexRequest,
+    RepositoryContextResponse,
+    RepositoryArchitectureResponse,
+    RepositoryDependencyItem,
+    RepositorySyncStatusResponse,
 )
 
 router = APIRouter(prefix="/repositories", tags=["Repository Management"])
@@ -689,4 +694,162 @@ async def delete_single_repository(
         tenant=tenant,
         db=db,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# KAVACH REPOSITORY INTELLIGENCE & CODEBASE UNDERSTANDING ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/{repository_id}/index",
+    response_model=RepositoryContextResponse,
+    summary="Trigger repository discovery and codebase indexing",
+    description="Analyzes full codebase structure, AST symbols, API inventory, and architecture.",
+)
+async def index_repository_endpoint(
+    repository_id: str,
+    payload: Optional[TriggerIndexRequest] = None,
+    tenant: TenantContext = Depends(get_current_tenant_context),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        rid = uuid.UUID(repository_id.strip())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid repository UUID")
+
+    from app.services.repository_intelligence_service import RepositoryIntelligenceService
+    service = RepositoryIntelligenceService(db, current_user=tenant.user)
+
+    req = payload or TriggerIndexRequest()
+    try:
+        snap = await service.index_repository(
+            repository_id=rid,
+            commit_sha=req.commit_sha,
+            branch=req.branch,
+            force_full=req.force_full,
+        )
+        context = await service.get_repository_context(rid, commit_sha=snap.commit_sha)
+        return RepositoryContextResponse(**context)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Indexing failed: {str(exc)}")
+
+
+@router.get(
+    "/{repository_id}/context",
+    response_model=RepositoryContextResponse,
+    summary="Get persistent repository context and understanding metrics",
+    description="Returns high-level project purpose, languages, frameworks, DBs, entry points, and understanding score.",
+)
+async def get_repository_context_endpoint(
+    repository_id: str,
+    commit_sha: Optional[str] = Query(None, description="Optional commit SHA filter"),
+    tenant: TenantContext = Depends(get_current_tenant_context),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        rid = uuid.UUID(repository_id.strip())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid repository UUID")
+
+    from app.services.repository_intelligence_service import RepositoryIntelligenceService
+    service = RepositoryIntelligenceService(db, current_user=tenant.user)
+    context = await service.get_repository_context(rid, commit_sha=commit_sha)
+    return RepositoryContextResponse(**context)
+
+
+@router.get(
+    "/{repository_id}/architecture",
+    response_model=RepositoryArchitectureResponse,
+    summary="Get detailed architecture breakdown and module inventory",
+)
+async def get_repository_architecture_endpoint(
+    repository_id: str,
+    tenant: TenantContext = Depends(get_current_tenant_context),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        rid = uuid.UUID(repository_id.strip())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid repository UUID")
+
+    from app.services.repository_intelligence_service import RepositoryIntelligenceService
+    service = RepositoryIntelligenceService(db, current_user=tenant.user)
+    res = await service.get_repository_architecture(rid)
+    return RepositoryArchitectureResponse(**res)
+
+
+@router.get(
+    "/{repository_id}/dependencies",
+    response_model=List[RepositoryDependencyItem],
+    summary="Get internal module relationships and external package dependencies",
+)
+async def get_repository_dependencies_endpoint(
+    repository_id: str,
+    tenant: TenantContext = Depends(get_current_tenant_context),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        rid = uuid.UUID(repository_id.strip())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid repository UUID")
+
+    from app.services.repository_intelligence_service import RepositoryIntelligenceService
+    service = RepositoryIntelligenceService(db, current_user=tenant.user)
+    deps = await service.get_repository_dependencies(rid)
+    return [RepositoryDependencyItem(**d) for d in deps]
+
+
+@router.get(
+    "/{repository_id}/sync-status",
+    response_model=RepositorySyncStatusResponse,
+    summary="Get incremental synchronization status and commit freshness",
+)
+async def get_repository_sync_status_endpoint(
+    repository_id: str,
+    tenant: TenantContext = Depends(get_current_tenant_context),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        rid = uuid.UUID(repository_id.strip())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid repository UUID")
+
+    from app.services.repository_intelligence_service import RepositoryIntelligenceService
+    service = RepositoryIntelligenceService(db, current_user=tenant.user)
+    status_dict = await service.get_sync_status(rid)
+    return RepositorySyncStatusResponse(**status_dict)
+
+
+@router.post(
+    "/{repository_id}/scan",
+    summary="Trigger context-aware security scan for repository",
+    description="Validates repository context freshness, runs incremental sync if needed, and executes scanner pipeline.",
+)
+async def scan_repository_context_aware_endpoint(
+    repository_id: str,
+    branch: Optional[str] = Query("main", description="Target git branch"),
+    commit_sha: Optional[str] = Query(None, description="Target commit SHA"),
+    tenant: TenantContext = Depends(get_current_tenant_context),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        rid = uuid.UUID(repository_id.strip())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid repository UUID")
+
+    repo = await db.get(GitHubRepository, rid)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    from app.services.scan_orchestrator import ScanOrchestrator
+    orchestrator = ScanOrchestrator(db)
+    res = await orchestrator.trigger_event_scan(
+        repository=repo,
+        commit_sha=commit_sha or "HEAD",
+        branch=branch or repo.default_branch or "main",
+        event_type="MANUAL_SCAN",
+        trigger_user=tenant.user.email if tenant.user else "developer",
+    )
+    return res
+
 

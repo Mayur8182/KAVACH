@@ -110,6 +110,31 @@ async def _run_startup_migrations() -> None:
         ("users", "onboarding_completed", "BOOLEAN DEFAULT 0"),
         ("users", "onboarding_state", "JSON"),
         ("users", "completed_tours", "JSON"),
+        ("users", "default_workspace_id", "VARCHAR(36)"),
+        ("users", "default_project_id", "VARCHAR(36)"),
+        ("oauth_clients", "client_type", "VARCHAR(50) DEFAULT 'dynamic'"),
+        ("oauth_clients", "metadata_url", "VARCHAR(1000)"),
+        ("oauth_clients", "is_verified", "BOOLEAN DEFAULT 0"),
+        ("oauth_authorization_codes", "resource", "VARCHAR(500)"),
+        ("oauth_authorization_codes", "nonce", "VARCHAR(255)"),
+        ("oauth_authorization_codes", "organization_id", "VARCHAR(36)"),
+        ("oauth_authorization_codes", "workspace_id", "VARCHAR(36)"),
+        ("oauth_authorization_codes", "project_id", "VARCHAR(36)"),
+        ("oauth_tokens", "authorization_code_id", "VARCHAR(36)"),
+        ("oauth_tokens", "token_family_id", "VARCHAR(36)"),
+        ("oauth_tokens", "parent_token_id", "VARCHAR(36)"),
+        ("oauth_tokens", "client_name", "VARCHAR(255)"),
+        ("oauth_tokens", "organization_id", "VARCHAR(36)"),
+        ("oauth_tokens", "workspace_id", "VARCHAR(36)"),
+        ("oauth_tokens", "project_id", "VARCHAR(36)"),
+        ("oauth_tokens", "resource", "VARCHAR(500)"),
+        ("oauth_tokens", "last_used_at", "TIMESTAMP"),
+        ("oauth_tokens", "user_agent", "VARCHAR(500)"),
+        ("oauth_tokens", "ip_address", "VARCHAR(100)"),
+        ("oauth_pending_transactions", "selected_workspace_id", "VARCHAR(36)"),
+        ("oauth_pending_transactions", "nonce", "VARCHAR(255)"),
+        ("oauth_pending_transactions", "prompt", "VARCHAR(100)"),
+        ("oauth_pending_transactions", "error_message", "TEXT"),
         ("organizations", "domain", "VARCHAR(255)"),
         ("organizations", "description", "TEXT"),
         ("organizations", "logo_url", "VARCHAR(500)"),
@@ -227,6 +252,17 @@ async def _run_startup_migrations() -> None:
         ("api_security_scans", "scan_config", "JSON"),
         ("api_security_scans", "tests_skipped", "INTEGER"),
         ("api_security_scans", "tests_errored", "INTEGER"),
+        ("users", "hubspot_contact_id", "VARCHAR(100)"),
+        ("users", "hubspot_sync_status", "VARCHAR(50) DEFAULT 'PENDING'"),
+        ("users", "last_hubspot_sync_at", "TIMESTAMP"),
+        ("organizations", "hubspot_company_id", "VARCHAR(100)"),
+        ("organizations", "hubspot_sync_status", "VARCHAR(50) DEFAULT 'PENDING'"),
+        ("organizations", "last_hubspot_sync_at", "TIMESTAMP"),
+        ("sales_leads", "hubspot_contact_id", "VARCHAR(100)"),
+        ("sales_leads", "hubspot_deal_id", "VARCHAR(100)"),
+        ("sales_leads", "hubspot_sync_status", "VARCHAR(50) DEFAULT 'PENDING'"),
+        ("sales_demo_requests", "hubspot_contact_id", "VARCHAR(100)"),
+        ("sales_demo_requests", "hubspot_deal_id", "VARCHAR(100)"),
     ]
     
     try:
@@ -344,8 +380,13 @@ def create_application() -> FastAPI:
     app.add_middleware(IdempotencyMiddleware)
     app.add_middleware(RateLimitingMiddleware)
 
-    # Configure CORS: In production, dev, and AI integrations (Claude, ChatGPT, Cursor, Anthropic), allow all HTTP/HTTPS origins
-    origin_regex = r"^https?://.*$"
+    # Configure CORS: Allow verified Kavach domains, localhost dev ports, and trusted AI client origins
+    origin_regex = (
+        r"^https://([a-z0-9-]+\.)*kavachsecurity\.me$"
+        r"|^https://([a-z0-9-]+\.)*onrender\.com$"
+        r"|^https://(chatgpt\.com|chat\.openai\.com|claude\.ai|grok\.com|x\.ai)$"
+        r"|^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+    )
 
     app.add_middleware(
         CORSMiddleware,
@@ -443,7 +484,7 @@ def create_application() -> FastAPI:
     app.add_api_route(
         "/mcp",
         mcp_unified_endpoint,
-        methods=["GET", "POST", "OPTIONS", "HEAD"],
+        methods=["GET", "POST", "DELETE", "OPTIONS", "HEAD"],
         include_in_schema=True,
         tags=["MCP Root Gateway"],
     )

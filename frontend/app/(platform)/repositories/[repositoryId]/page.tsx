@@ -81,6 +81,10 @@ const CICDView = dynamic(
   () => import('@/components/code/CICDView').then((m) => m.CICDView),
   { ssr: false }
 );
+const RepositoryIntelligenceView = dynamic(
+  () => import('@/components/code/RepositoryIntelligenceView').then((m) => m.RepositoryIntelligenceView),
+  { ssr: false }
+);
 import { RepositoryScanProgressBar, ScanJobProgress } from '@/components/code/RepositoryScanProgressBar';
 
 // Brand SVG Icons
@@ -1203,6 +1207,7 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
   // Nav Tabs Specification from Reference
   const TABS = [
     { id: 'Overview', label: 'Overview', icon: LayoutGrid },
+    { id: 'Intelligence', label: 'Codebase Intelligence', icon: Sparkles },
     { id: 'Code', label: 'Files Scanned', icon: Code2, hideIcon: true, labelDisplay: '</> Files Scanned' },
     { id: 'Security Findings', label: 'Findings', icon: ShieldCheck, badge: totalFindings, badgeColor: totalFindings > 0 ? '#EF4444' : '#10B981' },
     { id: 'Security Jobs', label: 'Security Runs', icon: ExternalLink },
@@ -1687,6 +1692,14 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
             );
           })}
         </div>
+
+        {/* ── Tab View: Codebase Intelligence ── */}
+        {activeTab === 'Intelligence' && (
+          <RepositoryIntelligenceView
+            repositoryId={rawId}
+            onTriggerScan={() => handleTriggerScan()}
+          />
+        )}
 
         {/* ── Tab View: Overview ── */}
         {activeTab === 'Overview' && (

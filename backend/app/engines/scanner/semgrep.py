@@ -16,6 +16,7 @@ class SemgrepScanner(SecurityScanner):
     scanner_type = "SAST"
     tool_name = "Semgrep"
     executable_name = "semgrep"
+    timeout_seconds = 35.0
 
     def build_command(self, target: ScanTarget) -> List[str]:
         target_path = os.path.abspath(target.path) if not os.path.isabs(target.path) else target.path

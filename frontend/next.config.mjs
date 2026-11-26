@@ -10,6 +10,7 @@ const nextConfig = {
   devIndicators: false,
   poweredByHeader: false,
   compress: true,
+  htmlLimitedBots: /.*/,
   outputFileTracingRoot: path.resolve(__dirname),
   productionBrowserSourceMaps: false,
   typescript: {
@@ -18,9 +19,10 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  images: {
+    formats: ['image/avif', 'image/webp'],
+  },
   experimental: {
-    cpus: 1,
-    webpackBuildWorker: false,
     optimizePackageImports: [
       'lucide-react',
     ],
@@ -99,6 +101,27 @@ const nextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
           },
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://client.crisp.chat https://www.googletagmanager.com https://www.google-analytics.com",
+              "style-src 'self' 'unsafe-inline' https://accounts.google.com https://client.crisp.chat",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' data: https://client.crisp.chat",
+              "connect-src 'self' https: wss: http://127.0.0.1:* http://localhost:*",
+              "media-src 'self' blob: data: https:",
+              "frame-src 'self' https://accounts.google.com https://client.crisp.chat",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self' https://accounts.google.com",
+              "frame-ancestors 'none'",
+            ].join('; '),
+          },
         ],
       },
     ];
@@ -115,7 +138,6 @@ const nextConfig = {
           config: [__filename],
         },
       };
-      config.devtool = 'eval-cheap-module-source-map';
       config.watchOptions = {
         ignored: ['**/node_modules/**', '**/.next/**', '**/dist/**', '**/.git/**'],
         aggregateTimeout: 50,
@@ -193,6 +215,10 @@ const nextConfig = {
       {
         source: '/mcp',
         destination: `${backendUrl}/mcp`,
+      },
+      {
+        source: '/mcp/:path*',
+        destination: `${backendUrl}/mcp/:path*`,
       },
       {
         source: '/sse',

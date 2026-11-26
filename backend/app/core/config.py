@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     mcp_base_url: Optional[str] = Field(default=None, description="Explicit base URL for MCP gateway endpoints (e.g. http://localhost:8000)")
     log_level: str = Field(default="INFO", description="Logging verbosity")
 
+    # MCP Gateway settings
+    mcp_enabled: bool = Field(default=True, description="Enable Kavach MCP Security Gateway")
+    mcp_server_name: str = Field(default="kavach-security-gateway", description="Canonical MCP server name")
+    mcp_server_version: str = Field(default="2.5.0", description="MCP server version")
+    mcp_transport: str = Field(default="streamable-http", description="Primary MCP transport protocol")
+    mcp_session_ttl_seconds: int = Field(default=3600, description="MCP session TTL in seconds")
+
     # Security settings
     jwt_secret: str = Field(
         default="development-secret-key-change-in-production-min-32-chars-long",
@@ -33,6 +40,11 @@ class Settings(BaseSettings):
     )
     jwt_algorithm: str = Field(default="HS256", description="JWT hashing algorithm")
     access_token_expire_minutes: int = Field(default=10080, description="Access token expiration window (7 days)")
+    oauth_rsa_private_key: Optional[str] = Field(default=None, description="Optional PEM-encoded RSA private key for OAuth 2.1 RS256 JWTs")
+    oauth_rsa_public_key: Optional[str] = Field(default=None, description="Optional PEM-encoded RSA public key for OAuth 2.1 JWKS")
+    oauth_rsa_key_id: Optional[str] = Field(default=None, description="Optional key ID (kid) for OAuth 2.1 JWKS")
+    oauth_access_token_ttl_seconds: int = Field(default=3600, description="OAuth 2.1 access token lifetime in seconds")
+    oauth_refresh_token_ttl_days: int = Field(default=30, description="OAuth 2.1 refresh token lifetime in days")
 
     # Database settings
     postgres_user: str = Field(default="postgres", description="PostgreSQL username")
@@ -299,6 +311,36 @@ class Settings(BaseSettings):
     sso_redirect_uri: str = Field(
         default="https://kavachsecurity.me/auth/callback/sso",
         description="SSO SAML / OIDC Callback URI",
+    )
+
+    # HubSpot CRM Integration Settings
+    hubspot_access_token: Optional[str] = Field(
+        default=None,
+        description="HubSpot Private App Access Token or Service Key",
+    )
+    hubspot_portal_id: Optional[str] = Field(
+        default=None,
+        description="HubSpot Hub / Portal ID",
+    )
+    hubspot_client_id: Optional[str] = Field(
+        default=None,
+        description="HubSpot OAuth Client ID (for multi-tenant OAuth)",
+    )
+    hubspot_client_secret: Optional[str] = Field(
+        default=None,
+        description="HubSpot OAuth Client Secret",
+    )
+    hubspot_redirect_uri: str = Field(
+        default="http://localhost:8000/api/v1/integrations/hubspot/oauth/callback",
+        description="HubSpot OAuth Redirect Callback URL",
+    )
+    hubspot_sync_enabled: bool = Field(
+        default=True,
+        description="Master switch for automated HubSpot CRM background synchronization",
+    )
+    hubspot_api_base_url: str = Field(
+        default="https://api.hubapi.com",
+        description="HubSpot REST API v3 Base URL",
     )
 
 

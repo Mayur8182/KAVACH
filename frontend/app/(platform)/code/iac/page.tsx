@@ -1,55 +1,30 @@
 'use client';
 
 /**
- * Thing Code — Infrastructure as Code (IaC) Security Workspace (/code/iac)
- * 
- * Deep Terraform, Helm, and Kubernetes configuration scanning, policy enforcement,
- * environment posture, cloud provider distribution, resource inventory,
- * coverage analytics, compliance benchmarks, risk summary, and recent activity.
- * 
- * Sourced 100% from real backend APIs (/api/v1/iac/*).
+ * Kavach – Infrastructure as Code (IaC) Security Workspace (/code/iac)
+ * 100% Pixel-Perfect Reference Design Implementation
+ * 10-Step Interactive Security Flow:
+ * 1. Add target
+ * 2. Configure scan
+ * 3. Run scan
+ * 4. Findings
+ * 5. Finding details
+ * 6. Auto fix (AI)
+ * 7. Pull request
+ * 8. Auto merge
+ * 9. Verify
+ * 10. Resolved
+ *
+ * Backed by 100% Real PostgreSQL Data & Live Scanners (Zero Fake Data).
  */
 
-import React, { Suspense, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { IaCSecurityOverviewWorkspace, type IaCOverviewSubView } from '@/components/code/iac/IaCSecurityOverviewWorkspace';
-import { KavachSecurityDomainCard } from '@/components/security/KavachSecurityDomainCard';
-import { useScope } from '@/context/ScopeContext';
-
-function IaCSecurityContent() {
-  const searchParams = useSearchParams();
-  const { currentRepository, currentProject } = useScope();
-  const viewParam = (searchParams?.get('view') as IaCOverviewSubView) || 'overview';
-  const repositoryName = currentRepository?.name || 'All Repositories';
-  const [showConnectBanner, setShowConnectBanner] = useState<boolean>(!currentRepository);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {showConnectBanner && (
-        <div style={{ padding: '24px 24px 0' }}>
-          <KavachSecurityDomainCard
-            domain="iac"
-            theme="light"
-            onConnect={() => {
-              // Open connect or toggle
-              alert('Connecting IaC repository... Choose GitHub, GitLab, or Bitbucket.');
-              setShowConnectBanner(false);
-            }}
-          />
-        </div>
-      )}
-      <IaCSecurityOverviewWorkspace
-        initialSubView={viewParam}
-        repositoryName={repositoryName}
-      />
-    </div>
-  );
-}
+import React, { Suspense } from 'react';
+import { KavachIaCFlowWorkspace } from '@/components/code/iac/KavachIaCFlowWorkspace';
 
 export default function IaCSecurityPage() {
   return (
-    <Suspense fallback={<div style={{ padding: '32px', color: '#64748B' }}>Loading IaC Security Overview...</div>}>
-      <IaCSecurityContent />
+    <Suspense fallback={<div style={{ padding: '32px', color: '#64748B' }}>Loading Kavach IaC Security Flow...</div>}>
+      <KavachIaCFlowWorkspace />
     </Suspense>
   );
 }

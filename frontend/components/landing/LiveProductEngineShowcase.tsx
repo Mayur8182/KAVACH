@@ -483,9 +483,9 @@ export const LiveProductEngineShowcase: React.FC<LiveProductEngineShowcaseProps>
                       height: '18px',
                       borderRadius: '50%',
                       backgroundColor: isStageActive
-                        ? '#2563EB'
-                        : isStageCompleted
                         ? '#10B981'
+                        : isStageCompleted
+                        ? '#059669'
                         : 'rgba(255, 255, 255, 0.1)',
                       color: '#FFFFFF',
                       fontSize: '10px',
@@ -818,7 +818,7 @@ export const LiveProductEngineShowcase: React.FC<LiveProductEngineShowcaseProps>
                   gap: '6px',
                   padding: '6px 12px',
                   borderRadius: '6px',
-                  backgroundColor: '#2563EB',
+                  backgroundColor: '#0F172A',
                   color: '#FFFFFF',
                   fontSize: '11.5px',
                   fontWeight: 700,
