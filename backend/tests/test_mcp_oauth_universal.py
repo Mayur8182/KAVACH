@@ -443,6 +443,203 @@ async def test_dcr_cimd_and_ssrf_guard(test_env, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_chatgpt_cimd_private_key_jwt_and_dual_auth_modes(test_env, monkeypatch):
+    """
+    Verifies exact ChatGPT CIMD metadata (`https://chatgpt.com/oauth/client.json`):
+    - Accepts `token_endpoint_auth_method: "private_key_jwt"` + `token_endpoint_auth_methods_supported: ["none", "private_key_jwt"]`
+    - Works seamlessly with BOTH `none`+PKCE AND RFC 7523 `private_key_jwt` assertion signed via `jwks_uri`
+    - Rejects forged `private_key_jwt` assertions with 401 invalid_client
+    """
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa as rsa_mod
+    from app.core.jwks import _int_to_base64url
+
+    client, session_factory = test_env
+    user_ctx = await _seed_user_org_ws(
+        session_factory,
+        email="chatgpt-cimd@acme.io",
+        name="ChatGPT Tester",
+        org_name="ChatGPT Org",
+        org_slug="chatgpt-org",
+        create_project=True,
+    )
+
+    priv_key = rsa_mod.generate_private_key(public_exponent=65537, key_size=2048)
+    pub_nums = priv_key.public_key().public_numbers()
+    kid = "chatgpt-cimd-test-key"
+    jwks_doc = {
+        "keys": [
+            {
+                "kty": "RSA",
+                "kid": kid,
+                "use": "sig",
+                "alg": "RS256",
+                "n": _int_to_base64url(pub_nums.n),
+                "e": _int_to_base64url(pub_nums.e),
+            }
+        ]
+    }
+
+    chatgpt_client_id = "https://chatgpt.com/oauth/client.json"
+    chatgpt_jwks_uri = "https://chatgpt.com/oauth/jwks.json"
+    chatgpt_redirect = "https://chatgpt.com/connector_platform_oauth_redirect"
+    chatgpt_meta = {
+        "client_id": chatgpt_client_id,
+        "client_uri": "https://chatgpt.com/",
+        "redirect_uris": [chatgpt_redirect],
+        "token_endpoint_auth_method": "private_key_jwt",
+        "token_endpoint_auth_methods_supported": ["none", "private_key_jwt"],
+        "grant_types": ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"],
+        "response_types": ["code"],
+        "client_name": "ChatGPT",
+        "logo_uri": "https://persistent.oaistatic.com/sonic/misc/openai-logo.png",
+        "token_endpoint_auth_signing_alg": "RS256",
+        "jwks_uri": chatgpt_jwks_uri,
+    }
+
+    class _MockResp:
+        def __init__(self, body: Dict):
+            self.status_code = 200
+            self.content = json.dumps(body).encode()
+            self._body = body
+
+        def json(self):
+            return self._body
+
+    class _MockAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, url, **kwargs):
+            if url == chatgpt_client_id:
+                return _MockResp(chatgpt_meta)
+            if url == chatgpt_jwks_uri:
+                return _MockResp(jwks_doc)
+            raise AssertionError(f"Unexpected remote URL fetch: {url}")
+
+    monkeypatch.setattr("app.api.v1.oauth.httpx.AsyncClient", _MockAsyncClient)
+    monkeypatch.setattr("app.core.jwks.httpx.AsyncClient", _MockAsyncClient)
+    monkeypatch.setattr("app.api.v1.oauth._is_safe_cimd_url", lambda u: u in {chatgpt_client_id, chatgpt_jwks_uri})
+
+    # Discovery advertises private_key_jwt alongside none
+    as_meta = (await client.get("/.well-known/oauth-authorization-server")).json()
+    assert "private_key_jwt" in as_meta["token_endpoint_auth_methods_supported"]
+
+    # Mode 1: Exact authorize query params sent by ChatGPT + token exchange via `none` + PKCE
+    tok1 = await _authorize_and_exchange_pkce(
+        client,
+        session_jwt=user_ctx["session_jwt"],
+        client_id=chatgpt_client_id,
+        redirect_uri=chatgpt_redirect,
+        scope="openid email offline_access projects:read projects:write scans:read scans:run findings:read remediation:propose remediation:apply profile",
+    )
+    assert tok1["access_token"]
+    assert tok1["token_type"] == "Bearer"
+
+    # Mode 2: Token exchange using RFC 7523 `private_key_jwt` client_assertion (without client_id param)
+    verifier, challenge = _make_pkce_pair()
+    auth2 = await client.get(
+        "/oauth/authorize",
+        params={
+            "response_type": "code",
+            "client_id": chatgpt_client_id,
+            "redirect_uri": chatgpt_redirect,
+            "scope": "openid email offline_access projects:read scans:read profile",
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "resource": "https://mcp.kavachsecurity.me/mcp",
+            "state": "oauth_s_test_pkj",
+            "ui_locales": "en-US",
+        },
+        headers={"Authorization": f"Bearer {user_ctx['session_jwt']}"},
+        follow_redirects=False,
+    )
+    assert auth2.status_code == 302
+    tx2 = parse_qs(urlparse(auth2.headers["location"]).query)["tx"][0]
+    approve2 = await client.post(
+        "/oauth/consent/approve",
+        json={"tx": tx2, "project_id": user_ctx["project_id"], "set_as_default": True},
+        headers={"Authorization": f"Bearer {user_ctx['session_jwt']}"},
+    )
+    assert approve2.status_code == 200
+    code2 = parse_qs(urlparse(approve2.json()["redirect_to"]).query)["code"][0]
+
+    priv_pem = priv_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    now_ts = int(__import__("time").time())
+    valid_assertion = jwt.encode(
+        {
+            "iss": chatgpt_client_id,
+            "sub": chatgpt_client_id,
+            "aud": "https://mcp.kavachsecurity.me/oauth/token",
+            "jti": secrets.token_urlsafe(12),
+            "iat": now_ts,
+            "exp": now_ts + 180,
+        },
+        priv_pem,
+        algorithm="RS256",
+        headers={"kid": kid},
+    )
+
+    # Forged assertion must fail before code consumption
+    rogue_key = rsa_mod.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    bad_assertion = jwt.encode(
+        {
+            "iss": chatgpt_client_id,
+            "sub": chatgpt_client_id,
+            "aud": "https://mcp.kavachsecurity.me/oauth/token",
+            "iat": now_ts,
+            "exp": now_ts + 180,
+        },
+        rogue_key,
+        algorithm="RS256",
+        headers={"kid": kid},
+    )
+    bad_tok = await client.post(
+        "/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "code": code2,
+            "redirect_uri": chatgpt_redirect,
+            "code_verifier": verifier,
+            "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+            "client_assertion": bad_assertion,
+        },
+    )
+    assert bad_tok.status_code == 401
+    assert bad_tok.json()["error"] == "invalid_client"
+
+    # Valid private_key_jwt succeeds
+    tok2 = await client.post(
+        "/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "code": code2,
+            "redirect_uri": chatgpt_redirect,
+            "code_verifier": verifier,
+            "resource": "https://mcp.kavachsecurity.me/mcp",
+            "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+            "client_assertion": valid_assertion,
+        },
+    )
+    assert tok2.status_code == 200, tok2.text
+    assert tok2.json()["access_token"]
+
+
+@pytest.mark.asyncio
 async def test_pkce_zero_project_onboarding_jwks_and_code_replay(test_env):
     client, session_factory = test_env
     user_ctx = await _seed_user_org_ws(

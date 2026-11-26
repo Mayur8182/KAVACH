@@ -37,6 +37,15 @@ export function getAuthToken(): string | null {
   if (typeof window !== 'undefined' && !inMemoryToken) {
     try {
       inMemoryToken = sessionStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY);
+      if (!inMemoryToken && document.cookie) {
+        const prefix = `${STORAGE_KEY}=`;
+        const match = document.cookie
+          .split('; ')
+          .find((row) => row.startsWith(prefix));
+        if (match) {
+          inMemoryToken = decodeURIComponent(match.slice(prefix.length));
+        }
+      }
     } catch {
       // Storage unavailable
     }

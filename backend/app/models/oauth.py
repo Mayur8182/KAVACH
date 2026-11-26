@@ -77,6 +77,18 @@ class OAuthClient(Base, TimestampMixin):
         nullable=False,
         default="none",
     )
+    supported_auth_methods: Mapped[Optional[List[str]]] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    jwks_uri: Mapped[Optional[str]] = mapped_column(
+        String(1000),
+        nullable=True,
+    )
+    jwks: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON,
+        nullable=True,
+    )
     is_confidential: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

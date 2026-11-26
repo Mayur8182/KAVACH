@@ -222,6 +222,72 @@ async def verify_jwt_with_db_jwks(token: str, db: AsyncSession) -> Tuple[Optiona
     return None, "invalid"
 
 
+async def _select_remote_jwk(
+    jwks_uri: str,
+    kid: Optional[str],
+    inline_jwks: Optional[Dict[str, Any]] = None,
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Resolves matching JWK from inline JWKS or cached remote JWKS (refreshes once on kid miss)."""
+    if inline_jwks and isinstance(inline_jwks.get("keys"), list):
+        inline_keys = inline_jwks["keys"]
+        for k in inline_keys:
+            if (kid and k.get("kid") == kid) or (not kid):
+                return k, None
+
+    if not jwks_uri:
+        return None, "Client does not declare a valid jwks_uri or inline jwks"
+
+    now = time.time()
+    cached = _EXTERNAL_JWKS_CACHE.get(jwks_uri)
+    keys: List[Dict[str, Any]] = []
+    if cached and now - cached[0] < 300:
+        keys = cached[1]
+    else:
+        try:
+            async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as client:
+                resp = await client.get(
+                    jwks_uri,
+                    headers={"Accept": "application/json", "User-Agent": "Kavach-MCP-OAuth/1.0"},
+                )
+                if resp.status_code != 200:
+                    return None, f"Failed to fetch external JWKS (HTTP {resp.status_code})"
+                jwks_body = resp.json()
+                keys = jwks_body.get("keys", [])
+                if keys:
+                    _EXTERNAL_JWKS_CACHE[jwks_uri] = (now, keys)
+        except Exception as exc:
+            return None, f"Failed to fetch external JWKS: {exc}"
+
+    matching_jwk = None
+    for k in keys:
+        if kid and k.get("kid") == kid:
+            matching_jwk = k
+            break
+    if not matching_jwk and keys and not kid:
+        matching_jwk = keys[0]
+
+    if not matching_jwk:
+        try:
+            async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as client:
+                resp = await client.get(
+                    jwks_uri,
+                    headers={"Accept": "application/json", "User-Agent": "Kavach-MCP-OAuth/1.0"},
+                )
+                if resp.status_code == 200:
+                    keys = resp.json().get("keys", [])
+                    _EXTERNAL_JWKS_CACHE[jwks_uri] = (now, keys)
+                    for k in keys:
+                        if kid and k.get("kid") == kid:
+                            matching_jwk = k
+                            break
+        except Exception:
+            pass
+
+    if not matching_jwk:
+        return None, f"No matching signing key (kid={kid}) found in JWKS"
+    return matching_jwk, None
+
+
 async def verify_external_oidc_id_token(
     id_token: str,
     jwks_uri: str,
@@ -243,49 +309,9 @@ async def verify_external_oidc_id_token(
     if alg not in {"RS256", "RS384", "RS512", "ES256"}:
         return None, f"Unsupported ID token signing algorithm: {alg}"
 
-    now = time.time()
-    cached = _EXTERNAL_JWKS_CACHE.get(jwks_uri)
-    keys: List[Dict[str, Any]] = []
-    if cached and now - cached[0] < 300:
-        keys = cached[1]
-    else:
-        try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.get(jwks_uri)
-                if resp.status_code != 200:
-                    return None, f"Failed to fetch external JWKS (HTTP {resp.status_code})"
-                jwks_body = resp.json()
-                keys = jwks_body.get("keys", [])
-                if keys:
-                    _EXTERNAL_JWKS_CACHE[jwks_uri] = (now, keys)
-        except Exception as exc:
-            return None, f"Failed to fetch external JWKS: {exc}"
-
-    matching_jwk = None
-    for k in keys:
-        if kid and k.get("kid") == kid:
-            matching_jwk = k
-            break
-    if not matching_jwk and keys and not kid:
-        matching_jwk = keys[0]
-
+    matching_jwk, err = await _select_remote_jwk(jwks_uri, kid)
     if not matching_jwk:
-        # Force refresh once in case of key rotation
-        try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.get(jwks_uri)
-                if resp.status_code == 200:
-                    keys = resp.json().get("keys", [])
-                    _EXTERNAL_JWKS_CACHE[jwks_uri] = (now, keys)
-                    for k in keys:
-                        if kid and k.get("kid") == kid:
-                            matching_jwk = k
-                            break
-        except Exception:
-            pass
-
-    if not matching_jwk:
-        return None, f"No matching signing key (kid={kid}) found in JWKS"
+        return None, err
 
     try:
         signing_key = jwt.PyJWK.from_dict(matching_jwk).key
@@ -304,6 +330,58 @@ async def verify_external_oidc_id_token(
 
     if expected_nonce is not None and claims.get("nonce") != expected_nonce:
         return None, "External ID token nonce mismatch"
+
+    return claims, None
+
+
+async def verify_client_assertion_jwt(
+    assertion: str,
+    *,
+    client_id: str,
+    valid_audiences: List[str],
+    jwks_uri: Optional[str] = None,
+    inline_jwks: Optional[Dict[str, Any]] = None,
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """
+    Verifies an RFC 7523 `private_key_jwt` client_assertion against the client's JWKS.
+    Checks signature, iss == client_id, sub == client_id, exp, and audience match.
+    """
+    try:
+        header = jwt.get_unverified_header(assertion)
+    except jwt.PyJWTError as exc:
+        return None, f"Malformed client_assertion header: {exc}"
+
+    alg = header.get("alg")
+    kid = header.get("kid")
+    if alg not in {"RS256", "RS384", "RS512", "ES256"}:
+        return None, f"Unsupported client_assertion signing algorithm: {alg}"
+
+    matching_jwk, err = await _select_remote_jwk(jwks_uri or "", kid, inline_jwks=inline_jwks)
+    if not matching_jwk:
+        return None, err
+
+    try:
+        signing_key = jwt.PyJWK.from_dict(matching_jwk).key
+        claims = jwt.decode(
+            assertion,
+            signing_key,
+            algorithms=[alg],
+            options={"verify_aud": False, "require": ["exp", "iss", "sub"]},
+            leeway=60,
+        )
+    except jwt.ExpiredSignatureError:
+        return None, "Client assertion JWT has expired"
+    except jwt.PyJWTError as exc:
+        return None, f"Client assertion signature verification failed: {exc}"
+
+    if claims.get("iss") != client_id or claims.get("sub") != client_id:
+        return None, "Client assertion 'iss' and 'sub' must match client_id"
+
+    raw_aud = claims.get("aud")
+    aud_values = [raw_aud] if isinstance(raw_aud, str) else ([str(a) for a in raw_aud] if isinstance(raw_aud, list) else [])
+    normalized_valid = {a.rstrip("/").lower() for a in valid_audiences if a}
+    if not any(a.rstrip("/").lower() in normalized_valid for a in aud_values):
+        return None, "Client assertion 'aud' does not match this authorization server or token endpoint"
 
     return claims, None
 

@@ -365,11 +365,14 @@ async def get_current_user_optional(
         if auth_header and auth_header.startswith("Bearer "):
             token_str = auth_header.replace("Bearer ", "").strip()
         elif request.cookies.get("seculayer_auth_token"):
-            token_str = request.cookies.get("seculayer_auth_token")
+            from urllib.parse import unquote
+            token_str = unquote(request.cookies.get("seculayer_auth_token", ""))
         elif request.cookies.get("kavach_token"):
-            token_str = request.cookies.get("kavach_token")
+            from urllib.parse import unquote
+            token_str = unquote(request.cookies.get("kavach_token", ""))
         elif request.cookies.get("access_token"):
-            token_str = request.cookies.get("access_token")
+            from urllib.parse import unquote
+            token_str = unquote(request.cookies.get("access_token", ""))
 
     if token_str:
         payload, err = await verify_jwt_with_db_jwks(token_str, db)

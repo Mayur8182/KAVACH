@@ -42,6 +42,7 @@ from app.core.database import get_db
 from app.core.jwks import (
     ensure_signing_keys_loaded,
     get_public_jwks,
+    verify_client_assertion_jwt,
     verify_external_oidc_id_token,
     verify_jwt_with_db_jwks,
 )
@@ -273,7 +274,8 @@ PRE_REGISTERED_CLIENTS: Dict[str, Dict[str, Any]] = {
 ALLOWED_IDE_SCHEMES = {"vscode", "vscode-insiders", "cursor", "windsurf"}
 ALLOWED_GRANT_TYPES = {"authorization_code", "refresh_token"}
 ALLOWED_RESPONSE_TYPES = {"code"}
-ALLOWED_AUTH_METHODS = {"none", "client_secret_post", "client_secret_basic"}
+ALLOWED_AUTH_METHODS = {"none", "private_key_jwt", "client_secret_post", "client_secret_basic"}
+CIMD_ALLOWED_AUTH_METHODS = {"none", "private_key_jwt"}
 
 
 def get_base_url(request: Request) -> str:
@@ -477,7 +479,13 @@ async def oauth_authorization_server_metadata(request: Request):
         "grant_types_supported": ["authorization_code", "refresh_token"],
         "code_challenge_methods_supported": ["S256"],
         "pkce_code_challenge_methods_supported": ["S256"],
-        "token_endpoint_auth_methods_supported": ["none", "client_secret_post", "client_secret_basic"],
+        "token_endpoint_auth_methods_supported": [
+            "none",
+            "private_key_jwt",
+            "client_secret_post",
+            "client_secret_basic",
+        ],
+        "token_endpoint_auth_signing_alg_values_supported": ["RS256", "ES256"],
         "scopes_supported": SUPPORTED_SCOPES,
         "subject_types_supported": ["public"],
         "id_token_signing_alg_values_supported": ["RS256"],
@@ -659,12 +667,20 @@ async def oauth_register_client(
 
 
 async def _fetch_cimd_client(client_id_url: str, db: AsyncSession) -> Optional[OAuthClient]:
-    """Fetches and validates an MCP Client ID Metadata Document (HTTPS URL `client_id`)."""
+    """
+    Fetches and validates an MCP Client ID Metadata Document (HTTPS URL `client_id`).
+    Supports both public (`none`) and asymmetric (`private_key_jwt` with `jwks_uri`/`jwks`) clients,
+    including dual-mode metadata such as ChatGPT (`["none", "private_key_jwt"]`).
+    Symmetric shared-secret methods (`client_secret_*`) remain disallowed in public metadata docs.
+    """
     if not _is_safe_cimd_url(client_id_url):
         return None
     try:
-        async with httpx.AsyncClient(timeout=5.0, follow_redirects=False) as http_client:
-            resp = await http_client.get(client_id_url, headers={"Accept": "application/json"})
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as http_client:
+            resp = await http_client.get(
+                client_id_url,
+                headers={"Accept": "application/json", "User-Agent": "Kavach-MCP-OAuth/1.0"},
+            )
             if resp.status_code != 200 or len(resp.content) > 65536:
                 return None
             doc = resp.json()
@@ -679,9 +695,41 @@ async def _fetch_cimd_client(client_id_url: str, db: AsyncSession) -> Optional[O
         return None
     if not all(isinstance(u, str) and _is_valid_redirect_uri_format(u) for u in redirect_uris):
         return None
-    auth_method = doc.get("token_endpoint_auth_method", "none")
-    if auth_method != "none":
+
+    raw_primary_method = str(doc.get("token_endpoint_auth_method") or "none").strip()
+    raw_supported = doc.get("token_endpoint_auth_methods_supported")
+    supported_methods: List[str] = []
+    if isinstance(raw_supported, list):
+        for m in raw_supported:
+            if isinstance(m, str) and m.strip() in CIMD_ALLOWED_AUTH_METHODS and m.strip() not in supported_methods:
+                supported_methods.append(m.strip())
+    if raw_primary_method in CIMD_ALLOWED_AUTH_METHODS and raw_primary_method not in supported_methods:
+        supported_methods.insert(0, raw_primary_method)
+
+    if not supported_methods:
+        logger.warning(f"[CIMD] Rejected unsupported auth methods for {client_id_url}: {raw_primary_method}")
         return None
+
+    effective_primary_method = (
+        raw_primary_method if raw_primary_method in CIMD_ALLOWED_AUTH_METHODS else supported_methods[0]
+    )
+
+    jwks_uri = doc.get("jwks_uri")
+    if jwks_uri is not None:
+        if not isinstance(jwks_uri, str) or not _is_safe_cimd_url(jwks_uri):
+            logger.warning(f"[CIMD] Rejected unsafe jwks_uri in metadata {client_id_url}: {jwks_uri}")
+            jwks_uri = None
+
+    inline_jwks = doc.get("jwks")
+    if not (isinstance(inline_jwks, dict) and isinstance(inline_jwks.get("keys"), list)):
+        inline_jwks = None
+
+    if "none" not in supported_methods and "private_key_jwt" in supported_methods:
+        if not jwks_uri and not inline_jwks:
+            logger.warning(f"[CIMD] Rejected private_key_jwt client missing jwks_uri/jwks: {client_id_url}")
+            return None
+
+    is_confidential = "none" not in supported_methods
 
     existing = (
         await db.execute(select(OAuthClient).where(OAuthClient.client_id == client_id_url))
@@ -691,6 +739,11 @@ async def _fetch_cimd_client(client_id_url: str, db: AsyncSession) -> Optional[O
         existing.redirect_uris = redirect_uris
         existing.client_uri = doc.get("client_uri")
         existing.logo_uri = doc.get("logo_uri")
+        existing.token_endpoint_auth_method = effective_primary_method
+        existing.supported_auth_methods = supported_methods
+        existing.jwks_uri = jwks_uri
+        existing.jwks = inline_jwks
+        existing.is_confidential = is_confidential
         existing.is_active = True
         existing.is_verified = True
         db.add(existing)
@@ -708,8 +761,11 @@ async def _fetch_cimd_client(client_id_url: str, db: AsyncSession) -> Optional[O
         grant_types=["authorization_code", "refresh_token"],
         response_types=["code"],
         scope=str(doc.get("scope") or " ".join(SUPPORTED_SCOPES))[:1000],
-        token_endpoint_auth_method="none",
-        is_confidential=False,
+        token_endpoint_auth_method=effective_primary_method,
+        supported_auth_methods=supported_methods,
+        jwks_uri=jwks_uri,
+        jwks=inline_jwks,
+        is_confidential=is_confidential,
         is_verified=True,
         is_active=True,
     )
@@ -723,6 +779,16 @@ async def _resolve_oauth_client(client_id: str, db: AsyncSession) -> Optional[OA
     stmt = select(OAuthClient).where(OAuthClient.client_id == client_id, OAuthClient.is_active == True)
     client = (await db.execute(stmt)).scalar_one_or_none()
     if client:
+        if (
+            client.client_type == "cimd"
+            and (
+                not client.supported_auth_methods
+                or (client.token_endpoint_auth_method == "private_key_jwt" and not client.jwks_uri and not client.jwks)
+            )
+        ):
+            refreshed = await _fetch_cimd_client(client_id, db)
+            if refreshed:
+                return refreshed
         return client
 
     # Check exact pre-registered public AI/IDE client identifiers (never substring wildcards)
@@ -2089,14 +2155,82 @@ async def oauth_unlink_openai(
 # ── OAuth 2.1 Token Endpoint (/oauth/token) ──
 
 
-def _authenticate_client(
+CLIENT_ASSERTION_JWT_BEARER = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+
+
+def _extract_unverified_assertion_client_id(params: Dict[str, Any]) -> Optional[str]:
+    """Extracts `sub`/`iss` lookup hint from client_assertion when `client_id` form param is omitted (RFC 7523)."""
+    if params.get("client_assertion_type") != CLIENT_ASSERTION_JWT_BEARER:
+        return None
+    assertion = params.get("client_assertion")
+    if not isinstance(assertion, str) or not assertion.strip():
+        return None
+    try:
+        import jwt as pyjwt
+        unverified = pyjwt.decode(assertion, options={"verify_signature": False})
+        cand = unverified.get("sub") or unverified.get("iss")
+        return str(cand).strip() if cand else None
+    except Exception:
+        return None
+
+
+async def _authenticate_client(
     client: OAuthClient,
     client_secret: Optional[str],
     auth_header: str,
+    params: Optional[Dict[str, Any]] = None,
+    valid_audiences: Optional[List[str]] = None,
 ) -> Optional[JSONResponse]:
-    """Validates confidential client credentials using constant-time SHA-256 comparison."""
-    if not client.is_confidential and client.token_endpoint_auth_method == "none":
+    """
+    Authenticates an OAuth client at /oauth/token across:
+    - `private_key_jwt` (RFC 7523 asymmetric JWT signed by CIMD `jwks_uri` or inline `jwks`)
+    - `none` (public / dual-mode PKCE clients)
+    - `client_secret_post` / `client_secret_basic` (constant-time SHA-256 secret verification)
+    """
+    params = params or {}
+    allowed_methods = set(client.supported_auth_methods or []) or {client.token_endpoint_auth_method or "none"}
+
+    assertion_type = params.get("client_assertion_type")
+    client_assertion = params.get("client_assertion")
+    if assertion_type == CLIENT_ASSERTION_JWT_BEARER or client_assertion:
+        if assertion_type != CLIENT_ASSERTION_JWT_BEARER or not isinstance(client_assertion, str):
+            return JSONResponse(
+                status_code=401,
+                content={"error": "invalid_client", "error_description": "Invalid client_assertion_type or missing client_assertion."},
+            )
+        if "private_key_jwt" not in allowed_methods and not client.jwks_uri and not client.jwks:
+            return JSONResponse(
+                status_code=401,
+                content={"error": "invalid_client", "error_description": "Client is not authorized for private_key_jwt authentication."},
+            )
+        if client.jwks_uri and not _is_safe_cimd_url(client.jwks_uri):
+            return JSONResponse(
+                status_code=401,
+                content={"error": "invalid_client", "error_description": "Client jwks_uri failed SSRF security policy."},
+            )
+        _, err = await verify_client_assertion_jwt(
+            client_assertion,
+            client_id=client.client_id,
+            valid_audiences=valid_audiences or [],
+            jwks_uri=client.jwks_uri,
+            inline_jwks=client.jwks,
+        )
+        if err:
+            return JSONResponse(
+                status_code=401,
+                content={"error": "invalid_client", "error_description": err},
+            )
         return None
+
+    if "none" in allowed_methods and not client.is_confidential:
+        return None
+
+    if "private_key_jwt" in allowed_methods and not ({"client_secret_post", "client_secret_basic"} & allowed_methods):
+        return JSONResponse(
+            status_code=401,
+            content={"error": "invalid_client", "error_description": "Client authentication via private_key_jwt (client_assertion) is required."},
+        )
+
     provided_secret = client_secret
     if not provided_secret and auth_header.startswith("Basic "):
         try:
@@ -2125,7 +2259,7 @@ async def oauth_token_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    OAuth 2.1 Token Endpoint (RFC 6749, RFC 7636 PKCE, RFC 8707 Resource Indicators).
+    OAuth 2.1 Token Endpoint (RFC 6749, RFC 7636 PKCE, RFC 8707 Resource Indicators, RFC 7523 private_key_jwt).
     Supports `authorization_code` and `refresh_token` grants with:
     - RS256 JWKS-signed access_token + optional OIDC id_token
     - Atomic single-use authorization code consumption + replay family revocation
@@ -2139,7 +2273,7 @@ async def oauth_token_endpoint(
         params = dict(form_data)
 
     grant_type = params.get("grant_type")
-    client_id = params.get("client_id")
+    client_id = params.get("client_id") or _extract_unverified_assertion_client_id(params)
     code = params.get("code")
     redirect_uri = params.get("redirect_uri")
     code_verifier = params.get("code_verifier")
@@ -2148,7 +2282,7 @@ async def oauth_token_endpoint(
     resource_param = params.get("resource")
 
     auth_header = request.headers.get("authorization", "")
-    if not client_id and auth_header.startswith("Basic "):
+    if not params.get("client_id") and auth_header.startswith("Basic "):
         try:
             decoded = base64.b64decode(auth_header.replace("Basic ", "").strip()).decode("utf-8")
             if ":" in decoded:
@@ -2160,6 +2294,14 @@ async def oauth_token_endpoint(
             pass
 
     base_url = get_base_url(request)
+    valid_token_audiences = [
+        base_url,
+        f"{base_url}/oauth/token",
+        "https://mcp.kavachsecurity.me",
+        "https://mcp.kavachsecurity.me/oauth/token",
+        "https://kavachsecurity.me",
+        "https://kavachsecurity.me/oauth/token",
+    ]
     kid, priv_pem, _ = await ensure_signing_keys_loaded(db)
     client_ip = request.client.host if request.client else None
     user_agent = (request.headers.get("user-agent") or "")[:500] or None
@@ -2247,7 +2389,13 @@ async def oauth_token_endpoint(
                 content={"error": "invalid_client", "error_description": "OAuth client is inactive or unknown."},
             )
 
-        auth_err = _authenticate_client(client, client_secret, auth_header)
+        auth_err = await _authenticate_client(
+            client,
+            client_secret,
+            auth_header,
+            params=params,
+            valid_audiences=valid_token_audiences,
+        )
         if auth_err:
             return auth_err
 
@@ -2441,7 +2589,13 @@ async def oauth_token_endpoint(
                 status_code=400,
                 content={"error": "invalid_client", "error_description": "OAuth client is inactive."},
             )
-        auth_err = _authenticate_client(client, client_secret, auth_header)
+        auth_err = await _authenticate_client(
+            client,
+            client_secret,
+            auth_header,
+            params=params,
+            valid_audiences=valid_token_audiences,
+        )
         if auth_err:
             return auth_err
 
