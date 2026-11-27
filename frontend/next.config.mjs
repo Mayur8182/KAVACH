@@ -12,6 +12,9 @@ const nextConfig = {
   compress: true,
   htmlLimitedBots: /.*/,
   outputFileTracingRoot: path.resolve(__dirname),
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   productionBrowserSourceMaps: false,
   typescript: {
     ignoreBuildErrors: true,
