@@ -26,39 +26,13 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { KavachLogo } from '@/components/common/KavachLogo';
+import { clearAuthToken, getAuthToken } from '@/lib/auth/token';
 import {
   api,
   type OAuthConsentContextResponse,
   type OAuthProjectOption,
   type OAuthScopeMetadata,
 } from '@/lib/api/client';
-
-const GithubIcon = ({ size = 18 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-  </svg>
-);
-
-const GoogleIcon = ({ size = 18 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      fill="#4285F4"
-      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-    />
-    <path
-      fill="#34A853"
-      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-    />
-    <path
-      fill="#FBBC05"
-      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-    />
-    <path
-      fill="#EA4335"
-      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-    />
-  </svg>
-);
 
 const WRITE_SENSITIVE_SCOPES = new Set([
   'mcp:write',
@@ -200,7 +174,7 @@ function ConsentContent() {
   const [ctx, setCtx] = useState<OAuthConsentContextResponse | null>(null);
   const [loadError, setLoadError] = useState<{ message: string; requestId?: string } | null>(null);
 
-  const [ssoProviderLoading, setSsoProviderLoading] = useState<'github' | 'google' | null>(null);
+  const [redirectingToLogin, setRedirectingToLogin] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Authenticated selections
@@ -246,6 +220,13 @@ function ConsentContent() {
       setSelectedScopes((data.requested_scopes || []).map((s) => s.scope));
 
       if (data.authenticated) {
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.removeItem(`kavach_consent_login_${tx}`);
+          } catch {
+            // ignore
+          }
+        }
         const list = data.projects || [];
         setProjects(list);
 
@@ -277,6 +258,35 @@ function ConsentContent() {
           const repoShortName = firstUnlinked.full_name.split('/').pop() || firstUnlinked.full_name;
           setNewProjectName((prev) => prev || repoShortName);
           setNewRepoUrl((prev) => prev || firstUnlinked.html_url);
+        }
+      } else if (typeof window !== 'undefined') {
+        // Unauthenticated visitors go straight through Kavach's unified /login page — never a separate login screen.
+        const bounceKey = `kavach_consent_login_${tx}`;
+        let alreadyBounced = false;
+        try {
+          alreadyBounced = sessionStorage.getItem(bounceKey) === '1';
+        } catch {
+          alreadyBounced = false;
+        }
+        if (!alreadyBounced) {
+          setRedirectingToLogin(true);
+          try {
+            sessionStorage.setItem(bounceKey, '1');
+          } catch {
+            // ignore
+          }
+          const hasStaleToken = Boolean(getAuthToken());
+          if (hasStaleToken) {
+            clearAuthToken();
+          }
+          const consentTarget = `/oauth/consent?tx=${encodeURIComponent(tx)}`;
+          const clientLabel = data.client?.client_name || 'MCP Client';
+          const loginHref =
+            `/login?redirect=${encodeURIComponent(consentTarget)}` +
+            `&client_name=${encodeURIComponent(clientLabel)}` +
+            (hasStaleToken ? '&stale=1' : '');
+          window.location.replace(loginHref);
+          return;
         }
       }
     } catch (err: any) {
@@ -317,40 +327,21 @@ function ConsentContent() {
     }
   };
 
-  const handleGithubLogin = async () => {
-    if (!tx) return;
-    setSsoProviderLoading('github');
-    setActionError(null);
-    try {
-      const nextUrl = `/oauth/consent?tx=${encodeURIComponent(tx)}`;
-      const returnUrl = `${window.location.origin}/auth/callback/github?next=${encodeURIComponent(nextUrl)}`;
-      const res = await api.auth.getGithubAuthUrl({ return_url: returnUrl });
-      if (!res?.url) {
-        throw new Error('GitHub authorization URL was not returned by the server.');
-      }
-      window.location.assign(res.url);
-    } catch (err: any) {
-      setActionError(err?.message || 'Failed to initiate GitHub authentication. Please try again.');
-      setSsoProviderLoading(null);
-    }
-  };
+  const buildKavachLoginHref = useCallback(() => {
+    const consentTarget = `/oauth/consent?tx=${encodeURIComponent(tx)}`;
+    const clientLabel = ctx?.client?.client_name || 'MCP Client';
+    return `/login?redirect=${encodeURIComponent(consentTarget)}&client_name=${encodeURIComponent(clientLabel)}`;
+  }, [tx, ctx?.client?.client_name]);
 
-  const handleGoogleLogin = async () => {
+  const handleGoToKavachLogin = () => {
     if (!tx) return;
-    setSsoProviderLoading('google');
-    setActionError(null);
+    setRedirectingToLogin(true);
     try {
-      const nextUrl = `/oauth/consent?tx=${encodeURIComponent(tx)}`;
-      const returnUrl = `${window.location.origin}/auth/callback/google?next=${encodeURIComponent(nextUrl)}`;
-      const res = await api.auth.getGoogleAuthUrl({ return_url: returnUrl });
-      if (!res?.url) {
-        throw new Error('Google authorization URL was not returned by the server.');
-      }
-      window.location.assign(res.url);
-    } catch (err: any) {
-      setActionError(err?.message || 'Failed to initiate Google authentication. Please try again.');
-      setSsoProviderLoading(null);
+      sessionStorage.removeItem(`kavach_consent_login_${tx}`);
+    } catch {
+      // ignore
     }
+    window.location.assign(buildKavachLoginHref());
   };
 
   const handleSelectGithubRepo = (repoId: string) => {
@@ -446,7 +437,7 @@ function ConsentContent() {
     }
   };
 
-  if (loading) {
+  if (loading || redirectingToLogin) {
     return <ConsentSkeletonCard />;
   }
 
@@ -746,56 +737,14 @@ function ConsentContent() {
           </div>
         </div>
 
-        {/* UNAUTHENTICATED VIEW: SSO Only (No Password Form) */}
+        {/* UNAUTHENTICATED VIEW: Hand off to main Kavach /login page (never a separate login page) */}
         {!ctx.authenticated && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Compact Permissions Preview */}
-            {ctx.requested_scopes && ctx.requested_scopes.length > 0 && (
-              <div
-                style={{
-                  border: '1px solid #EAECF0',
-                  borderRadius: '10px',
-                  padding: '14px 16px',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    color: '#64748B',
-                    marginBottom: '8px',
-                  }}
-                >
-                  Requested Permissions ({ctx.requested_scopes.length})
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {ctx.requested_scopes.map((sc) => (
-                    <span
-                      key={sc.scope}
-                      style={{
-                        fontSize: '11.5px',
-                        fontWeight: 500,
-                        color: isWriteSensitiveScope(sc) ? '#B45309' : '#334155',
-                        backgroundColor: isWriteSensitiveScope(sc) ? '#FFFBEB' : '#F1F5F9',
-                        border: `1px solid ${isWriteSensitiveScope(sc) ? '#FDE68A' : '#E2E8F0'}`,
-                        borderRadius: '6px',
-                        padding: '3px 8px',
-                      }}
-                    >
-                      {sc.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button
                 type="button"
-                onClick={handleGithubLogin}
-                disabled={ssoProviderLoading !== null || submittingAction !== null}
+                onClick={handleGoToKavachLogin}
+                disabled={submittingAction !== null}
                 style={{
                   width: '100%',
                   height: '46px',
@@ -808,58 +757,22 @@ function ConsentContent() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '10px',
-                  cursor: ssoProviderLoading ? 'not-allowed' : 'pointer',
-                  opacity: ssoProviderLoading && ssoProviderLoading !== 'github' ? 0.6 : 1,
+                  cursor: 'pointer',
                 }}
               >
-                {ssoProviderLoading === 'github' ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <GithubIcon size={18} />
-                )}
-                <span>Continue with GitHub</span>
+                <span>Continue to Kavach Sign In</span>
+                <ArrowRight size={16} />
               </button>
-
-              {ctx.login_providers?.google !== false && (
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={ssoProviderLoading !== null || submittingAction !== null}
-                  style={{
-                    width: '100%',
-                    height: '46px',
-                    borderRadius: '8px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #CBD5E1',
-                    color: '#0F172A',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    cursor: ssoProviderLoading ? 'not-allowed' : 'pointer',
-                    opacity: ssoProviderLoading && ssoProviderLoading !== 'google' ? 0.6 : 1,
-                  }}
-                >
-                  {ssoProviderLoading === 'google' ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <GoogleIcon size={18} />
-                  )}
-                  <span>Continue with Google</span>
-                </button>
-              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px' }}>
               <span style={{ fontSize: '12px', color: '#64748B' }}>
-                Single Kavach account sign-in
+                Redirects back here to approve access
               </span>
               <button
                 type="button"
                 onClick={handleDeny}
-                disabled={submittingAction !== null || ssoProviderLoading !== null}
+                disabled={submittingAction !== null}
                 style={{
                   fontSize: '13px',
                   fontWeight: 600,

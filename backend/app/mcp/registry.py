@@ -15,8 +15,10 @@ from app.mcp.tools.projects import (
 )
 from app.mcp.tools.security import (
     execute_check_security_policy,
+    execute_generate_security_blueprint,
     execute_get_security_blueprint,
     execute_get_security_requirements,
+    execute_list_security_policies,
 )
 from app.mcp.tools.scans import (
     execute_get_scan,
@@ -30,9 +32,13 @@ from app.mcp.tools.github import (
     execute_get_file_content,
     execute_get_github_repository,
     execute_get_pull_request,
+    execute_list_github_repositories,
+    execute_list_pull_requests,
 )
 from app.mcp.tools.remediation import (
+    execute_get_finding_detail,
     execute_propose_remediation_diff,
+    execute_update_finding_status,
     execute_verify_patch,
     execute_verify_remediation_patch,
 )
@@ -950,6 +956,132 @@ class MCPToolRegistry:
                 },
             ),
             execute_get_mcp_audit_trail,
+        )
+
+        # 27. list_github_repositories
+        self.register(
+            ToolDefinition(
+                name="list_github_repositories",
+                description="List all connected GitHub repositories and App installations accessible in your Kavach tenant to inspect or switch repositories directly from ChatGPT.",
+                version="1.0.0",
+                category="GITHUB",
+                required_permission="GITHUB_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Optional project UUID to check active repo link"},
+                        "sync_live": {"type": "boolean", "description": "Optionally sync latest repositories from GitHub App installation", "default": False},
+                    },
+                },
+            ),
+            execute_list_github_repositories,
+        )
+
+        # 28. list_pull_requests
+        self.register(
+            ToolDefinition(
+                name="list_pull_requests",
+                description="List Pull Requests for the active project's connected GitHub repository.",
+                version="1.0.0",
+                category="GITHUB",
+                required_permission="GITHUB_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                        "repository": {"type": "string", "description": "Optional 'owner/repo' override"},
+                        "state": {"type": "string", "description": "Filter PR state: open, closed, or all", "default": "open"},
+                        "limit": {"type": "integer", "description": "Max PRs to return (default 20)", "default": 20},
+                    },
+                },
+            ),
+            execute_list_pull_requests,
+        )
+
+        # 29. get_finding_detail
+        self.register(
+            ToolDefinition(
+                name="get_finding_detail",
+                description="Retrieve complete security finding evidence, vulnerable snippet, CWE/OWASP metadata, and persisted patches by finding_id.",
+                version="1.0.0",
+                category="SECURITY",
+                required_permission="SECURITY_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "finding_id": {"type": "string", "description": "SecurityFinding UUID"},
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                    },
+                    "required": ["finding_id"],
+                },
+            ),
+            execute_get_finding_detail,
+        )
+
+        # 30. update_finding_status
+        self.register(
+            ToolDefinition(
+                name="update_finding_status",
+                description="Triage a security finding status ('open', 'ignored', 'false_positive', 'accepted_risk') with immutable audit reason. Note: marking resolved requires verified rescan via `verify_patch`.",
+                version="1.0.0",
+                category="REMEDIATION",
+                required_permission="REMEDIATION_PROPOSE",
+                risk_level="MEDIUM",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "finding_id": {"type": "string", "description": "SecurityFinding UUID"},
+                        "status": {"type": "string", "description": "New status: open, ignored, false_positive, or accepted_risk"},
+                        "reason": {"type": "string", "description": "Justification for triage decision"},
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                    },
+                    "required": ["finding_id", "status"],
+                },
+            ),
+            execute_update_finding_status,
+        )
+
+        # 31. list_security_policies
+        self.register(
+            ToolDefinition(
+                name="list_security_policies",
+                description="List active project security policies and deterministic MCP Firewall / OPA rules.",
+                version="1.0.0",
+                category="POLICY",
+                required_permission="POLICY_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                        "active_only": {"type": "boolean", "default": False},
+                    },
+                },
+            ),
+            execute_list_security_policies,
+        )
+
+        # 32. generate_security_blueprint
+        self.register(
+            ToolDefinition(
+                name="generate_security_blueprint",
+                description="Generate or regenerate a dynamic Security Blueprint and tailored security requirements for the project.",
+                version="1.0.0",
+                category="BLUEPRINT",
+                required_permission="PROJECT_WRITE",
+                risk_level="MEDIUM",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                        "intent_summary": {"type": "string", "description": "Optional architectural or data-sensitivity summary to derive dynamic requirements"},
+                    },
+                },
+            ),
+            execute_generate_security_blueprint,
         )
 
     def register(self, tool: ToolDefinition, handler: Callable) -> None:

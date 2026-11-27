@@ -1241,11 +1241,24 @@ async def oauth_authorize_get(
         else:
             resolved_user = None
 
-    # Default browser flow: redirect to branded Next.js Consent UI (/oauth/consent?tx=...)
+    # Default browser flow: route through Kavach's unified /login when unauthenticated,
+    # or directly to the single /oauth/consent Authorize page when already signed in.
     if ui != "html":
         frontend_url = get_frontend_url(request)
+        consent_path = f"/oauth/consent?tx={pending_tx.transaction_token}"
+        if resolved_user:
+            return RedirectResponse(
+                url=f"{frontend_url}{consent_path}",
+                status_code=status.HTTP_302_FOUND,
+            )
+        client_label = client.client_name if client else pending_tx.client_id
+        login_url = (
+            f"{frontend_url}/login"
+            f"?redirect={quote(consent_path, safe='')}"
+            f"&client_name={quote(str(client_label or 'MCP Client'), safe='')}"
+        )
         return RedirectResponse(
-            url=f"{frontend_url}/oauth/consent?tx={quote(pending_tx.transaction_token)}",
+            url=login_url,
             status_code=status.HTTP_302_FOUND,
         )
 

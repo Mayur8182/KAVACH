@@ -87,10 +87,16 @@ TOOL_REQUIRED_SCOPES: Dict[str, str] = {
     "audit_cloud_posture": "projects:read",
     "get_security_blueprint": "projects:read",
     "get_security_requirements": "projects:read",
+    "generate_security_blueprint": "projects:write",
     "check_security_policy": "projects:read",
+    "list_security_policies": "projects:read",
     "get_github_repository": "projects:read",
+    "list_github_repositories": "projects:read",
     "get_pull_request": "projects:read",
+    "list_pull_requests": "projects:read",
     "get_file_content": "projects:read",
+    "get_finding_detail": "findings:read",
+    "update_finding_status": "remediation:propose",
     "create_branch": "remediation:apply",
     "apply_remediation_patch": "remediation:apply",
     "create_pull_request": "remediation:apply",
@@ -1069,6 +1075,7 @@ async def _dispatch_mcp_rpc(
                 "get_connection_status",
                 "get_available_permissions",
                 "list_pending_approvals",
+                "list_github_repositories",
             }
             resolved_proj_id = token_proj_id or uuid.UUID("00000000-0000-0000-0000-000000000000")
             if not is_context_tool:
@@ -1258,7 +1265,7 @@ async def _dispatch_mcp_rpc(
                                         },
                                         message=(
                                             f"Approval '{ap_row.id}' is awaiting human sign-off. Approve directly "
-                                            "inside the inline Kavach ChatGPT widget (or /settings/mcp), then re-call with approval_id."
+                                            "inside the inline Kavach ChatGPT card, then re-invoke with approval_id."
                                         ),
                                         error_code="MCP_APPROVAL_REQUIRED",
                                     )
@@ -1310,11 +1317,11 @@ async def _dispatch_mcp_rpc(
                                 "pending_arguments": sanitized_pending_args,
                                 "widget_approval_token": widget_tok,
                                 "review_path": "/settings/mcp",
-                                "instruction": "Approve directly inside the inline ChatGPT widget (no external tab needed) or in /settings/mcp, then re-invoke with approval_id.",
+                                "instruction": "Approve directly inside the inline ChatGPT card without leaving chat, then re-invoke with approval_id.",
                             },
                             message=(
                                 f"Tool '{tool.name}' requires human sign-off before execution. "
-                                f"Created pending SecurityApproval '{created_ap_id}' — approve inline in ChatGPT or via /settings/mcp."
+                                f"Created pending SecurityApproval '{created_ap_id}' — click Approve directly inside ChatGPT."
                             ),
                             error_code="MCP_APPROVAL_REQUIRED",
                         )

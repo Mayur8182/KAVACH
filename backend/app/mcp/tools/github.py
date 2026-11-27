@@ -33,7 +33,11 @@ from app.models.project import Project
 from app.models.remediation import RemediationPatch, RemediationPlan
 from app.models.scan import SecurityFinding
 from app.services.audit_service import AuditService
-from app.services.workspace_resolver import get_user_org_and_workspace_scope, normalize_git_remote
+from app.services.workspace_resolver import (
+    get_accessible_projects,
+    get_user_org_and_workspace_scope,
+    normalize_git_remote,
+)
 
 logger = logging.getLogger("kavach.mcp.github")
 
@@ -1162,4 +1166,235 @@ async def execute_create_pull_request(
         },
         message=f"Pull Request #{pr_num} ready on '{full_name}': {pr_url}",
         result_reference=str(pr_url or pr_num),
+    )
+
+
+async def execute_list_github_repositories(
+    context: MCPContext,
+    arguments: Dict[str, Any],
+    db: AsyncSession,
+) -> ToolExecutionResult:
+    """
+    Lists all authorized GitHub repositories & App installations accessible to the user's tenant
+    (plus active project linkage) so ChatGPT can inspect or switch repositories seamlessly.
+    """
+    from app.models.user import User
+
+    user = await db.get(User, context.identity.agent_id)
+    if not user:
+        return ToolExecutionResult(status="DENIED", message="Authenticated user not found.", error_code="MCP_AUTH_FAILED")
+
+    _, ws_map, _ = await get_user_org_and_workspace_scope(user, db)
+    projects = await get_accessible_projects(user, db)
+    proj_map = {p.id: p for p in projects}
+
+    inst_filters = [GitHubInstallation.connected_by_user_id == user.id]
+    if getattr(user, "github_user_id", None):
+        try:
+            inst_filters.append(GitHubInstallation.github_account_id == int(user.github_user_id))
+        except (ValueError, TypeError):
+            pass
+    if ws_map:
+        inst_filters.append(GitHubInstallation.workspace_id.in_(list(ws_map.keys())))
+
+    installations = list(
+        (
+            await db.execute(
+                select(GitHubInstallation).where(
+                    or_(*inst_filters),
+                    GitHubInstallation.status == "ACTIVE",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    inst_ids = [i.id for i in installations]
+
+    # Optionally sync repositories live from GitHub App installations when requested
+    if arguments.get("sync_live", False) and installations:
+        from app.services.github_service import GitHubService
+
+        gh_srv = GitHubService(db)
+        for inst in installations:
+            if inst.installation_id:
+                try:
+                    await gh_srv.sync_installation_repositories(
+                        installation_id=inst.installation_id,
+                        workspace_id=inst.workspace_id,
+                    )
+                except Exception as exc:
+                    logger.warning(f"[MCP] Live sync skipped for installation {inst.installation_id}: {exc}")
+
+    repo_conds = []
+    if ws_map:
+        repo_conds.append(GitHubRepository.workspace_id.in_(list(ws_map.keys())))
+    if proj_map:
+        repo_conds.append(GitHubRepository.project_id.in_(list(proj_map.keys())))
+    if inst_ids:
+        repo_conds.append(GitHubRepository.installation_id.in_(inst_ids))
+
+    repos: List[GitHubRepository] = []
+    if repo_conds:
+        repos = list(
+            (
+                await db.execute(
+                    select(GitHubRepository)
+                    .where(or_(*repo_conds))
+                    .order_by(desc(GitHubRepository.updated_at))
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    active_proj, _ = await resolve_authorized_project(context, arguments, db)
+    active_proj_id = active_proj.id if active_proj else None
+
+    seen_full = set()
+    repo_items: List[Dict[str, Any]] = []
+    for r in repos:
+        key = (r.full_name or "").lower()
+        if key in seen_full:
+            continue
+        seen_full.add(key)
+        linked_proj = proj_map.get(r.project_id) if r.project_id else None
+        repo_items.append(
+            {
+                "id": str(r.id),
+                "full_name": r.full_name,
+                "name": r.name,
+                "owner": r.owner,
+                "default_branch": r.default_branch,
+                "private": bool(r.private),
+                "archived": bool(r.archived),
+                "html_url": r.html_url,
+                "linked_project_id": str(r.project_id) if r.project_id else None,
+                "linked_project_name": linked_proj.name if linked_proj else None,
+                "is_active_project_repo": bool(active_proj_id and r.project_id == active_proj_id),
+            }
+        )
+
+    if not installations and not repo_items:
+        return ToolExecutionResult(
+            status="NOT_CONFIGURED",
+            data={
+                "github_connected": False,
+                "installations": [],
+                "repositories": [],
+            },
+            message="GITHUB NOT CONNECTED: No active GitHub App installation or repository found. Connect GitHub in Kavach first or call `connect_repository` with 'owner/repo'.",
+            error_code="GITHUB_NOT_CONNECTED",
+        )
+
+    return ToolExecutionResult(
+        status="SUCCESS",
+        data={
+            "github_connected": True,
+            "installations_count": len(installations),
+            "installations": [
+                {
+                    "installation_id": i.installation_id,
+                    "account_login": i.github_account_login,
+                    "account_type": i.github_account_type,
+                }
+                for i in installations
+            ],
+            "total_repositories": len(repo_items),
+            "active_project": (
+                {
+                    "id": str(active_proj.id),
+                    "name": active_proj.name,
+                    "repository_url": active_proj.repository_url,
+                }
+                if active_proj
+                else None
+            ),
+            "repositories": repo_items,
+            "github_repositories": repo_items,
+        },
+        message=f"Found {len(repo_items)} authorized GitHub repository(ies) across {len(installations)} installation(s).",
+    )
+
+
+async def execute_list_pull_requests(
+    context: MCPContext,
+    arguments: Dict[str, Any],
+    db: AsyncSession,
+) -> ToolExecutionResult:
+    """
+    Lists Pull Requests for the active/specified project's connected repository
+    from PostgreSQL and live GitHub API when credentials are present.
+    """
+    project, repo, full_name, default_branch, token, err = await _resolve_target_repo_full_name(context, arguments, db)
+    if err:
+        return err
+    assert full_name is not None
+
+    state_filter = str(arguments.get("state") or "open").strip().lower()
+    if state_filter not in {"open", "closed", "all"}:
+        state_filter = "open"
+    try:
+        limit = max(1, min(int(arguments.get("limit", 20)), 50))
+    except (TypeError, ValueError):
+        limit = 20
+
+    pr_by_num: Dict[int, Dict[str, Any]] = {}
+    if repo:
+        stmt = select(GitHubPullRequest).where(GitHubPullRequest.repository_id == repo.id)
+        if state_filter != "all":
+            stmt = stmt.where(GitHubPullRequest.state == state_filter)
+        db_prs = (await db.execute(stmt.order_by(desc(GitHubPullRequest.created_at)).limit(limit))).scalars().all()
+        for pr in db_prs:
+            pr_by_num[int(pr.number)] = {
+                "number": pr.number,
+                "title": pr.title,
+                "state": pr.state,
+                "head_branch": pr.head_ref,
+                "base_branch": pr.base_ref,
+                "draft": bool(pr.draft),
+                "merged": bool(pr.merged),
+                "html_url": pr.html_url,
+                "author": pr.author_login,
+                "source": "database",
+            }
+
+    if token:
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                gh_resp = await client.get(
+                    f"https://api.github.com/repos/{full_name}/pulls",
+                    params={"state": state_filter, "per_page": limit},
+                    headers=_gh_headers(token),
+                )
+                if gh_resp.status_code == 200:
+                    for item in gh_resp.json():
+                        num = int(item.get("number", 0))
+                        if num:
+                            pr_by_num[num] = {
+                                "number": num,
+                                "title": item.get("title"),
+                                "state": item.get("state"),
+                                "head_branch": (item.get("head") or {}).get("ref"),
+                                "base_branch": (item.get("base") or {}).get("ref"),
+                                "draft": bool(item.get("draft", False)),
+                                "merged": bool(item.get("merged_at")),
+                                "html_url": item.get("html_url"),
+                                "author": (item.get("user") or {}).get("login"),
+                                "source": "github_live",
+                            }
+        except Exception as exc:
+            logger.warning(f"[MCP] Live PR listing fallback to DB for {full_name}: {exc}")
+
+    items = sorted(pr_by_num.values(), key=lambda x: x["number"], reverse=True)[:limit]
+    return ToolExecutionResult(
+        status="SUCCESS",
+        data={
+            "repository": full_name,
+            "state": state_filter,
+            "total_count": len(items),
+            "pull_requests": items,
+        },
+        message=f"Retrieved {len(items)} pull request(s) for '{full_name}' (state={state_filter}).",
+        result_reference=full_name,
     )

@@ -92,15 +92,43 @@ function GoogleCallbackContent() {
       return;
     }
 
+    const resolveNextDestination = (rawNext: string | null): string | null => {
+      let current = resolveSafeRedirectTarget(rawNext);
+      for (let i = 0; i < 3 && current; i++) {
+        try {
+          const parsed = new URL(current, window.location.origin);
+          if (parsed.pathname === '/auth/callback/google' || parsed.pathname === '/auth/callback/github') {
+            const inner = resolveSafeRedirectTarget(parsed.searchParams.get('next'));
+            if (inner) {
+              current = inner;
+              continue;
+            }
+          }
+        } catch {
+          // keep current
+        }
+        break;
+      }
+      return current;
+    };
+
     const proceedWithToken = (jwtToken: string) => {
       setAuthToken(jwtToken);
       trackLogin({ method: 'google' });
 
+      const safeNext = resolveNextDestination(searchParams.get('next'));
       setStepIndex(2);
 
       // Transition to Image 5: Verifying Security Session
       setTimeout(() => {
         setStage('verifying');
+
+        if (safeNext && safeNext.includes('/oauth/consent')) {
+          setTimeout(() => {
+            window.location.assign(safeNext);
+          }, 600);
+          return;
+        }
 
         Promise.all([
           api.onboarding.getState().catch(() => null),
@@ -111,7 +139,6 @@ function GoogleCallbackContent() {
             localStorage.setItem('secu_active_project_id', projs[0].id);
           }
 
-          const safeNext = resolveSafeRedirectTarget(searchParams.get('next'));
           const isGithubInstalled = Boolean(onboardingState?.github_installed);
 
           setTimeout(() => {
@@ -130,7 +157,11 @@ function GoogleCallbackContent() {
             }
           }, 1200);
         }).catch(() => {
-          router.push('/onboarding/connect-github');
+          if (safeNext) {
+            window.location.assign(safeNext);
+          } else {
+            router.push('/onboarding/connect-github');
+          }
         });
       }, 900);
     };

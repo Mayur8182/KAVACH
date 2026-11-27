@@ -563,23 +563,44 @@ class GitHubService:
         except Exception as e:
             logger.warning(f"Initial repository sync failed: {e}")
 
-        from urllib.parse import quote
+        from urllib.parse import parse_qs, quote, urlparse
         default_onboarding = (
             "/onboarding?step=repository&installed=true"
             if (setup_action == "update" or project_id)
             else "/onboarding?step=create_project&installed=true"
         )
-        target_path = custom_redirect or default_onboarding
+        raw_target = custom_redirect or default_onboarding
+        for _ in range(3):
+            parsed_t = urlparse(str(raw_target))
+            if parsed_t.path in {"/auth/callback/github", "/auth/callback/google"}:
+                inner_next = (parse_qs(parsed_t.query).get("next") or [None])[0]
+                if inner_next:
+                    raw_target = inner_next
+                    continue
+            break
+
+        target_path = raw_target
         if getattr(self.settings, "app_env", "") == "production" and "localhost:3002" in target_path:
             target_path = target_path.replace("http://localhost:3002", "https://kavachsecurity.me")
         if not target_path.startswith("http"):
             target_path = f"{frontend_target}{target_path if target_path.startswith('/') else '/' + target_path}"
-        sep = "&" if "?" in target_path else "?"
-        action_q = f"&setup_action={quote(setup_action)}" if setup_action else ""
-        destination_url = f"{target_path}{sep}installation_id={installation_id}&account={quote(str(account_login))}&synced={synced_count}&installed=true{action_q}"
+
+        is_oauth_consent_flow = "/oauth/consent" in target_path
+        if is_oauth_consent_flow:
+            destination_url = target_path
+        else:
+            sep = "&" if "?" in target_path else "?"
+            action_q = f"&setup_action={quote(setup_action)}" if setup_action else ""
+            destination_url = f"{target_path}{sep}installation_id={installation_id}&account={quote(str(account_login))}&synced={synced_count}&installed=true{action_q}"
 
         if jwt_login_token:
-            final_redirect = f"{frontend_target}/auth/callback/github?token={jwt_login_token}&next={quote(destination_url)}&installation_id={installation_id}&account={quote(str(account_login))}&synced={synced_count}&installed=true{action_q}"
+            action_q_extra = (
+                f"&installation_id={installation_id}&account={quote(str(account_login))}&synced={synced_count}&installed=true"
+                + (f"&setup_action={quote(setup_action)}" if setup_action else "")
+                if not is_oauth_consent_flow
+                else ""
+            )
+            final_redirect = f"{frontend_target}/auth/callback/github?token={jwt_login_token}&next={quote(destination_url, safe='')}{action_q_extra}"
         else:
             final_redirect = destination_url
 

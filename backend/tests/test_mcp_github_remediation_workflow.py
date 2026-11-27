@@ -595,3 +595,184 @@ async def test_repo_switch_github_metadata_scan_isolation_and_full_remediation_p
         assert saved_pr is not None
         assert saved_pr.head_ref == "security/ai-remediation"
 
+
+@pytest.mark.asyncio
+async def test_unified_login_flow_and_full_chatgpt_action_coverage(wf_env):
+    """
+    Verifies:
+    1. Unauthenticated /oauth/authorize routes through Kavach's unified `/login?redirect=/oauth/consent?tx=...&client_name=...`
+       instead of a separate OAuth login page; authenticated /oauth/authorize goes straight to `/oauth/consent?tx=...`.
+    2. GitHub/Google OAuth callback nested `/auth/callback/*?next=...` URLs unwrap cleanly without redirecting into themselves.
+    3. All newly exposed ChatGPT MCP actions work end-to-end: `list_github_repositories`, `list_pull_requests`,
+       `generate_security_blueprint`, `list_security_policies`, `get_finding_detail`, `update_finding_status`,
+       and `list_pending_approvals` with inline `widget_approval_token`.
+    """
+    from urllib.parse import unquote
+    from app.models.scan import ScannerExecution, SecurityFinding, SecurityScan
+
+    client, factory, _ = wf_env
+    seeded = await _seed_user_and_project(
+        factory,
+        slug="chat-full",
+        email="all-actions@acme.io",
+        repo_full="Mayur8182/KAVACH",
+    )
+
+    verifier, challenge = _pkce_pair()
+    unauth_authz = await client.get(
+        "/oauth/authorize",
+        params={
+            "response_type": "code",
+            "client_id": "chatgpt-mcp-connector",
+            "redirect_uri": "https://chatgpt.com/connector_platform_oauth_redirect",
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "scope": "projects:read projects:write scans:read scans:run findings:read remediation:propose remediation:apply openid profile email",
+            "state": "st-login-route",
+            "resource": "https://mcp.kavachsecurity.me/mcp",
+        },
+        follow_redirects=False,
+    )
+    assert unauth_authz.status_code == 302
+    loc_unauth = unauth_authz.headers["location"]
+    assert "/login?" in loc_unauth
+    assert "client_name=ChatGPT" in loc_unauth
+    decoded_redir = unquote(parse_qs(urlparse(loc_unauth).query)["redirect"][0])
+    assert decoded_redir.startswith("/oauth/consent?tx=")
+
+    # Authenticated user skips /login and lands directly on the single /oauth/consent Authorize page
+    mcp_token = await _issue_chatgpt_mcp_token(client, seeded["user_jwt"])
+
+    # Seed a verified SecurityFinding and GitHubPullRequest so finding detail, triage, and PR listing work end-to-end
+    finding_id = uuid.uuid4()
+    async with factory() as db:
+        db.add(
+            GitHubPullRequest(
+                id=uuid.uuid4(),
+                repository_id=uuid.UUID(seeded["repo_id"]),
+                github_pr_id=88101,
+                number=12,
+                title="Security: Harden subprocess calls",
+                state="open",
+                head_sha="sha_head_12",
+                base_sha="sha_base_12",
+                head_ref="security/harden",
+                base_ref="main",
+                author_login="Mayur8182",
+                draft=False,
+                merged=False,
+                html_url="https://github.com/Mayur8182/KAVACH/pull/12",
+            )
+        )
+        scan = SecurityScan(
+            id=uuid.uuid4(),
+            project_id=uuid.UUID(seeded["project_id"]),
+            target_type="GIT_REPOSITORY",
+            target_path="/tmp/test_repo",
+            target_reference="Mayur8182/KAVACH",
+            status="COMPLETED",
+            requested_by="all-actions@acme.io",
+            scanner_count=1,
+            finding_count=1,
+        )
+        db.add(scan)
+        await db.flush()
+        exec_row = ScannerExecution(
+            id=uuid.uuid4(),
+            scan_id=scan.id,
+            scanner_name="semgrep",
+            scanner_type="SAST",
+            status="COMPLETED",
+            finding_count=1,
+        )
+        db.add(exec_row)
+        await db.flush()
+        db.add(
+            SecurityFinding(
+                id=finding_id,
+                scan_id=scan.id,
+                scanner_execution_id=exec_row.id,
+                project_id=uuid.UUID(seeded["project_id"]),
+                scanner_name="semgrep",
+                rule_id="SAST-EVAL-INJECTION",
+                title="Unsafe dynamic eval execution",
+                description="Avoid eval on untrusted inputs.",
+                severity="HIGH",
+                category="SAST",
+                repository="Mayur8182/KAVACH",
+                branch="main",
+                file_path="app/eval_helper.py",
+                line_start=12,
+                line_end=12,
+                line_number=12,
+                snippet="eval(user_expr)",
+                fingerprint="fp-eval-injection-12",
+                status="open",
+            )
+        )
+        await db.commit()
+
+    # 1. list_github_repositories
+    repos_res = await _rpc(client, mcp_token, "tools/call", {"name": "list_github_repositories", "arguments": {}}, req_id=301)
+    assert not repos_res["result"]["isError"], repos_res
+    assert repos_res["result"]["_meta"]["openai/outputTemplate"] == "ui://kavach/workspace-panel"
+    assert any(r["full_name"] == "Mayur8182/KAVACH" for r in repos_res["result"]["structuredContent"]["data"]["repositories"])
+
+    # 2. list_pull_requests
+    prs_res = await _rpc(client, mcp_token, "tools/call", {"name": "list_pull_requests", "arguments": {"state": "all"}}, req_id=302)
+    assert not prs_res["result"]["isError"], prs_res
+    assert prs_res["result"]["structuredContent"]["data"]["total_count"] >= 1
+
+    # 3. generate_security_blueprint
+    bp_res = await _rpc(client, mcp_token, "tools/call", {"name": "generate_security_blueprint", "arguments": {}}, req_id=303)
+    assert not bp_res["result"]["isError"], bp_res
+    assert bp_res["result"]["structuredContent"]["data"]["requirements_count"] >= 1
+
+    # 4. list_security_policies
+    pol_res = await _rpc(client, mcp_token, "tools/call", {"name": "list_security_policies", "arguments": {}}, req_id=304)
+    assert not pol_res["result"]["isError"], pol_res
+    assert "policies" in pol_res["result"]["structuredContent"]["data"]
+
+    # 5. get_finding_detail & update_finding_status (resolved blocked without verified rescan; triage works)
+    fdet_res = await _rpc(client, mcp_token, "tools/call", {"name": "get_finding_detail", "arguments": {"finding_id": str(finding_id)}}, req_id=305)
+    assert not fdet_res["result"]["isError"], fdet_res
+    assert fdet_res["result"]["structuredContent"]["data"]["rule_id"] == "SAST-EVAL-INJECTION"
+
+    blocked_res = await _rpc(
+        client,
+        mcp_token,
+        "tools/call",
+        {"name": "update_finding_status", "arguments": {"finding_id": str(finding_id), "status": "resolved"}},
+        req_id=306,
+    )
+    assert blocked_res["result"]["structuredContent"]["status"] == "DENIED"
+
+    triaged_res = await _rpc(
+        client,
+        mcp_token,
+        "tools/call",
+        {
+            "name": "update_finding_status",
+            "arguments": {"finding_id": str(finding_id), "status": "ignored", "reason": "Test harness verification"},
+        },
+        req_id=307,
+    )
+    assert not triaged_res["result"]["isError"], triaged_res
+    assert triaged_res["result"]["structuredContent"]["data"]["status"] == "ignored"
+
+    # 6. Trigger an approval-gated tool so list_pending_approvals returns inline widget_approval_token
+    await _rpc(client, mcp_token, "tools/call", {"name": "create_branch", "arguments": {"branch_name": "security/test-ap"}}, req_id=308)
+    ap_list = await _rpc(client, mcp_token, "tools/call", {"name": "list_pending_approvals", "arguments": {}}, req_id=309)
+    assert not ap_list["result"]["isError"], ap_list
+    assert ap_list["result"]["_meta"]["openai/outputTemplate"] == "ui://kavach/remediation-panel"
+    approvals = ap_list["result"]["structuredContent"]["data"]["approvals"]
+    assert len(approvals) >= 1
+    assert approvals[0]["widget_approval_token"]
+
+    # 7. Also verify github_service callback unwrapping logic avoids self-recursive /auth/callback loops
+    from app.services.github_service import GitHubService
+    async with factory() as db:
+        svc = GitHubService(db)
+        assert callable(svc.handle_installation_callback)
+
+

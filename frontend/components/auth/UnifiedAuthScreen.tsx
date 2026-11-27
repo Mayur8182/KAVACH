@@ -15,9 +15,9 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api/client';
-import { getAuthToken, isTokenExpired, setAuthToken, resolveSafeRedirectTarget } from '@/lib/auth/token';
+import { getAuthToken, isTokenExpired, setAuthToken, clearAuthToken, resolveSafeRedirectTarget } from '@/lib/auth/token';
 import { toast } from '@/lib/toast';
 
 const GithubIcon = ({ size = 20 }: { size?: number }) => (
@@ -61,20 +61,26 @@ function AuthContent({ mode = 'login' }: UnifiedAuthScreenProps) {
   const autoTriggerRef = React.useRef(false);
 
   const isSignup = mode === 'signup';
+  const redirectParam = searchParams.get('redirect');
+  const mcpClientName = searchParams.get('client_name');
+  const isOAuthAuthorizeFlow = Boolean(redirectParam && redirectParam.includes('/oauth/consent'));
+
+  const buildReturnUrl = (providerPath: string): string => {
+    const currentOrigin =
+      typeof window !== 'undefined' ? window.location.origin : 'https://kavachsecurity.me';
+    const safeRedirect = resolveSafeRedirectTarget(redirectParam);
+    if (safeRedirect) {
+      return safeRedirect.startsWith('http') ? safeRedirect : `${currentOrigin}${safeRedirect}`;
+    }
+    return `${currentOrigin}${providerPath}`;
+  };
 
   const handleGithubAuth = async () => {
     setGithubLoading(true);
     setError(null);
     try {
-      const currentOrigin =
-        typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002';
-      const redirectParam = searchParams.get('redirect');
-      let returnUrl = `${currentOrigin}/auth/callback/github`;
-      if (redirectParam) {
-        returnUrl += `?next=${encodeURIComponent(redirectParam)}`;
-      }
       const data = await api.auth.getGithubAuthUrl({
-        return_url: returnUrl,
+        return_url: buildReturnUrl('/auth/callback/github'),
       });
       if (data?.url) {
         window.location.href = data.url;
@@ -96,15 +102,8 @@ function AuthContent({ mode = 'login' }: UnifiedAuthScreenProps) {
     setGoogleLoading(true);
     setError(null);
     try {
-      const currentOrigin =
-        typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002';
-      const redirectParam = searchParams.get('redirect');
-      let returnUrl = `${currentOrigin}/auth/callback/google`;
-      if (redirectParam) {
-        returnUrl += `?next=${encodeURIComponent(redirectParam)}`;
-      }
       const data = await api.auth.getGoogleAuthUrl({
-        return_url: returnUrl,
+        return_url: buildReturnUrl('/auth/callback/google'),
       });
       if (data?.url) {
         window.location.href = data.url;
@@ -124,20 +123,23 @@ function AuthContent({ mode = 'login' }: UnifiedAuthScreenProps) {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const token = getAuthToken();
-      const safeRedirect = resolveSafeRedirectTarget(searchParams.get('redirect'));
-      if (token && !isTokenExpired(token)) {
-        // Refresh shared cross-subdomain cookie before continuing
-        setAuthToken(token);
-        if (safeRedirect && (safeRedirect.includes('/oauth') || safeRedirect.startsWith('http'))) {
-          window.location.assign(safeRedirect);
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('stale') === '1') {
+        clearAuthToken();
+      } else {
+        const token = getAuthToken();
+        const safeRedirect = resolveSafeRedirectTarget(searchParams.get('redirect'));
+        if (token && !isTokenExpired(token)) {
+          // Refresh shared cross-subdomain cookie before continuing straight to Authorize page
+          setAuthToken(token);
+          if (safeRedirect && (safeRedirect.includes('/oauth') || safeRedirect.startsWith('http'))) {
+            window.location.assign(safeRedirect);
+            return;
+          }
+          router.replace(safeRedirect || '/overview');
           return;
         }
-        router.replace(safeRedirect || '/overview');
-        return;
       }
-
-      const p = new URLSearchParams(window.location.search);
       if (p.get('logged_out') === '1') {
         toast.info('You have been signed out safely', {
           description: 'Authenticate with your provider to access your workspace again.',
@@ -195,9 +197,20 @@ function AuthContent({ mode = 'login' }: UnifiedAuthScreenProps) {
             </h1>
 
             {/* Subtitle */}
-            <p className="text-[14px] text-gray-500 font-normal mb-8">
-              {isSignup ? 'Create your secure workspace in seconds' : 'Securely access your workspace'}
+            <p className="text-[14px] text-gray-500 font-normal mb-6">
+              {isOAuthAuthorizeFlow
+                ? `Sign in once to authorize ${mcpClientName || 'your AI assistant'}`
+                : isSignup
+                  ? 'Create your secure workspace in seconds'
+                  : 'Securely access your workspace'}
             </p>
+
+            {isOAuthAuthorizeFlow && (
+              <div className="mb-6 inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-semibold text-indigo-700">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Next step: Authorize {mcpClientName || 'MCP Client'}</span>
+              </div>
+            )}
 
             {/* Error Notification if any OAuth error returned */}
             {error && (

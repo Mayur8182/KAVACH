@@ -348,4 +348,106 @@ def create_mcp_server(name: str = "secure-control-plane-mcp") -> MCPServer:
             )
             return json.dumps(res.model_dump(), default=str)
 
+    # 15. list_github_repositories tool
+    @server.tool(
+        name="list_github_repositories",
+        description="List all connected GitHub repositories and App installations accessible in Kavach.",
+    )
+    async def list_github_repositories(session_id: str, project_id: Optional[str] = None, sync_live: bool = False) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="list_github_repositories",
+                arguments={"project_id": project_id, "sync_live": sync_live},
+            )
+            return json.dumps(res.model_dump(), default=str)
+
+    # 16. list_pull_requests tool
+    @server.tool(
+        name="list_pull_requests",
+        description="List Pull Requests for the active project's connected repository.",
+    )
+    async def list_pull_requests(session_id: str, project_id: Optional[str] = None, state: str = "open") -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="list_pull_requests",
+                arguments={"project_id": project_id, "state": state},
+            )
+            return json.dumps(res.model_dump(), default=str)
+
+    # 17. get_finding_detail tool
+    @server.tool(
+        name="get_finding_detail",
+        description="Retrieve full finding evidence, snippet, CWE/OWASP metadata, and persisted patches.",
+    )
+    async def get_finding_detail(finding_id: str, session_id: str, project_id: Optional[str] = None) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="get_finding_detail",
+                arguments={"finding_id": finding_id, "project_id": project_id},
+            )
+            return json.dumps(res.model_dump(), default=str)
+
+    # 18. update_finding_status tool
+    @server.tool(
+        name="update_finding_status",
+        description="Triage a finding status ('open', 'ignored', 'false_positive', 'accepted_risk') with reason.",
+    )
+    async def update_finding_status(finding_id: str, status: str, session_id: str, reason: str = "", project_id: Optional[str] = None) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="update_finding_status",
+                arguments={"finding_id": finding_id, "status": status, "reason": reason, "project_id": project_id},
+            )
+            return json.dumps(res.model_dump(), default=str)
+
+    # 19. list_security_policies tool
+    @server.tool(
+        name="list_security_policies",
+        description="List active project security policies and deterministic MCP Firewall / OPA rules.",
+    )
+    async def list_security_policies(session_id: str, project_id: Optional[str] = None, active_only: bool = False) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="list_security_policies",
+                arguments={"project_id": project_id, "active_only": active_only},
+            )
+            return json.dumps(res.model_dump(), default=str)
+
+    # 20. generate_security_blueprint tool
+    @server.tool(
+        name="generate_security_blueprint",
+        description="Generate a dynamic Security Blueprint and tailored requirements for the project.",
+    )
+    async def generate_security_blueprint(session_id: str, project_id: Optional[str] = None, intent_summary: Optional[str] = None) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="generate_security_blueprint",
+                arguments={"project_id": project_id, "intent_summary": intent_summary},
+            )
+            return json.dumps(res.model_dump(), default=str)
+
     return server

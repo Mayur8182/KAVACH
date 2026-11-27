@@ -75,6 +75,26 @@ def verify_widget_approval_token(
 
 
 WIDGET_TOOL_TEMPLATE_MAP: Dict[str, Dict[str, str]] = {
+    "get_connection_status": {
+        "uri": "ui://kavach/workspace-panel",
+        "invoking": "Checking Kavach MCP connection status...",
+        "invoked": "Connection status ready.",
+    },
+    "list_workspaces": {
+        "uri": "ui://kavach/workspace-panel",
+        "invoking": "Loading Kavach workspaces...",
+        "invoked": "Workspaces loaded.",
+    },
+    "get_workspace": {
+        "uri": "ui://kavach/workspace-panel",
+        "invoking": "Loading active workspace details...",
+        "invoked": "Workspace loaded.",
+    },
+    "create_project": {
+        "uri": "ui://kavach/workspace-panel",
+        "invoking": "Creating project in Kavach...",
+        "invoked": "Project created.",
+    },
     "get_active_project": {
         "uri": "ui://kavach/workspace-panel",
         "invoking": "Loading Kavach workspace & repository...",
@@ -100,6 +120,11 @@ WIDGET_TOOL_TEMPLATE_MAP: Dict[str, Dict[str, str]] = {
         "invoking": "Fetching GitHub repository metadata...",
         "invoked": "GitHub repository metadata loaded.",
     },
+    "list_github_repositories": {
+        "uri": "ui://kavach/workspace-panel",
+        "invoking": "Loading connected GitHub repositories...",
+        "invoked": "GitHub repositories loaded.",
+    },
     "get_project_posture": {
         "uri": "ui://kavach/remediation-panel",
         "invoking": "Evaluating Kavach security posture...",
@@ -119,6 +144,16 @@ WIDGET_TOOL_TEMPLATE_MAP: Dict[str, Dict[str, str]] = {
         "uri": "ui://kavach/remediation-panel",
         "invoking": "Loading verified repository findings...",
         "invoked": "Findings loaded.",
+    },
+    "get_finding_detail": {
+        "uri": "ui://kavach/remediation-panel",
+        "invoking": "Loading finding evidence and snippet...",
+        "invoked": "Finding evidence ready.",
+    },
+    "update_finding_status": {
+        "uri": "ui://kavach/remediation-panel",
+        "invoking": "Updating finding triage status...",
+        "invoked": "Finding status updated.",
     },
     "propose_remediation_diff": {
         "uri": "ui://kavach/remediation-panel",
@@ -149,6 +184,31 @@ WIDGET_TOOL_TEMPLATE_MAP: Dict[str, Dict[str, str]] = {
         "uri": "ui://kavach/remediation-panel",
         "invoking": "Opening GitHub Pull Request...",
         "invoked": "Pull Request ready.",
+    },
+    "list_pull_requests": {
+        "uri": "ui://kavach/remediation-panel",
+        "invoking": "Loading GitHub Pull Requests...",
+        "invoked": "Pull Requests loaded.",
+    },
+    "list_pending_approvals": {
+        "uri": "ui://kavach/remediation-panel",
+        "invoking": "Loading pending human security approvals...",
+        "invoked": "Pending approvals ready.",
+    },
+    "list_security_policies": {
+        "uri": "ui://kavach/remediation-panel",
+        "invoking": "Loading project policies & MCP firewall rules...",
+        "invoked": "Policies loaded.",
+    },
+    "get_security_blueprint": {
+        "uri": "ui://kavach/remediation-panel",
+        "invoking": "Loading dynamic Security Blueprint...",
+        "invoked": "Security Blueprint loaded.",
+    },
+    "generate_security_blueprint": {
+        "uri": "ui://kavach/remediation-panel",
+        "invoking": "Generating dynamic Security Blueprint...",
+        "invoked": "Security Blueprint generated.",
     },
 }
 
@@ -232,9 +292,16 @@ def render_workspace_panel_html(api_base: str) -> str:
       <div class="lbl" style="margin-bottom:4px;">Connect / Switch GitHub Repository (owner/repo)</div>
       <input id="repoInput" placeholder="Mayur8182/KAVACH" />
     </div>
-    <button id="connectBtn" type="button" style="align-self:flex-end;">Connect & Sync</button>
+    <button id="connectBtn" type="button" style="align-self:flex-end;">Connect & Switch</button>
     <button id="scanBtn" type="button" class="ok" style="align-self:flex-end;">Scan Repo</button>
   </div>
+  <div class="row">
+    <button id="findingsBtn" type="button" class="sec">View Findings</button>
+    <button id="blueprintBtn" type="button" class="sec">Security Blueprint</button>
+    <button id="approvalsBtn" type="button" class="sec">Pending Approvals</button>
+    <button id="reposBtn" type="button" class="sec">All Repos</button>
+  </div>
+  <div id="reposList" class="list"></div>
   <div id="projectsList" class="list"></div>
   <div id="feedback" class="msg"></div>
 </div>
@@ -246,11 +313,20 @@ def render_workspace_panel_html(api_base: str) -> str:
   const data = out.data || out || {{}};
   const activeEl = document.getElementById("activeInfo");
   const repoInput = document.getElementById("repoInput");
+  const reposListEl = document.getElementById("reposList");
   const listEl = document.getElementById("projectsList");
   const msgEl = document.getElementById("feedback");
 
   function escapeHtml(s) {{
     return String(s || "").replace(/[&<>\"']/g, c => ({{ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }}[c]));
+  }}
+
+  async function invoke(toolName, args, statusMsg) {{
+    msgEl.textContent = statusMsg || ("Running " + toolName + "...");
+    if (oa.callTool) {{
+      const res = await oa.callTool(toolName, args || {{}});
+      msgEl.textContent = (res && res.result) || ("Completed " + toolName + ".");
+    }}
   }}
 
   const ap = data.active_project || data.project || data;
@@ -262,6 +338,18 @@ def render_workspace_panel_html(api_base: str) -> str:
     repoInput.value = cleaned;
   }}
 
+  const repos = data.repositories || data.github_repositories || [];
+  if (Array.isArray(repos) && repos.length > 0) {{
+    reposListEl.innerHTML = repos.slice(0, 8).map(r => (
+      '<div class="item"><div><strong>' + escapeHtml(r.full_name) + '</strong><div class="lbl">' +
+      escapeHtml((r.is_active_project_repo ? "ACTIVE • " : "") + (r.default_branch || "main")) + '</div></div>' +
+      '<button class="sec" data-repo="' + escapeHtml(r.full_name) + '">Use Repo</button></div>'
+    )).join("");
+    reposListEl.querySelectorAll("button[data-repo]").forEach(btn => {{
+      btn.addEventListener("click", () => invoke("connect_repository", {{ repository: btn.getAttribute("data-repo"), replace_project_repo: true }}, "Switching active repository..."));
+    }});
+  }}
+
   const projects = data.projects || data.available_projects || [];
   if (Array.isArray(projects) && projects.length > 0) {{
     listEl.innerHTML = projects.slice(0, 8).map(p => (
@@ -270,36 +358,20 @@ def render_workspace_panel_html(api_base: str) -> str:
       '<button class="sec" data-pid="' + escapeHtml(p.id) + '">Activate</button></div>'
     )).join("");
     listEl.querySelectorAll("button[data-pid]").forEach(btn => {{
-      btn.addEventListener("click", async () => {{
-        const pid = btn.getAttribute("data-pid");
-        msgEl.textContent = "Switching active project inside ChatGPT...";
-        if (oa.callTool) {{
-          const res = await oa.callTool("set_active_project", {{ project_id: pid, set_as_default: true }});
-          msgEl.textContent = (res && res.result) || "Switched project.";
-        }}
-      }});
+      btn.addEventListener("click", () => invoke("set_active_project", {{ project_id: btn.getAttribute("data-pid"), set_as_default: true }}, "Switching active project inside ChatGPT..."));
     }});
   }}
 
-  document.getElementById("connectBtn").addEventListener("click", async () => {{
+  document.getElementById("connectBtn").addEventListener("click", () => {{
     const r = repoInput.value.trim();
     if (!r) return;
-    msgEl.textContent = "Linking " + r + " to active project...";
-    if (oa.callTool) {{
-      const res = await oa.callTool("connect_repository", {{ repository: r, replace_project_repo: true }});
-      msgEl.textContent = (res && res.result) || ("Connected " + r);
-    }} else {{
-      msgEl.textContent = "Connected " + r + " via " + apiBase;
-    }}
+    invoke("connect_repository", {{ repository: r, replace_project_repo: true }}, "Linking " + r + " to active project...");
   }});
-
-  document.getElementById("scanBtn").addEventListener("click", async () => {{
-    msgEl.textContent = "Starting real repository security scan...";
-    if (oa.callTool) {{
-      const res = await oa.callTool("run_security_scan", {{}});
-      msgEl.textContent = (res && res.result) || "Scan initiated.";
-    }}
-  }});
+  document.getElementById("scanBtn").addEventListener("click", () => invoke("run_security_scan", {{}}, "Starting real repository security scan..."));
+  document.getElementById("findingsBtn").addEventListener("click", () => invoke("list_project_findings", {{ limit: 25 }}, "Loading verified findings..."));
+  document.getElementById("blueprintBtn").addEventListener("click", () => invoke("generate_security_blueprint", {{}}, "Generating dynamic Security Blueprint..."));
+  document.getElementById("approvalsBtn").addEventListener("click", () => invoke("list_pending_approvals", {{}}, "Loading pending approvals..."));
+  document.getElementById("reposBtn").addEventListener("click", () => invoke("list_github_repositories", {{}}, "Loading GitHub repositories..."));
 }})();
 </script>
 </body>
@@ -331,10 +403,13 @@ def render_remediation_panel_html(api_base: str) -> str:
       <button id="rejectInlineBtn" class="sec" type="button">Reject</button>
     </div>
   </div>
+  <div id="approvalsList" class="list"></div>
+  <div id="findingsList" class="list"></div>
   <pre id="diffBox" style="display:none;"></pre>
   <div class="row" id="actionsRow">
     <button id="verifyBtn" type="button" class="sec">Verify Patch</button>
     <button id="prBtn" type="button">Open GitHub PR</button>
+    <button id="scanAgainBtn" type="button" class="sec">Rescan Repo</button>
   </div>
   <div id="statusMsg" class="msg"></div>
 </div>
@@ -350,11 +425,37 @@ def render_remediation_panel_html(api_base: str) -> str:
   const summaryEl = document.getElementById("summaryBox");
   const approvalBox = document.getElementById("approvalBox");
   const approvalDesc = document.getElementById("approvalDesc");
+  const approvalsList = document.getElementById("approvalsList");
+  const findingsList = document.getElementById("findingsList");
   const diffBox = document.getElementById("diffBox");
   const msgEl = document.getElementById("statusMsg");
 
   function esc(s) {{
     return String(s || "").replace(/[&<>\"']/g, c => ({{ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }}[c]));
+  }}
+
+  async function submitDecision(apId, tok, decision, pendingTool, pendingArgs, containerEl) {{
+    if (!tok) {{
+      msgEl.textContent = "Signed widget token unavailable for this approval.";
+      return;
+    }}
+    msgEl.textContent = "Submitting signed decision (" + decision + ")...";
+    const res = await fetch(apiBase + "/api/v1/mcp/approvals/" + encodeURIComponent(apId) + "/widget-decide", {{
+      method: "POST",
+      headers: {{ "Content-Type": "application/json" }},
+      body: JSON.stringify({{ decision: decision, widget_token: tok }}),
+    }});
+    const body = await res.json();
+    if (!res.ok) {{
+      msgEl.textContent = "Decision failed: " + (body.detail || res.status);
+      return;
+    }}
+    if (containerEl) containerEl.style.display = "none";
+    msgEl.textContent = "Decision recorded: " + body.status + (decision === "APPROVED" ? ". Executing action..." : ".");
+    if (decision === "APPROVED" && oa.callTool && pendingTool) {{
+      const nextArgs = Object.assign({{}}, pendingArgs || {{}}, {{ approval_id: apId }});
+      await oa.callTool(pendingTool, nextArgs);
+    }}
   }}
 
   statusEl.textContent = out.status || data.status || "READY";
@@ -376,31 +477,42 @@ def render_remediation_panel_html(api_base: str) -> str:
   if (approvalId && out.status === "REQUIRES_APPROVAL") {{
     approvalBox.style.display = "block";
     approvalDesc.textContent = "Approve tool '" + (data.pending_tool || out.tool || "security action") + "' (" + approvalId + ") directly without leaving ChatGPT.";
-    const decide = async (decision) => {{
-      if (!widgetToken) {{
-        msgEl.textContent = "Widget approval token unavailable; approve via /settings/mcp.";
-        return;
-      }}
-      msgEl.textContent = "Submitting signed decision (" + decision + ")...";
-      const res = await fetch(apiBase + "/api/v1/mcp/approvals/" + encodeURIComponent(approvalId) + "/widget-decide", {{
-        method: "POST",
-        headers: {{ "Content-Type": "application/json" }},
-        body: JSON.stringify({{ decision: decision, widget_token: widgetToken }}),
+    document.getElementById("approveInlineBtn").addEventListener("click", () => submitDecision(approvalId, widgetToken, "APPROVED", data.pending_tool, data.pending_arguments, approvalBox));
+    document.getElementById("rejectInlineBtn").addEventListener("click", () => submitDecision(approvalId, widgetToken, "REJECTED", data.pending_tool, data.pending_arguments, approvalBox));
+  }}
+
+  const pendingApprovals = Array.isArray(data.approvals) ? data.approvals : [];
+  if (pendingApprovals.length > 0) {{
+    approvalsList.innerHTML = pendingApprovals.slice(0, 6).map((ap, idx) => (
+      '<div class="item" data-ap-row="' + idx + '"><div><strong>' + esc(ap.tool_name || ap.operation_type) + '</strong><div class="lbl">' +
+      esc(ap.reason || ap.approval_id) + '</div></div><div style="display:flex;gap:6px;">' +
+      '<button class="ok" data-ap-approve="' + idx + '">Approve</button>' +
+      '<button class="sec" data-ap-reject="' + idx + '">Reject</button></div></div>'
+    )).join("");
+    pendingApprovals.slice(0, 6).forEach((ap, idx) => {{
+      const row = approvalsList.querySelector('[data-ap-row="' + idx + '"]');
+      const appBtn = approvalsList.querySelector('[data-ap-approve="' + idx + '"]');
+      const rejBtn = approvalsList.querySelector('[data-ap-reject="' + idx + '"]');
+      if (appBtn) appBtn.addEventListener("click", () => submitDecision(ap.approval_id, ap.widget_approval_token, "APPROVED", ap.tool_name, ap.arguments || {{}}, row));
+      if (rejBtn) rejBtn.addEventListener("click", () => submitDecision(ap.approval_id, ap.widget_approval_token, "REJECTED", ap.tool_name, ap.arguments || {{}}, row));
+    }});
+  }}
+
+  const findings = Array.isArray(data.findings) ? data.findings : [];
+  if (findings.length > 0 && !patchText) {{
+    findingsList.innerHTML = findings.slice(0, 6).map(f => (
+      '<div class="item"><div><strong>[' + esc(f.severity || "INFO") + '] ' + esc(f.title || f.rule_id) + '</strong><div class="lbl">' +
+      esc((f.file_path || "repo") + (f.line_number ? (":" + f.line_number) : "")) + '</div></div>' +
+      '<button class="sec" data-fix-fid="' + esc(f.id) + '">Propose Fix</button></div>'
+    )).join("");
+    findingsList.querySelectorAll("button[data-fix-fid]").forEach(btn => {{
+      btn.addEventListener("click", async () => {{
+        if (!oa.callTool) return;
+        const fid = btn.getAttribute("data-fix-fid");
+        msgEl.textContent = "Generating grounded fix diff for finding " + fid + "...";
+        await oa.callTool("propose_remediation_diff", {{ finding_id: fid }});
       }});
-      const body = await res.json();
-      if (!res.ok) {{
-        msgEl.textContent = "Decision failed: " + (body.detail || res.status);
-        return;
-      }}
-      msgEl.textContent = "Decision recorded: " + body.status + (decision === "APPROVED" ? ". Executing approved tool..." : ".");
-      approvalBox.style.display = "none";
-      if (decision === "APPROVED" && oa.callTool && data.pending_tool) {{
-        const nextArgs = Object.assign({{}}, data.pending_arguments || {{}}, {{ approval_id: approvalId }});
-        await oa.callTool(data.pending_tool, nextArgs);
-      }}
-    }};
-    document.getElementById("approveInlineBtn").addEventListener("click", () => decide("APPROVED"));
-    document.getElementById("rejectInlineBtn").addEventListener("click", () => decide("REJECTED"));
+    }});
   }}
 
   document.getElementById("verifyBtn").addEventListener("click", async () => {{
@@ -421,6 +533,12 @@ def render_remediation_panel_html(api_base: str) -> str:
       head_branch: data.branch || "security/ai-remediation",
       title: "Security: AI remediation for verified findings",
     }});
+  }});
+
+  document.getElementById("scanAgainBtn").addEventListener("click", async () => {{
+    if (!oa.callTool) return;
+    msgEl.textContent = "Triggering repository scan...";
+    await oa.callTool("run_security_scan", {{}});
   }});
 }})();
 </script>

@@ -2,6 +2,8 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { PlatformShellWrapper } from './PlatformShellWrapper';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   robots: {
     index: false,

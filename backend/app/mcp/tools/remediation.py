@@ -7,6 +7,7 @@ Fetches real repository source context when synthesizing patches and executes re
 import uuid
 from typing import Any, Dict, Optional
 
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.engines.remediation.synthesizer import PatchSynthesizer
@@ -21,7 +22,7 @@ from app.mcp.tools.github import (
     resolve_project_github_repo,
     _extract_owner_repo,
 )
-from app.models.remediation import RemediationValidation
+from app.models.remediation import RemediationPatch, RemediationPlan, RemediationValidation
 from app.models.scan import SecurityFinding
 from app.services.audit_service import AuditService
 
@@ -337,3 +338,167 @@ async def execute_verify_patch(
 ) -> ToolExecutionResult:
     """First-class alias for `verify_patch` executing real syntax + scanner verification."""
     return await execute_verify_remediation_patch(context, arguments, db)
+
+
+async def execute_get_finding_detail(
+    context: MCPContext,
+    arguments: Dict[str, Any],
+    db: AsyncSession,
+) -> ToolExecutionResult:
+    """
+    Retrieves complete evidence, vulnerable source snippet, CWE/OWASP metadata,
+    and any persisted remediation patches for a SecurityFinding in PostgreSQL.
+    """
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+
+    raw_fid = arguments.get("finding_id")
+    if not raw_fid:
+        return ToolExecutionResult(
+            status="INVALID_INPUT",
+            message="Provide 'finding_id' UUID to retrieve detailed finding evidence.",
+            error_code="MCP_INVALID_INPUT",
+        )
+
+    finding = await _load_finding_scoped(raw_fid, project.id, db)
+    if not finding:
+        return ToolExecutionResult(
+            status="NOT_FOUND",
+            message=f"Finding '{raw_fid}' was not found in authorized project '{project.name}'.",
+            error_code="MCP_RESOURCE_NOT_FOUND",
+        )
+
+    patches_stmt = (
+        select(RemediationPatch)
+        .join(RemediationPlan, RemediationPatch.remediation_plan_id == RemediationPlan.id, isouter=True)
+        .where(RemediationPlan.project_id == project.id)
+        .order_by(desc(RemediationPatch.created_at))
+        .limit(10)
+    )
+    recent_patches = [
+        {
+            "id": str(p.id),
+            "status": p.status,
+            "affected_files": p.affected_files,
+            "diff": p.diff,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in (await db.execute(patches_stmt)).scalars().all()
+        if finding.file_path and finding.file_path in (p.affected_files or [])
+    ]
+
+    return ToolExecutionResult(
+        status="SUCCESS",
+        data={
+            "id": str(finding.id),
+            "finding_id": str(finding.id),
+            "project_id": str(project.id),
+            "scan_id": str(finding.scan_id),
+            "rule_id": finding.rule_id,
+            "scanner": finding.scanner_name,
+            "title": finding.title,
+            "description": finding.description,
+            "severity": finding.severity,
+            "status": finding.status,
+            "category": finding.category,
+            "repository": finding.repository,
+            "branch": finding.branch,
+            "file_path": finding.file_path,
+            "line_number": finding.line_number or finding.line_start,
+            "line_start": finding.line_start,
+            "line_end": finding.line_end,
+            "snippet": finding.snippet,
+            "cwe_id": finding.cwe_id,
+            "owasp_category": finding.owasp_category,
+            "confidence": finding.confidence,
+            "remediation": finding.remediation,
+            "patches": recent_patches,
+            "created_at": finding.created_at.isoformat() if finding.created_at else None,
+        },
+        message=f"Loaded finding '{finding.title}' ({finding.severity}) in {finding.file_path or 'repository'}.",
+        result_reference=str(finding.id),
+    )
+
+
+async def execute_update_finding_status(
+    context: MCPContext,
+    arguments: Dict[str, Any],
+    db: AsyncSession,
+) -> ToolExecutionResult:
+    """
+    Triages a verified SecurityFinding status (`open`, `ignored`, `false_positive`).
+    Marking `resolved`/`fixed` directly is blocked per Rule 18 — call `verify_patch` with `mark_resolved=True`.
+    """
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+
+    raw_fid = arguments.get("finding_id")
+    new_status = str(arguments.get("status") or "").strip().lower()
+    reason = str(arguments.get("reason") or "").strip()
+
+    if not raw_fid:
+        return ToolExecutionResult(
+            status="INVALID_INPUT",
+            message="Missing required 'finding_id'.",
+            error_code="MCP_INVALID_INPUT",
+        )
+    if new_status in {"resolved", "fixed", "closed"}:
+        return ToolExecutionResult(
+            status="DENIED",
+            message="Findings cannot be marked 'resolved' without rescan verification. Run `verify_patch` with `mark_resolved=True`.",
+            error_code="MCP_EVIDENCE_REQUIRED",
+        )
+    if new_status not in {"open", "ignored", "false_positive", "accepted_risk"}:
+        return ToolExecutionResult(
+            status="INVALID_INPUT",
+            message="Supported status transitions: 'open', 'ignored', 'false_positive', 'accepted_risk'.",
+            error_code="MCP_INVALID_INPUT",
+        )
+    if new_status != "open" and not reason:
+        return ToolExecutionResult(
+            status="INVALID_INPUT",
+            message="Provide a concrete 'reason' when ignoring or marking a finding as false_positive.",
+            error_code="MCP_INVALID_INPUT",
+        )
+
+    finding = await _load_finding_scoped(raw_fid, project.id, db)
+    if not finding:
+        return ToolExecutionResult(
+            status="NOT_FOUND",
+            message=f"Finding '{raw_fid}' not found in project '{project.name}'.",
+            error_code="MCP_RESOURCE_NOT_FOUND",
+        )
+
+    prev_status = finding.status
+    finding.status = new_status
+    meta = dict(finding.raw_metadata or {}) if isinstance(finding.raw_metadata, dict) else {}
+    meta["triage_reason"] = reason
+    meta["triaged_by"] = str(context.identity.authenticated_principal or context.identity.agent_id)
+    finding.raw_metadata = meta
+    db.add(finding)
+
+    await AuditService(db).log_event(
+        action="FINDING_STATUS_UPDATED",
+        resource_type="mcp_tool",
+        actor_type="user",
+        actor_id=str(context.identity.agent_id),
+        resource_id=str(finding.id),
+        project_id=project.id,
+        status="SUCCESS",
+        metadata={"previous_status": prev_status, "new_status": new_status, "reason": reason},
+    )
+    await db.commit()
+
+    return ToolExecutionResult(
+        status="SUCCESS",
+        data={
+            "finding_id": str(finding.id),
+            "previous_status": prev_status,
+            "status": new_status,
+            "reason": reason,
+        },
+        message=f"Finding '{finding.title}' updated from '{prev_status}' to '{new_status}'.",
+        result_reference=str(finding.id),
+    )

@@ -297,6 +297,8 @@ async def execute_list_pending_approvals(
     rows = (await db.execute(stmt)).all()
     project_name_map = {str(p.id): p.name for p in projects}
 
+    from app.mcp.widgets import issue_widget_approval_token
+
     items: List[Dict[str, Any]] = []
     for ap, dec in rows:
         snap = dec.context_snapshot if isinstance(dec.context_snapshot, dict) else {}
@@ -309,11 +311,16 @@ async def execute_list_pending_approvals(
                 "operation_type": dec.operation_type,
                 "tool_name": snap.get("tool_name"),
                 "client_name": snap.get("agent_name"),
+                "arguments": snap.get("arguments") or {},
                 "status": ap.status,
                 "reason": ap.reason,
                 "requested_by": ap.requested_by,
                 "requested_at": ap.requested_at.isoformat() if ap.requested_at else None,
                 "expires_at": ap.expires_at.isoformat() if ap.expires_at else None,
+                "widget_approval_token": issue_widget_approval_token(
+                    approval_id=ap.id,
+                    user_id=user.id,
+                ),
             }
         )
 

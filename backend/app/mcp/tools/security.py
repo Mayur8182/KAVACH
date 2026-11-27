@@ -136,3 +136,185 @@ async def execute_check_security_policy(
         message=f"Policy decision evaluated: {result.decision.value}",
         result_reference=result.decision.value,
     )
+
+
+async def execute_list_security_policies(
+    context: MCPContext,
+    arguments: Dict[str, Any],
+    db: AsyncSession,
+) -> ToolExecutionResult:
+    """
+    Lists real SecurityPolicy definitions and active MCPFirewallRule rules for the authorized project.
+    """
+    from sqlalchemy import or_, select
+    from app.models.mcp_security import MCPFirewallRule
+
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+
+    active_only = bool(arguments.get("active_only", False))
+    policies = await PolicyRepository(db).list_policies_for_project(project.id, active_only=active_only)
+    fw_rows = (
+        await db.execute(
+            select(MCPFirewallRule).where(
+                or_(MCPFirewallRule.project_id == project.id, MCPFirewallRule.project_id.is_(None)),
+                MCPFirewallRule.is_active == True,
+            )
+        )
+    ).scalars().all()
+
+    policy_items = []
+    for p in policies:
+        versions = getattr(p, "versions", []) or []
+        latest = versions[0] if versions else None
+        policy_items.append(
+            {
+                "id": str(p.id),
+                "name": p.name,
+                "description": p.description,
+                "scope": p.scope,
+                "status": p.status,
+                "priority": p.priority,
+                "policy_type": p.policy_type,
+                "current_version": p.current_version,
+                "definition": latest.definition if latest else None,
+            }
+        )
+
+    firewall_items = [
+        {
+            "id": str(r.id),
+            "name": r.name,
+            "rule_type": r.rule_type,
+            "tool_pattern": r.tool_pattern,
+            "client_pattern": r.client_pattern,
+            "action": r.action,
+            "priority": r.priority,
+            "match_count": r.match_count,
+        }
+        for r in fw_rows
+    ]
+
+    return ToolExecutionResult(
+        status="SUCCESS",
+        data={
+            "project_id": str(project.id),
+            "project_name": project.name,
+            "policies_count": len(policy_items),
+            "firewall_rules_count": len(firewall_items),
+            "policies": policy_items,
+            "firewall_rules": firewall_items,
+        },
+        message=f"Retrieved {len(policy_items)} security policy(ies) and {len(firewall_items)} MCP firewall rule(s).",
+        result_reference=str(project.id),
+    )
+
+
+async def execute_generate_security_blueprint(
+    context: MCPContext,
+    arguments: Dict[str, Any],
+    db: AsyncSession,
+) -> ToolExecutionResult:
+    """
+    Generates a fresh dynamic SecurityBlueprint for the authorized project using BlueprintService
+    (deriving an Intent from project metadata/architecture when none exists yet).
+    """
+    from sqlalchemy import desc, select
+    from app.engines.intent.models import DataDomain, DeploymentContext, Interface, NormalizedIntent, Technology
+    from app.models.intent import Intent
+    from app.models.user import User
+    from app.services.blueprint_service import BlueprintService
+
+    project, err = await resolve_authorized_project(context, arguments, db)
+    if err:
+        return err
+
+    user = await db.get(User, context.identity.agent_id)
+    if not user:
+        return ToolExecutionResult(status="DENIED", message="Authenticated user not found.", error_code="MCP_AUTH_FAILED")
+
+    existing_intent = (
+        await db.execute(
+            select(Intent)
+            .where(Intent.project_id == project.id)
+            .order_by(desc(Intent.created_at))
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    if not existing_intent or arguments.get("intent_summary"):
+        purpose_text = str(
+            arguments.get("intent_summary")
+            or project.description
+            or f"{project.name} ({project.application_type or 'web_service'}) connected to {project.repository_url or 'workspace'}"
+        )
+        techs = []
+        if project.primary_language:
+            techs.append(Technology(name=project.primary_language, category="LANGUAGE", confidence=0.95))
+        if project.framework:
+            techs.append(Technology(name=project.framework, category="FRAMEWORK", confidence=0.95))
+        norm = NormalizedIntent(
+            raw_input=purpose_text,
+            purpose=purpose_text,
+            application_type=str(project.application_type or "WEB_APPLICATION").upper(),
+            interfaces=[Interface(type="REST_API", description=f"Application API / web endpoints for {project.name}", confidence=0.9)],
+            technologies=techs,
+            data_domains=[
+                DataDomain(domain="ACCOUNT_DATA", description="Workspace user accounts and tokens", confidence=0.85),
+                DataDomain(domain="SOURCE_CODE", description="Connected application source repository", confidence=0.9),
+            ],
+            deployment_context=DeploymentContext(
+                environment=str(project.environment or "production").upper(),
+                confidence=0.9,
+            ),
+            overall_confidence=0.9,
+        )
+        new_intent = Intent(
+            id=uuid.uuid4(),
+            project_id=project.id,
+            raw_input=purpose_text,
+            environment=project.environment or "production",
+            application_type=norm.application_type,
+            purpose=purpose_text,
+            normalized_intent=norm.model_dump(),
+            status="ANALYZED",
+            provider="deterministic",
+            overall_confidence=0.9,
+        )
+        db.add(new_intent)
+        await db.commit()
+        existing_intent = new_intent
+
+    bp_service = BlueprintService(db)
+    bp = await bp_service.generate_blueprint(
+        project_id=project.id,
+        current_user=user,
+        intent_id=existing_intent.id,
+        request_id=context.request_id,
+    )
+    bp_full = await bp_service.repo.get_by_id(bp.id)
+    reqs = [
+        {
+            "id": str(r.id),
+            "requirement_key": r.requirement_key,
+            "title": r.title,
+            "category": r.category,
+            "severity": r.severity,
+        }
+        for r in (getattr(bp_full, "requirements", []) or [])
+    ]
+
+    return ToolExecutionResult(
+        status="SUCCESS",
+        data={
+            "blueprint_id": str(bp.id),
+            "project_id": str(project.id),
+            "version": bp.version,
+            "status": bp.status,
+            "requirements_count": len(reqs),
+            "requirements": reqs,
+        },
+        message=f"Generated dynamic Security Blueprint v{bp.version} with {len(reqs)} requirement(s) for '{project.name}'.",
+        result_reference=str(bp.id),
+    )

@@ -439,7 +439,11 @@ async def test_dcr_cimd_and_ssrf_guard(test_env, monkeypatch):
         follow_redirects=False,
     )
     assert cimd_auth.status_code == 302
-    assert "/oauth/consent?tx=" in cimd_auth.headers["location"]
+    loc_url = cimd_auth.headers["location"]
+    assert "/login?" in loc_url
+    parsed_loc = urlparse(loc_url)
+    redir_target = (parse_qs(parsed_loc.query).get("redirect") or [""])[0]
+    assert "/oauth/consent?tx=" in redir_target
 
 
 @pytest.mark.asyncio
@@ -671,7 +675,13 @@ async def test_pkce_zero_project_onboarding_jwks_and_code_replay(test_env):
         follow_redirects=False,
     )
     assert auth_resp.status_code == 302
-    tx = parse_qs(urlparse(auth_resp.headers["location"]).query)["tx"][0]
+    loc_q = parse_qs(urlparse(auth_resp.headers["location"]).query)
+    if "tx" in loc_q:
+        tx = loc_q["tx"][0]
+    else:
+        assert "/login" in auth_resp.headers["location"]
+        redir_target = loc_q["redirect"][0]
+        tx = parse_qs(urlparse(redir_target).query)["tx"][0]
 
     unauth_ctx = await client.get(f"/oauth/consent/context?tx={tx}")
     assert unauth_ctx.status_code == 200

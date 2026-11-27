@@ -2169,7 +2169,17 @@ async def google_oauth_redirect_callback(
     has_project = proj_count > 0
 
     if custom_return_url:
-        next_route = custom_return_url
+        from urllib.parse import parse_qs as _parse_qs, urlparse as _urlparse
+        unwrapped = str(custom_return_url)
+        for _ in range(3):
+            parsed_ret = _urlparse(unwrapped)
+            if parsed_ret.path in {"/auth/callback/google", "/auth/callback/github"}:
+                inner_next = (_parse_qs(parsed_ret.query).get("next") or [None])[0]
+                if inner_next:
+                    unwrapped = inner_next
+                    continue
+            break
+        next_route = unwrapped
     elif is_new_user and not github_installed:
         next_route = "/onboarding/connect-github"
     elif has_project and (active_user.onboarding_completed or github_installed):
@@ -2437,7 +2447,17 @@ async def google_oauth_callback(
     has_project = proj_count > 0
 
     if custom_return_url:
-        next_route = custom_return_url
+        from urllib.parse import parse_qs as _parse_qs, urlparse as _urlparse
+        unwrapped = str(custom_return_url)
+        for _ in range(3):
+            parsed_ret = _urlparse(unwrapped)
+            if parsed_ret.path in {"/auth/callback/google", "/auth/callback/github"}:
+                inner_next = (_parse_qs(parsed_ret.query).get("next") or [None])[0]
+                if inner_next:
+                    unwrapped = inner_next
+                    continue
+            break
+        next_route = unwrapped
     elif is_new_user and not github_installed:
         next_route = "/onboarding/connect-github"
     elif has_project and (active_user.onboarding_completed or github_installed):

@@ -77,10 +77,32 @@ function GitHubCallbackContent() {
       return;
     }
 
+    const resolveNextDestination = (rawNext: string | null): string | null => {
+      let current = resolveSafeRedirectTarget(rawNext);
+      for (let i = 0; i < 3 && current; i++) {
+        try {
+          const parsed = new URL(current, window.location.origin);
+          if (parsed.pathname === '/auth/callback/github' || parsed.pathname === '/auth/callback/google') {
+            const inner = resolveSafeRedirectTarget(parsed.searchParams.get('next'));
+            if (inner) {
+              current = inner;
+              continue;
+            }
+          }
+        } catch {
+          // keep current
+        }
+        break;
+      }
+      return current;
+    };
+
     const proceedWithToken = (jwtToken: string) => {
       setAuthToken(jwtToken);
       trackGitHubConnect({ context: 'oauth_callback' });
       trackLogin({ method: 'github' });
+
+      const safeNext = resolveNextDestination(searchParams.get('next'));
 
       // Move step to Authorizing -> Syncing
       setStepIndex(2);
@@ -88,6 +110,13 @@ function GitHubCallbackContent() {
       // Transition to Image 5: Verifying Security Session
       setTimeout(() => {
         setStage('verifying');
+
+        if (safeNext && safeNext.includes('/oauth/consent')) {
+          setTimeout(() => {
+            window.location.assign(safeNext);
+          }, 600);
+          return;
+        }
 
         // Resolve onboarding & project state
         Promise.all([
@@ -98,8 +127,6 @@ function GitHubCallbackContent() {
           if (hasProject && typeof window !== 'undefined') {
             localStorage.setItem('secu_active_project_id', projs[0].id);
           }
-
-          const safeNext = resolveSafeRedirectTarget(searchParams.get('next'));
 
           setTimeout(() => {
             if (safeNext) {
@@ -115,7 +142,11 @@ function GitHubCallbackContent() {
             }
           }, 1200);
         }).catch(() => {
-          router.push('/onboarding');
+          if (safeNext) {
+            window.location.assign(safeNext);
+          } else {
+            router.push('/onboarding');
+          }
         });
       }, 900);
     };

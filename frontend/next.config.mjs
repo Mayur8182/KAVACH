@@ -26,6 +26,12 @@ const nextConfig = {
     optimizePackageImports: [
       'lucide-react',
     ],
+    // Bound worker spawning & memory during static prerender so Render/CI containers never OOM at (0/N)
+    cpus: 1,
+    memoryBasedWorkersCount: true,
+    webpackMemoryOptimizations: true,
+    staticGenerationMaxConcurrency: 2,
+    staticGenerationMinPagesPerWorker: 1000,
   },
   async redirects() {
     return [
