@@ -94,9 +94,12 @@ export function middleware(request: NextRequest) {
     '/superadmin',
   ];
 
-  const isProtected = protectedPrefixes.some(
-    (prefix) => effectivePath === prefix || effectivePath.startsWith(`${prefix}/`)
-  );
+  const isProtected =
+    !pathname.startsWith('/integrations/github/callback') &&
+    !pathname.startsWith('/integrations/google/callback') &&
+    protectedPrefixes.some(
+      (prefix) => effectivePath === prefix || effectivePath.startsWith(`${prefix}/`)
+    );
 
   if (!isProtected) {
     if (hostname.startsWith('app.') && pathname === '/') {
@@ -155,6 +158,6 @@ export const config = {
      * - login, register, auth
      * - static image and media files
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|login|signup|register|auth|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|login|signup|register|auth|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm|vtt|txt|xml)$).*)',
   ],
 };

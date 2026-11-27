@@ -91,6 +91,7 @@ backend/bin/trivy.exe
 # Large Media & Video Files (>50MB / Exports)
 # ==============================================================================
 *.mp4
+!frontend/public/videos/code-security-demo.mp4
 *.mov
 *.avi
 *.webm

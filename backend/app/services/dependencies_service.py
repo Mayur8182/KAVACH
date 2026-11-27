@@ -334,11 +334,15 @@ class DependenciesService:
         if selected_repo_id or selected_repo_name:
             repo_clauses = []
             if selected_repo_id:
-                repo_clauses.append(SecurityFinding.repository_id == selected_repo_id)
+                try:
+                    repo_clauses.append(SecurityFinding.repository_id == uuid.UUID(str(selected_repo_id)))
+                except (ValueError, TypeError):
+                    pass
             if selected_repo_name:
                 repo_clauses.append(SecurityFinding.repository == selected_repo_name)
                 repo_clauses.append(SecurityFinding.repository.ilike(f"%{selected_repo_name}%"))
-            findings_stmt = findings_stmt.where(or_(*repo_clauses))
+            if repo_clauses:
+                findings_stmt = findings_stmt.where(or_(*repo_clauses))
 
         findings_res = await self.db.execute(findings_stmt.order_by(desc(SecurityFinding.detected_at)))
         findings = findings_res.scalars().all()

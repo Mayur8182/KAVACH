@@ -880,54 +880,73 @@ class CodeService:
             owner = user_prefix
             full_name = f"{user_prefix}/{name}"
 
-        # Resolve project for user
+        # Resolve project & workspace cleanly for current user (ensures valid workspace_id/org_id)
         is_empty, proj_uuids = await self._resolve_scoped_project_ids(payload.project_id)
         project_id = proj_uuids[0] if (proj_uuids and not is_empty) else None
+        workspace_id = None
 
-        if not project_id:
-            # Find existing project owned by current user or create dedicated one for this tenant
-            user_id = getattr(self.current_user, 'id', None)
-            user_project = None
-            if user_id:
-                p_res = await self.db.execute(
-                    select(Project).where(Project.owner_id == user_id).limit(1)
-                )
-                user_project = p_res.scalar_one_or_none()
-                if not user_project:
-                    user_name = getattr(self.current_user, 'name', None) or 'Workspace'
+        if project_id:
+            proj_obj = await self.db.get(Project, project_id)
+            if proj_obj:
+                workspace_id = proj_obj.workspace_id
+        else:
+            from app.services.workspace_resolver import ensure_user_workspace_provisioned, get_accessible_projects
+            if self.current_user:
+                _, workspaces = await ensure_user_workspace_provisioned(self.current_user, self.db)
+                accessible = await get_accessible_projects(self.current_user, self.db)
+                if accessible:
+                    user_project = next(
+                        (p for p in accessible if getattr(self.current_user, "default_project_id", None) == p.id),
+                        accessible[0],
+                    )
+                    project_id = user_project.id
+                    workspace_id = user_project.workspace_id
+                elif workspaces:
+                    ws = workspaces[0]
                     user_project = Project(
                         id=uuid.uuid4(),
-                        name=f"{user_name} Project",
-                        owner_id=user_id,
+                        name=f"{name} Project",
+                        owner_id=self.current_user.id,
+                        workspace_id=ws.id,
+                        organization_id=ws.organization_id,
+                        repository_url=f"https://github.com/{full_name}",
+                        default_branch=payload.default_branch or "main",
                     )
                     self.db.add(user_project)
                     await self.db.commit()
                     await self.db.refresh(user_project)
-            project_id = user_project.id if user_project else None
+                    project_id = user_project.id
+                    workspace_id = ws.id
 
-        # Query existing repo in DB
-        db_stmt = select(GitHubRepository).where(
-            or_(
-                GitHubRepository.name.ilike(name),
-                GitHubRepository.full_name.ilike(full_name),
-            )
-        ).limit(1)
-        res = await self.db.execute(db_stmt)
+        # Tenant-scoped lookup strictly by full_name (never match another owner's repo with identical short name)
+        repo_conds = [func.lower(GitHubRepository.full_name) == full_name.lower()]
+        tenant_scope_conds = []
+        if proj_uuids:
+            tenant_scope_conds.append(GitHubRepository.project_id.in_(proj_uuids))
+        if workspace_id:
+            tenant_scope_conds.append(GitHubRepository.workspace_id == workspace_id)
+        db_stmt = select(GitHubRepository).where(and_(*repo_conds))
+        if tenant_scope_conds:
+            db_stmt = db_stmt.where(or_(*tenant_scope_conds))
+        res = await self.db.execute(db_stmt.limit(1))
         repo = res.scalars().first()
 
         if repo:
-            if not repo.project_id and project_id:
+            if project_id:
                 repo.project_id = project_id
+            if workspace_id and not repo.workspace_id:
+                repo.workspace_id = workspace_id
             if not repo.clone_url:
                 repo.clone_url = f"https://github.com/{full_name}.git"
             if not repo.html_url:
                 repo.html_url = f"https://github.com/{full_name}"
             if payload.default_branch:
                 repo.default_branch = payload.default_branch
+            repo.last_synced_at = datetime.now(timezone.utc)
         else:
-            new_gh_id = random.randint(10000000, 99999999)
+            new_gh_id = random.randint(100000000, 999999999)
             while (await self.db.execute(select(GitHubRepository).where(GitHubRepository.github_repository_id == new_gh_id))).scalar_one_or_none():
-                new_gh_id = random.randint(10000000, 99999999)
+                new_gh_id = random.randint(100000000, 999999999)
             repo = GitHubRepository(
                 id=uuid.uuid4(),
                 github_repository_id=new_gh_id,
@@ -939,8 +958,10 @@ class CodeService:
                 html_url=f"https://github.com/{full_name}",
                 clone_url=f"https://github.com/{full_name}.git",
                 project_id=project_id,
+                workspace_id=workspace_id,
                 visibility="private" if payload.private else "public",
                 archived=False,
+                last_synced_at=datetime.now(timezone.utc),
             )
             self.db.add(repo)
 
@@ -957,19 +978,16 @@ class CodeService:
 
         # Trigger real initial security scan if requested
         scan_job_id = None
-        if payload.trigger_scan:
+        if payload.trigger_scan and self.current_user:
             try:
                 from app.services.github_service import GitHubService
                 from app.schemas.github import TriggerRepositoryScanRequest
                 gh_svc = GitHubService(self.db)
-                usr = self.current_user
-                if not usr:
-                    usr = User(id=project_id, email="system@thing.security", full_name="Security Pipeline")
                 bg = background_tasks or BackgroundTasks()
                 job = await gh_svc.trigger_manual_scan(
                     repo.id,
                     TriggerRepositoryScanRequest(ref=repo.default_branch or "main"),
-                    usr,
+                    self.current_user,
                     bg,
                 )
                 scan_job_id = str(job.id)
@@ -1409,22 +1427,142 @@ class CodeService:
         )
 
     # ─────────────────────────────────────────────
+    # Repository Access & CIMS Fallback Resolver
+    # ─────────────────────────────────────────────
+
+    async def _resolve_accessible_github_repo(
+        self,
+        repository_id: str,
+        *,
+        allow_name_lookup: bool = False,
+    ) -> Optional[GitHubRepository]:
+        """
+        Resolves an authorized GitHubRepository by UUID (with RealIntegrationRepository bridge)
+        or optional name/full_name, verifying access across project, workspace, or GitHub App installation.
+        """
+        from app.models.github import GitHubInstallation
+        from app.models.integration_models import RealIntegration
+        from app.services.workspace_resolver import get_user_org_and_workspace_scope
+
+        is_empty, proj_uuids = await self._resolve_scoped_project_ids(None)
+        is_super = bool(self.current_user and getattr(self.current_user, "is_superuser", False))
+
+        ws_uuids: set[uuid.UUID] = set()
+        org_uuids: set[uuid.UUID] = set()
+        inst_uuids: set[uuid.UUID] = set()
+        if self.current_user and not is_super:
+            orgs_map, ws_map, _ = await get_user_org_and_workspace_scope(self.current_user, self.db)
+            org_uuids = set(orgs_map.keys())
+            ws_uuids = set(ws_map.keys())
+
+            inst_filters = [GitHubInstallation.connected_by_user_id == self.current_user.id]
+            if getattr(self.current_user, "github_user_id", None):
+                try:
+                    inst_filters.append(GitHubInstallation.github_account_id == int(self.current_user.github_user_id))
+                except (ValueError, TypeError):
+                    pass
+            if proj_uuids:
+                inst_filters.append(GitHubInstallation.project_id.in_(proj_uuids))
+            if ws_uuids:
+                inst_filters.append(GitHubInstallation.workspace_id.in_(list(ws_uuids)))
+            inst_rows = (await self.db.execute(select(GitHubInstallation.id).where(or_(*inst_filters)))).scalars().all()
+            inst_uuids = set(inst_rows)
+
+        if is_empty and not is_super and not ws_uuids and not inst_uuids:
+            return None
+
+        repo: Optional[GitHubRepository] = None
+        rid: Optional[uuid.UUID] = None
+        try:
+            rid = uuid.UUID(str(repository_id).strip())
+            repo = await self.db.get(GitHubRepository, rid)
+        except (ValueError, TypeError):
+            rid = None
+
+        if not repo and rid:
+            # Check if caller passed a RealIntegrationRepository ID and resolve/provision linked GitHubRepository
+            int_repo = await self.db.get(RealIntegrationRepository, rid)
+            if int_repo:
+                if int_repo.repository_id:
+                    repo = await self.db.get(GitHubRepository, int_repo.repository_id)
+                if not repo and int_repo.full_name:
+                    repo = (
+                        await self.db.execute(
+                            select(GitHubRepository).where(GitHubRepository.full_name.ilike(int_repo.full_name)).limit(1)
+                        )
+                    ).scalar_one_or_none()
+                if not repo:
+                    integ = await self.db.get(RealIntegration, int_repo.integration_id)
+                    integ_authorized = bool(
+                        is_super
+                        or (
+                            integ
+                            and (
+                                (integ.organization_id and integ.organization_id in org_uuids)
+                                or (integ.workspace_id and integ.workspace_id in ws_uuids)
+                            )
+                        )
+                    )
+                    if integ_authorized:
+                        gh_id_int = (
+                            int(int_repo.external_repository_id)
+                            if int_repo.external_repository_id and int_repo.external_repository_id.isdigit()
+                            else abs(hash(int_repo.full_name)) % 100000000
+                        )
+                        while (
+                            await self.db.execute(
+                                select(GitHubRepository).where(GitHubRepository.github_repository_id == gh_id_int)
+                            )
+                        ).scalar_one_or_none():
+                            gh_id_int += 1
+                        repo = GitHubRepository(
+                            id=uuid.uuid4(),
+                            project_id=proj_uuids[0] if proj_uuids else None,
+                            workspace_id=(integ.workspace_id if integ else None) or (next(iter(ws_uuids), None)),
+                            github_repository_id=gh_id_int,
+                            owner=int_repo.full_name.split("/")[0] if "/" in int_repo.full_name else "github",
+                            name=int_repo.name,
+                            full_name=int_repo.full_name,
+                            default_branch=int_repo.default_branch or "main",
+                            private=bool(int_repo.private),
+                            html_url=int_repo.url,
+                            clone_url=f"{int_repo.url}.git" if int_repo.url and not int_repo.url.endswith(".git") else int_repo.url,
+                            last_synced_at=datetime.now(timezone.utc),
+                        )
+                        self.db.add(repo)
+                        await self.db.flush()
+                        int_repo.repository_id = repo.id
+                        await self.db.commit()
+                        await self.db.refresh(repo)
+
+        if not repo and allow_name_lookup:
+            q = select(GitHubRepository).where(
+                or_(GitHubRepository.name == repository_id, GitHubRepository.full_name == repository_id)
+            )
+            repo = (await self.db.execute(q)).scalar_one_or_none()
+
+        if not repo:
+            return None
+
+        if is_super:
+            return repo
+
+        authorized = bool(
+            (repo.project_id and repo.project_id in proj_uuids)
+            or (repo.workspace_id and repo.workspace_id in ws_uuids)
+            or (repo.installation_id and repo.installation_id in inst_uuids)
+        )
+        return repo if authorized else None
+
+    # ─────────────────────────────────────────────
     # Repository Detail
     # ─────────────────────────────────────────────
 
     async def get_repository_detail(self, repository_id: str) -> Optional[CodeRepositoryDetailResponse]:
-        try:
-            rid = uuid.UUID(repository_id)
-        except ValueError:
-            return None
-
-        repo = await self.db.get(GitHubRepository, rid)
+        repo = await self._resolve_accessible_github_repo(repository_id)
         if not repo:
             return None
-
-        is_empty, proj_uuids = await self._resolve_scoped_project_ids(None)
-        if is_empty or (proj_uuids and repo.project_id not in proj_uuids):
-            return None
+        rid = repo.id
 
         job_q = (
             select(GitHubSecurityJob, SecurityScan)
@@ -1724,16 +1862,13 @@ class CodeService:
     async def get_repository_tree(self, repository_id: str, branch: Optional[str] = "main") -> RepositoryTreeResponse:
         """Returns the real file tree structure for the repository from verified disk checkout."""
         try:
-            rid = uuid.UUID(repository_id)
+            uuid.UUID(repository_id)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid repository ID")
-        repo = await self.db.get(GitHubRepository, rid)
+        repo = await self._resolve_accessible_github_repo(repository_id)
         if not repo:
             raise HTTPException(status_code=404, detail="Repository not found")
-
-        is_empty, proj_uuids = await self._resolve_scoped_project_ids(None)
-        if is_empty or (proj_uuids and repo.project_id not in proj_uuids):
-            raise HTTPException(status_code=404, detail="Repository not found")
+        rid = repo.id
 
         base_ws = os.path.abspath(getattr(get_settings(), "github_workspace_dir", "scratch/github_workspaces"))
         target_dir = None
@@ -1818,27 +1953,8 @@ class CodeService:
         branch: Optional[str] = "main",
     ) -> Optional[RepositoryFileResponse]:
         """Returns file content, line counts, language, and real associated security findings."""
-        # 1. Resolve repo
-        repo = None
-        try:
-            repo_uuid = uuid.UUID(repository_id)
-            q = select(GitHubRepository).where(GitHubRepository.id == repo_uuid)
-            repo = (await self.db.execute(q)).scalar_one_or_none()
-        except ValueError:
-            pass
-
+        repo = await self._resolve_accessible_github_repo(repository_id, allow_name_lookup=True)
         if not repo:
-            q = select(GitHubRepository).where(
-                (GitHubRepository.name == repository_id) |
-                (GitHubRepository.full_name == repository_id)
-            )
-            repo = (await self.db.execute(q)).scalar_one_or_none()
-
-        if not repo:
-            return None
-
-        is_empty, proj_uuids = await self._resolve_scoped_project_ids(None)
-        if is_empty or (proj_uuids and repo.project_id not in proj_uuids):
             return None
 
         # Clean relative path

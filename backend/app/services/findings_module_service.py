@@ -19,7 +19,7 @@ from sqlalchemy import func, select, and_, or_, desc, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.scan import SecurityFinding, SecurityScan, ScannerExecution
-from app.models.github import GitHubRepository
+from app.models.github import GitHubRepository, GitHubSecurityJob
 from app.models.project import Project
 from app.models.user import User
 from app.models.invitation import OrganizationMember
@@ -195,17 +195,43 @@ class FindingsModuleService:
                 pass
 
         if repository_id and repository_id != "all":
-            clean_rid = repository_id.replace("-", "")
-            id_conds = [
-                SecurityFinding.repository_id == clean_rid,
-                SecurityFinding.repository_id == repository_id,
-            ]
+            raw_rid = str(repository_id).strip()
             try:
-                rid_u = uuid.UUID(repository_id)
-                id_conds.append(SecurityFinding.repository_id == rid_u)
-            except Exception:
-                pass
-            conditions.append(or_(*id_conds))
+                rid_u = uuid.UUID(raw_rid)
+                target_repo_ids = [rid_u]
+                # Also map RealIntegrationRepository.id -> GitHubRepository.id if linked
+                try:
+                    from app.models.integration_models import RealIntegrationRepository
+                    int_repo = await self.db.get(RealIntegrationRepository, rid_u)
+                    if int_repo:
+                        if int_repo.repository_id and int_repo.repository_id not in target_repo_ids:
+                            target_repo_ids.append(int_repo.repository_id)
+                        if int_repo.full_name:
+                            gh_by_name = (
+                                await self.db.execute(
+                                    select(GitHubRepository.id).where(
+                                        GitHubRepository.full_name.ilike(int_repo.full_name)
+                                    )
+                                )
+                            ).scalars().all()
+                            for gid in gh_by_name:
+                                if gid not in target_repo_ids:
+                                    target_repo_ids.append(gid)
+                except Exception:
+                    pass
+                conditions.append(
+                    or_(
+                        SecurityFinding.repository_id.in_(target_repo_ids),
+                        SecurityFinding.scan_id.in_(
+                            select(GitHubSecurityJob.scan_id).where(
+                                GitHubSecurityJob.repository_id.in_(target_repo_ids),
+                                GitHubSecurityJob.scan_id.isnot(None),
+                            )
+                        ),
+                    )
+                )
+            except (ValueError, TypeError):
+                conditions.append(SecurityFinding.repository.ilike(f"%{raw_rid}%"))
 
         if repository and repository != "all":
             repo_list = [r.strip() for r in repository.split(",") if r.strip() and r.strip() != "all"]

@@ -326,17 +326,23 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
 
         // Existing users should not be forced through onboarding again if they already have a project and linked repository
         const forceProducts = searchParams?.get('step') === 'products';
-        const forceRepoStep = searchParams?.get('step') === 'repository' || searchParams?.get('step') === 'repo';
-        const isInstalledParam = searchParams?.get('installed') === 'true' || searchParams?.get('step') === 'github';
+        const forceRepoStep =
+          searchParams?.get('step') === 'repository' ||
+          searchParams?.get('step') === 'repo';
+        const isInstalledParam =
+          searchParams?.get('installed') === 'true' ||
+          searchParams?.get('step') === 'github' ||
+          searchParams?.get('setup_action') === 'install' ||
+          searchParams?.get('setup_action') === 'update';
 
-        if (searchParams?.get('installed') === 'true') {
-          toast.success('GitHub App Installed', {
-            description: 'Your GitHub account and repositories have been authorized.',
+        if (isInstalledParam) {
+          toast.success('GitHub App Installed & Synchronized', {
+            description: 'Your GitHub account and repositories are ready for selection.',
           });
         }
 
-        if (forceRepoStep) {
-          // Explicit navigation to Select & Link Repository stage
+        if (forceRepoStep || (isInstalledParam && activeProj)) {
+          // Returning from GitHub App installation/update goes straight to Select & Link Repository
           setStage(3);
         } else if ((activeProj && (savedRepo || selectedRepo)) || forceProducts) {
           // If project and repository exist, go directly to Kavach Product Selection!
@@ -349,7 +355,7 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
             setStage(2);
           }
         } else {
-          // Fresh user: start at Create Project
+          // Fresh user: start at Create Project (Stage 2 auto-skips if githubConnected is already true!)
           setStage(1);
         }
       } catch (err) {
@@ -487,10 +493,10 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
   // ── STEP 2: Handle Native GitHub App Installation & Authorization ──
   const handleConnectGitHubOAuth = async () => {
     try {
-      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002';
-      const returnUrl = `${currentOrigin}/onboarding?step=github&connected=true`;
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://kavachsecurity.me';
+      const returnUrl = `${currentOrigin}/onboarding?step=repository&installed=true`;
 
-      // Official GitHub App Installation Flow
+      // Official GitHub App Installation Flow (same-tab OAuth transition returns directly to onboarding)
       const appData = await api.github.getInstallUrl({
         project_id: createdProjectId || currentProject?.id || undefined,
         workspace_id: currentWorkspace?.id || undefined,
@@ -504,10 +510,7 @@ export function CreateProjectWorkflow({ onFinished }: { onFinished?: () => void 
           .replace(/github\.com\/apps\/Kavach%20Security/gi, 'github.com/apps/kavach-security')
           .replace(/github\.com\/apps\/Kavach\+Security/gi, 'github.com/apps/kavach-security')
           .replace(/github\.com\/apps\/Kavach Security/gi, 'github.com/apps/kavach-security');
-        const newWin = window.open(targetUrl, '_blank');
-        if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
-          window.location.href = targetUrl;
-        }
+        window.location.assign(targetUrl);
         return;
       }
 

@@ -41,11 +41,13 @@ class ScanService:
         payload: ScanTriggerRequest,
         current_user: User,
         request_id: Optional[str] = None,
+        target_reference: Optional[str] = None,
+        repository_id: Optional[uuid.UUID] = None,
+        branch: Optional[str] = None,
     ) -> SecurityScan:
-        # 1. Project ownership validation
+        # 1. Project ownership / workspace membership validation
         project = await self.project_repo.get_by_id(project_id)
         if not project:
-            # Fallback to authentic project for user if provided project_id is stale or invalid
             from app.intelligence.action_orchestrator import resolve_target_project
             project = await resolve_target_project(self.db, current_user, project_id)
             if project:
@@ -55,24 +57,51 @@ class ScanService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Target project '{project_id}' does not exist",
                 )
-        if project.owner_id != current_user.id and not current_user.is_superuser:
+        from app.services.workspace_resolver import user_can_access_project
+        if not await user_can_access_project(current_user, project, self.db):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have authorization to trigger security scans for this project",
             )
 
-        # 2. Resolve target path safely
+        # 2. Resolve target path safely — avoid scanning Kavach's own server cwd for remote GitHub repos
         target_path = payload.target_path
         if not target_path or target_path.startswith(("http://", "https://", "git@")) or not os.path.exists(target_path):
-            ws_candidates = [
-                os.path.abspath(f"scratch/github_workspaces/repo_{project_id}"),
-                os.path.abspath(f"backend/scratch/github_workspaces/repo_{project_id}"),
-                os.getcwd(),
-            ]
-            target_path = next((p for p in ws_candidates if os.path.exists(p) and os.listdir(p)), os.getcwd())
-
-        if not os.path.exists(target_path):
-            target_path = os.getcwd()
+            ws_candidates = []
+            if repository_id:
+                ws_candidates.append(os.path.abspath(f"scratch/github_workspaces/repo_{repository_id}"))
+                ws_candidates.append(os.path.abspath(f"backend/scratch/github_workspaces/repo_{repository_id}"))
+            ws_candidates.extend(
+                [
+                    os.path.abspath(f"scratch/github_workspaces/repo_{project_id}"),
+                    os.path.abspath(f"backend/scratch/github_workspaces/repo_{project_id}"),
+                ]
+            )
+            target_path = next((p for p in ws_candidates if os.path.exists(p) and os.listdir(p)), None)
+            clone_ref = target_reference
+            if not clone_ref and project.repository_url:
+                from app.mcp.tools.github import _extract_owner_repo
+                parsed_proj_repo = _extract_owner_repo(project.repository_url)
+                if parsed_proj_repo:
+                    clone_ref = parsed_proj_repo[2]
+            if not target_path and clone_ref:
+                from app.mcp.tools.github import ensure_repo_workspace_cloned, resolve_github_token
+                from app.models.github import GitHubRepository
+                repo_obj = await self.db.get(GitHubRepository, repository_id) if repository_id else None
+                tok = await resolve_github_token(self.db, repo=repo_obj, project=project, user_id=current_user.id)
+                cloned, _ = await ensure_repo_workspace_cloned(
+                    repo=repo_obj,
+                    project=project,
+                    full_name=clone_ref,
+                    branch=branch or project.default_branch or "main",
+                    token=tok,
+                )
+                target_path = cloned
+            if not target_path or not os.path.exists(target_path):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Target repository workspace is not checked out and could not be cloned.",
+                )
 
         # 3. Resolve Blueprint & Requirements
         blueprint = None
@@ -96,6 +125,8 @@ class ScanService:
                 for r in blueprint.requirements
             ]
 
+        resolved_ref = target_reference or project.repository_url or project.name
+
         # 4. Create initial scan record in DB
         scan = await self.repo.create_scan(
             project_id=project_id,
@@ -104,6 +135,7 @@ class ScanService:
             target_type=payload.target_type,
             target_path=target_path,
             requested_by=current_user.email,
+            target_reference=resolved_ref,
         )
         scan.status = "RUNNING"
         scan.started_at = datetime.now(timezone.utc)
@@ -216,7 +248,12 @@ class ScanService:
         await live_svc.complete_task(scan.id, "report_generation", finding_count=scan_result.finding_count, duration_ms=15)
 
         # 7. Persist real results, executions, findings, and verifications
-        await self.repo.record_scan_results(scan.id, scan_result)
+        await self.repo.record_scan_results(
+            scan.id,
+            scan_result,
+            repository_id=repository_id,
+            branch=branch or getattr(project, "default_branch", None) or "main",
+        )
 
         # 8. Log SCAN_COMPLETED audit event
         await self.audit.log_event(

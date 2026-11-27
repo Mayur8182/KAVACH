@@ -30,6 +30,11 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: '/remediation',
+        destination: '/code/remediation',
+        permanent: false,
+      },
+      {
         source: '/kubernetes',
         destination: '/cloud/kubernetes',
         permanent: true,

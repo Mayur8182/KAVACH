@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { ScrollRevealText } from '@/components/landing/ScrollRevealText';
+import { getAuthToken } from '@/lib/auth/token';
 
 interface ScannerHealthItem {
   scanner_name: string;
@@ -94,9 +95,15 @@ export const KavachFeatureDiagrams: React.FC = () => {
           };
 
     try {
-      const res = await fetch('/api/v1/mcp/sandbox-call', {
+      const token = getAuthToken();
+      const endpoint = token ? '/api/v1/mcp/sandbox-call' : '/api/v1/mcp/policy-preview';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
       if (res.ok) {
@@ -304,7 +311,7 @@ export const KavachFeatureDiagrams: React.FC = () => {
           </p>
 
           <Link
-            href="/remediation"
+            href="/code/remediation"
             className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white hover:bg-[#EA580C] hover:text-white hover:border-[#EA580C] hover:shadow-[0_8px_20px_-6px_rgba(234,88,12,0.42)] px-5 py-2.5 text-[14px] font-semibold text-slate-900 shadow-sm transition-all duration-200"
           >
             <span>View Auto-Fix</span>
@@ -402,7 +409,11 @@ export const KavachFeatureDiagrams: React.FC = () => {
                   >
                     <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-[#FAF9F6] px-2.5 py-1 text-[11.5px] font-mono text-slate-700">
                       <Check size={11} className="text-emerald-600" />
-                      {idStage?.cryptographic_proof ? idStage.cryptographic_proof.slice(0, 18) : 'Ed25519 Signed'}
+                      {idStage?.cryptographic_proof
+                        ? idStage.cryptographic_proof.slice(0, 18)
+                        : idStage?.status === 'PREVIEW'
+                        ? 'Policy Preview'
+                        : 'Identity Verified'}
                     </span>
 
                     <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-[#FAF9F6] px-2.5 py-1 text-[11.5px] font-mono text-slate-700">

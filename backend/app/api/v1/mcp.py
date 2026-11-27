@@ -35,6 +35,11 @@ from app.mcp.protocol import (
     get_mcp_prompt,
     read_mcp_resource,
 )
+from app.mcp.widgets import (
+    build_tool_ui_meta,
+    issue_widget_approval_token,
+    verify_widget_approval_token,
+)
 from app.mcp.registry import default_tool_registry
 from app.mcp.risk import MCPRiskEvaluator
 from app.mcp.schemas import (
@@ -85,6 +90,10 @@ TOOL_REQUIRED_SCOPES: Dict[str, str] = {
     "check_security_policy": "projects:read",
     "get_github_repository": "projects:read",
     "get_pull_request": "projects:read",
+    "get_file_content": "projects:read",
+    "create_branch": "remediation:apply",
+    "apply_remediation_patch": "remediation:apply",
+    "create_pull_request": "remediation:apply",
     "scan_container_image_security": "scans:read",
     "query_threat_intelligence": "findings:read",
     "get_active_incidents": "findings:read",
@@ -97,6 +106,7 @@ TOOL_REQUIRED_SCOPES: Dict[str, str] = {
     "security_check": "scans:run",
     "propose_remediation_diff": "remediation:propose",
     "verify_remediation_patch": "remediation:apply",
+    "verify_patch": "scans:run",
     "quarantine_compromised_target": "remediation:apply",
     "simulate_attack_path": "remediation:apply",
     "list_project_findings": "findings:read",
@@ -106,7 +116,8 @@ TOOL_REQUIRED_SCOPES: Dict[str, str] = {
 }
 
 DEFAULT_OAUTH_CHALLENGE_SCOPES = (
-    "projects:read projects:write scans:read scans:run findings:read remediation:propose offline_access"
+    "projects:read projects:write scans:read scans:run findings:read "
+    "remediation:propose remediation:apply offline_access openid profile email"
 )
 
 router = APIRouter(tags=["MCP Gateway Management"])
@@ -371,11 +382,20 @@ async def get_mcp_manifest(request: Request):
         "configs": {
             "claude": {"url": mcp_endpoint, "auth": "OAuth 2.1 + PKCE (Automatic Discovery)"},
             "chatgpt": {"url": mcp_endpoint, "auth": "OAuth 2.1 + PKCE (Automatic Discovery)"},
+            "claude_desktop": {
+                "mcpServers": {
+                    "kavach": {
+                        "command": "npx",
+                        "args": ["-y", "mcp-remote", mcp_endpoint],
+                    }
+                }
+            },
             "cursor": {"mcpServers": {"kavach": {"url": mcp_endpoint}}},
             "vscode": {"servers": {"kavach": {"type": "http", "url": mcp_endpoint}}},
             "windsurf": {"mcpServers": {"kavach": {"serverUrl": mcp_endpoint}}},
             "claude_code": {"command": f"claude mcp add --transport http kavach {mcp_endpoint}"},
             "codex": {"command": f"codex mcp add kavach --url {mcp_endpoint}"},
+            "gemini": {"command": f"gemini mcp add --transport http kavach {mcp_endpoint}"},
         },
         "capabilities": {
             "tools": {"listChanged": False, "annotations": True},
@@ -469,13 +489,14 @@ async def resolve_ide_project_by_remote(
     }
 
 
-@router.post("/mcp/sandbox-call", response_model=MCPSandboxCallResponse, summary="Execute MCP Tool Validation Call")
-async def execute_mcp_sandbox_call(
+def _evaluate_mcp_tool_policy_check(
     payload: MCPSandboxCallPayload,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Executes an authenticated MCP tool pipeline check through identity, authorization, policy, and audit."""
+    *,
+    principal: str,
+    identity_status: str = "PASSED",
+    execute_when_allowed: bool = True,
+) -> Tuple[Any, str, Dict[str, Any], Dict[str, Any], Dict[str, Any], Dict[str, Any], Dict[str, Any], Dict[str, Any], float]:
+    """Deterministic identity, RBAC scope, OPA Rego (#POL-MCP-09), and risk gate evaluation."""
     t_start = time.perf_counter()
     tool = default_tool_registry.get_tool(payload.tool_name)
     if not tool:
@@ -486,8 +507,8 @@ async def execute_mcp_sandbox_call(
 
     identity_stage = {
         "stage": "IDENTITY_VERIFICATION",
-        "status": "PASSED",
-        "principal": current_user.email,
+        "status": identity_status,
+        "principal": principal,
         "client_name": payload.client_name,
         "agent_type": payload.agent_type,
         "verified_at": time.time(),
@@ -495,7 +516,7 @@ async def execute_mcp_sandbox_call(
 
     auth_stage = {
         "stage": "AUTHORIZATION_CHECK",
-        "status": "PASSED",
+        "status": identity_status,
         "required_permission": tool.required_permission,
         "required_scope": TOOL_REQUIRED_SCOPES.get(tool.name, "projects:read"),
         "enforcer": "Kavach RBAC / Tenant Engine",
@@ -535,6 +556,9 @@ async def execute_mcp_sandbox_call(
             "status": "PENDING_APPROVAL",
             "notice": f"Tool '{tool.name}' requires security approval before execution.",
         }
+    elif not execute_when_allowed:
+        exec_status = "POLICY_PASSED"
+        output_data = {"tool": tool.name, "result_status": "PREVIEW_ONLY", "parameters_checked": payload.arguments}
     else:
         exec_status = "EXECUTED"
         output_data = {"tool": tool.name, "result_status": "READY", "parameters_applied": payload.arguments}
@@ -544,6 +568,58 @@ async def execute_mcp_sandbox_call(
         "status": exec_status,
         "duration_ms": round((time.perf_counter() - t_start) * 1000, 2),
     }
+    return tool, exec_status, output_data, identity_stage, auth_stage, policy_stage, risk_stage, exec_stage, t_start
+
+
+@router.post("/mcp/policy-preview", response_model=MCPSandboxCallResponse, summary="Deterministic MCP Policy Gate Preview")
+async def preview_mcp_policy_gate(payload: MCPSandboxCallPayload):
+    """
+    Public read-only deterministic policy evaluation of registered MCP tool schemas & OPA Rego rules.
+    Does not execute tools or access tenant secrets/databases.
+    """
+    tool, exec_status, output_data, identity_stage, auth_stage, policy_stage, risk_stage, exec_stage, t_start = (
+        _evaluate_mcp_tool_policy_check(
+            payload,
+            principal="public-policy-preview",
+            identity_status="PREVIEW",
+            execute_when_allowed=False,
+        )
+    )
+    preview_id = f"prv_mcp_{uuid.uuid4().hex[:12]}"
+    audit_stage = {
+        "stage": "IMMUTABLE_AUDIT_LOGGING",
+        "status": "PREVIEW_ONLY",
+        "audit_trace_id": preview_id,
+        "persisted": False,
+    }
+    return MCPSandboxCallResponse(
+        status=exec_status,
+        tool_name=tool.name,
+        client_name=payload.client_name,
+        pipeline_stages=[identity_stage, auth_stage, policy_stage, risk_stage, exec_stage, audit_stage],
+        output=output_data,
+        policy_evaluation=policy_stage,
+        risk_assessment=risk_stage,
+        audit_trace_id=preview_id,
+        execution_time_ms=round((time.perf_counter() - t_start) * 1000, 2),
+    )
+
+
+@router.post("/mcp/sandbox-call", response_model=MCPSandboxCallResponse, summary="Execute MCP Tool Validation Call")
+async def execute_mcp_sandbox_call(
+    payload: MCPSandboxCallPayload,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Executes an authenticated MCP tool pipeline check through identity, authorization, policy, and audit."""
+    tool, exec_status, output_data, identity_stage, auth_stage, policy_stage, risk_stage, exec_stage, t_start = (
+        _evaluate_mcp_tool_policy_check(
+            payload,
+            principal=current_user.email,
+            identity_status="PASSED",
+            execute_when_allowed=True,
+        )
+    )
 
     audit_trace_id = f"aud_mcp_{uuid.uuid4().hex[:16]}"
     await AuditService(db).log_event(
@@ -631,6 +707,12 @@ class MCPApprovalDecisionPayload(BaseModel):
     notes: Optional[str] = Field(default=None, description="Optional reviewer rationale or notes")
 
 
+class MCPWidgetApprovalPayload(BaseModel):
+    decision: str = Field(..., description="APPROVED or REJECTED")
+    widget_token: str = Field(..., description="HMAC-signed per-approval token issued to embedded MCP UI widget")
+    notes: Optional[str] = Field(default=None, description="Optional human reviewer notes")
+
+
 async def _dispatch_mcp_rpc(
     body: Dict[str, Any],
     request: Request,
@@ -713,8 +795,10 @@ async def _dispatch_mcp_rpc(
             result = {}
     elif method == "tools/list":
         tools = default_tool_registry.list_tools()
-        listed_tools = [
-            {
+        gateway_base = get_mcp_base_url(request)
+        listed_tools = []
+        for t in tools:
+            t_entry: Dict[str, Any] = {
                 "name": t.name,
                 "title": build_tool_annotations(t)["title"],
                 "description": t.description,
@@ -727,8 +811,10 @@ async def _dispatch_mcp_rpc(
                     }
                 ],
             }
-            for t in tools
-        ]
+            ui_meta = build_tool_ui_meta(t.name, widget_api_base=gateway_base)
+            if ui_meta:
+                t_entry["_meta"] = ui_meta
+            listed_tools.append(t_entry)
         # Multi-Server Gateway Routing: include discovered tools from active upstream MCP servers
         upstream_servers = (
             await db.execute(
@@ -775,7 +861,14 @@ async def _dispatch_mcp_rpc(
         if not uri:
             error = {"code": -32602, "message": "Missing required 'uri' parameter for resources/read."}
         else:
-            res_data, res_err, missing_scope = await read_mcp_resource(uri, auth_user, token_payload, str(client_id), db)
+            res_data, res_err, missing_scope = await read_mcp_resource(
+                uri,
+                auth_user,
+                token_payload,
+                str(client_id),
+                db,
+                base_url=get_mcp_base_url(request),
+            )
             if missing_scope:
                 challenge = _build_www_authenticate(
                     request,
@@ -1145,6 +1238,10 @@ async def _dispatch_mcp_rpc(
                                     approved_ticket = ap_row
                                 elif ap_row.status == "PENDING" and not_expired:
                                     runtime_decision = "REQUIRE_APPROVAL"
+                                    widget_tok = issue_widget_approval_token(
+                                        approval_id=ap_row.id,
+                                        user_id=auth_user.id,
+                                    )
                                     exec_result = ToolExecutionResult(
                                         status="REQUIRES_APPROVAL",
                                         approval_id=str(ap_row.id),
@@ -1152,11 +1249,16 @@ async def _dispatch_mcp_rpc(
                                             "approval_id": str(ap_row.id),
                                             "decision_id": str(dec_row.id),
                                             "status": ap_row.status,
+                                            "pending_tool": tool.name,
+                                            "pending_arguments": {
+                                                k: v for k, v in arguments.items() if k not in {"approval_id", "approved"}
+                                            },
+                                            "widget_approval_token": widget_tok,
                                             "review_url": f"{get_mcp_base_url(request)}/settings/mcp",
                                         },
                                         message=(
-                                            f"Approval '{ap_row.id}' is still PENDING human sign-off in Kavach "
-                                            "(/settings/mcp). Ask the user to approve before re-calling with approval_id."
+                                            f"Approval '{ap_row.id}' is awaiting human sign-off. Approve directly "
+                                            "inside the inline Kavach ChatGPT widget (or /settings/mcp), then re-call with approval_id."
                                         ),
                                         error_code="MCP_APPROVAL_REQUIRED",
                                     )
@@ -1185,11 +1287,18 @@ async def _dispatch_mcp_rpc(
                             or firewall_res.get("reason")
                             or f"{tool.risk_level} risk operation requires human sign-off"
                         )
+                        sanitized_pending_args = {
+                            k: v for k, v in arguments.items() if k not in {"approval_id", "approved"}
+                        }
                         created_ap_id = await MCPApprovalManager(db).create_approval_request(
                             context=mcp_ctx,
                             tool=tool,
-                            arguments={k: v for k, v in arguments.items() if k not in {"approval_id", "approved"}},
+                            arguments=sanitized_pending_args,
                             reason=reason_msg,
+                        )
+                        widget_tok = issue_widget_approval_token(
+                            approval_id=created_ap_id,
+                            user_id=auth_user.id,
                         )
                         exec_result = ToolExecutionResult(
                             status="REQUIRES_APPROVAL",
@@ -1197,12 +1306,15 @@ async def _dispatch_mcp_rpc(
                             data={
                                 "approval_id": str(created_ap_id),
                                 "status": "PENDING",
+                                "pending_tool": tool.name,
+                                "pending_arguments": sanitized_pending_args,
+                                "widget_approval_token": widget_tok,
                                 "review_path": "/settings/mcp",
-                                "instruction": "Approve in Kavach Dashboard (/settings/mcp), then re-invoke this tool with approval_id.",
+                                "instruction": "Approve directly inside the inline ChatGPT widget (no external tab needed) or in /settings/mcp, then re-invoke with approval_id.",
                             },
                             message=(
-                                f"Tool '{tool.name}' requires human security approval before execution. "
-                                f"Created pending SecurityApproval '{created_ap_id}' in PostgreSQL."
+                                f"Tool '{tool.name}' requires human sign-off before execution. "
+                                f"Created pending SecurityApproval '{created_ap_id}' — approve inline in ChatGPT or via /settings/mcp."
                             ),
                             error_code="MCP_APPROVAL_REQUIRED",
                         )
@@ -1329,6 +1441,11 @@ async def _dispatch_mcp_rpc(
             if exec_result.approval_id:
                 content_payload["approval_id"] = exec_result.approval_id
 
+            ui_meta = build_tool_ui_meta(
+                tool.name,
+                is_approval_gate=(exec_result.status == "REQUIRES_APPROVAL"),
+                widget_api_base=get_mcp_base_url(request),
+            )
             result = {
                 "content": [
                     {
@@ -1339,6 +1456,8 @@ async def _dispatch_mcp_rpc(
                 "structuredContent": content_payload,
                 "isError": is_error,
             }
+            if ui_meta:
+                result["_meta"] = ui_meta
     else:
         error = {"code": -32601, "message": f"Method '{method}' not implemented."}
 
@@ -1861,6 +1980,74 @@ async def decide_mcp_approval(
         "approved_at": ap.approved_at.isoformat() if ap.approved_at else None,
         "approval_notes": ap.approval_notes,
     }
+
+
+@router.options("/mcp/approvals/{approval_id}/widget-decide")
+async def widget_decide_mcp_approval_preflight():
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        },
+    )
+
+
+@router.post(
+    "/mcp/approvals/{approval_id}/widget-decide",
+    summary="Approve or Reject an MCP Approval Inline from Embedded ChatGPT/MCP UI Widget",
+)
+async def widget_decide_mcp_approval(
+    approval_id: uuid.UUID,
+    payload: MCPWidgetApprovalPayload,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Allows human operators to approve or reject pending MCP approvals directly inside embedded
+    ChatGPT / MCP UI widgets without leaving chat. Authenticates strictly via the server-signed
+    single-approval HMAC token (`widget_token`), enforces RBAC and separation of duties, and
+    persists immutable PostgreSQL audit records.
+    """
+    claims = verify_widget_approval_token(payload.widget_token, approval_id)
+    if not claims:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Invalid or expired inline widget approval token."},
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
+
+    try:
+        reviewer_uuid = uuid.UUID(claims["user_id"])
+    except (ValueError, TypeError):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Malformed reviewer identity in widget token."},
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
+
+    reviewer = await db.get(User, reviewer_uuid)
+    if not reviewer or not reviewer.is_active:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Authenticated user account is missing or inactive."},
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
+
+    res_obj = await decide_mcp_approval(
+        approval_id=approval_id,
+        payload=MCPApprovalDecisionPayload(
+            decision=payload.decision,
+            notes=payload.notes or "Approved inline via embedded ChatGPT MCP UI widget",
+        ),
+        db=db,
+        current_user=reviewer,
+    )
+    return JSONResponse(
+        status_code=200,
+        content=res_obj,
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
 
 
 @router.get("/mcp/activity", summary="List Recent MCP Runtime Tool & Resource Activity")

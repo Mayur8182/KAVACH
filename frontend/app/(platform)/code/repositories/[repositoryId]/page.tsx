@@ -511,26 +511,40 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
     try {
       const targetId = rawId;
 
-      // Parallelize all workspace queries concurrently in single network roundtrip
-      const [healthData, detailData, findingsData, treeData, commitsData, jobsData] = await Promise.all([
+      // Fetch repository list and repository detail first before firing dependent tree/findings/jobs requests
+      const [healthData, detailData] = await Promise.all([
         api.code.repositoryHealth({ limit: 100 }).catch(() => ({ items: [] })),
         api.code.repositoryDetail(targetId).catch((err) => {
-          if (err?.status_code === 404) return null;
+          if (
+            err?.status_code === 404 ||
+            err?.status === 404 ||
+            err?.code === 'HTTP_404' ||
+            err?.code === 'NOT_FOUND'
+          ) {
+            return null;
+          }
           throw err;
         }),
-        api.code.findings({ repositoryId: targetId, limit: 100 }).catch(() => ({ items: [] })),
-        api.code.repositoryTree(targetId, selectedBranch).catch(() => ({ tree: [] })),
-        api.code.commits(targetId, 5).catch(() => []),
-        api.code.repositoryJobs(targetId).catch(() => []),
       ]);
 
       const items = healthData?.items || [];
       setAllRepos(items);
-      setSecurityJobs(jobsData || []);
 
       if (!detailData) {
-        setError(`Repository '${rawId}' could not be located in the database.`);
-      } else {
+        setSecurityJobs([]);
+        setError(`Repository '${rawId}' could not be located in your connected workspace.`);
+        return;
+      }
+
+      const [findingsData, treeData, commitsData, jobsData] = await Promise.all([
+        api.code.findings({ repositoryId: targetId, limit: 100 }).catch(() => ({ items: [] })),
+        api.code.repositoryTree(targetId, detailData.default_branch || selectedBranch).catch(() => ({ tree: [] })),
+        api.code.commits(targetId, 5).catch(() => []),
+        api.code.repositoryJobs(targetId).catch(() => []),
+      ]);
+      setSecurityJobs(jobsData || []);
+
+      {
         setRepo(detailData);
         setSelectedBranch(detailData.default_branch || 'main');
         const resolvedFindings = findingsData?.items || detailData.recent_findings || [];
@@ -1240,24 +1254,75 @@ export default function RepositoryWorkspacePage({ repositoryId }: { repositoryId
         <div style={{ maxWidth: '800px', margin: '0 auto', background: '#FFFFFF', padding: '32px', borderRadius: '12px', border: '1px solid #E2E8F0', textAlign: 'center' }}>
           <AlertCircle size={40} color="#EF4444" style={{ margin: '0 auto 16px auto' }} />
           <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>Repository Not Found</h2>
-          <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '24px' }}>{error}</p>
-          <Link
-            href="/code/repositories"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 18px',
-              backgroundColor: '#0F172A',
-              color: '#FFFFFF',
-              borderRadius: '8px',
-              fontWeight: 600,
-              fontSize: '13px',
-              textDecoration: 'none',
-            }}
-          >
-            <ChevronLeft size={16} /> Return to Repositories
-          </Link>
+          <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '20px' }}>{error}</p>
+          {allRepos.length > 0 && (
+            <div style={{ marginBottom: '20px', textAlign: 'left', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '14px 16px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+                Switch to an available repository in your workspace:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {allRepos.slice(0, 6).map((r: any) => (
+                  <Link
+                    key={r.id}
+                    href={`/code/repositories/${r.id}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '6px',
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      color: '#0F172A',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <FolderGit2 size={14} />
+                    {r.full_name || r.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <Link
+              href="/code/repositories"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 18px',
+                backgroundColor: '#0F172A',
+                color: '#FFFFFF',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '13px',
+                textDecoration: 'none',
+              }}
+            >
+              <ChevronLeft size={16} /> Return to Repositories
+            </Link>
+            <Link
+              href="/repositories/connect"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 18px',
+                backgroundColor: '#FFFFFF',
+                color: '#0F172A',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '13px',
+                textDecoration: 'none',
+              }}
+            >
+              Reconnect Repository
+            </Link>
+          </div>
         </div>
       </div>
     );

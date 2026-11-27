@@ -24,11 +24,16 @@ from app.mcp.tools.scans import (
     execute_security_check,
 )
 from app.mcp.tools.github import (
+    execute_apply_remediation_patch,
+    execute_create_branch,
+    execute_create_pull_request,
+    execute_get_file_content,
     execute_get_github_repository,
     execute_get_pull_request,
 )
 from app.mcp.tools.remediation import (
     execute_propose_remediation_diff,
+    execute_verify_patch,
     execute_verify_remediation_patch,
 )
 from app.mcp.tools.cloud_infra import (
@@ -466,21 +471,23 @@ class MCPToolRegistry:
         self.register(
             ToolDefinition(
                 name="propose_remediation_diff",
-                description="Synthesize an automated minimal unified diff patch to fix a security vulnerability finding using LLM reasoning.",
+                description="Synthesize a source-grounded unified diff patch to remediate a security finding using live repository file source.",
                 version="1.0.0",
                 category="REMEDIATION",
-                required_permission="SCAN_READ",
+                required_permission="REMEDIATION_PROPOSE",
                 risk_level="LOW",
                 input_schema={
                     "type": "object",
                     "properties": {
                         "project_id": {"type": "string", "description": "Target project UUID"},
-                        "rule_id": {"type": "string", "description": "Security rule identifier (e.g., bandit.B608)"},
-                        "file_path": {"type": "string", "description": "Relative file path containing the issue"},
-                        "snippet": {"type": "string", "description": "Vulnerable code snippet"},
-                        "file_content": {"type": "string", "description": "Full or surrounding file content"},
+                        "finding_id": {"type": "string", "description": "Verified SecurityFinding UUID (recommended — auto-loads file_path & snippet)"},
+                        "rule_id": {"type": "string", "description": "Security rule identifier (e.g., SAST-001, SEC-001)"},
+                        "file_path": {"type": "string", "description": "Relative file path in repository"},
+                        "branch": {"type": "string", "description": "Optional branch/ref name"},
+                        "line_number": {"type": "integer", "description": "1-based line number of finding"},
+                        "snippet": {"type": "string", "description": "Vulnerable source code line/snippet"},
+                        "file_content": {"type": "string", "description": "Optional full file content (fetched automatically from GitHub if omitted)"},
                     },
-                    "required": ["file_path"],
                 },
             ),
             execute_propose_remediation_diff,
@@ -490,7 +497,7 @@ class MCPToolRegistry:
         self.register(
             ToolDefinition(
                 name="verify_remediation_patch",
-                description="Verify in an isolated sandbox that applying the patch removes the vulnerability under real scanner execution.",
+                description="Verify in an isolated sandbox that applying the patch eliminates the vulnerability under real scanner execution.",
                 version="1.0.0",
                 category="REMEDIATION",
                 required_permission="SCAN_EXECUTE",
@@ -498,16 +505,150 @@ class MCPToolRegistry:
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "file_path": {"type": "string", "description": "Target file name"},
+                        "finding_id": {"type": "string", "description": "Optional SecurityFinding UUID"},
+                        "patch_id": {"type": "string", "description": "Optional RemediationPatch UUID"},
+                        "file_path": {"type": "string", "description": "Target file path in repository"},
+                        "branch": {"type": "string", "description": "Remediation branch to fetch & scan (e.g. 'security/ai-remediation')"},
                         "original_content": {"type": "string", "description": "Pre-patch file content"},
-                        "patched_content": {"type": "string", "description": "Post-patch file content"},
-                        "rule_id": {"type": "string", "description": "Security rule that should now be resolved"},
-                        "scanner_type": {"type": "string", "description": "semgrep or gitleaks"},
+                        "patched_content": {"type": "string", "description": "Post-patch file content (fetched from branch if omitted)"},
+                        "rule_id": {"type": "string", "description": "Security rule that must be resolved"},
+                        "scanner_type": {"type": "string", "description": "semgrep, gitleaks, checkov, osv, or seculayer-builtin"},
                     },
-                    "required": ["file_path", "patched_content", "rule_id"],
                 },
             ),
             execute_verify_remediation_patch,
+        )
+
+        # 11b. get_file_content
+        self.register(
+            ToolDefinition(
+                name="get_file_content",
+                description="Retrieve actual source file contents from the connected GitHub repository or synced workspace.",
+                version="1.0.0",
+                category="GITHUB",
+                required_permission="GITHUB_READ",
+                risk_level="LOW",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string", "description": "Repository-relative file path (e.g. 'app/main.py')"},
+                        "ref": {"type": "string", "description": "Branch name, tag, or commit SHA (defaults to repo default branch)"},
+                        "branch": {"type": "string", "description": "Alias for 'ref'"},
+                        "repository": {"type": "string", "description": "Optional 'owner/repo' override"},
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                        "start_line": {"type": "integer", "description": "Optional 1-based start line"},
+                        "end_line": {"type": "integer", "description": "Optional 1-based end line"},
+                    },
+                    "required": ["file_path"],
+                },
+            ),
+            execute_get_file_content,
+        )
+
+        # 11c. create_branch
+        self.register(
+            ToolDefinition(
+                name="create_branch",
+                description="Create a remediation branch (e.g. 'security/ai-remediation') on the connected GitHub repository without modifying main.",
+                version="1.0.0",
+                category="GITHUB",
+                required_permission="REMEDIATION_APPLY",
+                risk_level="HIGH",
+                requires_approval=True,
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "branch_name": {"type": "string", "description": "New branch name (e.g. 'security/ai-remediation')"},
+                        "base_branch": {"type": "string", "description": "Base branch to fork from (defaults to repository default branch)"},
+                        "repository": {"type": "string", "description": "Optional 'owner/repo' override"},
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                    },
+                    "required": ["branch_name"],
+                },
+            ),
+            execute_create_branch,
+        )
+
+        # 11d. apply_remediation_patch
+        self.register(
+            ToolDefinition(
+                name="apply_remediation_patch",
+                description="Apply and commit a verified unified diff or patched file content onto a remediation branch on GitHub.",
+                version="1.0.0",
+                category="REMEDIATION",
+                required_permission="REMEDIATION_APPLY",
+                risk_level="HIGH",
+                requires_approval=True,
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string", "description": "Repository-relative file path to patch"},
+                        "branch": {"type": "string", "description": "Target remediation branch (default 'security/ai-remediation')"},
+                        "finding_id": {"type": "string", "description": "Optional SecurityFinding UUID"},
+                        "patch": {"type": "string", "description": "Unified diff string (--- a/... +++ b/... @@ ... @@)"},
+                        "patched_content": {"type": "string", "description": "Optional complete patched file content instead of unified diff"},
+                        "commit_message": {"type": "string", "description": "Commit message for GitHub commit"},
+                        "create_branch_if_missing": {"type": "boolean", "default": True},
+                        "repository": {"type": "string", "description": "Optional 'owner/repo' override"},
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                    },
+                },
+            ),
+            execute_apply_remediation_patch,
+        )
+
+        # 11e. verify_patch
+        self.register(
+            ToolDefinition(
+                name="verify_patch",
+                description="Run real syntax checks and security scanners against patched source code (inline or on a GitHub branch) before opening a PR.",
+                version="1.0.0",
+                category="REMEDIATION",
+                required_permission="SCAN_EXECUTE",
+                risk_level="MEDIUM",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "finding_id": {"type": "string", "description": "Optional SecurityFinding UUID"},
+                        "patch_id": {"type": "string", "description": "Optional RemediationPatch UUID"},
+                        "file_path": {"type": "string", "description": "Repository-relative file path"},
+                        "branch": {"type": "string", "description": "GitHub branch containing applied patch"},
+                        "patched_content": {"type": "string", "description": "Optional patched file text (fetched from branch if omitted)"},
+                        "original_content": {"type": "string", "description": "Optional pre-patch file text"},
+                        "rule_id": {"type": "string", "description": "Rule ID being verified resolved"},
+                        "scanner_type": {"type": "string", "description": "Scanner name (semgrep, gitleaks, checkov, osv, seculayer-builtin)"},
+                        "mark_resolved": {"type": "boolean", "description": "Only marks finding resolved after real rescan passes with 0 matching findings", "default": False},
+                    },
+                },
+            ),
+            execute_verify_patch,
+        )
+
+        # 11f. create_pull_request
+        self.register(
+            ToolDefinition(
+                name="create_pull_request",
+                description="Open a reviewable Pull Request on the connected GitHub repository from a remediation branch (never auto-merges).",
+                version="1.0.0",
+                category="GITHUB",
+                required_permission="REMEDIATION_APPLY",
+                risk_level="HIGH",
+                requires_approval=True,
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "head_branch": {"type": "string", "description": "Source remediation branch (e.g. 'security/ai-remediation')"},
+                        "base_branch": {"type": "string", "description": "Target base branch (defaults to repository default branch)"},
+                        "title": {"type": "string", "description": "Pull request title"},
+                        "body": {"type": "string", "description": "Markdown PR summary with findings & verification proof"},
+                        "draft": {"type": "boolean", "default": False},
+                        "repository": {"type": "string", "description": "Optional 'owner/repo' override"},
+                        "project_id": {"type": "string", "description": "Optional target project UUID"},
+                    },
+                    "required": ["head_branch", "title"],
+                },
+            ),
+            execute_create_pull_request,
         )
 
         # 12. audit_cloud_posture

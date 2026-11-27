@@ -156,7 +156,14 @@ async def github_installation_callback(
         error=error,
         error_description=error_description,
     )
-    redirect_target = result.get("redirect_url", "http://localhost:3002/onboarding?step=github&connected=true")
+    from app.core.config import get_settings
+    cfg = get_settings()
+    fallback_frontend = (
+        "https://kavachsecurity.me"
+        if cfg.app_env == "production"
+        else (cfg.frontend_url or "http://localhost:3002")
+    ).rstrip("/")
+    redirect_target = result.get("redirect_url", f"{fallback_frontend}/onboarding?step=repository&installed=true")
     return RedirectResponse(url=redirect_target, status_code=status.HTTP_302_FOUND)
 
 

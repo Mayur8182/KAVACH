@@ -218,4 +218,134 @@ def create_mcp_server(name: str = "secure-control-plane-mcp") -> MCPServer:
             )
             return json.dumps(res.model_dump(), default=str)
 
+    # 10. get_file_content tool
+    @server.tool(
+        name="get_file_content",
+        description="Retrieve real source file contents from the connected GitHub repository.",
+    )
+    async def get_file_content(
+        file_path: str,
+        session_id: str,
+        ref: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="get_file_content",
+                arguments={"file_path": file_path, "ref": ref, "project_id": project_id},
+            )
+            return json.dumps(res.model_dump(), default=str)
+
+    # 11. create_branch tool
+    @server.tool(
+        name="create_branch",
+        description="Create a remediation branch on the connected GitHub repository.",
+    )
+    async def create_branch(
+        branch_name: str,
+        session_id: str,
+        base_branch: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="create_branch",
+                arguments={"branch_name": branch_name, "base_branch": base_branch, "project_id": project_id},
+            )
+            return json.dumps(res.model_dump(), default=str)
+
+    # 12. apply_remediation_patch tool
+    @server.tool(
+        name="apply_remediation_patch",
+        description="Apply and commit a verified remediation patch onto a GitHub remediation branch.",
+    )
+    async def apply_remediation_patch(
+        file_path: str,
+        branch: str,
+        session_id: str,
+        patch: Optional[str] = None,
+        patched_content: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="apply_remediation_patch",
+                arguments={
+                    "file_path": file_path,
+                    "branch": branch,
+                    "patch": patch,
+                    "patched_content": patched_content,
+                    "project_id": project_id,
+                },
+            )
+            return json.dumps(res.model_dump(), default=str)
+
+    # 13. verify_patch tool
+    @server.tool(
+        name="verify_patch",
+        description="Run syntax and security scanner verification on patched source before opening a PR.",
+    )
+    async def verify_patch(
+        file_path: str,
+        session_id: str,
+        branch: Optional[str] = None,
+        patched_content: Optional[str] = None,
+        rule_id: Optional[str] = None,
+    ) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="verify_patch",
+                arguments={
+                    "file_path": file_path,
+                    "branch": branch,
+                    "patched_content": patched_content,
+                    "rule_id": rule_id,
+                },
+            )
+            return json.dumps(res.model_dump(), default=str)
+
+    # 14. create_pull_request tool
+    @server.tool(
+        name="create_pull_request",
+        description="Open a reviewable GitHub Pull Request from a verified remediation branch.",
+    )
+    async def create_pull_request(
+        head_branch: str,
+        title: str,
+        session_id: str,
+        base_branch: Optional[str] = None,
+        body: Optional[str] = None,
+    ) -> str:
+        factory = get_session_factory()
+        async with factory() as db:
+            gateway = MCPGateway(db)
+            import uuid
+            res = await gateway.invoke_tool(
+                session_id=uuid.UUID(session_id),
+                tool_name="create_pull_request",
+                arguments={
+                    "head_branch": head_branch,
+                    "base_branch": base_branch,
+                    "title": title,
+                    "body": body,
+                },
+            )
+            return json.dumps(res.model_dump(), default=str)
+
     return server

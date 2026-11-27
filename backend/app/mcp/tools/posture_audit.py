@@ -20,22 +20,45 @@ async def execute_list_project_findings(
 ) -> ToolExecutionResult:
     """
     Lists real SecurityFinding rows from PostgreSQL for the authorized project
-    with optional severity, status, and category filters.
+    with optional severity, status, category, scan_id, and deduplicated unique view.
     """
     project, err = await resolve_authorized_project(context, arguments, db)
     if err:
         return err
 
     try:
-        limit = max(1, min(int(arguments.get("limit", 25)), 100))
+        limit = max(1, min(int(arguments.get("limit", 50)), 100))
     except (TypeError, ValueError):
-        limit = 25
+        limit = 50
 
     severity = str(arguments.get("severity") or "").strip().upper()
     finding_status = str(arguments.get("status") or "").strip().lower()
     category = str(arguments.get("category") or "").strip()
+    deduplicate = bool(arguments.get("deduplicate", True))
+    latest_scan_only = bool(arguments.get("latest_scan_only", False))
+    scan_id_arg = arguments.get("scan_id")
 
     stmt = select(SecurityFinding).where(SecurityFinding.project_id == project.id)
+    target_scan_id: Optional[uuid.UUID] = None
+    if scan_id_arg:
+        try:
+            target_scan_id = uuid.UUID(str(scan_id_arg).strip())
+            stmt = stmt.where(SecurityFinding.scan_id == target_scan_id)
+        except (ValueError, TypeError):
+            pass
+    elif latest_scan_only:
+        latest_scan = (
+            await db.execute(
+                select(SecurityScan.id)
+                .where(SecurityScan.project_id == project.id)
+                .order_by(desc(SecurityScan.created_at))
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if latest_scan:
+            target_scan_id = latest_scan
+            stmt = stmt.where(SecurityFinding.scan_id == latest_scan)
+
     if severity:
         stmt = stmt.where(func.upper(SecurityFinding.severity) == severity)
     if finding_status:
@@ -43,8 +66,41 @@ async def execute_list_project_findings(
     if category:
         stmt = stmt.where(SecurityFinding.category == category)
 
-    stmt = stmt.order_by(desc(SecurityFinding.created_at)).limit(limit)
+    stmt = stmt.order_by(desc(SecurityFinding.created_at)).limit(500 if deduplicate else limit)
     rows = (await db.execute(stmt)).scalars().all()
+
+    items: List[Dict[str, Any]] = []
+    seen_sigs = set()
+    for f in rows:
+        if deduplicate:
+            sig = f.fingerprint or f"{f.rule_id}:{f.file_path}:{f.line_number or f.line_start}"
+            if sig in seen_sigs:
+                continue
+            seen_sigs.add(sig)
+        items.append(
+            {
+                "id": str(f.id),
+                "scan_id": str(f.scan_id),
+                "scanner": f.scanner_name,
+                "rule_id": f.rule_id,
+                "title": f.title,
+                "severity": f.severity,
+                "status": f.status,
+                "category": f.category,
+                "repository": f.repository,
+                "branch": f.branch,
+                "file_path": f.file_path,
+                "line_number": f.line_number or f.line_start,
+                "snippet": f.snippet,
+                "cwe_id": f.cwe_id,
+                "owasp_category": f.owasp_category,
+                "confidence": f.confidence,
+                "remediation": f.remediation,
+                "created_at": f.created_at.isoformat() if f.created_at else None,
+            }
+        )
+        if len(items) >= limit:
+            break
 
     sev_stmt = (
         select(func.upper(SecurityFinding.severity), func.count(SecurityFinding.id))
@@ -53,37 +109,19 @@ async def execute_list_project_findings(
     )
     severity_counts = {str(k or "UNKNOWN"): int(v or 0) for k, v in (await db.execute(sev_stmt)).all()}
 
-    items: List[Dict[str, Any]] = [
-        {
-            "id": str(f.id),
-            "scan_id": str(f.scan_id),
-            "scanner": f.scanner_name,
-            "rule_id": f.rule_id,
-            "title": f.title,
-            "severity": f.severity,
-            "status": f.status,
-            "category": f.category,
-            "file_path": f.file_path,
-            "line_number": f.line_number or f.line_start,
-            "cwe_id": f.cwe_id,
-            "owasp_category": f.owasp_category,
-            "confidence": f.confidence,
-            "remediation": f.remediation,
-            "created_at": f.created_at.isoformat() if f.created_at else None,
-        }
-        for f in rows
-    ]
-
     return ToolExecutionResult(
         status="SUCCESS",
         data={
             "project_id": str(project.id),
             "project_name": project.name,
+            "repository_url": project.repository_url,
             "returned_count": len(items),
+            "deduplicated": deduplicate,
+            "raw_open_severity_breakdown": severity_counts,
             "open_severity_breakdown": severity_counts,
             "findings": items,
         },
-        message=f"Retrieved {len(items)} verified findings for project '{project.name}'.",
+        message=f"Retrieved {len(items)} finding(s) for project '{project.name}'.",
         result_reference=str(project.id),
     )
 

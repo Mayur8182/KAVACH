@@ -1570,6 +1570,30 @@ async def oauth_consent_create_project(
         if target_ws_id:
             gh_repo.workspace_id = target_ws_id
         db.add(gh_repo)
+    elif repo_url:
+        import random
+        from app.mcp.tools.github import _extract_owner_repo
+        parsed_repo = _extract_owner_repo(repo_url)
+        if parsed_repo:
+            r_owner, r_name, r_full = parsed_repo
+            gh_num_id = random.randint(100000000, 999999999)
+            db.add(
+                GitHubRepository(
+                    id=uuid.uuid4(),
+                    github_repository_id=gh_num_id,
+                    project_id=new_proj.id,
+                    workspace_id=target_ws_id,
+                    owner=r_owner,
+                    name=r_name,
+                    full_name=r_full,
+                    default_branch="main",
+                    private=False,
+                    html_url=f"https://github.com/{r_full}",
+                    clone_url=f"https://github.com/{r_full}.git",
+                    visibility="public",
+                    archived=False,
+                )
+            )
 
     current_user.default_project_id = new_proj.id
     if target_ws_id:

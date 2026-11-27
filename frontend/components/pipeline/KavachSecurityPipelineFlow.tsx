@@ -250,23 +250,114 @@ export function KavachSecurityPipelineFlow({
           </div>
         </div>
 
-        {/* ── 12-NODE 6-BRANCH CURVED SVG PIPELINE WITH SYNCHRONIZED PACKET DOT MOTION ── */}
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            overflowX: 'auto',
-            minHeight: '410px',
-          }}
-        >
+        {/* ── MOBILE COMPACT VERTICAL PIPELINE (zero empty vertical gap, zero horizontal clipping) ── */}
+        <div className="md:hidden space-y-2.5">
+          {/* Row 1: Repository -> Ingestion */}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: 'repo', label: 'Repository', icon: FolderGit2, stepIdx: 0 },
+              { id: 'ingestion', label: 'Ingestion', icon: Layers, stepIdx: 1 },
+            ].map((node) => {
+              const isSelected = selectedNodeId === node.id || activeStepIndex === node.stepIdx;
+              const isReached = activeStepIndex >= node.stepIdx;
+              const Icon = node.icon;
+              return (
+                <button
+                  key={node.id}
+                  type="button"
+                  onClick={() => handleSelectNode(node.id, node.stepIdx)}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'border-slate-900 bg-white shadow-sm'
+                      : isReached
+                      ? 'border-slate-300 bg-white/95'
+                      : 'border-slate-200 bg-white/85'
+                  }`}
+                >
+                  <Icon size={16} className="text-slate-900 shrink-0" />
+                  <span className="text-[12px] font-bold text-slate-900 truncate">{node.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Row 2: 6 Parallel Scanners */}
+          <div className="rounded-xl border border-slate-200/80 bg-white/60 p-2">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-600 px-1 mb-1.5">
+              Parallel Security Scanners
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {AGENTS.map((agent) => {
+                const sc = getScannerInfo(agent.scannerKey);
+                const isSelected = selectedNodeId === agent.id;
+                const isHealthy = sc ? sc.is_available : false;
+                const Icon = agent.icon;
+                return (
+                  <button
+                    key={`mobile-${agent.id}`}
+                    type="button"
+                    onClick={() => handleSelectNode(agent.id, 2)}
+                    className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors cursor-pointer ${
+                      isSelected ? 'border-slate-900 bg-white shadow-sm' : 'border-slate-200/90 bg-white/95'
+                    }`}
+                  >
+                    <Icon size={14} className="text-slate-900 shrink-0" />
+                    <span className="text-[11.5px] font-bold text-slate-900 truncate">{agent.label}</span>
+                    <span className="ml-auto shrink-0">
+                      {sc ? (
+                        isHealthy ? (
+                          <CheckCircle2 size={12} color="#10B981" />
+                        ) : (
+                          <ShieldAlert size={12} color="#D97706" />
+                        )
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Row 3: AI Draft -> Policy Gate -> Re-Test -> Clean PR */}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: 'investigation', label: 'AI Draft', icon: Sparkles, stepIdx: 3 },
+              { id: 'policy', label: 'Policy Gate', icon: ShieldCheck, stepIdx: 4 },
+              { id: 'remediation', label: 'Re-Test', icon: Wrench, stepIdx: 5 },
+              { id: 'pr', label: 'Clean PR', icon: GitPullRequest, stepIdx: 6 },
+            ].map((node) => {
+              const isSelected = selectedNodeId === node.id || activeStepIndex === node.stepIdx;
+              const isSuccess = activeStepIndex >= 5 && (node.id === 'remediation' || node.id === 'pr');
+              const Icon = node.icon;
+              return (
+                <button
+                  key={`mobile-${node.id}`}
+                  type="button"
+                  onClick={() => handleSelectNode(node.id, node.stepIdx)}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'border-slate-900 bg-white shadow-sm'
+                      : isSuccess
+                      ? 'border-emerald-300 bg-emerald-50/70'
+                      : 'border-slate-200 bg-white/90'
+                  }`}
+                >
+                  <Icon
+                    size={15}
+                    className={isSuccess ? 'text-emerald-600 shrink-0' : 'text-slate-900 shrink-0'}
+                  />
+                  <span className="text-[12px] font-bold text-slate-900 truncate">{node.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── DESKTOP / TABLET 12-NODE 6-BRANCH CURVED SVG PIPELINE ── */}
+        <div className="hidden md:block relative w-full overflow-x-auto">
           <svg
-            viewBox="0 0 1065 440"
-            style={{
-              width: '100%',
-              height: 'auto',
-              display: 'block',
-              overflow: 'visible',
-            }}
+            viewBox="0 0 1065 415"
+            className="w-full h-auto block overflow-visible"
           >
             {/* 1. Repository -> Ingestion */}
             <path
@@ -619,10 +710,10 @@ export function KavachSecurityPipelineFlow({
 
         {/* ── 7-Step Interactive Progress Timeline ── */}
         <div className="mt-3 pt-4 border-t border-slate-200/70">
-          <div className="relative flex items-center justify-between max-w-[920px] mx-auto">
-            <div className="absolute top-[8px] left-5 right-5 h-[2px] bg-slate-200/90" />
+          <div className="relative grid grid-cols-4 gap-y-2.5 sm:flex sm:items-center sm:justify-between max-w-[920px] mx-auto">
+            <div className="hidden sm:block absolute top-[8px] left-5 right-5 h-[2px] bg-slate-200/90" />
             <div
-              className="absolute top-[8px] left-5 right-5 h-[2px] origin-left transition-transform duration-300 bg-[#0F172A]"
+              className="hidden sm:block absolute top-[8px] left-5 right-5 h-[2px] origin-left transition-transform duration-300 bg-[#0F172A]"
               style={{ transform: `scaleX(${activeStepIndex / (STEPS.length - 1)})` }}
             />
 
@@ -647,7 +738,7 @@ export function KavachSecurityPipelineFlow({
                     }}
                   />
                   <span
-                    className={`mt-1.5 text-[11.5px] group-hover:text-[#EA580C] transition-colors ${
+                    className={`mt-1.5 text-[10.5px] sm:text-[11.5px] whitespace-nowrap group-hover:text-[#EA580C] transition-colors ${
                       isCurr ? 'font-bold text-slate-900' : 'font-medium text-slate-600'
                     }`}
                   >

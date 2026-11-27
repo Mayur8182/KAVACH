@@ -149,8 +149,8 @@ function ConnectGitHubContent() {
     try {
       const currentOrigin =
         typeof window !== 'undefined' ? window.location.origin : 'https://kavachsecurity.me';
-      // After installation completes on GitHub, redirect user directly to Create Project onboarding
-      const redirectTarget = `${currentOrigin}/projects/create`;
+      // After installation completes on GitHub, redirect user directly back to onboarding repository step
+      const redirectTarget = `${currentOrigin}/onboarding?step=repository&installed=true`;
 
       const installPromise = api.github.getInstallUrl({
         redirect_url: redirectTarget,

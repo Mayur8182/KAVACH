@@ -21,6 +21,7 @@ out/
 # Large video files
 *.mp4
 !public/export-1792834178028.mp4
+!public/videos/code-security-demo.mp4
 *.webm
 
 # Editor directories and files

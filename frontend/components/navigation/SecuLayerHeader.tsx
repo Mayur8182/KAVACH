@@ -573,7 +573,7 @@ export const SecuLayerHeader: React.FC<SecuLayerHeaderProps> = ({
                                   {
                                     title: 'Verified Auto-Fix',
                                     desc: 'Patch bugs and re-scan before opening PRs',
-                                    href: '/remediation',
+                                    href: '/code/remediation',
                                     Icon: Sparkles,
                                   },
                                   {

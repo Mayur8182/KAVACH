@@ -433,6 +433,24 @@ class GitHubService:
             except Exception as e:
                 logger.warning(f"Error during GitHub OAuth code exchange: {e}")
 
+        # Ensure user onboarding flags reflect installation even when GitHub omits OAuth `code` (e.g. setup_action=update)
+        if user_id:
+            try:
+                from app.models.user import User
+                curr_u = await self.db.get(User, user_id)
+                if curr_u:
+                    curr_state = dict(curr_u.onboarding_state or {})
+                    if not curr_state.get("github_installed"):
+                        curr_state["github_installed"] = True
+                        if not curr_u.onboarding_completed:
+                            curr_state["status"] = "REPOSITORY_SELECTION_REQUIRED" if project_id else "PROJECT_CREATION_REQUIRED"
+                            curr_state["current_step"] = "select_repository" if project_id else "create_project"
+                        curr_u.onboarding_state = curr_state
+                        self.db.add(curr_u)
+                        await self.db.flush()
+            except Exception as u_err:
+                logger.warning(f"Could not update onboarding_state after GitHub install: {u_err}")
+
         if not installation_id:
             installation_id = account_id or 818290
 
@@ -546,16 +564,22 @@ class GitHubService:
             logger.warning(f"Initial repository sync failed: {e}")
 
         from urllib.parse import quote
-        target_path = custom_redirect or "/onboarding?step=create_project&installed=true"
+        default_onboarding = (
+            "/onboarding?step=repository&installed=true"
+            if (setup_action == "update" or project_id)
+            else "/onboarding?step=create_project&installed=true"
+        )
+        target_path = custom_redirect or default_onboarding
         if getattr(self.settings, "app_env", "") == "production" and "localhost:3002" in target_path:
             target_path = target_path.replace("http://localhost:3002", "https://kavachsecurity.me")
         if not target_path.startswith("http"):
             target_path = f"{frontend_target}{target_path if target_path.startswith('/') else '/' + target_path}"
         sep = "&" if "?" in target_path else "?"
-        destination_url = f"{target_path}{sep}installation_id={installation_id}&account={account_login}&synced={synced_count}&installed=true"
+        action_q = f"&setup_action={quote(setup_action)}" if setup_action else ""
+        destination_url = f"{target_path}{sep}installation_id={installation_id}&account={quote(str(account_login))}&synced={synced_count}&installed=true{action_q}"
 
         if jwt_login_token:
-            final_redirect = f"{frontend_target}/auth/callback/github?token={jwt_login_token}&next={quote(destination_url)}&installation_id={installation_id}&account={account_login}&synced={synced_count}&installed=true"
+            final_redirect = f"{frontend_target}/auth/callback/github?token={jwt_login_token}&next={quote(destination_url)}&installation_id={installation_id}&account={quote(str(account_login))}&synced={synced_count}&installed=true{action_q}"
         else:
             final_redirect = destination_url
 
@@ -2000,33 +2024,79 @@ class GitHubService:
         background_tasks: BackgroundTasks,
     ) -> GitHubSecurityJob:
         """Triggers a manual security scan on a connected repository branch or commit SHA."""
+        from app.models.project import Project
+        from app.models.invitation import OrganizationMember
+        from app.models.github import GitHubInstallation
+        from app.services.workspace_resolver import get_user_org_and_workspace_scope
+
         repo = await self.repo.get_repository_by_id(repository_id)
-        if not repo or not repo.project_id:
+        if not repo:
+            # Fallback: check if repository_id matches a RealIntegrationRepository mapped to a GitHubRepository
+            from app.models.integration_models import RealIntegrationRepository
+            int_repo = await self.db.get(RealIntegrationRepository, repository_id)
+            if int_repo and int_repo.repository_id:
+                repo = await self.repo.get_repository_by_id(int_repo.repository_id)
+            elif int_repo and int_repo.full_name:
+                repo = (
+                    await self.db.execute(
+                        select(GitHubRepository).where(GitHubRepository.full_name.ilike(int_repo.full_name)).limit(1)
+                    )
+                ).scalar_one_or_none()
+        if not repo:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
 
-        project = await self.project_repo.get_by_id(repo.project_id)
-        if not project:
-            from app.models.project import Project
-            project = await self.db.get(Project, repo.project_id)
-        is_authorized = (
-            getattr(current_user, 'is_superuser', False)
-            or not project
-            or not project.owner_id
-            or project.owner_id == current_user.id
-        )
-        if not is_authorized and project and project.organization_id:
-            from app.models.invitation import OrganizationMember
-            mem_stmt = select(OrganizationMember.id).where(
-                and_(
-                    OrganizationMember.organization_id == project.organization_id,
-                    OrganizationMember.user_id == current_user.id,
-                    OrganizationMember.is_active == True,
+        is_authorized = getattr(current_user, "is_superuser", False)
+        project = await self.db.get(Project, repo.project_id) if repo.project_id else None
+        if project:
+            if not project.owner_id or project.owner_id == current_user.id:
+                is_authorized = True
+            elif project.organization_id:
+                mem_stmt = select(OrganizationMember.id).where(
+                    and_(
+                        OrganizationMember.organization_id == project.organization_id,
+                        OrganizationMember.user_id == current_user.id,
+                        OrganizationMember.is_active == True,
+                    )
                 )
-            )
-            is_authorized = bool((await self.db.execute(mem_stmt)).scalars().first())
+                is_authorized = bool((await self.db.execute(mem_stmt)).scalars().first())
+
+        if not is_authorized:
+            orgs_map, ws_map, _ = await get_user_org_and_workspace_scope(current_user, self.db)
+            if repo.workspace_id and repo.workspace_id in ws_map:
+                is_authorized = True
+            elif repo.installation_id:
+                inst = await self.db.get(GitHubInstallation, repo.installation_id)
+                if inst and (
+                    inst.connected_by_user_id == current_user.id
+                    or (inst.workspace_id and inst.workspace_id in ws_map)
+                    or (
+                        getattr(current_user, "github_user_id", None)
+                        and str(inst.github_account_id) == str(current_user.github_user_id)
+                    )
+                ):
+                    is_authorized = True
 
         if not is_authorized:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized")
+
+        # Resolve effective project_id cleanly when a GitHub App repository was synced before project binding
+        effective_project_id = repo.project_id
+        if not effective_project_id:
+            if repo.workspace_id:
+                ws_proj = (
+                    await self.db.execute(select(Project).where(Project.workspace_id == repo.workspace_id).limit(1))
+                ).scalar_one_or_none()
+                if ws_proj:
+                    effective_project_id = ws_proj.id
+            if not effective_project_id:
+                own_proj = (
+                    await self.db.execute(select(Project).where(Project.owner_id == current_user.id).limit(1))
+                ).scalar_one_or_none()
+                if own_proj:
+                    effective_project_id = own_proj.id
+            if effective_project_id:
+                repo.project_id = effective_project_id
+                await self.db.flush()
 
         # Prevent duplicate scan if scan is already queued or running
         active_job = await self.repo.get_active_job_for_repository(repo.id)
@@ -2051,7 +2121,7 @@ class GitHubService:
         event_type = payload.event_type or "manual_scan"
 
         job = await self.repo.create_security_job(
-            project_id=repo.project_id,
+            project_id=effective_project_id,
             repository_id=repo.id,
             event_type=event_type,
             commit_sha=commit_sha,
@@ -2070,7 +2140,7 @@ class GitHubService:
             actor_type="USER",
             actor_id=str(current_user.id),
             resource_id=str(job.id),
-            project_id=repo.project_id,
+            project_id=effective_project_id,
             status="SUCCESS",
             metadata={"repository": repo.full_name, "ref": branch, "commit_sha": commit_sha},
         )

@@ -48,6 +48,9 @@ class ScanRepository:
         self,
         scan_id: uuid.UUID,
         scan_result: FullScanVerificationResult,
+        *,
+        repository_id: Optional[uuid.UUID] = None,
+        branch: Optional[str] = None,
     ) -> SecurityScan:
         scan = await self.get_by_id(scan_id, include_details=False)
         if not scan:
@@ -56,10 +59,11 @@ class ScanRepository:
         scan.status = scan_result.status
         scan.completed_at = datetime.now(timezone.utc)
         scan.scanner_count = scan_result.scanner_count
-        scan.finding_count = scan_result.finding_count
         scan.error_message = scan_result.error_message
 
-        # Persist Executions & Findings
+        # Persist ScannerExecutions and index by scanner_name so deduplicated findings retain valid FK
+        exec_id_by_scanner: dict[str, uuid.UUID] = {}
+        first_exec_id: Optional[uuid.UUID] = None
         for exec_res in scan_result.executions:
             execution = ScannerExecution(
                 scan_id=scan.id,
@@ -78,40 +82,85 @@ class ScanRepository:
             )
             self.session.add(execution)
             await self.session.flush()
+            exec_id_by_scanner[exec_res.scanner_name.lower()] = execution.id
+            if first_exec_id is None:
+                first_exec_id = execution.id
 
-            from app.services.unified_findings_service import classify_finding_module
+        from app.services.unified_findings_service import classify_finding_module
+        from app.models.github import GitHubRepository
 
-            repo_ref = scan.target_reference or "codebase"
-            clean_repo = repo_ref.split("/")[-1].replace(".git", "")
+        repo_ref = scan.target_reference or "codebase"
+        clean_repo = repo_ref if "/" in repo_ref else repo_ref.split("/")[-1].replace(".git", "")
+        resolved_repo_id = repository_id
+        if resolved_repo_id is None and "/" in clean_repo:
+            gh_row = (
+                await self.session.execute(
+                    select(GitHubRepository.id).where(GitHubRepository.full_name == clean_repo).limit(1)
+                )
+            ).scalar_one_or_none()
+            resolved_repo_id = gh_row
 
-            for f in exec_res.findings:
-                # Determine module category robustly
-                initial_cat = getattr(f, "category", None) or exec_res.scanner_type or "SAST"
-                mod = classify_finding_module(exec_res.scanner_name, f.rule_id, initial_cat)
-                finding_cat = mod.value if mod else initial_cat
+        # Persist deduplicated CrossScannerDeduplicator findings when available, with seen-key guard
+        dedup_pool = list(scan_result.findings or [])
+        persisted_count = 0
+        seen_keys = set()
 
-                finding = SecurityFinding(
+        def _persist_candidate(f, scanner_label: str, scanner_type_hint: str, exec_id: uuid.UUID):
+            nonlocal persisted_count
+            fp = getattr(f, "fingerprint", None) or ""
+            dedup_sig = (
+                fp or f"{f.rule_id}:{f.file_path}:{f.line_number}"
+            )
+            if dedup_sig in seen_keys:
+                return
+            seen_keys.add(dedup_sig)
+            initial_cat = getattr(f, "category", None) or (f.raw_metadata or {}).get("category") or scanner_type_hint or "SAST"
+            mod = classify_finding_module(scanner_label, f.rule_id, initial_cat)
+            finding_cat = mod.value if mod else initial_cat
+            ln = getattr(f, "line_number", None)
+            self.session.add(
+                SecurityFinding(
                     scan_id=scan.id,
-                    scanner_execution_id=execution.id,
-                    scanner_name=exec_res.scanner_name,
+                    scanner_execution_id=exec_id,
+                    scanner_name=scanner_label,
                     rule_id=f.rule_id,
                     title=f.title,
                     description=f.description,
                     severity=f.severity,
                     file_path=f.file_path,
-                    line_number=f.line_number,
-                    column_number=f.column_number,
-                    snippet=f.snippet,
-                    fingerprint=f.fingerprint,
-                    raw_metadata=f.raw_metadata,
+                    line_number=ln,
+                    line_start=ln,
+                    line_end=ln,
+                    column_number=getattr(f, "column_number", None),
+                    snippet=getattr(f, "snippet", None),
+                    fingerprint=fp,
+                    raw_metadata=f.raw_metadata or {},
                     category=finding_cat,
                     project_id=scan.project_id,
+                    repository_id=resolved_repo_id,
                     repository=clean_repo,
-                    branch=getattr(scan, "branch", None) or "main",
+                    branch=branch or getattr(scan, "branch", None) or "main",
                     detected_at=scan.started_at or datetime.now(timezone.utc),
                     status="open",
                 )
-                self.session.add(finding)
+            )
+            persisted_count += 1
+
+        if dedup_pool and first_exec_id is not None:
+            for f in dedup_pool:
+                meta = f.raw_metadata if isinstance(f.raw_metadata, dict) else {}
+                sc_name = str(meta.get("engine") or meta.get("primary_scanner") or "seculayer-builtin")
+                exec_id = exec_id_by_scanner.get(sc_name.lower(), first_exec_id)
+                _persist_candidate(f, sc_name, str(meta.get("category") or "SAST"), exec_id)
+        else:
+            for exec_res in scan_result.executions:
+                exec_id = exec_id_by_scanner.get(exec_res.scanner_name.lower(), first_exec_id)
+                if not exec_id:
+                    continue
+                for f in exec_res.findings:
+                    _persist_candidate(f, exec_res.scanner_name, exec_res.scanner_type, exec_id)
+
+        scan.finding_count = persisted_count
 
         # Persist Requirement Verifications
         for v in scan_result.verifications:

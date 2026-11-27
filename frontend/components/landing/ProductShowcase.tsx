@@ -78,6 +78,7 @@ export function ProductShowcase({ embeddedHero = false }: { embeddedHero?: boole
   const [duration, setDuration] = useState(39.9);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [theaterOpen, setTheaterOpen] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   const handleTimeUpdate = useCallback(() => {
     const video = videoRef.current;
@@ -295,14 +296,41 @@ export function ProductShowcase({ embeddedHero = false }: { embeddedHero?: boole
               loop
               muted
               playsInline
-              preload="metadata"
+              preload="auto"
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
-              onPlay={() => setIsPlaying(true)}
+              onPlay={() => {
+                setVideoError(false);
+                setIsPlaying(true);
+              }}
               onPause={() => setIsPlaying(false)}
+              onError={() => {
+                setVideoError(true);
+                setIsPlaying(false);
+              }}
               className="block w-full h-full object-contain bg-white"
               style={{ transform: 'translateZ(0)' }}
             />
+            {videoError && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setVideoError(false);
+                  const v = videoRef.current;
+                  if (v) {
+                    v.load();
+                    v.play().catch(() => {});
+                  }
+                }}
+                className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/55 text-white p-4 text-center"
+              >
+                <p className="text-sm font-semibold mb-2">Walkthrough video temporarily unavailable</p>
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-white text-slate-900 px-3 py-1.5 text-xs font-semibold">
+                  <RotateCcw size={12} />
+                  Retry playback
+                </span>
+              </div>
+            )}
           </div>
         </motion.div>
       </motion.div>

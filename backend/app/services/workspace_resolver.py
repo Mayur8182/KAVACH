@@ -342,7 +342,13 @@ async def get_accessible_projects(
             if p.organization_id == org_id
             or (p.workspace_id in accessible_ws_ids and ws_map[p.workspace_id].organization_id == org_id)
         ]
-    return projects
+    seen_pids: Set[uuid.UUID] = set()
+    unique_projects: List[Project] = []
+    for p in projects:
+        if p.id not in seen_pids:
+            seen_pids.add(p.id)
+            unique_projects.append(p)
+    return unique_projects
 
 
 async def user_can_access_project(

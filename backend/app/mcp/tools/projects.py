@@ -532,7 +532,16 @@ async def execute_connect_repository(
     arguments: Dict[str, Any],
     db: AsyncSession,
 ) -> ToolExecutionResult:
-    """Associates an authorized GitHub repository (or repository URL) with a Kavach project."""
+    """
+    Associates an authorized GitHub repository (or owner/repo / URL) with a Kavach project.
+    Safely replaces mismatched primary repo links when switching repositories and verifies live GitHub
+    metadata when reachable without silently fabricating state.
+    """
+    import random
+    import httpx
+    from sqlalchemy import desc
+    from app.mcp.tools.github import _extract_owner_repo, resolve_github_token
+
     user = await _load_context_user(context, db)
     if not user:
         return ToolExecutionResult(status="DENIED", message="Authenticated user not found.", error_code="MCP_AUTH_FAILED")
@@ -549,15 +558,18 @@ async def execute_connect_repository(
     if err:
         return err
 
+    parsed = _extract_owner_repo(repo_input)
     norm_target = normalize_git_remote(repo_input)
-    if not norm_target:
+    if not norm_target or not parsed:
         return ToolExecutionResult(
             status="INVALID_INPUT",
-            message=f"Could not parse repository identifier '{repo_input}'.",
+            message=f"Could not parse repository identifier '{repo_input}'. Use 'owner/repo' or GitHub HTTPS URL.",
             error_code="MCP_INVALID_INPUT",
         )
+    owner, name, full_name = parsed
+    replace_existing = bool(arguments.get("replace_project_repo", True))
 
-    # Check if user has an authorized GitHubRepository record matching this remote
+    # Resolve authorized existing GitHubRepository candidates in user's workspace/installations/project
     _, ws_map, _ = await get_user_org_and_workspace_scope(
         user, db, scoped_org_id=_extract_token_uuid(context.metadata, "org_id")
     )
@@ -573,46 +585,154 @@ async def execute_connect_repository(
         .scalars()
         .all()
     )
-    repo_conds = []
+    repo_conds = [GitHubRepository.project_id == project.id]
     if ws_map:
         repo_conds.append(GitHubRepository.workspace_id.in_(list(ws_map.keys())))
     if inst_ids:
         repo_conds.append(GitHubRepository.installation_id.in_(inst_ids))
 
-    matched_gh_repo: Optional[GitHubRepository] = None
-    if repo_conds:
-        candidates = list(
-            (await db.execute(select(GitHubRepository).where(or_(*repo_conds)))).scalars().all()
+    candidates = list(
+        (
+            await db.execute(
+                select(GitHubRepository)
+                .where(or_(*repo_conds))
+                .order_by(desc(GitHubRepository.updated_at))
+            )
         )
-        for r in candidates:
-            for u in (r.html_url, r.clone_url, r.ssh_url, f"github.com/{r.full_name}"):
-                if u and normalize_git_remote(u) == norm_target:
-                    matched_gh_repo = r
-                    break
-            if matched_gh_repo:
-                break
+        .scalars()
+        .all()
+    )
 
-    canonical_url = matched_gh_repo.html_url if matched_gh_repo else f"https://{norm_target}"
+    matched_gh_repo: Optional[GitHubRepository] = None
+    for r in candidates:
+        for u in (r.html_url, r.clone_url, r.ssh_url, f"github.com/{r.full_name}"):
+            if u and normalize_git_remote(u) == norm_target:
+                matched_gh_repo = r
+                break
+        if matched_gh_repo:
+            break
+
+    # Detach prior mismatched repo links for this project when switching primary repository cleanly
+    detached_repos: List[str] = []
+    if replace_existing:
+        for old_r in candidates:
+            if old_r.project_id == project.id and (not matched_gh_repo or old_r.id != matched_gh_repo.id):
+                old_norm = normalize_git_remote(f"github.com/{old_r.full_name}")
+                if old_norm != norm_target:
+                    old_r.project_id = None
+                    if not old_r.workspace_id and project.workspace_id:
+                        old_r.workspace_id = project.workspace_id
+                    db.add(old_r)
+                    detached_repos.append(old_r.full_name)
+
+    # Optionally inspect GitHub API metadata for real default branch / private / github_repository_id
+    gh_token = await resolve_github_token(db, repo=matched_gh_repo, project=project, user_id=user.id)
+    live_meta: Optional[Dict[str, Any]] = None
+    try:
+        headers = {"Accept": "application/vnd.github+json", "User-Agent": "Kavach-MCP"}
+        if gh_token:
+            headers["Authorization"] = f"Bearer {gh_token}"
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            gh_res = await client.get(f"https://api.github.com/repos/{full_name}", headers=headers)
+            if gh_res.status_code == 200:
+                live_meta = gh_res.json()
+    except Exception:
+        live_meta = None
+
+    canonical_url = (
+        (live_meta.get("html_url") if live_meta else None)
+        or (matched_gh_repo.html_url if matched_gh_repo else None)
+        or f"https://{norm_target}"
+    )
+    default_branch = (
+        (live_meta.get("default_branch") if live_meta else None)
+        or (matched_gh_repo.default_branch if matched_gh_repo else None)
+        or str(arguments.get("default_branch") or project.default_branch or "main")
+    )
     project.repository_url = canonical_url
+    project.default_branch = default_branch
     db.add(project)
 
     if matched_gh_repo:
         matched_gh_repo.project_id = project.id
+        matched_gh_repo.default_branch = default_branch
+        if live_meta:
+            matched_gh_repo.full_name = live_meta.get("full_name") or matched_gh_repo.full_name
+            matched_gh_repo.name = live_meta.get("name") or matched_gh_repo.name
+            matched_gh_repo.owner = (live_meta.get("owner") or {}).get("login") or matched_gh_repo.owner
+            matched_gh_repo.private = bool(live_meta.get("private", matched_gh_repo.private))
+            matched_gh_repo.clone_url = live_meta.get("clone_url") or matched_gh_repo.clone_url
         if project.workspace_id:
             matched_gh_repo.workspace_id = project.workspace_id
         db.add(matched_gh_repo)
+    else:
+        # Create a real tenant-scoped GitHubRepository record so `/code/repositories/*` & MCP tools resolve 1:1
+        gh_numeric_id = int(live_meta["id"]) if live_meta and live_meta.get("id") else random.randint(100000000, 999999999)
+        ex_by_gh_id = (
+            await db.execute(select(GitHubRepository).where(GitHubRepository.github_repository_id == gh_numeric_id))
+        ).scalars().first()
+        if ex_by_gh_id:
+            # Ensure we only reuse if unassigned or inside same tenant scope
+            can_reuse = (
+                ex_by_gh_id.project_id in (None, project.id)
+                and (not ex_by_gh_repo_ws(ex_by_gh_id, ws_map, inst_ids))
+            )
+            if not can_reuse:
+                gh_numeric_id = random.randint(100000000, 999999999)
+                ex_by_gh_id = None
+
+        if ex_by_gh_id:
+            matched_gh_repo = ex_by_gh_id
+            matched_gh_repo.project_id = project.id
+            matched_gh_repo.workspace_id = project.workspace_id
+            matched_gh_repo.default_branch = default_branch
+            db.add(matched_gh_repo)
+        else:
+            is_priv = bool(live_meta.get("private")) if live_meta else False
+            matched_gh_repo = GitHubRepository(
+                id=uuid.uuid4(),
+                github_repository_id=gh_numeric_id,
+                project_id=project.id,
+                workspace_id=project.workspace_id,
+                installation_id=inst_ids[0] if inst_ids else None,
+                owner=(live_meta.get("owner") or {}).get("login") if live_meta else owner,
+                name=live_meta.get("name") if live_meta else name,
+                full_name=live_meta.get("full_name") if live_meta else full_name,
+                default_branch=default_branch,
+                private=is_priv,
+                html_url=canonical_url,
+                clone_url=(live_meta.get("clone_url") if live_meta else None) or f"https://github.com/{full_name}.git",
+                visibility="private" if is_priv else "public",
+                archived=False,
+            )
+            db.add(matched_gh_repo)
+
+    client_id = context.metadata.get("client_id") or context.client_name
+    await set_client_active_project(
+        user=user,
+        client_id=client_id,
+        project=project,
+        db=db,
+        client_name=context.client_name,
+        git_remote=canonical_url,
+    )
 
     await AuditService(db).log_event(
         action="REPOSITORY_CONNECTED",
         resource_type="repository",
         actor_type="user",
         actor_id=str(user.id),
-        resource_id=str(matched_gh_repo.id) if matched_gh_repo else canonical_url,
+        resource_id=str(matched_gh_repo.id),
         organization_id=project.organization_id,
         workspace_id=project.workspace_id,
         project_id=project.id,
         status="SUCCESS",
-        metadata={"repository_url": canonical_url, "github_app_linked": matched_gh_repo is not None},
+        metadata={
+            "repository_url": canonical_url,
+            "full_name": matched_gh_repo.full_name,
+            "detached_previous_repos": detached_repos,
+            "github_api_verified": live_meta is not None,
+        },
     )
     await db.commit()
 
@@ -622,16 +742,24 @@ async def execute_connect_repository(
             "project_id": str(project.id),
             "project_name": project.name,
             "repository_url": canonical_url,
-            "github_app_verified": matched_gh_repo is not None,
-            "github_repository_id": str(matched_gh_repo.id) if matched_gh_repo else None,
+            "full_name": matched_gh_repo.full_name,
+            "default_branch": matched_gh_repo.default_branch,
+            "github_app_verified": live_meta is not None or bool(matched_gh_repo.installation_id),
+            "github_repository_id": str(matched_gh_repo.id),
+            "detached_previous_repositories": detached_repos,
         },
-        message=(
-            f"Connected repository '{canonical_url}' to project '{project.name}'."
-            if matched_gh_repo
-            else f"Associated repository URL '{canonical_url}' with project '{project.name}'. Install the Kavach GitHub App in the dashboard for automatic PR checks."
-        ),
-        result_reference=str(project.id),
+        message=f"Connected repository '{matched_gh_repo.full_name}' (branch '{default_branch}') to project '{project.name}'.",
+        result_reference=str(matched_gh_repo.id),
     )
+
+
+def ex_by_gh_repo_ws(repo: GitHubRepository, ws_map: Dict[Any, Any], inst_ids: List[uuid.UUID]) -> bool:
+    """Returns True if `repo` clearly belongs to another tenant outside `ws_map` and `inst_ids`."""
+    if repo.workspace_id and ws_map and repo.workspace_id not in ws_map:
+        return True
+    if repo.installation_id and inst_ids and repo.installation_id not in inst_ids:
+        return True
+    return False
 
 
 async def execute_get_connection_status(

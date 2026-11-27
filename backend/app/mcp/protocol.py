@@ -50,6 +50,7 @@ READ_ONLY_TOOLS: Set[str] = {
     "get_scan",
     "get_github_repository",
     "get_pull_request",
+    "get_file_content",
     "get_cloud_inventory",
     "audit_cloud_posture",
     "query_threat_intelligence",
@@ -66,6 +67,10 @@ READ_ONLY_TOOLS: Set[str] = {
 
 DESTRUCTIVE_TOOLS: Set[str] = {
     "verify_remediation_patch",
+    "verify_patch",
+    "create_branch",
+    "apply_remediation_patch",
+    "create_pull_request",
     "quarantine_compromised_target",
     "simulate_attack_path",
 }
@@ -73,6 +78,10 @@ DESTRUCTIVE_TOOLS: Set[str] = {
 OPEN_WORLD_TOOLS: Set[str] = {
     "get_github_repository",
     "get_pull_request",
+    "get_file_content",
+    "create_branch",
+    "apply_remediation_patch",
+    "create_pull_request",
     "connect_repository",
     "audit_cloud_posture",
     "get_cloud_inventory",
@@ -134,6 +143,18 @@ MCP_STATIC_RESOURCES: List[Dict[str, Any]] = [
         "description": "Real PostgreSQL SecurityApproval tickets awaiting human sign-off for gated MCP tool executions.",
         "mimeType": "application/json",
     },
+    {
+        "uri": "ui://kavach/workspace-panel",
+        "name": "Kavach Interactive Workspace & Repository Switcher",
+        "description": "Embedded ChatGPT / MCP Apps UI for switching projects, linking repositories, and launching scans without leaving chat.",
+        "mimeType": "text/html+skybridge",
+    },
+    {
+        "uri": "ui://kavach/remediation-panel",
+        "name": "Kavach Interactive Remediation, Diff & Inline Approval Panel",
+        "description": "Embedded ChatGPT / MCP Apps UI for inspecting diffs, verifying patches, signing off HITL approvals, and opening PRs inside chat.",
+        "mimeType": "text/html+skybridge",
+    },
 ]
 
 MCP_RESOURCE_TEMPLATES: List[Dict[str, Any]] = [
@@ -179,12 +200,56 @@ async def read_mcp_resource(
     token_payload: Optional[Dict[str, Any]],
     client_id: str,
     db: AsyncSession,
+    *,
+    base_url: Optional[str] = None,
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]], Optional[str]]:
     """
-    Reads a real `kavach://...` MCP resource with tenant isolation.
+    Reads a real `kavach://...` or interactive `ui://kavach/...` MCP resource with tenant isolation.
     Returns (resource_result, jsonrpc_error, required_scope_if_missing).
     """
     parsed = urlparse(uri.strip())
+    if parsed.scheme == "ui":
+        from app.core.config import get_settings
+        from app.mcp.widgets import render_remediation_panel_html, render_workspace_panel_html
+
+        cfg = get_settings()
+        api_base = (
+            base_url
+            or getattr(cfg, "mcp_base_url", None)
+            or ("https://mcp.kavachsecurity.me" if cfg.app_env == "production" else getattr(cfg, "public_app_url", "http://localhost:8000"))
+        )
+        host = (parsed.netloc or "").lower()
+        path = (parsed.path or "").strip("/").lower()
+        if host == "kavach" and path == "workspace-panel":
+            return {
+                "contents": [
+                    {
+                        "uri": uri,
+                        "mimeType": "text/html+skybridge",
+                        "text": render_workspace_panel_html(api_base),
+                        "_meta": {
+                            "openai/widgetPrefersBorder": True,
+                            "openai/widgetCSP": {"connect_domains": [api_base], "resource_domains": []},
+                        },
+                    }
+                ]
+            }, None, None
+        if host == "kavach" and path == "remediation-panel":
+            return {
+                "contents": [
+                    {
+                        "uri": uri,
+                        "mimeType": "text/html+skybridge",
+                        "text": render_remediation_panel_html(api_base),
+                        "_meta": {
+                            "openai/widgetPrefersBorder": True,
+                            "openai/widgetCSP": {"connect_domains": [api_base], "resource_domains": []},
+                        },
+                    }
+                ]
+            }, None, None
+        return None, {"code": -32002, "message": f"UI widget resource '{uri}' not found."}, None
+
     if parsed.scheme != "kavach":
         return None, {"code": -32602, "message": f"Unsupported resource URI scheme in '{uri}'."}, None
 

@@ -395,3 +395,62 @@ async def test_mcp_scanner_rug_pull_simulation_observability_and_compliance(suit
     comp = (await client.get("/api/v1/mcp/suite/compliance", headers=user_hdr)).json()
     assert comp["total_controls"] == 6
 
+
+@pytest.mark.asyncio
+async def test_public_policy_preview_and_github_onboarding_redirect(suite_env):
+    from app.integrations.github.state_manager import github_state_manager
+    from app.models.user import User
+
+    client, factory = suite_env
+
+    # 1. Public landing page policy-preview works without auth (zero 401 console error),
+    # while /api/v1/mcp/sandbox-call strictly requires authentication.
+    safe_preview = await client.post(
+        "/api/v1/mcp/policy-preview",
+        json={"tool_name": "run_security_scan", "client_name": "cursor", "arguments": {"project_id": "probe"}},
+    )
+    assert safe_preview.status_code == 200
+    assert safe_preview.json()["status"] == "POLICY_PASSED"
+    assert safe_preview.json()["policy_evaluation"]["decision"] == "ALLOW"
+
+    blocked_preview = await client.post(
+        "/api/v1/mcp/policy-preview",
+        json={
+            "tool_name": "quarantine_compromised_target",
+            "client_name": "cursor",
+            "arguments": {"force_bypass_approval": True},
+        },
+    )
+    assert blocked_preview.status_code == 200
+    assert blocked_preview.json()["status"] == "BLOCKED"
+    assert blocked_preview.json()["policy_evaluation"]["decision"] == "DENIED"
+
+    unauth_sandbox = await client.post(
+        "/api/v1/mcp/sandbox-call",
+        json={"tool_name": "run_security_scan", "client_name": "cursor", "arguments": {}},
+    )
+    assert unauth_sandbox.status_code == 401
+
+    # 2. GitHub App installation callback with `setup_action=update` or signed state redirects back into /onboarding
+    admin = await _seed_admin(factory, email="gh-onboard@enterprise.io", org_slug="gh-onboard")
+    state = github_state_manager.create_installation_state(
+        user_id=uuid.UUID(admin["user_id"]),
+        redirect_url="https://kavachsecurity.me/onboarding?step=repository&installed=true",
+    )
+    cb_res = await client.get(
+        "/integrations/github/callback",
+        params={"installation_id": 998877, "setup_action": "update", "state": state},
+        follow_redirects=False,
+    )
+    assert cb_res.status_code == 302
+    loc = cb_res.headers["location"]
+    assert "/onboarding?step=repository&installed=true" in loc
+    assert "installation_id=998877" in loc
+    assert "setup_action=update" in loc
+
+    async with factory() as db:
+        u = await db.get(User, uuid.UUID(admin["user_id"]))
+        assert u is not None
+        assert (u.onboarding_state or {}).get("github_installed") is True
+
+

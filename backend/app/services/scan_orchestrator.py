@@ -281,7 +281,8 @@ class ScanOrchestrator:
             completed_job = await gh_service.execute_security_pipeline(job_id)
 
             # Query real findings summary for this repository
-            stmt = select(SecurityFinding).where(SecurityFinding.repository_id == repository_id)
+            repo_uuid_filter = uuid.UUID(str(repository_id)) if not isinstance(repository_id, uuid.UUID) else repository_id
+            stmt = select(SecurityFinding).where(SecurityFinding.repository_id == repo_uuid_filter)
             findings_res = await self.db.execute(stmt)
             findings = findings_res.scalars().all()
 

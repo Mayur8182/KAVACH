@@ -558,10 +558,29 @@ export const GitHubImportModal: React.FC<GitHubImportModalProps> = ({
 
               {/* Action Buttons matching screenshot */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <a
-                  href="https://github.com/apps/kavach-security/installations/new"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const currentUrl =
+                        typeof window !== 'undefined'
+                          ? window.location.href
+                          : 'https://kavachsecurity.me/onboarding?step=repository&installed=true';
+                      const res = await api.github.getInstallUrl({ redirect_url: currentUrl });
+                      const rawUrl = res?.url || res?.install_url;
+                      if (rawUrl) {
+                        const cleanUrl = rawUrl.replace(
+                          /github\.com\/apps\/[^/]+\/installations/i,
+                          'github.com/apps/kavach-security/installations'
+                        );
+                        window.location.assign(cleanUrl);
+                        return;
+                      }
+                    } catch {
+                      // Fallback to canonical app URL
+                    }
+                    window.location.assign('https://github.com/apps/kavach-security/installations/new');
+                  }}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -580,7 +599,7 @@ export const GitHubImportModal: React.FC<GitHubImportModalProps> = ({
                   }}
                 >
                   + Connect more repositories
-                </a>
+                </button>
 
                 <button
                   type="button"

@@ -6,6 +6,7 @@ import { Copy, Check, Terminal, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface MCPManifestData {
   endpoints?: {
+    mcp?: string;
     sse?: string;
   };
   configs?: {
@@ -18,11 +19,31 @@ interface MCPManifestData {
         };
       };
     };
+    claude_code?: {
+      command?: string;
+    };
+    codex?: {
+      command?: string;
+    };
+    gemini?: {
+      command?: string;
+    };
     cursor?: {
       mcpServers?: {
+        kavach?: {
+          url?: string;
+        };
         'kavach-security'?: {
           url?: string;
           headers?: Record<string, string>;
+        };
+      };
+    };
+    vscode?: {
+      servers?: {
+        kavach?: {
+          type?: string;
+          url?: string;
         };
       };
     };
@@ -164,15 +185,28 @@ export const KavachMcpConnectWidget: React.FC = () => {
         if (manifestRes.ok) {
           const mf = (await manifestRes.json()) as MCPManifestData;
           if (!cancelled) {
-            if (mf.endpoints?.sse) {
-              setMcpUrl(mf.endpoints.sse);
+            const resolvedUrl =
+              mf.endpoints?.mcp ||
+              mf.endpoints?.sse ||
+              (typeof window !== 'undefined' ? `${window.location.origin}/mcp` : '');
+            if (resolvedUrl) {
+              setMcpUrl(resolvedUrl);
             }
             if (mf.configs) {
               setManifestConfigs(mf.configs);
             }
             const claudeCfg = mf.configs?.claude_desktop?.mcpServers?.kavach;
-            if (claudeCfg?.command && Array.isArray(claudeCfg.args)) {
-              setCliCommand(`${claudeCfg.command} ${claudeCfg.args.join(' ')}`);
+            const derivedCli =
+              mf.configs?.claude_code?.command ||
+              mf.configs?.codex?.command ||
+              mf.configs?.gemini?.command ||
+              (claudeCfg?.command && Array.isArray(claudeCfg.args)
+                ? `${claudeCfg.command} ${claudeCfg.args.join(' ')}`
+                : resolvedUrl
+                  ? `claude mcp add --transport http kavach ${resolvedUrl}`
+                  : '');
+            if (derivedCli) {
+              setCliCommand(derivedCli);
             }
           }
         }
@@ -213,8 +247,28 @@ export const KavachMcpConnectWidget: React.FC = () => {
     ? MCP_AGENTS.find((a) => a.id === selectedAgent)?.name
     : null;
 
+  const selectedCliSnippet = React.useMemo(() => {
+    if (!mcpUrl && !cliCommand) return '';
+    if (selectedAgent === 'chatgpt') {
+      return manifestConfigs?.codex?.command || (mcpUrl ? `codex mcp add kavach --url ${mcpUrl}` : cliCommand);
+    }
+    if (selectedAgent === 'gemini') {
+      return manifestConfigs?.gemini?.command || (mcpUrl ? `gemini mcp add --transport http kavach ${mcpUrl}` : cliCommand);
+    }
+    if (selectedAgent === 'claude') {
+      return manifestConfigs?.claude_code?.command || (mcpUrl ? `claude mcp add --transport http kavach ${mcpUrl}` : cliCommand);
+    }
+    if (selectedAgent === 'cursor' || selectedAgent === 'vscode') {
+      return mcpUrl ? `npx -y mcp-remote ${mcpUrl}` : cliCommand;
+    }
+    return cliCommand || (mcpUrl ? `claude mcp add --transport http kavach ${mcpUrl}` : '');
+  }, [mcpUrl, cliCommand, selectedAgent, manifestConfigs]);
+
   const selectedJsonSnippet = React.useMemo(() => {
     if (!mcpUrl) return '';
+    if (selectedAgent === 'vscode' && manifestConfigs?.vscode) {
+      return JSON.stringify(manifestConfigs.vscode, null, 2);
+    }
     if (selectedAgent === 'claude' && manifestConfigs?.claude_desktop) {
       return JSON.stringify(manifestConfigs.claude_desktop, null, 2);
     }
@@ -234,7 +288,7 @@ export const KavachMcpConnectWidget: React.FC = () => {
     );
   }, [mcpUrl, selectedAgent, manifestConfigs]);
 
-  const terminalCopyPayload = snippetMode === 'cli' ? cliCommand : selectedJsonSnippet;
+  const terminalCopyPayload = snippetMode === 'cli' ? selectedCliSnippet : selectedJsonSnippet;
 
   return (
     <div className="w-full rounded-2xl border border-slate-200/90 bg-white p-6 shadow-[0_14px_38px_-16px_rgba(15,23,42,0.10)] text-left">
@@ -412,7 +466,7 @@ export const KavachMcpConnectWidget: React.FC = () => {
 
               {snippetMode === 'cli' ? (
                 <code className="block text-[11.5px] font-mono text-slate-800 break-all select-all">
-                  {cliCommand || (gatewayStatus === 'offline' ? 'Start the backend server to load MCP CLI config.' : 'Loading CLI command...')}
+                  {selectedCliSnippet || (gatewayStatus === 'offline' ? 'Start the backend server to load MCP CLI config.' : 'Connecting to MCP gateway...')}
                 </code>
               ) : (
                 <pre className="text-[11px] font-mono text-slate-800 overflow-x-auto leading-relaxed select-all m-0">
