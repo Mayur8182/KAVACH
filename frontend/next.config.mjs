@@ -29,6 +29,7 @@ const nextConfig = {
     // Bound worker spawning & memory during static prerender so Render/CI containers never OOM at (0/N)
     cpus: 1,
     memoryBasedWorkersCount: true,
+    webpackBuildWorker: false,
     webpackMemoryOptimizations: true,
     staticGenerationMaxConcurrency: 2,
     staticGenerationMinPagesPerWorker: 1000,
